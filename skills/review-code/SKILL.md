@@ -255,7 +255,7 @@ Only if `--comment` is set and a PR exists for the current branch (or `target` n
    > needs it, and this block adds one on the path that does not go through the engine. Putting a
    > lead in the file itself would double-lead whichever path ran.
 
-   **GitHub** (`VCS=github`): one summary comment via `tracker_call_with_retry gh pr comment "$PR_URL" --body-file "$PR_COMMENT_BODY_FILE"`, inheriting 3× exponential backoff and the `ACCESS_TRACKER` deferral gate for free.
+   **GitHub** (`VCS=github`): one summary comment via `tracker_call_with_retry gh pr comment "$PR_URL" --body-file "$PR_COMMENT_BODY_FILE"`, inheriting 3× exponential backoff and the `ACCESS_TRACKER` deferral gate for free. Write `$PR_COMMENT_BODY_FILE` with the file tool in one call and post it in a later one, asserting a line only this run's body carries before the post (`references/file-write-rules.md#fresh-body-post`).
 
    **Bitbucket** (`VCS=bitbucket`): via the Bitbucket REST API. Resolve the credential with `source references/bitbucket-auth.sh` (Bearer or Basic, chosen by variable name; non-zero when neither is set), then `POST` the contents of that same `$PR_COMMENT_BODY_FILE` as a `{content: {raw: …}}` body to `${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/pullrequests/${PR_ID}/comments`. Make it idempotent the way `/finalise` does: search the PR's existing comments for a leading HTML marker and `PUT` that comment id instead of posting a duplicate. The working dual-platform recipe is in [`skills/finalise/SKILL.md`](../finalise/SKILL.md) **Step 7 — "Mark as Accepted and Generate Artifacts"**, which carries both arms side by side; copy that shape rather than re-deriving it.
 

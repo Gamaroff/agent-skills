@@ -10,6 +10,7 @@ priority: Medium
 created: 2026-11-06
 updated: 2026-11-20
 depends_on: [265]
+pr_number: 923
 estimated_effort_hours: 16
 ---
 
@@ -73,7 +74,7 @@ Each site writes its payload with the file tool (the agent's write is a tool cal
 
 ### Out of Scope
 
-❌ **Engines** (`tracker-comment.js`, `qa-read-back.js`): they already read a body file.
+❌ **Engines** (`tracker-comment.js`, `qa-read-back.js`): they already read a body file. One exception, added by QA bugs 1–3: `tracker-comment.js` now removes `--body-file` once the comment is posted, already there, or deferred into the journal, so a skipped write fails instead of re-posting the previous comment. That change, its contract paragraph and its tests are in scope of this PR; `qa-read-back.js` is untouched.
 ❌ **`security-input-corpus.md` rows**: test data, not instructions.
 
 ---
@@ -244,6 +245,7 @@ All three bugs are fixed and closed. Bug 3 (a deferred comment losing its body w
 | 2026-11-20 |         | QA gate CONCERNS (90/100) — 1 finding (bugs 1 and 2 closed)                 | qa-task |
 | 2026-11-20 |         | QA findings fixed — 1 bug Ready for QA, 1 iteration                         | qa-fix |
 | 2026-11-20 |         | QA gate PASS (100/100) — 0 findings (bug 3 closed)                          | qa-task |
+| 2026-11-20 |         | PR review findings fixed — citation sweep completed, pr_number, scope note, footer status; 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---
@@ -267,4 +269,4 @@ Depends on task 265 and is the migration half of the split noted in `docs/tasks/
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review

@@ -201,6 +201,9 @@ command node references/observation-log.js write \
   --title "…" --skill "…" --siblings-checked "…" --body-file "$BODY" --json
 ```
 
+Write `$BODY` with the file tool in one call and run the command in a later one; a body left over from an
+earlier observation would be logged again (`references/file-write-rules.md#fresh-body-post`).
+
 The body is Issue → Improvement → Principle. `--siblings-checked` is **mandatory and never blank** —
 the literal `none` is correct where the target belongs to no family, and it is a recorded judgement
 rather than a missing one. There is deliberately **no `--id` flag**; ids are always derived, and the
