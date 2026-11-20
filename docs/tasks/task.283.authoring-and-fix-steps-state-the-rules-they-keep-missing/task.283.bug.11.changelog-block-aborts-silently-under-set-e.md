@@ -4,7 +4,7 @@
 **Bug ID**: TASK-283-BUG-11
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (code-review CR-1, reproduced; CR-2, CR-3 and CR-4 folded in)
 **Date Found**: 2026-11-20
 
@@ -31,3 +31,9 @@ Both bullet counts now come from awk (`NF { n++ } END { print n + 0 }`), which a
 
 ## Recommendation
 Count with `awk 'END{print NR}'` or append `|| true`; read the base into a variable before awk; pass it through `ENVIRON`; assert the HALT text in the release-cut test; add a `set -e` case with an empty released region; mutation-prove.
+
+## Status History
+
+| Date | Status | Changed By | Notes |
+| --- | --- | --- | --- |
+| 2026-11-20 | Closed | qa-task | Verified by task.283.qa.6 |

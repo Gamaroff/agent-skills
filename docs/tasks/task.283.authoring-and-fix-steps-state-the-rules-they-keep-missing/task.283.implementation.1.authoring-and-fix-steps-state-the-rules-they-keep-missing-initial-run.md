@@ -217,6 +217,16 @@ Probe: `git grep -F -e 'grep -c .' -e 'more bullets'` over SKILL.md, shared reso
 Population: 6 sites (1 updated, 5 pre-existing, out of scope)
 Importer audit: no shared parser widened; skipped.
 
+### QA Cycle 6 — 2026-11-20
+**Gate Result**: PASS (95/100)
+**Issues Found**: 1 low advisory (the added-bullet list in the HALT message is empty for a duplicate bullet, and a `pipefail` caller gets exit 141 with many additions; both fail closed)
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**Traceability**: skipped (no Acceptance Criteria section)
+**PR Review**: pending — Step 5c runs next
+**Loop exit**: PASS — exit taken after a sixth gate allowed by the owner
+**Action**: Proceeding to Step 5c (/review-pr)
+
 ---
 
 ## Completion

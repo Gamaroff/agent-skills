@@ -320,24 +320,24 @@ None identified.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-20
-**Quality Score**: 88/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 95/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.283.qa.5.authoring-and-fix-steps-state-the-rules-they-keep-missing.md](./task.283.qa.5.authoring-and-fix-steps-state-the-rules-they-keep-missing.md)
-- **Gate File**: [task.283.gate.5.authoring-and-fix-steps-state-the-rules-they-keep-missing.yml](./task.283.gate.5.authoring-and-fix-steps-state-the-rules-they-keep-missing.yml)
+- **Full Report**: [task.283.qa.6.authoring-and-fix-steps-state-the-rules-they-keep-missing.md](./task.283.qa.6.authoring-and-fix-steps-state-the-rules-they-keep-missing.md)
+- **Gate File**: [task.283.gate.6.authoring-and-fix-steps-state-the-rules-they-keep-missing.yml](./task.283.gate.6.authoring-and-fix-steps-state-the-rules-they-keep-missing.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: CI-parity run on the LAN server at the reviewed commit: 8658 pass, 0 fail, 3 skipped; 40 CHANGELOG-placement tests
+- **Tests Executed**: CI-parity run on the LAN server at the reviewed commit: 8665 tests, 8662 pass, 0 fail, 3 skipped; 44 CHANGELOG-placement tests
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-The wall-time criterion is met: median of five alternating runs, develop 750 s and branch 763 s (+1.7%). The cycle 4 fix holds. One reproduced medium remains in the CHANGELOG block: a valid edit aborts silently under `set -e` when the released region holds no bullets (T283-QA-12). The gate budget is spent, so the fix is left for an owner decision.
+T283-QA-12 is fixed and mutation-proven. The wall-time criterion is met (median +1.7%, QA report 5). One low advisory remains (T283-QA-13): the added-bullet list in the HALT message can be empty or missing; the block still fails closed. This was the sixth gate, allowed by the owner after the five-gate budget was spent.
 
 <!-- change-log-start -->
 ## Change Log
@@ -358,6 +358,7 @@ The wall-time criterion is met: median of five alternating runs, develop 750 s a
 | 2026-11-20 |         | QA findings fixed — temp files removed, set -e safe, remedy named; wall-time measurement pending, 4 iterations | qa-fix      |
 | 2026-11-20 |         | QA gate CONCERNS (88/100) — wall time met (+1.7%), 1 medium open (set -e on an empty region), gate budget spent | qa-task     |
 | 2026-11-20 |         | QA findings fixed — awk counts, base read before the pipe, ENVIRON; sixth gate allowed by the owner, 5 iterations | qa-fix      |
+| 2026-11-20 |         | QA gate PASS (95/100) — 1 low advisory (HALT message list), sixth gate | qa-task     |
 <!-- change-log-end -->
 
 ---
