@@ -4,7 +4,7 @@
 **Bug ID**: TASK-284-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 2, code review CR-1, reproduced by execution)
 **Date Found**: 2026-11-20
 
@@ -83,3 +83,4 @@ importer is affected.
 | --- | --- | --- | --- |
 | 2026-11-20 | New | qa-task | Found in QA cycle 2, reproduced by execution |
 | 2026-11-20 | Ready for QA | qa-fix | Fix applied in QA cycle 2; verification in the next gate |
+| 2026-11-20 | Closed | qa-task | Verified by task.284.qa.3.migrate-payload-heredocs-to-file-tool.md |

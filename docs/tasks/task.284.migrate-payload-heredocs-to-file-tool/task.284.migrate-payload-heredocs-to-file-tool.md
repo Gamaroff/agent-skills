@@ -211,24 +211,24 @@ Population commands: `git grep -nE "(cat|tee)[^|]*<<-?['\"]?[A-Za-z_]+['\"]?" --
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-20
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.284.qa.2.migrate-payload-heredocs-to-file-tool.md](./task.284.qa.2.migrate-payload-heredocs-to-file-tool.md)
-- **Gate File**: [task.284.gate.2.migrate-payload-heredocs-to-file-tool.yml](./task.284.gate.2.migrate-payload-heredocs-to-file-tool.yml)
+- **Full Report**: [task.284.qa.3.migrate-payload-heredocs-to-file-tool.md](./task.284.qa.3.migrate-payload-heredocs-to-file-tool.md)
+- **Gate File**: [task.284.gate.3.migrate-payload-heredocs-to-file-tool.yml](./task.284.gate.3.migrate-payload-heredocs-to-file-tool.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 8668
+- **Tests Executed**: 8670
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Bugs 1 and 2 are fixed and closed. The refute pass found one new medium defect in the cycle-1 engine fix: a deferred comment whose journal write fails loses its only copy (bug 3). CI on the head is green.
+All three bugs are fixed and closed. Bug 3 (a deferred comment losing its body when the journal write fails) is verified on the head. Three low advisories are recorded in the gate. PR CI on the head was pending when read.
 
 <!-- change-log-start -->
 ## Change Log
@@ -243,6 +243,7 @@ Bugs 1 and 2 are fixed and closed. The refute pass found one new medium defect i
 | 2026-11-20 |         | QA findings fixed — 2 bugs Ready for QA, 1 iteration                        | qa-fix |
 | 2026-11-20 |         | QA gate CONCERNS (90/100) — 1 finding (bugs 1 and 2 closed)                 | qa-task |
 | 2026-11-20 |         | QA findings fixed — 1 bug Ready for QA, 1 iteration                         | qa-fix |
+| 2026-11-20 |         | QA gate PASS (100/100) — 0 findings (bug 3 closed)                          | qa-task |
 <!-- change-log-end -->
 
 ---
