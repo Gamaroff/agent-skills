@@ -87,7 +87,7 @@ function deleteBlock() {
 function bindBlock() {
   const md = fs.readFileSync(CONTRACT, "utf8");
   const blocks = extractBlocks(md).filter((b) =>
-    /Persist the JSON the Explore dispatch RETURNED/.test(b.code),
+    /The JSON the Explore dispatch RETURNED was written verbatim/.test(b.code),
   );
   assert.equal(
     blocks.length,
@@ -273,12 +273,13 @@ for (const sh of SHELLS) {
         ],
       });
       const env = { ...process.env, PATH: `${bin}:${process.env.PATH}` };
-      const bind = bindBlock()
-        .replace(/\{doc-directory\}/g, docDir)
-        .replace(
-          /\{the JSON object the detector returned, pasted verbatim\}/,
-          json,
-        );
+      // The orchestrator writes the returned JSON with the file tool BEFORE the block runs.
+      fs.mkdirSync(path.join(docDir, ".summaries"), { recursive: true });
+      fs.writeFileSync(
+        path.join(docDir, ".summaries", "step-0a-resume-detector.json"),
+        json + "\n",
+      );
+      const bind = bindBlock().replace(/\{doc-directory\}/g, docDir);
       const r1 = spawnSync(sh, argvFor(sh, bind), {
         cwd: dir,
         encoding: "utf8",
@@ -377,7 +378,7 @@ for (const sh of SHELLS) {
     assert.equal(r.exists, true);
   });
 
-  test(`K [${sh}] — bind block persists the returned JSON, binds DETECTOR_JSON, rejects a non-array and a bare-string element`, () => {
+  test(`K [${sh}] — bind block binds DETECTOR_JSON from the persisted JSON, rejects a non-array and a bare-string element`, () => {
     const base = {
       schema_version: 1,
       recommended_step: 2,
@@ -406,13 +407,14 @@ for (const sh of SHELLS) {
       fs.mkdirSync(docDir, { recursive: true });
       // The block is a CHECK the prose reads ("If validation fails …"), not an exit — so read the
       // status of its last pipeline, the way the prose does.
+      // The orchestrator writes the returned JSON with the file tool BEFORE the block runs.
+      fs.mkdirSync(path.join(docDir, ".summaries"), { recursive: true });
+      fs.writeFileSync(
+        path.join(docDir, ".summaries", "step-0a-resume-detector.json"),
+        json + "\n",
+      );
       const script =
-        bindBlock()
-          .replace(/\{doc-directory\}/g, docDir)
-          .replace(
-            /\{the JSON object the detector returned, pasted verbatim\}/,
-            json,
-          ) +
+        bindBlock().replace(/\{doc-directory\}/g, docDir) +
         '\nSCHEMA_RC=$?; echo "SCHEMA_RC=$SCHEMA_RC BOUND=${#DETECTOR_JSON}"\n';
       const r = spawnSync(sh, argvFor(sh, script), {
         cwd: dir,

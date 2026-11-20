@@ -5,17 +5,17 @@ type: task
 description: "Move each payload heredoc in shipped skill prose to the file-edit tool plus --body-file or --findings-file, deleting one ratchet allowlist entry per site, and cite the fresh-body-post recipe at the other body-file posting sites."
 tags: [qa-task, qa-story, finalise, create-pr, ensure-task-github-issue, observation]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-11-06
-updated: 2026-11-06
+updated: 2026-11-20
 depends_on: [265]
 estimated_effort_hours: 16
 ---
 
 # Task 284: Migrate shipped payload heredocs to the file tool
 
-**Status:** Planned
+**Status:** Ready for Review
 
 ---
 
@@ -93,11 +93,12 @@ None - prose and one test. No script, flag or exit code changes.
 **Risk Level**: Low
 
 **Files**:
-- `shared/resources/develop-pipeline-step-{0,1,2,3,4,7}-*.md`, `shared/resources/tracker-comment-contract.md`
+- `shared/resources/develop-pipeline-step-{0,1,2,3,4,7}-*.md`, `shared/resources/develop-pipeline-resume-contract.md` (its `DETECTOR_EOF` summary heredoc), `shared/resources/tracker-comment-contract.md`
 
 **Changes**:
-- [ ] Replace each payload heredoc with a file-tool write plus a path argument.
-- [ ] Delete the matching allowlist entries; run `npm run bundle`.
+- [x] Replace each payload heredoc with a file-tool write plus a path argument. The step 1 lock heredoc (`cat > .claude/state/develop-pipeline.lock <<EOF`, 2 sites) is unquoted and expands `$(date -u …)`: the migrated text gives the agent the timestamp command to run first and the value to write in.
+- [x] Delete the matching allowlist entries; run `npm run bundle`.
+- [x] Run the removed-literal sweep (Testing Strategy) before the first deletion.
 
 **Dependencies**: task 265.
 
@@ -105,12 +106,12 @@ None - prose and one test. No script, flag or exit code changes.
 
 **Risk Level**: Medium
 
-**Files**: `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md`, `skills/qa-fix/SKILL.md`
+**Files**: `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md` (`skills/qa-fix/SKILL.md` has no allowlist entry: task 265 migrated it, and its one remaining `<<` is a `read` here-document, not a payload write; verify and leave it)
 
 **Changes**:
-- [ ] Migrate the findings JSON and PR comment body sites.
-- [ ] Run `qa-execute-snippets.mjs` over each changed block.
-- [ ] Delete the entries.
+- [x] Migrate the findings JSON and PR comment body sites.
+- [x] Run `qa-execute-snippets.mjs` over each changed block.
+- [x] Delete the entries.
 
 **Dependencies**: Phase 1 pattern settled.
 
@@ -121,7 +122,7 @@ None - prose and one test. No script, flag or exit code changes.
 **Files**: `skills/finalise/SKILL.md`, `skills/create-pr/SKILL.md`, `skills/create-issue/SKILL.md`
 
 **Changes**:
-- [ ] Migrate the heredoc sites and delete the entries.
+- [x] Migrate the heredoc sites and delete the entries.
 
 **Dependencies**: none beyond task 265.
 
@@ -129,10 +130,10 @@ None - prose and one test. No script, flag or exit code changes.
 
 **Risk Level**: Low
 
-**Files**: `skills/ensure-{bug,epic,story,task}-github-issue/SKILL.md`, `skills/review-{bug,story,task}/SKILL.md`
+**Files**: `skills/ensure-{bug,epic,story}-github-issue/SKILL.md` (`ensure-task-github-issue` carries no allowlist entry: it is a citation-sweep site, Phase 5), `skills/review-{bug,story,task}/SKILL.md`
 
 **Changes**:
-- [ ] Migrate each site and delete the entries.
+- [x] Migrate each site and delete the entries.
 
 **Dependencies**: none.
 
@@ -143,8 +144,8 @@ None - prose and one test. No script, flag or exit code changes.
 **Files**: the `--body-file` posting sites not yet citing the recipe; the ratchet test
 
 **Changes**:
-- [ ] Cite `file-write-rules.md#fresh-body-post` at each remaining site, or list it as excluded with a reason in the QA report.
-- [ ] With the allowlist empty, delete it and assert the count is zero.
+- [x] Cite `file-write-rules.md#fresh-body-post` at each remaining site, or list it as excluded with a reason in the QA report.
+- [x] With the allowlist empty, delete it and assert the count is zero.
 
 **Dependencies**: Phases 1-4.
 
@@ -152,7 +153,7 @@ None - prose and one test. No script, flag or exit code changes.
 
 ## 7. Files Summary
 
-Population commands: `git grep -nE "(cat|tee)[^|]*<<-?['\"]?[A-Za-z_]+['\"]?" -- 'skills/*/SKILL.md' 'shared/resources/*.md'` for the heredocs (32 at filing), and the `--body-file` command in § 3 (31 files).
+Population commands: `git grep -nE "(cat|tee)[^|]*<<-?['\"]?[A-Za-z_]+['\"]?" -- 'skills/*/SKILL.md' 'shared/resources/*.md'` for the heredocs, and the `--body-file` command in § 3 for the posting files. Both figures decay: the ratchet test's own non-vacuity count (31 on 2026-11-20, 22 allowlist rows) and `git grep -l` (32 files on 2026-11-20) are the measurements, and this document's earlier "32" and "31" were the filing-day readings.
 
 **Core**: the 32-line allowlist's files (listed in the ratchet test); `shared/resources/tests/payload-heredoc-ratchet.test.mjs`.
 **Generated**: `skills/*/references/` copies, via `npm run bundle`.
@@ -165,24 +166,25 @@ Population commands: `git grep -nE "(cat|tee)[^|]*<<-?['\"]?[A-Za-z_]+['\"]?" --
 - **Ratchet**: `CI=true command node --test shared/resources/tests/payload-heredoc-ratchet.test.mjs` stays green after every deletion; mutation-prove the final state by adding one heredoc and seeing it red.
 - **Runnable prose**: `qa-execute-snippets.mjs` over every changed fenced block (QA Step 4b).
 - **Bundle**: `npm run bundle -- --check` reports 0 problems; `CI=true npm test`.
+- **Removed-literal sweep** (before the first deletion): for each heredoc line the migration rewrites, `git grep -n` its literal across the tracked tests. Files that mention heredoc payload literals on 2026-11-20: `skills/qa-task/tests/qa-task.test.js`, `skills/qa-story/tests/qa-story.test.js`, `tests/mutation-call-site-coverage.test.js`, `tests/fenced-bash-positional-params.test.js`, `shared/resources/tests/pipeline-answers-docs.test.mjs`, `shared/resources/tests/step-8-completion-checklist.test.mjs`, `evals/shared/tests/finding-anchors-blocks.test.mjs`, `evals/shared/tests/ci-gate-parity.test.mjs`. Read each for a block located by the literal; list the ones that break and update them in the axis commit. Search again by file name for each rewritten document (`git grep -l "<basename>" -- 'tests/**' 'evals/**' '*.test.*'`) for pattern pins.
 
 ---
 
 ## 9. Success Criteria
 
 ### Functional
-- [ ] The ratchet's allowlist is empty and the test fails on any added payload heredoc (mutation-proven).
-- [ ] Every changed block still runs under `qa-execute-snippets.mjs`.
+- [x] The ratchet's allowlist is empty and the test fails on any added payload heredoc (mutation-proven).
+- [x] Every changed block still runs under `qa-execute-snippets.mjs`.
 
 ### Performance
-- [ ] `CI=true npm test` wall time is within 10% of `develop`, measured once and recorded in the QA report.
+- [ ] `CI=true npm test` wall time is within 10% of `develop`, measured with `uptime; time CI=true npm test` on the PR head and on `develop` on the same machine (the LAN server), the two figures and their `uptime` load recorded in the QA report's Findings section.
 
 ### Code Quality
-- [ ] `npm run bundle -- --check` reports 0 problems and `npm run validate -- skills/<changed-skill>/` passes for each changed skill.
+- [x] `npm run bundle -- --check` reports 0 problems and `npm run validate -- skills/<changed-skill>/` passes for each changed skill.
 
 ### Migration
-- [ ] `CHANGELOG.md` has an `[Unreleased]` entry citing (task 284).
-- [ ] Each remaining `--body-file` posting site cites the fresh-body-post recipe or is listed as excluded with a reason in the QA report.
+- [x] `CHANGELOG.md` has an `[Unreleased]` entry citing (task 284).
+- [x] Each remaining `--body-file` posting site cites the fresh-body-post recipe or is listed as excluded with a reason in the QA report.
 
 ---
 
@@ -213,17 +215,20 @@ Population commands: `git grep -nE "(cat|tee)[^|]*<<-?['\"]?[A-Za-z_]+['\"]?" --
 | Date       | Version | Description                                                                 | Author      |
 | ---------- | ------- | --------------------------------------------------------------------------- | ----------- |
 | 2026-11-06 | 1.0     | Initial draft — migration half of the task 265 split (QA T265-QA-1/2)       | create-task |
+| 2026-11-20 | 1.1     | Review passed (8/10) — added resume-contract site, lock-heredoc expansion note, qa-fix/ensure-task scope corrections, removed-literal sweep, measured perf criterion | review-task |
+| 2026-11-20 |         | Status → ready-for-development                                              | review-task |
+| 2026-11-20 |         | All 31 payload heredocs migrated, allowlist emptied, CI-parity gate green; status → ready-for-review | develop-task |
 <!-- change-log-end -->
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1
-- [ ] Phase 2
-- [ ] Phase 3
-- [ ] Phase 4
-- [ ] Phase 5
+- [x] Phase 1
+- [x] Phase 2
+- [x] Phase 3
+- [x] Phase 4
+- [x] Phase 5
 
 ## References
 

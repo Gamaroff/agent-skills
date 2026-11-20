@@ -227,16 +227,18 @@ done, so its verdict is earned.
 
 **Post skip notice to tracker issue** (non-blocking — skip if `TRACKER_ISSUE` is empty):
 
-```bash
-mkdir -p .claude/state
-cat > .claude/state/comment-body.md <<'EOF'
+Run `mkdir -p .claude/state`, then write `.claude/state/comment-body.md` with the **file tool** in one
+call, and post it in a later call (`file-write-rules.md#fresh-body-post`). Body:
+
+```markdown
 ## 📋 Review — Step 2/8
 
 **Outcome**: Skipped — already reviewed
 **Status**: {status}
 **Review report**: {path}
-EOF
+```
 
+```bash
 node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
   --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
   --stage review \
@@ -483,16 +485,18 @@ Log. Post here only when the review skill skipped its comment or its call failed
 
 #### develop-story
 
-```bash
-mkdir -p .claude/state
-cat > .claude/state/comment-body.md <<'EOF'
+Run `mkdir -p .claude/state`, then write `.claude/state/comment-body.md` with the **file tool**, and
+post it in a later call (`file-write-rules.md#fresh-body-post`). Body:
+
+```markdown
 ## 📋 Story Review Complete — Step 2/8
 
 **Outcome**: {Ready for Development / Needs Revision}
 **Review report**: {path, or 'not produced — see Issues Log'}
 **Findings**: {brief summary of blocking/non-blocking issues, or 'No blocking issues found'}
-EOF
+```
 
+```bash
 node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
   --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
   --stage review \
@@ -505,16 +509,18 @@ Read `reason` and act per the table in [`references/tracker-comment-contract.md`
 
 #### develop-task
 
-```bash
-mkdir -p .claude/state
-cat > .claude/state/comment-body.md <<'EOF'
+Run `mkdir -p .claude/state`, then write `.claude/state/comment-body.md` with the **file tool**, and
+post it in a later call (`file-write-rules.md#fresh-body-post`). Body:
+
+```markdown
 ## 📋 Task Review Complete — Step 2/8
 
 **Outcome**: {Ready for Development / Needs Revision}
 **Review report**: {path, or 'not produced — see Issues Log'}
 **Findings**: {brief summary of blocking/non-blocking issues, or 'No blocking issues found'}
-EOF
+```
 
+```bash
 node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
   --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
   --stage review \

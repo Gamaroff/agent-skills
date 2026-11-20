@@ -18,8 +18,8 @@ Repository files and body payloads are written with the file tool, not the shell
 - **A block an agent runs verbatim carries no payload heredoc.** The only exception is an agent with
   no file tool.
 
-`payload-heredoc-ratchet.test.mjs` (beside the other shared tests) counts the payload heredocs that
-remain in shipped prose and fails when a new one appears.
+`payload-heredoc-ratchet.test.mjs` (beside the other shared tests) fails when a payload heredoc
+appears in shipped prose. It carries no allow-list: every site was moved to the file tool (task 284).
 
 ## Recipes
 

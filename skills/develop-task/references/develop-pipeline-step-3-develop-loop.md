@@ -453,17 +453,19 @@ orchestrator writes this row, because `/develop` did not run. It is still exactl
 
 #### develop-story
 
-```bash
-mkdir -p .claude/state
-cat > .claude/state/comment-body.md <<'EOF'
+Run `mkdir -p .claude/state`, then write `.claude/state/comment-body.md` with the **file tool**, and
+post it in a later call (`file-write-rules.md#fresh-body-post`). Body:
+
+```markdown
 ## 🛠️ Development Complete — Step 3/8
 
 **Status**: Ready for Review
 **Tasks completed**: {audit.completed}/{audit.total}
 **Tests**: {all passing / {N} failures — see implementation report}
 **Branch**: {branch}
-EOF
+```
 
+```bash
 node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
   --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
   --stage develop-complete \
@@ -478,17 +480,19 @@ Read `reason` and act per the table in [`references/tracker-comment-contract.md`
 
 #### develop-task
 
-```bash
-mkdir -p .claude/state
-cat > .claude/state/comment-body.md <<'EOF'
+Run `mkdir -p .claude/state`, then write `.claude/state/comment-body.md` with the **file tool**, and
+post it in a later call (`file-write-rules.md#fresh-body-post`). Body:
+
+```markdown
 ## 🛠️ Development Complete — Step 3/8
 
 **Status**: Ready for Review
 **Phases completed**: {audit.completed}/{audit.total}
 **Tests**: {all passing / {N} failures — see implementation report}
 **Branch**: {branch}
-EOF
+```
 
+```bash
 node .agents/skills/{develop-story|develop-task|develop-bug}/references/tracker-comment.js \
   --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
   --stage develop-complete \

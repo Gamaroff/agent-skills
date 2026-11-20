@@ -205,6 +205,8 @@ node references/tracker-issue.js --kind edit --issue ${ISSUE_NUM} \
 
 The body is rebuilt to the **same shape** `ensure-story-github-issue` emits on create — Summary, Acceptance Criteria (capped at 5), Metadata, Document — so create→update is diff-stable. That shape and its caps are specified once, in [`references/tracker-card-summary.md`](./references/tracker-card-summary.md); follow it there rather than restating it here. Two hand-maintained copies of this contract had already drifted apart once.
 
+Write the body file with the **file tool** and run the edit in a later call (`references/file-write-rules.md#fresh-body-post`).
+
 If the priority label changed, also re-mirror the board's Priority field:
 
 ```bash

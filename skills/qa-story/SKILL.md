@@ -1177,15 +1177,15 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
    **Check every anchor before the findings go anywhere** (task.194). A reviewer's `file_line` is a
    claim, not a fact: on PR #594 the shared reviewer reported every finding at a patch-file line
    number, and the number was rendered as if it were real. Right after the `code_review:` block is
-   read, write it to a JSON file and run the shared checker, from the repository root:
+   read, write it to a JSON file and run the shared checker, from the repository root. First get a
+   scratch path with `mktemp "${TMPDIR:-/tmp}/qa-findings.XXXXXX"`, then write the parsed block to that
+   path with the **file tool** (`references/file-write-rules.md#the-rule`): `line_text` quotes source,
+   and source carries `'` and `$`, which a shell heredoc would mangle. Then run:
 
    ```bash
-   # The parsed code_review: block as JSON — {"code_review":{…}}. Items 5 and 6 read this same file.
-   FINDINGS_JSON=$(mktemp "${TMPDIR:-/tmp}/qa-findings.XXXXXX")
-   # A quoted heredoc: line_text quotes source, and source carries ' and $.
-   cat > "$FINDINGS_JSON" <<'JSON'
-{findings-json}
-JSON
+   # {findings-json}: the scratch path above, holding the parsed code_review: block as JSON —
+   # {"code_review":{…}}. Items 5 and 6 read this same file.
+   FINDINGS_JSON="{findings-json}"
    # --rev HEAD: the diff under review is $BASE...HEAD, so uncommitted edits are not what was reviewed.
    # Decide on the checker's `reason`, never on its exit code: `node` also exits 1 when the script
    # cannot load, and that must not read as "malformed anchors — mark and continue" (task.195).
@@ -2430,7 +2430,7 @@ After review:
 
    **Resolve the platform first.** Source the resolver with `source references/resolve-platform.sh || exit 1` — guarded, because that file also validates the platform and access keys and returns non-zero on an unrecognised value. It sets `VCS` (which this step branches on) and provides `tracker_call_with_retry` (3× exponential backoff: 1s, 2s, 4s). Transient GitHub API / Anthropic API errors are common on long QA runs; the helper retries transparently before reporting failure. On Bitbucket, derive the REST coordinates and resolve the credential — the same Step 0.5 preamble `create-pr` uses.
 
-   The fences below start at column 0 deliberately: an indented terminator does not close a heredoc, and indented body lines would be written into the comment verbatim.
+   The fences below start at column 0 deliberately: the body fence is written to the file as given, and an indented body would carry its indentation into the comment verbatim.
 
 ```bash
 source references/resolve-platform.sh || exit 1
@@ -2457,8 +2457,14 @@ fi
 TARGET=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo develop)
 command node .agents/skills/qa-story/references/qa-read-back.js --doc "{story-file}" --target "$TARGET" >/dev/null || { echo "HALT: read-back not clean — not posting"; exit 1; }
 mkdir -p .claude/state
-BODY_FILE=.claude/state/qa-comment-body.md
-cat > "$BODY_FILE" <<'EOF'
+echo "body file: .claude/state/qa-comment-body.md"
+```
+
+Now write `.claude/state/qa-comment-body.md` with the **file tool**, in one call, with every `[…]` and
+`{…}` placeholder filled in textually. Nothing expands here: the file tool writes the text as given, so
+a `$` or a backtick in a finding is safe. Then run the block after it, in a later call. Body:
+
+```markdown
 ## 🧪 QA Review: [GATE_DECISION]
 
 **Gate Decision**: ✅/⚠️/❌ [PASS/CONCERNS/FAIL]
@@ -2504,7 +2510,15 @@ cat > "$BODY_FILE" <<'EOF'
 2. [Step 2]
 
 ---
-EOF
+```
+
+```bash
+# Re-checked immediately before the post: the body was written in an earlier call, and the
+# read-back can have gone stale since (obs #226, #288).
+TARGET=$(gh pr view --json baseRefName -q .baseRefName 2>/dev/null || echo develop)
+command node .agents/skills/qa-story/references/qa-read-back.js --doc "{story-file}" --target "$TARGET" >/dev/null || { echo "HALT: read-back not clean — not posting"; exit 1; }
+# A new shell: re-bind the body file the file tool wrote above.
+BODY_FILE=.claude/state/qa-comment-body.md
 
 # The plain-language lead, obtained ONCE and folded into $BODY_FILE — ABOVE the
 # arm split below, so the GitHub and Bitbucket arms post the same bytes and
@@ -2512,8 +2526,8 @@ EOF
 # moment uses; a pull-request comment about a moment that also exists on the
 # tracker reuses that stage rather than inventing a second vocabulary.
 #
-# GATE_DECISION is bound HERE, deliberately. The heredoc above is quoted
-# (`<<'EOF'`), so its [GATE_DECISION] placeholder is filled in textually when
+# GATE_DECISION is bound HERE, deliberately. The body above was written with the
+# file tool, so its [GATE_DECISION] placeholder is filled in textually when
 # the body is written — it never becomes a shell variable. Set this to the same
 # verdict you wrote into the body: PASS, CONCERNS, FAIL or WAIVED.
 GATE_DECISION="{PASS|CONCERNS|FAIL|WAIVED — the same verdict written into the body above}"

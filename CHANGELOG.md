@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Changed
+
+- **Shipped skill prose writes payloads with the file tool, not a heredoc (task 284).** All 31
+  payload heredocs in `skills/*/SKILL.md` and `shared/resources/*.md` (tracker and PR comment bodies,
+  findings JSON, issue bodies, the pipeline lock, the resume-detector JSON) are now a file-tool write
+  followed by a call that passes the path. Values a heredoc used to expand are printed first and typed
+  into the file. `payload-heredoc-ratchet.test.mjs` lost its allowlist: any payload heredoc in shipped
+  prose now fails it. The `--body-file` posting sites cite `file-write-rules.md#fresh-body-post`, and
+  the QA posting blocks re-check the read-back immediately before they post.
+
 ### Added
 
 - **Authoring and fix steps state the rules they keep missing (task 283).** The Step 3 develop loop

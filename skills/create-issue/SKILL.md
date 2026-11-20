@@ -184,11 +184,14 @@ acceptance criteria at 5**, and when more remain add a final
 `+N more in the linked document` line with the exact count. The general contract
 is [`references/tracker-card-summary.md`](./references/tracker-card-summary.md).
 
-1. Render the body to a tempfile:
+1. Write the body with the **file tool** to `.claude/state/issue-body.md` (run `mkdir -p .claude/state`
+   first). A shell heredoc is not used: the description carries backticks and `${…}` text, which a
+   heredoc would evaluate or truncate (`references/file-write-rules.md#the-rule`). Substitute every
+   `{…}` token in the text. Each later block re-binds `body_file=.claude/state/issue-body.md`, since
+   every fenced block is its own shell. Post it in a later call than the write
+   (`references/file-write-rules.md#fresh-body-post`).
 
-```bash
-body_file=$(mktemp)
-cat > "$body_file" <<'EOF'
+```markdown
 ## Context
 
 Related to: story.1.180.3.quick-re-search
@@ -206,12 +209,12 @@ Related to: story.1.180.3.quick-re-search
 ## Acceptance Criteria
 
 - [ ] {Derived from description}
-EOF
 ```
 
 2. **Pre-flight validation — MANDATORY.** Abort if any template token survived substitution:
 
 ```bash
+body_file=.claude/state/issue-body.md
 if grep -Eq '(_PLACEHOLDER|\{[a-z_]+\})' "$body_file"; then
   echo "ERROR: unsubstituted tokens in issue body:" >&2
   grep -nE '(_PLACEHOLDER|\{[a-z_]+\})' "$body_file" >&2
@@ -238,6 +241,7 @@ Map type and priority to Jira values:
 | low            | Low             |
 
 ```bash
+body_file=.claude/state/issue-body.md
 JIRA_AUTH=$(echo -n "${JIRA_USER_EMAIL}:${JIRA_API_TOKEN}" | base64)
 
 JIRA_RESPONSE=$(curl -s -X POST \
@@ -276,6 +280,7 @@ fi
 **GitHub:**
 
 ```bash
+body_file=.claude/state/issue-body.md
 # Every label reaches gh through the shared helper: one the repository does not
 # define (`story.180` on a fresh repo) fails the WHOLE create otherwise
 # (task.125, TASK-125-BUG-11).
@@ -342,6 +347,7 @@ Map type and priority to Bitbucket values:
 | low            | trivial              |
 
 ```bash
+body_file=.claude/state/issue-body.md
 ISSUE_RESPONSE=$(curl -s -X POST \
   "${BB_API}/repositories/${BB_WORKSPACE}/${BB_REPO}/issues" \
   -H "Content-Type: application/json" \
@@ -372,6 +378,7 @@ fi
 ---
 
 ```bash
+body_file=.claude/state/issue-body.md
 rm -f "$body_file"
 ```
 

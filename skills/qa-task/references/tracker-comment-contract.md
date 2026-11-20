@@ -55,12 +55,12 @@ description: How every pipeline step and skill posts a comment to a tracker issu
 One call covers both trackers — `tracker-comment.js` resolves `TRACKER` itself,
 so a step doc never branches on it for a comment:
 
-```bash
-mkdir -p .claude/state
-cat > .claude/state/comment-body.md <<'EOF'
-{the markdown body}
-EOF
+Run `mkdir -p .claude/state`, then write `.claude/state/comment-body.md` with the **file tool** in one
+call (the markdown body, unedited), and post it in a **later** call. Never both in one parallel batch,
+and assert a line only this body carries before the post (`file-write-rules.md#fresh-body-post`).
+Then:
 
+```bash
 node .agents/skills/{skill}/references/tracker-comment.js \
   --issue {TRACKER_ISSUE} --body-file .claude/state/comment-body.md \
   --stage {moment} \
