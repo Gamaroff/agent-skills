@@ -6,6 +6,15 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **Authoring and fix steps state the rules they keep missing (task 283).** The Step 3 develop loop
+  runs a tested CHANGELOG placement block that fails a new entry below the first release heading, and
+  `review-task` checks an "under `[Unreleased]`" claim against the file. `render-task-issue-body.js`
+  renders the GitHub task issue body from the one card definition in `jira-sync.js` (effort kept,
+  relative links made absolute, an exact "+N more"), and `ensure-task-github-issue` calls it in place
+  of a hand-filled heredoc; `sync-github-task` is unchanged. `create-task` § 1.2 gains the multi-task
+  path (pre-allocated numbers, one writer per directory, one registry pass), `develop-bug` and
+  `qa-fix` audit importers when a fix widens a shared parser, and `traps.md` says to resolve a path
+  once under an exec-wrapper.
 - **review-task resolves the right task and reports every review (task 282).** `tracker-comment.js`
   keys the `review-story`, `review-task` and `review-bug` stages by the review report's number
   (`review-task-2`), so a second review's verdict reaches the tracker instead of reading `already`

@@ -168,6 +168,10 @@ resolved: run `card-preflight.js` on the document and fix it there, never hand-w
 
 ```bash
 mkdir -p .claude/state
+# INPUTS, bound in THIS block (each fenced block is its own shell): TASK_RELATIVE_PATH and DOC_URL,
+# the values Step T5's first block computes. Unbound, the script would exit 2 on a usage error.
+: "${TASK_RELATIVE_PATH:?bind TASK_RELATIVE_PATH (the task file, relative to the repo root) in this block}"
+: "${DOC_URL:?bind DOC_URL (the https blob URL of the task file) in this block}"
 command node references/render-task-issue-body.js \
   --file "${TASK_RELATIVE_PATH}" --doc-url "${DOC_URL}" --rel-path "${TASK_RELATIVE_PATH}" \
   > .claude/state/issue-body.md \

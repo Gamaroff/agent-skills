@@ -117,18 +117,13 @@ gh issue view ${ISSUE_NUM} --json state,title,labels,body,milestone > /tmp/issue
   || { echo "⚠️ GitHub issue #${ISSUE_NUM} not found — aborting update"; exit 1; }
 ```
 
-Diff `title`, `body`, `labels`, `milestone` against current GitHub state. The body is rebuilt to the **same shape** `ensure-task-github-issue` emits on create — Summary, Success Criteria (capped at 5), Breaking Changes when present, Metadata, Document — so create→update is diff-stable. That shape and its caps are specified once, in [`references/tracker-card-summary.md`](./references/tracker-card-summary.md); follow it there rather than restating it here. The `## Document` link uses `DOC_URL` above, so re-syncing from a feature branch refreshes the link to that branch. At acceptance, `finalise` re-points the link to the durable integration branch so the closed issue doesn't link to a deleted feature branch.
+Diff `title`, `body`, `labels`, `milestone` against current GitHub state. The body is rebuilt to the **same shape** `ensure-task-github-issue` emits on create — Summary, Success Criteria (capped at 5), Breaking Changes when present, Metadata, Document — so create→update is diff-stable. (`render-task-issue-body.js` renders the create path only, on purpose: task 283's Migration criterion keeps every existing issue body unchanged, so this update path is out of its scope.) That shape and its caps are specified once, in [`references/tracker-card-summary.md`](./references/tracker-card-summary.md); follow it there rather than restating it here. The `## Document` link uses `DOC_URL` above, so re-syncing from a feature branch refreshes the link to that branch. At acceptance, `finalise` re-points the link to the durable integration branch so the closed issue doesn't link to a deleted feature branch.
 
 If anything changed, run:
 
 ```bash
 mkdir -p .claude/state
-# Rendered, never hand-built (task.283, obs #34): the same script `ensure-task-github-issue` runs on
-# create, so create→update stays diff-stable and relative links resolve against DOC_URL.
-command node references/render-task-issue-body.js \
-  --file "${TASK_RELATIVE_PATH}" --doc-url "${DOC_URL}" --rel-path "${TASK_RELATIVE_PATH}" \
-  > .claude/state/issue-body.md \
-  || { echo "HALT: no issue body rendered — run card-preflight.js on ${TASK_RELATIVE_PATH}"; exit 1; }
+printf '%s' "$NEW_BODY" > .claude/state/issue-body.md
 
 # A label the repository does not define fails the WHOLE edit; the shared
 # helper drops it with a warning instead (task.125, TASK-125-BUG-3).

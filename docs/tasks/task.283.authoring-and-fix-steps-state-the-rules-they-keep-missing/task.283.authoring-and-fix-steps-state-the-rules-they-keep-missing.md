@@ -5,16 +5,16 @@ type: task
 description: "Add four missing rules: verify a plan's CHANGELOG placement claim, a documented multi-task path for create-task, an importer audit when a fix widens a shared parser, and the command-node-under-wrapper trap."
 tags: [create-task, review-task, develop-bug, observation]
 category: refactoring
-status: ready-for-development
+status: ready-for-review
 priority: Medium
 created: 2026-11-06
-updated: 2026-11-19
+updated: 2026-11-20
 estimated_effort_hours: 16
 ---
 
 # Task 283: Authoring and fix steps state the rules they keep missing
 
-**Status:** Ready for Development
+**Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.283.review.1.authoring-and-fix-steps-state-the-rules-they-keep-missing.md` implemented 2026-11-19
 
 ---
@@ -318,6 +318,27 @@ None identified.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-19
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.283.qa.1.authoring-and-fix-steps-state-the-rules-they-keep-missing.md](./task.283.qa.1.authoring-and-fix-steps-state-the-rules-they-keep-missing.md)
+- **Gate File**: [task.283.gate.1.authoring-and-fix-steps-state-the-rules-they-keep-missing.yml](./task.283.gate.1.authoring-and-fix-steps-state-the-rules-they-keep-missing.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 15 new (full run 8629 tests, 0 failed)
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+Five medium findings: no CHANGELOG entry citing task 283, `sync-github-task` calls the renderer against the Migration criterion, wall time unmeasured, the render block leaves its inputs unbound, and the CHANGELOG block fails open on an unfetched base.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -327,6 +348,8 @@ None identified.
 | 2026-11-19 | 1.1     | Review 1 (8/10): renderer reuses `jira-sync.js` card builder; Step 3 CHANGELOG check is a tested block; `sync-github-task`, payload-heredoc ratchet and shared-resource tests named; memory-note edit dropped; Phase 3 steps named | review-task |
 | 2026-11-19 |         | Status → ready-for-development                            | review-task |
 | 2026-11-19 |         | Implemented — 4 rules, 1 renderer script, 2 new test files (15 tests) | develop     |
+| 2026-11-19 |         | QA gate CONCERNS (90/100) — 5 medium findings, 1 low | qa-task     |
+| 2026-11-20 |         | QA findings fixed — 4 of 5 medium and the low; wall-time criterion left open, 1 iteration | qa-fix      |
 <!-- change-log-end -->
 
 ---
@@ -371,4 +394,4 @@ None.
 
 ---
 
-**Status:** Ready for Development
+**Status:** Ready for Review

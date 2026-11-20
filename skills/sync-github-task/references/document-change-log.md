@@ -4,7 +4,7 @@
 > **Canonical spec.** Consumed by `create-{prd,epic,story,task}`, `review-{prd,epic,story,task}`,
 > `edit-{epic,story}`, `correct-course`, `develop`, `qa-{story,task}`, `finalise`, and the six
 > `sync-{jira,github}-{epic,story,task}` skills. Implemented by
-> [`change-log.js`](change-log.js).
+> [`change-log.js`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/change-log.js).
 
 A PRD, epic, story, or task document carries a **Change Log** section: an append-only table
 recording what changed about the document, when, and who changed it. It is the document's own
@@ -280,7 +280,7 @@ anchor.
 
 ## See also
 
-- [`change-log.js`](change-log.js) — the engine implementing this spec
+- [`change-log.js`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/change-log.js) — the engine implementing this spec
 - [`open-knowledge-format.md`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/open-knowledge-format.md) — `updated` ≡ OKF `timestamp`
 - [`tracker-card-summary.md`](tracker-card-summary.md) — why cards never carry the log
 - [`sign-off.md`](https://github.com/Gamaroff/agent-skills/blob/develop/shared/resources/sign-off.md) — the structural precedent for a config-gated document section

@@ -57,21 +57,19 @@ test("keeps effort and metadata when the description spans lines (task.202 shape
   assert.match(body, /\| Depends on \| — \|/);
 });
 
-test("control: the old `\\s*` pattern drops the effort on the same document", () => {
-  const m = /description:\s*\n[\s\S]*?estimated_effort_hours:\s*(\d+)/.exec(
-    doc(["a"]),
+test("an empty-valued key directly above the effort does not swallow it (the `\\s*` newline crossing)", () => {
+  const content = doc(["a"]).replace(
+    "description:\n  spans two lines\n",
+    "description:\nnotes:\n",
   );
-  // The shape the old script used: `key:\s*(\S*)` matched across the newline after an empty value.
-  const old = /^description:\s*(\S+)/m.exec(doc(["a"]));
-  assert.equal(
-    old[1],
-    "spans",
-    "the old pattern read the next line as the value",
-  );
-  assert.ok(
-    m,
-    "document carries the effort, so the renderer losing it would be the defect",
-  );
+  assert.match(content, /description:\nnotes:\npriority: High/);
+  const { body } = renderTaskIssueBody({
+    content,
+    docUrl: URL_,
+    relPath: "p",
+  });
+  assert.match(body, /\| Effort \| 12h \|/);
+  assert.match(body, /\| Priority \| High \|/);
 });
 
 test("relative links become absolute against the document URL; anchors are kept", () => {

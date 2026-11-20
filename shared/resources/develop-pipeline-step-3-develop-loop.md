@@ -375,7 +375,15 @@ replaces a line, so it is never blocked here, and a project with no `CHANGELOG.m
 # branch this run's PR targets (Phase 0d's Q2 answer). A new bullet must sit above the first release
 # heading (## [v…), which is inside [Unreleased].
 CL=CHANGELOG.md
-if [ -f "$CL" ] && ! git diff --quiet "origin/{base}" -- "$CL"; then
+if [ -f "$CL" ]; then
+  # "Could not look" is a HALT, never a pass: with the base unfetched, git diff exits 128, which a
+  # bare `!` reads as "changed"; the pipeline below then reads nothing and the block exits 0.
+  git rev-parse --verify --quiet "origin/{base}^0" >/dev/null \
+    || { echo "HALT: origin/{base} is not a ref in this checkout — run git fetch origin {base}, then re-run (the CHANGELOG check cannot look without it)"; exit 1; }
+  git diff --quiet "origin/{base}" -- "$CL"; DIFF_RC=$?
+  [ "$DIFF_RC" -le 1 ] || { echo "HALT: git diff against origin/{base} failed (exit $DIFF_RC) — the CHANGELOG check cannot look"; exit 1; }
+fi
+if [ -f "$CL" ] && [ "${DIFF_RC:-0}" -eq 1 ]; then
   FIRST_RELEASE=$(grep -n '^## \[v' "$CL" | head -1 | cut -d: -f1)
   [ -n "$FIRST_RELEASE" ] || FIRST_RELEASE=999999999
   MISPLACED=$(git diff -U0 "origin/{base}" -- "$CL" | awk -v first="$FIRST_RELEASE" '

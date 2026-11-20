@@ -11,6 +11,8 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import {
   SHELLS,
   readDoc,
@@ -102,6 +104,36 @@ for (const shell of SHELLS) {
     try {
       const r = run(shell, block, { cwd: work });
       assert.equal(r.status, 0, r.stdout + r.stderr);
+    } finally {
+      cleanup(dir);
+    }
+  });
+
+  test(`${shell}: an unfetched base HALTs instead of passing (could not look)`, () => {
+    const { dir, work } = scenario((t) =>
+      insertAfter(t, "- **Shipped fix.**", "- **Misplaced new entry.**"),
+    );
+    try {
+      const unfetched = bind(blockBy(readDoc(STEP3), ANCHOR), {
+        "{base}": "nonexistent",
+      });
+      const r = run(shell, unfetched, { cwd: work });
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.match(r.stdout, /origin\/nonexistent is not a ref/);
+    } finally {
+      cleanup(dir);
+    }
+  });
+
+  test(`${shell}: a git diff that fails with the base present HALTs (corrupt index)`, () => {
+    const { dir, work } = scenario((t) =>
+      insertAfter(t, "- **Shipped fix.**", "- **Misplaced new entry.**"),
+    );
+    try {
+      fs.writeFileSync(path.join(work, ".git", "index"), "not an index");
+      const r = run(shell, block, { cwd: work });
+      assert.equal(r.status, 1, r.stdout + r.stderr);
+      assert.match(r.stdout, /git diff against origin\/develop failed/);
     } finally {
       cleanup(dir);
     }
