@@ -73,6 +73,7 @@
   "devDependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.138",
     "prettier": "^3.9.6",
+    "typescript": "5.9.3",
     "wireloom": "0.7.0"
   }
 }

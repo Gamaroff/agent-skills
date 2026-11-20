@@ -911,7 +911,9 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
 6. **The zero-guard still applies — now to this run.** `boundary: true` with `probes_executed: 0`
    (an empty plan, every entry refused or declined) adds the `probe mode executed no candidates`
    FAIL check; a zero from this run **still takes the zero-guard**, because then the engine declined
-   the entry, which is the guard's real case. Recompute `overall`: FAIL if any check or general
+   the entry, which is the guard's real case. A TypeScript module entry (`.ts`, `.mts`, `.cts`,
+   `.tsx`) is probeable: a zero on one means a decline named in the record, and
+   `typescript-unavailable` says the fix is the repository's own install, not an override. Recompute `overall`: FAIL if any check or general
    check FAILs or any probe reproduced and still in `probes[]` (a probe item 5a moved to
    `deferred_probes[]` does not count), otherwise PASS.
 7. **Say so.** Add `- Probe run by /finalise from the security agent's plan — {N} control(s), record

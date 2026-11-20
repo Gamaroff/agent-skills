@@ -5,7 +5,7 @@ type: task
 description: "Teach the security probe engine's module entry form to load .ts, .mts, .cts and .tsx boundaries through the target repository's own TypeScript compiler, so /finalise's zero-guard stops failing on every TypeScript consumer."
 tags: [security-probe, finalise, typescript, entry-forms]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: High
 created: 2026-11-20
 updated: 2026-11-20
@@ -15,7 +15,8 @@ estimated_effort_hours: 16
 
 # Technical Task: The security probe engine loads a TypeScript entry
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.314.review.1.probe-engine-loads-a-typescript-entry.md` implemented 2026-11-20
 
 ---
 
@@ -201,26 +202,27 @@ should say so.
 
 **Risk**: Medium (a wrong premise here costs every later phase).
 
-- [ ] Find the Node version `module.registerHooks` arrived in, and run `typeof` on the **Node 22 CI
+- [x] Find the Node version `module.registerHooks` arrived in, and run `typeof` on the **Node 22 CI
   image** (`docker run node:22-trixie node -e ...`). If the lowest Node this repository supports lacks
   it, choose the async `module.register()` path or raise `"engines"`, and record the choice.
-- [ ] Re-measure the per-child cost with the section 9 statistic (median of at least five runs, load
+- [x] Re-measure the per-child cost with the section 9 statistic (median of at least five runs, load
   recorded), with and without the hook. Record both in the QA report.
-- [ ] Decide **transpile once in the parent** (into the out-of-tree scratch dir from task.250, then
+- [x] Decide **transpile once in the parent** (into the out-of-tree scratch dir from task.250, then
   import the `.mjs` output) against **one hook per child**. Record the decision and the number that
   drove it.
-- [ ] Decide how the tests obtain a compiler (Phase 1 decision below) before any test is written.
+- [x] Decide how the tests obtain a compiler (Phase 1 decision below) before any test is written.
 
 ### Phase 1: The hook and the fixture family
 
 **Risk**: High (new code on the probe path).
 
-- [ ] Add the hook file beside the engine in `shared/resources/` (name chosen here; cite siblings by bare
+- [x] Add the hook file beside the engine in `shared/resources/` (name chosen here; cite siblings by bare
   filename inside `shared/resources/`).
-- [ ] Build the fixture family: the three shapes (parameter property / enum / namespace; value import
+- [x] Build the fixture family: the three shapes (parameter property / enum / namespace; value import
   under `"type": "commonjs"`; extensionless and `paths` alias imports) plus NodeNext `.js`-to-`.ts`
-  imports, a decorator, a `"type": "module"` package and a `.tsx` entry.
-- [ ] Decide how tests get `typescript`: a pinned `devDependencies` entry (recommended: a test that skips
+  imports, a decorator, a `"type": "module"` package and a `.tsx` entry, and one fixture with no
+  `tsconfig.json` (the hook then defaults `moduleResolution` to `Bundler`; review 1, O1).
+- [x] Decide how tests get `typescript`: a pinned `devDependencies` entry (recommended: a test that skips
   when the compiler is absent is vacuous, and `scripts/ci-tool-skips` style guards fail it under
   `CI=true`) or a vendored fixture. A devDependency does not reach a consumer's vendored copy.
 
@@ -228,30 +230,41 @@ should say so.
 
 **Risk**: High.
 
-- [ ] In the child spawn (`security-probe.mjs:2234`), add `--import <absolute hook path>` only when the
+- [x] In the child spawn (`security-probe.mjs:2234`), add `--import <absolute hook path>` only when the
   entry extension is one of the four; leave the `RUNNER` string untouched.
-- [ ] Pass the repo root to the child through `sandboxEnv`'s `bindings`, after `resolveEntry`'s
+- [x] (As built: the engine passes the compiler path it resolved, not the root.) Pass the repo root to the child through `sandboxEnv`'s `bindings`, after `resolveEntry`'s
   containment check, never from a case or plan field.
-- [ ] Add the named decline for a missing compiler, with the searched root in its detail.
+- [x] Add the named decline for a missing compiler, with the searched root in its detail. **The engine
+  checks in the parent, before it spawns**: `createRequire(<root>/)` then `resolve("typescript")`, and
+  `typeof registerHooks` on the running Node. A hook that threw inside the child would kill `node`
+  before `RUNNER` could report anything, so the child never meets either failure. A Node without
+  `registerHooks` is declined by name too, carrying `process.version` (review 1, I1).
 
 ### Phase 3: Prove it
 
 **Risk**: Medium.
 
-- [ ] Fixture test, calibration and mutation proof per sections 8 and 9.
-- [ ] Escape test: the hook writes nothing inside the repo or sandbox; the watched-spawn check stays green.
-- [ ] Interpolation test: no caller-supplied string reaches the child's argv or the hook source.
+- [x] Fixture test, calibration and mutation proof per sections 8 and 9.
+- [x] Escape test: the hook writes nothing inside the repo or sandbox; the watched-spawn check stays green.
+- [x] Interpolation test: no caller-supplied string reaches the child's argv or the hook source.
 
 ### Phase 4: Bundle and document
 
 **Risk**: Low.
 
-- [ ] `npm run bundle`, `npm run bundle:check`; the hook ships with the 4 skills that ship
-  `security-probe.mjs` (and with `finalise`, which ships the plan runner).
-- [ ] Update the engine header's entry-form list, the six-entry-forms paragraph in
+- [x] `npm run bundle`, `npm run bundle:check`; the hook ships with the 4 skills that ship
+  `security-probe.mjs` (finalise, qa-story, qa-task, review-security; finalise also ships the plan
+  runner). Confirm `tests/bundled-links.test.js` and `tests/test-runner-reach.test.js` stay green; the
+  new suite is reached by the `shared/resources/tests/*.test.mjs` glob in `package.json` (review 1, I3).
+- [x] Update the engine header's entry-form list, the six-entry-forms paragraph in
   `probe-boundary-rule.md`, and the `/finalise` zero-guard text so a TypeScript entry is a reachable one.
-- [ ] `CHANGELOG.md` `[Unreleased]` entry citing (task 314).
-- [ ] `npm run validate -- skills/<skill>/` for every changed skill.
+  Tests pin these documents, so run them after the edit: `evals/shared/tests/finalise-dod-prompt-contract.test.mjs`
+  (5 pins on `executed no candidates`), `evals/shared/tests/probes-executed-population.test.mjs`,
+  `evals/shared/tests/qa-gate-preconditions-parity.test.mjs` and `tests/shared-script-literals.test.js`
+  (found by `git grep -ln "probe-boundary-rule" -- '*.test.*'`). No test asserts that a `.ts` entry is
+  declined (`git grep '\.ts#'` over tests and evals: 0 hits), so none breaks on the behaviour change (review 1, I2).
+- [x] `CHANGELOG.md` `[Unreleased]` entry citing (task 314).
+- [x] `npm run validate -- skills/<skill>/` for every changed skill.
 
 ---
 
@@ -335,16 +348,16 @@ None.
 
 ### Functional
 
-- [ ] A fixture library holding each of: a parameter property, an `enum`, a value import under
+- [x] A fixture library holding each of: a parameter property, an `enum`, a value import under
   `"type": "commonjs"`, an extensionless import, a `paths` alias value import loads through the module
   entry form, and each export is scored `rejected` or `accepted`, never declined.
-- [ ] Calibration holds: a refusing control scores held and an accept-everything control on the same
+- [x] Calibration holds: a refusing control scores held and an accept-everything control on the same
   fixture scores reproduced.
-- [ ] Mutation proof holds: unregistering the hook turns the fixture test red with `entry-not-probeable`;
+- [x] Mutation proof holds: unregistering the hook turns the fixture test red with `entry-not-probeable`;
   removing the `paths` handling turns only the alias case red. The QA report names the test that went red.
-- [ ] With no `typescript` resolvable from the repo root, the entry is declined with the named reason and
+- [x] With no `typescript` resolvable from the repo root, the entry is declined with the named reason and
   the searched root, never a raw import error.
-- [ ] The hook writes nothing inside the repo, the escape check is green, and nothing caller-supplied is
+- [x] The hook writes nothing inside the repo, the escape check is green, and nothing caller-supplied is
   interpolated into the child (a test for each, per section 8).
 
 ### Performance
@@ -357,16 +370,16 @@ None.
 
 ### Code Quality
 
-- [ ] `npm run bundle -- --check` reports 0 problems, and the hook file ships in every skill that ships
+- [x] `npm run bundle -- --check` reports 0 problems, and the hook file ships in every skill that ships
   `security-probe.mjs`.
-- [ ] `npm run validate -- skills/<skill>/` passes for each changed skill.
+- [x] `npm run validate -- skills/<skill>/` passes for each changed skill.
 - [ ] `CI=true npm run test:remote` is green on the PR head.
 
 ### Migration
 
-- [ ] The engine header, `probe-boundary-rule.md` and the `/finalise` zero-guard text name the
+- [x] The engine header, `probe-boundary-rule.md` and the `/finalise` zero-guard text name the
   TypeScript entry, and none still says a TypeScript boundary is not probeable.
-- [ ] `CHANGELOG.md` has an `[Unreleased]` entry citing (task 314).
+- [x] `CHANGELOG.md` has an `[Unreleased]` entry citing (task 314).
 - [ ] The QA report says which previously overridden plans now report a reproduced case, if any are known.
 
 ---
@@ -433,6 +446,9 @@ None.
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-11-20 | 1.0     | Initial draft | create-task |
+| 2026-11-20 | 1.1     | Review passed (8/10) — parent-side compiler and hook-API check, tests that pin the probe documents named, bundling and runner reach confirmed, tsconfig-less fixture added | review-task |
+| 2026-11-20 |         | Status → ready-for-development | review-task |
+| 2026-11-20 |         | Implemented: hook, engine wiring, fixture family and suite, docs, bundle; status → ready-for-review | develop-task |
 <!-- change-log-end -->
 
 ---
@@ -440,19 +456,19 @@ None.
 ## Progress Tracking
 
 ### Phase 0: Settle the facts the design rests on
-- [ ] Not started
+- [x] Done 2026-11-20
 
 ### Phase 1: The hook and the fixture family
-- [ ] Not started
+- [x] Done 2026-11-20
 
 ### Phase 2: Wire the module entry form
-- [ ] Not started
+- [x] Done 2026-11-20
 
 ### Phase 3: Prove it
-- [ ] Not started
+- [x] Done 2026-11-20
 
 ### Phase 4: Bundle and document
-- [ ] Not started
+- [x] Done 2026-11-20
 
 ---
 
@@ -473,6 +489,41 @@ None.
 - Edit `shared/resources/` sources, never the bundled `references/` copies, or `npm run bundle` reverts
   the fix.
 - A timing figure has one home, the QA report; never the implementation report.
+
+### Implementation Summary (2026-11-20)
+
+**Approach.** One hook per child (the transpile-once alternative was not needed): the hook costs about
+0.3 s per child over a bare `node -e 0` (seven runs each, load average about 3, timings go to the QA
+report), so a 59-case plan adds about 18 s against `ENGINE_TIMEOUT_MS` of 20 minutes.
+
+**Differences from the plan, and why.**
+
+- The parent resolves `typescript` (from the **entry's directory** upwards) and the engine binds that
+  absolute path into the child as `PROBE_TS_COMPILER`; the hook does not receive the repo root. A throw
+  inside an `--import` hook kills `node` before `RUNNER` can report anything (review 1, I1), so both
+  prerequisites are checked in the parent and declined by name: `typescript-unavailable`
+  (carries the entry directory and the repo root) and `typescript-hook-unavailable` (Node before
+  22.15.0; Node 22.23.5 on the CI image has `registerHooks`, measured on the LAN server).
+- Containment is therefore one layer, `resolveEntry`'s, plus an engine-owned binding; there is no second
+  root check to stand alone. The test that replaces it asserts an ambient `PROBE_TS_COMPILER` never
+  reaches the child.
+- Every TypeScript source loads as a module, `.cts` included (the compiler is given a `.mts` name for
+  it). Loading it as CommonJS passed on Node 26 and failed on the Node 22 CI image, where a CommonJS
+  `require` of a sibling did not go through the resolve hook (found by the first `test:remote` run).
+- The hook is named in the engine by a `// bundle-dependency:` line, because the child loads it by
+  path and no import statement names it; without it the bundler copied nothing.
+- `typescript@5.9.3` is a new devDependency (`package.json` and the lockfile change).
+
+**Testing results.** `shared/resources/tests/security-probe-typescript-entry.test.mjs` (21 tests) and
+the four tests that pin the probe documents pass, with `security-probe.test.mjs` (398 in the combined
+run). Mutation (a), `--import` removed from the spawn: 13 of 21 red, every fixture load declined
+`entry-not-probeable`. Mutation (b), `paths` handling removed from the hook: exactly one test red,
+`loads and scores alias.ts`. Both reverted.
+
+**Deferred work.** A `cli:` entry for `.ts`; a test that holds the three entry-form lists together
+(review 1, O3).
+
+**Completion Date:** 2026-11-20
 
 ### Known Issues
 
