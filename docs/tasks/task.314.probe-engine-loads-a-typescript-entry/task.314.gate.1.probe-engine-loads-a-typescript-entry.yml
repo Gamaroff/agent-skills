@@ -1,0 +1,71 @@
+schema: 2
+task: 'task.314.probe-engine-loads-a-typescript-entry'
+task_title: 'The security probe engine loads a TypeScript entry'
+gate: CONCERNS
+status_reason: 'One medium finding, reproduced by QA: the TypeScript compiler is resolved by walking up from the entry directory with no stop at the repo root, so a typescript in a parent of the repo root is accepted. Everything else holds: 21 tests, two mutation proofs, Node 22 gate green.'
+reviewer: 'QA Engineer'
+head: '548784c73fc58b0f5d1a9953131610bec47a4f4a'
+updated: '2026-11-20T16:47:00Z'
+
+top_issues:
+  - id: 'T314-CR-1'
+    origin: 'code-review, reproduced by QA'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'checkTypeScriptRuntime resolves typescript with createRequire(entryPath).resolve("typescript"), which walks up past the repo root (and consults the parent process NODE_PATH and global folders). Reproduced: a repo root with no compiler of its own, inside a parent directory that holds node_modules/typescript, is probed (verdict engages, executed 2) instead of declined typescript-unavailable. Control: a repo with its own node_modules/typescript engages as it should. The header, probe-boundary-rule.md and the task say the TARGET repository''s own compiler; reviewer confidence was medium and is recorded unchanged.'
+    suggested_action: 'Realpath the resolved compiler and decline typescript-unavailable unless it lies inside the realpath of the repo root; add a test with the compiler only in a parent directory.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 21
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: ['never']
+    boundary_reason: 'The criteria word "never" describes what the committed argv, binding and no-write tests hold (nothing caller-supplied reaches the child; the hook writes nothing). None of the functions the diff adds accepts or rejects external input: checkTypeScriptRuntime is an environment preflight, TS_ENTRY_EXTENSION is a routing test, and the hook is a loader. Containment stays with resolveEntry, which the diff does not change.'
+    notes: 'Compiler provenance is not bounded to the repo root (T314-CR-1). The escape check is green and the hook writes nothing.'
+  performance:
+    status: PASS
+    notes: 'Median per-child cost 363 ms (bare 42 ms, hook 405 ms, 7 runs, load 3.35-3.47); 59 children is about 21 s against ENGINE_TIMEOUT_MS of 20 minutes.'
+  reliability:
+    status: PASS
+    notes: 'Both prerequisites are checked in the parent and declined by name; the .cts defect found on Node 22 is fixed and the Node 22 gate is green.'
+  maintainability:
+    status: PASS
+    notes: 'One hook, one definition of the entry extensions in the engine; generated copies match their sources.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Bound the compiler to the repo root (T314-CR-1).'
+      refs: ['shared/resources/security-probe.mjs']
+  future:
+    - action: 'Memoise ts.findConfigFile per directory in the hook (cleanup CR-2, low).'
+      refs: ['shared/resources/security-probe-ts-hook.mjs']
+      remedy: unverified
+    - action: 'A test that holds the three entry-form lists together (review 1, O3).'
+      refs: ['shared/resources/security-probe.mjs', 'shared/resources/probe-boundary-rule.md', 'skills/finalise/SKILL.md']
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T314-CR-1 fixed']

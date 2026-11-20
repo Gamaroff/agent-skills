@@ -20,7 +20,15 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { cpSync, existsSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
+import {
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+} from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -211,6 +219,47 @@ test("a repository with no typescript is declined by name, with what was searche
     `the searched root must be named: ${r.declined[0].detail}`,
   );
   assert.doesNotMatch(r.declined[0].detail, /Cannot find|ERR_MODULE_NOT_FOUND/);
+});
+
+test("a typescript that exists only ABOVE the repo root is never borrowed (T314-CR-1)", (t) => {
+  const parent = realpathSync(mkdtempSync(join(tmpdir(), "probe-ts-above-")));
+  t.after(() => rmSync(parent, { recursive: true, force: true }));
+  // A compiler in the PARENT of the repo root, none inside it.
+  mkdirSync(join(parent, "node_modules"), { recursive: true });
+  symlinkSync(
+    dirname(
+      createRequire(resolve(HERE, "..", "..", "..", "package.json")).resolve(
+        "typescript/package.json",
+      ),
+    ),
+    join(parent, "node_modules", "typescript"),
+  );
+  const repo = join(parent, "repo");
+  mkdirSync(repo);
+  cpSync(resolve(FX), join(repo, "fx"), { recursive: true });
+  const r = probe("fx/guard.ts#validateHost", CASES, { repoRoot: repo });
+  assert.equal(r.reason, "typescript-unavailable");
+  assert.equal(r.executed, 0);
+  assert.ok(r.declined[0].detail.includes(repo));
+});
+
+test("the control: a typescript inside the repo root, above the entry's directory, is found", (t) => {
+  const parent = realpathSync(mkdtempSync(join(tmpdir(), "probe-ts-inside-")));
+  t.after(() => rmSync(parent, { recursive: true, force: true }));
+  const repo = join(parent, "repo");
+  mkdirSync(join(repo, "node_modules"), { recursive: true });
+  symlinkSync(
+    dirname(
+      createRequire(resolve(HERE, "..", "..", "..", "package.json")).resolve(
+        "typescript/package.json",
+      ),
+    ),
+    join(repo, "node_modules", "typescript"),
+  );
+  cpSync(resolve(FX), join(repo, "fx"), { recursive: true });
+  const r = probe("fx/guard.ts#validateHost", CASES, { repoRoot: repo });
+  assert.deepEqual(r.declined, [], JSON.stringify(r.declined));
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
 });
 
 test("a Node without registerHooks is declined by name with its version", () => {

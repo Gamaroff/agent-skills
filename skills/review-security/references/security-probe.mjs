@@ -117,8 +117,8 @@
  * outside a module"; extensionless imports and `tsconfig` `paths` aliases do not
  * resolve — so the child is started with `--import security-probe-ts-hook.mjs`,
  * which resolves and transpiles through the TARGET repository's own `typescript`
- * package (resolved from the entry's directory upwards, in the parent, before the
- * spawn). It never type-checks and writes nothing. The hook path is a constant
+ * package (found between the entry's directory and the repo root, in the
+ * parent, before the spawn). It never type-checks and writes nothing. The hook path is a constant
  * and the compiler path is the engine's own binding: nothing a plan or case
  * supplies reaches the child's argv. A repository with no resolvable compiler is
  * declined `typescript-unavailable`, and a Node without `module.registerHooks`
@@ -801,9 +801,10 @@ const TS_HOOK_PATH = join(__dirname, "security-probe-ts-hook.mjs");
 /**
  * Whether a TypeScript module entry can be loaded on this host (task.314): the
  * running Node must have the synchronous `module.registerHooks` (Node 22.15.0
- * onward), and a `typescript` package must resolve from the entry's directory
- * upwards — the target repository's own compiler, never one this repository
- * ships. Checked in the parent so a miss is a NAMED decline carrying what to
+ * onward), and a `typescript` package must be installed between the entry's
+ * directory and the repo root, inclusive — the target repository's own
+ * compiler, never one this repository ships and never one above the root.
+ * Checked in the parent so a miss is a NAMED decline carrying what to
  * do, not a crash inside the child's `--import` hook. `nodeApi` is a seam for
  * the test that stands in an older Node.
  *
@@ -822,10 +823,28 @@ export function checkTypeScriptRuntime(
     };
   }
   try {
-    return {
-      ok: true,
-      compiler: createRequire(entryPath).resolve("typescript"),
-    };
+    // Walk from the entry's directory up to the repo root and no further, and
+    // take the first directory that holds a `typescript` package. A plain
+    // `createRequire(entryPath).resolve` keeps climbing past the root and also
+    // reads the parent process's NODE_PATH and global folders, so a compiler
+    // above the repository, or an ambient one, would be borrowed (QA cycle 1,
+    // T314-CR-1). The directory is vetted here, lexically; a symlinked install
+    // inside the repository is the repository's own choice and resolves fine.
+    const root = resolve(repoRoot);
+    for (
+      let dir = dirname(entryPath);
+      dir === root || dir.startsWith(root + sep);
+      dir = dirname(dir)
+    ) {
+      if (existsSync(join(dir, "node_modules", "typescript", "package.json"))) {
+        return {
+          ok: true,
+          compiler: createRequire(join(dir, "noop.js")).resolve("typescript"),
+        };
+      }
+      if (dir === root || dirname(dir) === dir) break;
+    }
+    throw new Error("no typescript inside the repository root");
   } catch {
     return {
       ok: false,

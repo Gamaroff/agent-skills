@@ -440,6 +440,27 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-20
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.314.qa.1.probe-engine-loads-a-typescript-entry.md](./task.314.qa.1.probe-engine-loads-a-typescript-entry.md)
+- **Gate File**: [task.314.gate.1.probe-engine-loads-a-typescript-entry.yml](./task.314.gate.1.probe-engine-loads-a-typescript-entry.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 21
+- **Phases Verified**: 5/5
+- **Critical Issues**: 0
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+One medium finding, reproduced by QA: the TypeScript compiler is resolved by walking up past the repo root, so a `typescript` in a parent directory is accepted where a repository with no compiler of its own should be declined (T314-CR-1).
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -449,6 +470,8 @@ None.
 | 2026-11-20 | 1.1     | Review passed (8/10) — parent-side compiler and hook-API check, tests that pin the probe documents named, bundling and runner reach confirmed, tsconfig-less fixture added | review-task |
 | 2026-11-20 |         | Status → ready-for-development | review-task |
 | 2026-11-20 |         | Implemented: hook, engine wiring, fixture family and suite, docs, bundle; status → ready-for-review | develop-task |
+| 2026-11-20 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-11-20 |         | QA findings fixed — compiler bounded to the repo root (T314-CR-1), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---
@@ -498,7 +521,8 @@ report), so a 59-case plan adds about 18 s against `ENGINE_TIMEOUT_MS` of 20 min
 
 **Differences from the plan, and why.**
 
-- The parent resolves `typescript` (from the **entry's directory** upwards) and the engine binds that
+- The parent finds `typescript` (from the **entry's directory** up to the repo root, never above it:
+  QA cycle 1, T314-CR-1) and the engine binds that
   absolute path into the child as `PROBE_TS_COMPILER`; the hook does not receive the repo root. A throw
   inside an `--import` hook kills `node` before `RUNNER` can report anything (review 1, I1), so both
   prerequisites are checked in the parent and declined by name: `typescript-unavailable`
