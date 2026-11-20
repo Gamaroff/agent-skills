@@ -1,0 +1,152 @@
+{
+  "schema": 1,
+  "dod_n": 3,
+  "head": "353ec3fceb09c5037ac2ddbb920d335dea4d85a6",
+  "dirty_paths": [
+    "docs/tasks/task.286.qa-fix-step4-guard-looks-beneath-gitlinks/task.286.qa-fix-step4-guard-looks-beneath-gitlinks.md"
+  ],
+  "document": "docs/tasks/task.286.qa-fix-step4-guard-looks-beneath-gitlinks/task.286.qa-fix-step4-guard-looks-beneath-gitlinks.md",
+  "result": {
+    "bytes": 7480,
+    "sha256": "4f329450e5121cd4c906542880b2a3e478b4a7cfa6c7c0fbd7b9db7f0cbdbeaf",
+    "verified": true
+  },
+  "scope": {
+    "mode": "scoped",
+    "reason": "prior-record",
+    "rejudged": 2,
+    "carried": 6
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "3fd5b325c17574afff7084408aebf624c11db0a92731460816f3f418f8a1a19c",
+      "status": "PASS",
+      "description": "Directory over gitlink with untracked file refused in bash and zsh, held by scenario",
+      "code_citation": "skills/qa-fix/SKILL.md:938",
+      "test_citation": "tests/qa-fix-step4-guard.test.js:633",
+      "members": [],
+      "non_member_fail": null,
+      "note": "SKILL.md:938-949 lists gitlinks (mode 160000) at or beneath the changed directory and refuses one that holds an untracked file. The REFUSED scenarios gitlink-under-dir (:633) and gitlink-under-dir-trailing-slash (:640) cover `pkg2` and `pkg2/`, and the REFUSED loop runs them under every shell in SHELLS (bash and zsh). tests/*.test.js is in the test:suite glob, so they run per-PR."
+    },
+    {
+      "id": "#2",
+      "text_hash": "9cd062ef9e15ad3cd6a0f01db7d14d6ae68e81feeaa2089e057c76bdfc4146fa",
+      "status": "PASS",
+      "description": "Directory over clean checked-out gitlink admitted, held by scenario",
+      "code_citation": "skills/qa-fix/SKILL.md:941",
+      "test_citation": "tests/qa-fix-step4-guard.test.js:506",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The ADMITTED scenario clean-gitlink-under-dir expects `pkg2` over a clean checked-out gitlink to be admitted. SKILL.md:941-946 flags a gitlink only when it is not its own top level or holds an untracked file."
+    },
+    {
+      "id": "#3",
+      "text_hash": "415bd502eec414e7a06c3566c2d5f119a4518e63148d8fa0824c96c8c5f76423",
+      "status": "PASS",
+      "description": "CR-3 route behaves as decided in Phase 1 and a scenario holds it",
+      "code_citation": "skills/qa-fix/SKILL.md:894",
+      "test_citation": "tests/qa-fix-step4-guard.test.js:766",
+      "members": [],
+      "non_member_fail": null,
+      "note": "SKILL.md:894-896 documents that an absolute path through an external symlink is refused by git ('could not look') and that this is intended (T286-CR-3). The existing test at :766 holds that refusal. The QA report records CR-3 as 'did not reproduce, documented'."
+    },
+    {
+      "id": "#4",
+      "text_hash": "0a4bbc2701881b4096eb9d0a490ca64278def7249bae3c0ef66c7d063bc5297f",
+      "status": "PASS",
+      "description": "Inside test works when TOP is /, held by committed test of the comparison",
+      "code_citation": "skills/qa-fix/SKILL.md:927",
+      "test_citation": "tests/qa-fix-step4-guard.test.js:924",
+      "members": [],
+      "non_member_fail": null,
+      "note": "SKILL.md:927 sets TOPP=${TOP%/} before the case comparison. The test at :924 runs the line with TOP=/ and LEX=/a/b in bash and zsh and expects INSIDE=1. It also expects the pre-fix line to give an empty INSIDE, and /repo vs /repo2 to stay correct."
+    },
+    {
+      "id": "#5",
+      "text_hash": "ce78e9ce236bcb0677a72af20523cd473367719ba41cc6b87bab49f708e5c15a",
+      "status": "PASS",
+      "description": "No performance criterion; block runs once per fix cycle (approved N/A)",
+      "code_citation": "docs/tasks/task.286.qa-fix-step4-guard-looks-beneath-gitlinks/task.286.qa-fix-step4-guard-looks-beneath-gitlinks.md:182",
+      "test_citation": "NOT_APPLICABLE: no performance bound stated; owner-approved not-applicable reading",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Decision. The criterion states no number, so it is not a measured criterion and there is nothing a per-PR test could assert. It is a non-requirement. The task doc line 267 says so, and line 182 now carries the text '(Not applicable: no bound to meet; approved by Lorien Gamaroff 2026-11-21.)'. criteria-drift.js (exit 0) reports #5 as kind `reworded`, `approved: true`, approver 'Lorien Gamaroff 2026-11-21'. The amendment rule therefore does not fail it. The citation is the criterion line itself, because nothing else can be cited. It is not failed for lacking a test, because the recorded owner approval makes the N/A reading apply. I did not treat the ticked checkbox as evidence."
+    },
+    {
+      "id": "#6",
+      "text_hash": "f671fac6300c758def4c4a65318ffd3021925d9b2303ab5950791e5607cd553c",
+      "status": "PASS",
+      "description": "Each new clause has a mutant that turns a committed test red",
+      "code_citation": "docs/tasks/task.286.qa-fix-step4-guard-looks-beneath-gitlinks/task.286.qa.1.qa-fix-step4-guard-looks-beneath-gitlinks.md:145",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "untracked-file look inside a gitlink (GU)",
+          "evidence": "task.286.qa.1...md:145; tests/qa-fix-step4-guard.test.js:892",
+          "status": "PASS"
+        },
+        {
+          "member": "could-not-look test (GP/GT)",
+          "evidence": "task.286.qa.1...md:146; tests/qa-fix-step4-guard.test.js:899",
+          "status": "PASS"
+        },
+        {
+          "member": "gitlink listing (grep 160000)",
+          "evidence": "task.286.qa.1...md:147; tests/qa-fix-step4-guard.test.js:906",
+          "status": "PASS"
+        },
+        {
+          "member": "own-level gate (NEST = TOP)",
+          "evidence": "task.286.qa.1...md:148; tests/qa-fix-step4-guard.test.js:913",
+          "status": "PASS"
+        },
+        {
+          "member": "TOPP strip of trailing / (CR-2)",
+          "evidence": "tests/qa-fix-step4-guard.test.js:924 (the old line goes red; INSIDE_LINE is pinned at :806)",
+          "status": "PASS"
+        },
+        {
+          "member": "ls-files -s failure fallback",
+          "evidence": "task.286.qa.1...md:149 (no committed test, the one fallback the criterion excepts)",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Each unit has a committed record of the revert and the test that went red. The criterion itself excepts the one defensive fail-closed fallback, which the QA report names as no-red-untested."
+    },
+    {
+      "id": "#7",
+      "text_hash": "b6cb5e5b6d4996fda6723627f5af979f1ae2db4c9af5daef2f01910a40be186b",
+      "status": "PASS",
+      "description": "validate for skills/qa-fix/ and ci:fast pass",
+      "code_citation": ".github/workflows/test.yml:1",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 353ec3fceb09c5037ac2ddbb920d335dea4d85a6 — CI-state criterion, returned ungraded. It asks that `npm run validate -- skills/qa-fix/` and `npm run ci:fast` pass. The only evidence is the state of the PR's CI run (.github/workflows/test.yml and validate.yml). The criterion's own text records a LAN-server run (exit 0, 2026-11-20), but that run is self-reported and predates head 353ec3f. /finalise Step 6 grades it from CI reading 1.",
+      "ci_reading": "CI reading 1: SUCCESS @ 353ec3fceb09c5037ac2ddbb920d335dea4d85a6"
+    },
+    {
+      "id": "#8",
+      "text_hash": "f83f9900ba4b1d797918a311b9cb0cbb87c20c7ea2d635440d13189039caafb4",
+      "status": "PASS",
+      "description": "CHANGELOG [Unreleased] entry citing (task 286)",
+      "code_citation": "CHANGELOG.md:9",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "CHANGELOG.md:9 under [Unreleased] > Fixed reads 'qa-fix Step 4 guard looks beneath gitlinks (task 286)' and describes the change. I did not confirm a changelog corpus guard that pins this entry. tests/release-ci-gate.test.js mentions CHANGELOG, but I did not read it for that."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#8",
+      "note": "The prior run's carried note says no changelog corpus guard was confirmed. Not re-checked in this scoped run, and it does not change the PASS."
+    },
+    {
+      "ac_id": "#7",
+      "note": "The criterion text embeds a dated, self-reported result ('ci:fast ran on the LAN server ... exit 0, 2026-11-20'). That text is not evidence for grading. PR 927 is OPEN with an empty reviewDecision."
+    }
+  ]
+}

@@ -5,16 +5,18 @@ type: task
 description: "Close the residual false clean left by task 285: a changed directory that contains a gitlink holding an untracked file reads clean in the qa-fix Step 4 guard. Fold in two small advisories from the same QA gate."
 tags: [qa-fix, develop-task, security, deferred-work]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-11-07
-updated: 2026-11-20
+updated: 2026-11-21
+completed_date: 2026-11-21
+pr_number: 927
 estimated_effort_hours: 4
 ---
 
 # Task 286: qa-fix Step 4 guard looks beneath gitlinks
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.286.review.1.qa-fix-step4-guard-looks-beneath-gitlinks.md` implemented 2026-11-20
 
 ---
@@ -179,7 +181,7 @@ None.
 
 ### Performance
 
-- [ ] No performance criterion; the block runs once per fix cycle.
+- [x] No performance criterion; the block runs once per fix cycle. (Not applicable: no bound to meet; approved by Lorien Gamaroff 2026-11-21.)
 
 ### Code Quality
 
@@ -256,11 +258,26 @@ None.
 ### Key Findings
 No blocking issues. Two low findings reproduced and are recorded as future work: a gitlink nested inside a gitlink is not looked into (pre-existing), and a non-ASCII gitlink path is refused for the wrong reason (new, safe side).
 
-## Definition of Done - Gaps Identified
+## Definition of Done - PASSED ✅
 
-**Status:** IN PROGRESS
+**Status:** ACCEPTED
 
-QA gate PASS (95/100) and the security boundary held (36 executed, 0 reproduced). One criterion is open.
+All Definition of Done criteria verified (DoD run 3):
+
+✅ **Acceptance Criteria:** 8 of 8 (#5 recorded as not applicable, approved by Lorien Gamaroff 2026-11-21; #7 graded from CI reading 1)
+✅ **QA gate:** PASS, 95/100 (`task.286.gate.1.qa-fix-step4-guard-looks-beneath-gitlinks.yml`)
+✅ **PR review:** APPROVE (`task.286.pr-review.1.qa-fix-step4-guard-looks-beneath-gitlinks.md`)
+✅ **Security:** boundary held, 36 executed, 0 reproduced
+✅ **Docs:** CHANGELOG entry and skill prose updated
+✅ Compliance: not applicable
+
+**Detailed Verification Log:** See `task.286.dod.3.qa-fix-step4-guard-looks-beneath-gitlinks.md`.
+
+## Definition of Done - Gaps Identified — run 2 (historical, superseded)
+
+**Status:** SUPERSEDED by run 3
+
+DoD run 2: QA gate PASS (95/100) and the security boundary held (36 executed, 0 reproduced). One criterion was open.
 
 ### Missing Criteria:
 
@@ -285,6 +302,7 @@ QA gate PASS (95/100) and the security boundary held (36 executed, 0 reproduced)
 | 2026-11-20 |         | Implemented CR-1 (gitlink look), CR-2 (root top level), CR-3 documented; status → ready-for-review | develop |
 | 2026-11-20 |         | QA gate PASS (95/100) — 2 low findings, advisory | qa-task |
 | 2026-11-20 |         | DoD incomplete — 1 gap identified (Success Criteria #5) | finalise |
+| 2026-11-21 | 1.2     | DoD passed — accepted (PR #927); #5 recorded as not applicable, approved by Lorien Gamaroff | finalise |
 <!-- change-log-end -->
 
 ---
