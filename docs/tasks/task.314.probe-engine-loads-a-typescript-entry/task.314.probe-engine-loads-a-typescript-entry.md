@@ -442,24 +442,24 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-20
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 95/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.314.qa.3.probe-engine-loads-a-typescript-entry.md](./task.314.qa.3.probe-engine-loads-a-typescript-entry.md)
-- **Gate File**: [task.314.gate.3.probe-engine-loads-a-typescript-entry.yml](./task.314.gate.3.probe-engine-loads-a-typescript-entry.yml)
+- **Full Report**: [task.314.qa.4.probe-engine-loads-a-typescript-entry.md](./task.314.qa.4.probe-engine-loads-a-typescript-entry.md)
+- **Gate File**: [task.314.gate.4.probe-engine-loads-a-typescript-entry.yml](./task.314.gate.4.probe-engine-loads-a-typescript-entry.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 28
+- **Tests Executed**: 30
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-The three cycle 2 fixes hold. One medium finding, reproduced by QA: a tsconfig inside the repo that extends a file above the repo root still inherits its options (T314-CR3-1).
+The cycle 3 fix holds. No open findings; three low-severity advisories are recorded in the gate for follow-up.
 
 <!-- change-log-start -->
 ## Change Log
@@ -476,6 +476,7 @@ The three cycle 2 fixes hold. One medium finding, reproduced by QA: a tsconfig i
 | 2026-11-20 |         | QA findings fixed — ES2022 default target, tsconfig lookup bounded to the repo root, root-of-/ bound (T314-CR2-1 to -3), 2 iterations | qa-fix |
 | 2026-11-20 |  | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-11-20 |         | QA findings fixed — every compiler filesystem read goes through one root-bound host, so a tsconfig `extends` above the repo root is not inherited (T314-CR3-1), 1 iteration | qa-fix |
+| 2026-11-20 |  | QA gate PASS (95/100) — 0 findings | qa-task |
 <!-- change-log-end -->
 
 ---
