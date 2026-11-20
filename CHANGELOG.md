@@ -14,7 +14,8 @@ All notable changes to this project will be documented in this file. Format foll
   prose now fails it. The `--body-file` posting sites cite `file-write-rules.md#fresh-body-post`, and
   the QA posting blocks re-check the read-back immediately before they post. A body file is now
   single-use: `tracker-comment.js` removes `--body-file` once the comment is posted, already there or
-  deferred, so a skipped write fails instead of re-posting the previous comment, and `create-issue`
+  deferred into the journal (a deferral whose journal write failed keeps the file, its only copy), so a
+  skipped write fails instead of re-posting the previous comment, and `create-issue`
   stops on a missing body or one that does not name its own document.
 
 ### Added

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-284-BUG-1
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (QA cycle 1, code review CR-1, confirmed against the base)
 **Date Found**: 2026-11-20
 
@@ -61,3 +61,4 @@ that names another document, and it still refuses an unsubstituted `{token}`.
 | Date | Status | Changed By | Notes |
 | --- | --- | --- | --- |
 | 2026-11-20 | Ready for QA | qa-fix | Fix applied in QA cycle 1; verification in the next gate |
+| 2026-11-20 | Closed | qa-task | Verified by task.284.qa.2.migrate-payload-heredocs-to-file-tool.md |

@@ -1,0 +1,77 @@
+schema: 2
+task: 'task.284.migrate-payload-heredocs-to-file-tool'
+task_title: 'Migrate shipped payload heredocs to the file tool'
+gate: CONCERNS
+status_reason: 'Both cycle-1 findings are fixed and verified (bugs 1 and 2 closed). The refute pass found one new medium defect in the cycle-1 fix itself: a deferred comment whose journal write fails loses its only copy, because the engine now consumes the body file on every deferred outcome. CI on the head is green.'
+reviewer: 'QA Engineer'
+head: 'ecb8ba8a258bfb579ffb012aa7f6495b6fa3e858'
+updated: '2026-11-20T10:49:28Z'
+
+top_issues:
+  - id: 'TASK-284-C2-CR-1'
+    severity: medium
+    file: 'shared/resources/tracker-comment.js'
+    finding: 'When the deferred journal write throws, the catch emits reason deferred with no record, and emit() then removes --body-file. The body is not posted, not journalled and not on disk. Reproduced: with the journal path unwritable the file is gone and record is none; with a working journal the record exists and removal is correct; against the base engine the file survives both. Origin: code-review, reproduced by QA. The reviewer rated it high confidence.'
+    suggested_action: 'Consume on posted and already, and on deferred only when payload.record is set. Add tests for the journal-failure path (file kept) and the record path (file consumed), and correct the contract sentence.'
+    suggested_owner: dev
+    bug_ref: 'task.284.bug.3.deferred-comment-loses-its-body-when-the-journal-write-fails.md'
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 8668
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, 4, 5]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    boundary_signals: []
+    notes: 'Prose, tests and a file-removal in the comment engine. No input gate is added. The criteria carry no boundary signal. The unlink path is the caller-supplied --body-file; every importer passes a throwaway state file.'
+  performance:
+    status: PASS
+    notes: 'Measured in cycle 1 (head 610,751 ms against develop 631,771 ms). Cycle 1 added one unlink and no work per test; not re-measured.'
+  reliability:
+    status: CONCERNS
+    notes: 'The deferred-with-no-record path drops a comment (TASK-284-C2-CR-1). Bugs 1 and 2 are closed: create-issue refuses an absent, empty or foreign body, and a posted body file is single-use.'
+  maintainability:
+    status: PASS
+    notes: 'The single-use rule lives once, in the engine, with fresh-body-post step 3 and the contract paragraph stating it. Bundled copies match their sources.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 1
+  fix_date: '2026-11-20'
+  verification_method: 'Reproduction against the committed head, the create-issue guard run in a temporary directory with five cases, and the engine test file (108 pass under TMPDIR=/tmp)'
+
+recommendations:
+  immediate:
+    - action: 'Keep the body file when a deferred outcome has no record (TASK-284-C2-CR-1).'
+      refs: ['shared/resources/tracker-comment.js', 'shared/resources/tracker-comment-contract.md']
+  future:
+    - action: 'Residual of the single-use rule: a failed or unverifiable post keeps the body file at the shared fixed path, so a later call that skips its write posts the stale body rather than exiting 2. State the residual in the contract, or add a stage or nonce check (reviewer CR-2, low, not reproduced).'
+      refs: ['shared/resources/tracker-comment.js']
+      remedy: unverified
+    - action: 'The qa-task and qa-story post block folds the lead into the body file in place, so a re-run after an interruption between the fold and the rm prepends a second lead. Fold into a copy instead (reviewer CR-3, low, not reproduced).'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+      remedy: unverified
+    - action: 'Reduce the first qa-task and qa-story block to the mkdir; its read-back guard is repeated before the post (cycle 1 cleanup, advisory).'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['Fix TASK-284-C2-CR-1 before merge']

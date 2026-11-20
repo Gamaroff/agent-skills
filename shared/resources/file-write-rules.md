@@ -49,6 +49,6 @@ A post can republish last cycle's body if the write failed and the post ran anyw
 2. Before the post, assert a line only this cycle's body carries (the commit sha, the cycle number)
    and stop without posting when it is absent.
 3. A body file at a fixed path is single-use. `tracker-comment.js` removes it once the comment is
-   posted, already there or deferred, so a call with no new write fails (exit 2, missing file)
+   posted, already there or deferred into the journal (a deferral whose journal write failed keeps it), so a call with no new write fails (exit 2, missing file)
    instead of re-posting. A block that posts a body file by another route (`gh pr comment
    --body-file`) removes it itself after the post attempt, and stops when it is missing or empty.

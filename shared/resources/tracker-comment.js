@@ -578,7 +578,13 @@ async function run({
   // exit code.
   const CONSUMING_REASONS = new Set(["posted", "already", "deferred"]);
   const emit = (payload, exitCode) => {
-    if (CONSUMING_REASONS.has(payload.reason) && args.bodyFile) {
+    // "deferred" consumes only when a journal record carries the body. A deferred
+    // outcome whose journal write failed has no record, and the file is then the
+    // body's only copy (task 284, QA cycle 2, bug 3).
+    const delivered =
+      CONSUMING_REASONS.has(payload.reason) &&
+      (payload.reason !== "deferred" || Boolean(payload.record));
+    if (delivered && args.bodyFile) {
       try {
         fs.unlinkSync(args.bodyFile);
       } catch (_) {

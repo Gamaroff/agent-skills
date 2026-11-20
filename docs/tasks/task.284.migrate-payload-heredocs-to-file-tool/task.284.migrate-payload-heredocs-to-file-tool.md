@@ -218,17 +218,17 @@ Population commands: `git grep -nE "(cat|tee)[^|]*<<-?['\"]?[A-Za-z_]+['\"]?" --
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.284.qa.1.migrate-payload-heredocs-to-file-tool.md](./task.284.qa.1.migrate-payload-heredocs-to-file-tool.md)
-- **Gate File**: [task.284.gate.1.migrate-payload-heredocs-to-file-tool.yml](./task.284.gate.1.migrate-payload-heredocs-to-file-tool.yml)
+- **Full Report**: [task.284.qa.2.migrate-payload-heredocs-to-file-tool.md](./task.284.qa.2.migrate-payload-heredocs-to-file-tool.md)
+- **Gate File**: [task.284.gate.2.migrate-payload-heredocs-to-file-tool.yml](./task.284.gate.2.migrate-payload-heredocs-to-file-tool.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 8664
+- **Tests Executed**: 8668
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-Two medium findings: `create-issue` and the tracker-comment post blocks no longer guarantee that the posted body was written in the same run (bug reports 1 and 2). Performance is within bound (head 610,751 ms against 631,771 ms on `develop`).
+Bugs 1 and 2 are fixed and closed. The refute pass found one new medium defect in the cycle-1 engine fix: a deferred comment whose journal write fails loses its only copy (bug 3). CI on the head is green.
 
 <!-- change-log-start -->
 ## Change Log
@@ -241,6 +241,8 @@ Two medium findings: `create-issue` and the tracker-comment post blocks no longe
 | 2026-11-20 |         | All 31 payload heredocs migrated, allowlist emptied, CI-parity gate green; status → ready-for-review | develop-task |
 | 2026-11-20 |         | QA gate CONCERNS (90/100) — 2 findings                                      | qa-task |
 | 2026-11-20 |         | QA findings fixed — 2 bugs Ready for QA, 1 iteration                        | qa-fix |
+| 2026-11-20 |         | QA gate CONCERNS (90/100) — 1 finding (bugs 1 and 2 closed)                 | qa-task |
+| 2026-11-20 |         | QA findings fixed — 1 bug Ready for QA, 1 iteration                         | qa-fix |
 <!-- change-log-end -->
 
 ---

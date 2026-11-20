@@ -384,6 +384,47 @@ test("an 'already' outcome also removes the body file", async () => {
   assert.equal(existsSync(f), false, "nothing more will read the file");
 });
 
+async function runDeferred(breakJournal) {
+  const dir = withRepo();
+  const state = join(dir, ".claude", "state");
+  mkdirSync(state, { recursive: true });
+  // A directory where the journal file belongs makes the append throw.
+  if (breakJournal) mkdirSync(join(state, "tracker-actions.jsonl"));
+  const f = bodyFile(dir, "the only copy of this comment");
+  const gh = stubGh({ comments: [] });
+  const r = await cli.run({
+    argv: [
+      "node",
+      "x",
+      "--issue",
+      "42",
+      "--body-file",
+      f,
+      "--stage",
+      "done",
+      "--quiet",
+    ],
+    execImpl: gh.execImpl,
+    repoRoot: dir,
+    env: { ...baseEnv, ACCESS_TRACKER: "manual" },
+  });
+  return { r, f };
+}
+
+test("a deferred outcome with a journal record removes the body file", async () => {
+  const { r, f } = await runDeferred(false);
+  assert.equal(r.reason, "deferred");
+  assert.ok(r.record, "the journal holds the body");
+  assert.equal(existsSync(f), false);
+});
+
+test("a deferred outcome whose journal write failed keeps the body file", async () => {
+  const { r, f } = await runDeferred(true);
+  assert.equal(r.reason, "deferred");
+  assert.equal(r.record, undefined, "nothing was recorded");
+  assert.equal(existsSync(f), true, "the file is the body's only copy");
+});
+
 test("two marker matches keep the body file: the outcome is unverifiable, a retry needs it", async () => {
   const marker = cli.markerHtml("done");
   const { r, f } = await runConsuming([

@@ -84,8 +84,9 @@ what makes two different comments on the same issue hash to two different
 records instead of collapsing into one.
 
 **A body file is single-use.** The engine removes `--body-file` once the outcome is `posted`,
-`already` or `deferred` (the deferred record already carries the body on stdin). Every other outcome
-keeps it, so a retry still has its body, and a call with no fresh write fails with exit 2 (missing
+`already` or `deferred` with a record id (the record carries the body on stdin). A `deferred` outcome
+with no record, because the journal write failed, keeps the file: it is then the body's only copy.
+Every other outcome keeps it, so a retry still has its body, and a call with no fresh write fails with exit 2 (missing
 file) rather than posting the previous comment. Write the body again before each call.
 
 **`--stage` is the comment's identity**, not a board column. It is what builds
