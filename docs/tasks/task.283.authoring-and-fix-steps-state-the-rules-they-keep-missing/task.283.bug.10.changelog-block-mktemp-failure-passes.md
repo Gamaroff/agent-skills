@@ -4,7 +4,7 @@
 **Bug ID**: TASK-283-BUG-10
 **Severity**: MEDIUM
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer (code-review CR-1, reproduced; CR-2, CR-3 and CR-4 folded in)
 **Date Found**: 2026-11-20
 
@@ -29,3 +29,9 @@ No temp files: both bullet lists are held in variables, and a failed read HALTs.
 
 ## Recommendation
 Hold the lists in variables; HALT on a failed read; capture the diff exit code safely; name the remedy; test each.
+
+## Status History
+
+| Date | Status | Changed By | Notes |
+| --- | --- | --- | --- |
+| 2026-11-20 | Closed | qa-task | Verified by task.283.qa.5 |

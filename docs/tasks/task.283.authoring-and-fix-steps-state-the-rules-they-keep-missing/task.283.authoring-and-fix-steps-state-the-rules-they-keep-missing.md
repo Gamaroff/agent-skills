@@ -228,7 +228,7 @@ The prose rules of Phases 1 (review-task claim check), 3 and 4: a fresh session 
 
 ### Performance
 
-- [ ] `CI=true command npm test` wall time is within 10% of `develop`, as the median of five alternating runs with `uptime` beside each, taken on one host (the LAN server via `command npm run test:remote`, not the laptop) and recorded in the QA report.
+- [x] `CI=true command npm test` wall time is within 10% of `develop`, as the median of five alternating runs with `uptime` beside each, taken on one host (the LAN server via `command npm run test:remote`, not the laptop) and recorded in the QA report.
 
 ### Code Quality
 
@@ -323,21 +323,21 @@ None identified.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-20
-**Quality Score**: 82/100
+**Quality Score**: 88/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.283.qa.4.authoring-and-fix-steps-state-the-rules-they-keep-missing.md](./task.283.qa.4.authoring-and-fix-steps-state-the-rules-they-keep-missing.md)
-- **Gate File**: [task.283.gate.4.authoring-and-fix-steps-state-the-rules-they-keep-missing.yml](./task.283.gate.4.authoring-and-fix-steps-state-the-rules-they-keep-missing.yml)
+- **Full Report**: [task.283.qa.5.authoring-and-fix-steps-state-the-rules-they-keep-missing.md](./task.283.qa.5.authoring-and-fix-steps-state-the-rules-they-keep-missing.md)
+- **Gate File**: [task.283.gate.5.authoring-and-fix-steps-state-the-rules-they-keep-missing.yml](./task.283.gate.5.authoring-and-fix-steps-state-the-rules-they-keep-missing.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 30 CHANGELOG-placement tests in this cycle's files; CI-parity run on the server at an earlier tree: 8642 tests, 8639 pass
+- **Tests Executed**: CI-parity run on the LAN server at the reviewed commit: 8658 pass, 0 fail, 3 skipped; 40 CHANGELOG-placement tests
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: CONCERNS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-The cycle 3 rewrite holds: QA-10 closed. The scoped review reproduced one more medium defect in the rewritten block: a failed `mktemp` reads as a pass (T283-QA-11). The wall-time criterion is still unrecorded (T283-QA-3).
+The wall-time criterion is met: median of five alternating runs, develop 750 s and branch 763 s (+1.7%). The cycle 4 fix holds. One reproduced medium remains in the CHANGELOG block: a valid edit aborts silently under `set -e` when the released region holds no bullets (T283-QA-12). The gate budget is spent, so the fix is left for an owner decision.
 
 <!-- change-log-start -->
 ## Change Log
@@ -356,6 +356,7 @@ The cycle 3 rewrite holds: QA-10 closed. The scoped review reproduced one more m
 | 2026-11-20 |         | QA findings fixed — CHANGELOG block mechanism replaced; wall-time measurement pending, 3 iterations | qa-fix      |
 | 2026-11-20 |         | QA gate CONCERNS (82/100) — 1 new medium (mktemp failure reads as a pass), wall time recording | qa-task     |
 | 2026-11-20 |         | QA findings fixed — temp files removed, set -e safe, remedy named; wall-time measurement pending, 4 iterations | qa-fix      |
+| 2026-11-20 |         | QA gate CONCERNS (88/100) — wall time met (+1.7%), 1 medium open (set -e on an empty region), gate budget spent | qa-task     |
 <!-- change-log-end -->
 
 ---

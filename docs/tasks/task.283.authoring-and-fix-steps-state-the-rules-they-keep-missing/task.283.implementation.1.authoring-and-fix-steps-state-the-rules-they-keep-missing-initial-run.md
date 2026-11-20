@@ -191,6 +191,16 @@ Probe: `git grep -F -i -e 'mktemp' -e 'cannot look'` over SKILL.md, shared resou
 Population: 1
 Importer audit: no shared parser widened; skipped.
 
+### QA Cycle 5 — 2026-11-20
+**Gate Result**: CONCERNS (88/100)
+**Issues Found**: 1 medium (a valid edit aborts silently under set -e when the released region holds no bullets), 3 low folded in; wall-time criterion met (median +1.7%)
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**Traceability**: skipped (no Acceptance Criteria section)
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: budget — 5 of 5 gates used; the fix is not applied, because an ungated fix is never handed over
+**Action**: Escalated to the owner (fix with a sixth gate, or accept the limit)
+
 ---
 
 ## Completion

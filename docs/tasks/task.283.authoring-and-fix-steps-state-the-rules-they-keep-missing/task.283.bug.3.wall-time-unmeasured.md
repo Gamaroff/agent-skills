@@ -4,7 +4,7 @@
 **Bug ID**: TASK-283-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: New
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-11-19
 
@@ -25,3 +25,9 @@ One success criterion cannot be marked verified.
 
 ## Recommendation
 Run the pairs in a quiet window using the task 282 QA-2 procedure, and record them in the QA report.
+
+## Status History
+
+| Date | Status | Changed By | Notes |
+| --- | --- | --- | --- |
+| 2026-11-20 | Closed | qa-task | Verified by task.283.qa.5 |
