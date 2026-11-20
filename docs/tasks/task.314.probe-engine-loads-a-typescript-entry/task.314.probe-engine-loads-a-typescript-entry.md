@@ -445,21 +445,21 @@ None.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-20
-**Quality Score**: 80/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.314.qa.2.probe-engine-loads-a-typescript-entry.md](./task.314.qa.2.probe-engine-loads-a-typescript-entry.md)
-- **Gate File**: [task.314.gate.2.probe-engine-loads-a-typescript-entry.yml](./task.314.gate.2.probe-engine-loads-a-typescript-entry.yml)
+- **Full Report**: [task.314.qa.3.probe-engine-loads-a-typescript-entry.md](./task.314.qa.3.probe-engine-loads-a-typescript-entry.md)
+- **Gate File**: [task.314.gate.3.probe-engine-loads-a-typescript-entry.yml](./task.314.gate.3.probe-engine-loads-a-typescript-entry.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 23
+- **Tests Executed**: 28
 - **Phases Verified**: 5/5
 - **Critical Issues**: 0
-- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-The cycle 1 fix holds. The refute pass found three more defects, each reproduced by QA: the hook compiles to ES5 when no `target` is set (T314-CR2-1), its tsconfig lookup climbs past the repo root (T314-CR2-2), and the root bound fails for a root of `/` (T314-CR2-3).
+The three cycle 2 fixes hold. One medium finding, reproduced by QA: a tsconfig inside the repo that extends a file above the repo root still inherits its options (T314-CR3-1).
 
 <!-- change-log-start -->
 ## Change Log
@@ -474,6 +474,8 @@ The cycle 1 fix holds. The refute pass found three more defects, each reproduced
 | 2026-11-20 |         | QA findings fixed — compiler bounded to the repo root (T314-CR-1), 1 iteration | qa-fix |
 | 2026-11-20 |  | QA gate CONCERNS (80/100) — 3 findings | qa-task |
 | 2026-11-20 |         | QA findings fixed — ES2022 default target, tsconfig lookup bounded to the repo root, root-of-/ bound (T314-CR2-1 to -3), 2 iterations | qa-fix |
+| 2026-11-20 |  | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-11-20 |         | QA findings fixed — every compiler filesystem read goes through one root-bound host, so a tsconfig `extends` above the repo root is not inherited (T314-CR3-1), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

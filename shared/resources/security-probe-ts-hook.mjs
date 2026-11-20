@@ -29,7 +29,7 @@
  */
 import { createRequire, registerHooks } from "node:module";
 import { readFileSync } from "node:fs";
-import { dirname, isAbsolute, relative, sep } from "node:path";
+import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const compilerPath = process.env.PROBE_TS_COMPILER;
@@ -50,14 +50,38 @@ const TS_DECLARATION = /\.d\.[cm]?ts$/;
 /** The compiler options for the nearest tsconfig of `file`, parsed once per config. */
 const optionsByConfig = new Map();
 const NO_CONFIG = Symbol("no-tsconfig");
+/**
+ * The ONE host every compiler call reads the filesystem through: it answers only
+ * for paths inside the repo root. The tsconfig lookup, the `extends` chain, the
+ * `paths` and module resolution all read through it, so nothing above the root
+ * can reach the probe: each of those was bounded one at a time before (QA cycles
+ * 1 to 3: the compiler, the located tsconfig, its `extends`) and a fourth
+ * unbounded read was the expected next finding.
+ */
+const within = (p) => {
+  const rel = relative(root, resolve(p));
+  return (
+    rel === "" ||
+    (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel))
+  );
+};
+const rooted = {
+  ...ts.sys,
+  fileExists: (p) => within(p) && ts.sys.fileExists(p),
+  readFile: (p) => (within(p) ? ts.sys.readFile(p) : undefined),
+  directoryExists: (p) => within(p) && ts.sys.directoryExists(p),
+  readDirectory: (p, ...rest) =>
+    within(p) ? ts.sys.readDirectory(p, ...rest) : [],
+  realpath: (p) => (within(p) ? ts.sys.realpath(p) : p),
+};
+
 const configByDir = new Map();
 function nearestConfig(dir) {
   if (!configByDir.has(dir)) {
-    const found = ts.findConfigFile(dir, ts.sys.fileExists, "tsconfig.json");
-    const rel = found === undefined ? "" : relative(root, found);
-    const inside =
-      rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel);
-    configByDir.set(dir, found !== undefined && inside ? found : undefined);
+    configByDir.set(
+      dir,
+      ts.findConfigFile(dir, rooted.fileExists, "tsconfig.json"),
+    );
   }
   return configByDir.get(dir);
 }
@@ -74,11 +98,13 @@ function compilerOptions(file) {
           ts.ModuleResolutionKind.Bundler ?? ts.ModuleResolutionKind.NodeJs,
       };
     } else {
-      const { config: json } = ts.readConfigFile(config, ts.sys.readFile);
+      const { config: json } = ts.readConfigFile(config, rooted.readFile);
       options = ts.parseJsonConfigFileContent(
         json ?? {},
-        ts.sys,
+        rooted,
         dirname(config),
+        undefined,
+        config,
       ).options;
     }
     optionsByConfig.set(key, options);
@@ -101,7 +127,7 @@ registerHooks({
         specifier,
         parentFile,
         compilerOptions(parentFile),
-        ts.sys,
+        rooted,
       ).resolvedModule;
       if (
         found !== undefined &&

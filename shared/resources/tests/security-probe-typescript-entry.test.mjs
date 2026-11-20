@@ -198,13 +198,31 @@ function repoWithEs5Config(t, at) {
   mkdirSync(join(repo, "node_modules"), { recursive: true });
   symlinkSync(OWN_TS, join(repo, "node_modules", "typescript"));
   cpSync(resolve(FX_NO_CONFIG), join(repo, "fx"), { recursive: true });
+  const es5 = JSON.stringify({ compilerOptions: { target: "ES5" } });
+  if (at === "extends-parent" || at === "extends-inside") {
+    // The repo's own tsconfig only `extends` a base that asks for ES5: above the root or inside it.
+    const base =
+      at === "extends-parent"
+        ? join(parent, "base.json")
+        : join(repo, "base.json");
+    writeFileSync(base, es5);
+    writeFileSync(
+      join(repo, "tsconfig.json"),
+      JSON.stringify({
+        extends: at === "extends-parent" ? "../base.json" : "./base.json",
+      }),
+    );
+    return repo;
+  }
   const dir = at === "parent" ? parent : repo;
-  writeFileSync(
-    join(dir, "tsconfig.json"),
-    JSON.stringify({ compilerOptions: { target: "ES5" } }),
-  );
+  writeFileSync(join(dir, "tsconfig.json"), es5);
   return repo;
 }
+
+/** The ES5 crash signature: the refusal is not recognised, so the hostile case is accepted, not declined. */
+const es5Signature = (r) =>
+  r.declined.length === 0 &&
+  r.cases.find((c) => c.id === "h.slash")?.outcome === "accepted";
 
 test("T314-CR2-2: a tsconfig that exists only ABOVE the repo root is never inherited", (t) => {
   const repo = repoWithEs5Config(t, "parent");
@@ -219,6 +237,20 @@ test("T314-CR2-2 control: the same tsconfig INSIDE the repo root is applied", (t
   const r = probe("fx/errguard.ts#validateHost", BASIC, { repoRoot: repo });
   // ES5 downlevels the subclass, so the refusal reads as a crash: proof the config was read.
   assert.notEqual(r.verdict, "engages", JSON.stringify(r.cases));
+  assert.ok(es5Signature(r), JSON.stringify(r));
+});
+
+test("T314-CR3-1: a repo tsconfig that EXTENDS a file above the repo root does not inherit it", (t) => {
+  const repo = repoWithEs5Config(t, "extends-parent");
+  const r = probe("fx/errguard.ts#validateHost", BASIC, { repoRoot: repo });
+  assert.deepEqual(r.declined, [], JSON.stringify(r.declined));
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+});
+
+test("T314-CR3-1 control: a tsconfig that extends a file INSIDE the repo root inherits it", (t) => {
+  const repo = repoWithEs5Config(t, "extends-inside");
+  const r = probe("fx/errguard.ts#validateHost", BASIC, { repoRoot: repo });
+  assert.ok(es5Signature(r), JSON.stringify(r));
 });
 
 test("T314-CR2-3: a repo root of / finds the compiler between the entry and the root", () => {
