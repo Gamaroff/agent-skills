@@ -5,16 +5,18 @@ type: task
 description: "Move the registry rows stranded after the Notes section (tasks 286 onward) back under the table header, add a test that holds every row in one contiguous block, and say in the writers' prose where a new row goes, so registry-tick --annotate can find the notes cell again."
 tags: [task-registry, registry-tick, develop-next, deferred-work]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-11-21
 updated: 2026-11-21
+completed_date: 2026-11-21
+pr_number: 928
 estimated_effort_hours: 2
 ---
 
 # Task 317: Task registry rows sit under the table header
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.317.review.1.task-registry-rows-sit-under-the-table-header.md` implemented 2026-11-21
 
 ---
@@ -170,21 +172,21 @@ None.
 
 ### Functional
 
-- [ ] Every registry row lies inside the one table block directly under the header, held by a committed test with a non-vacuity floor.
-- [ ] `registry-tick.js --annotate` on a formerly stranded row answers `annotated`, recorded in the QA report.
-- [ ] The placement test fails when one row is moved after `## Notes`, recorded in the QA report with the test that went red.
+- [x] Every registry row lies inside the one table block directly under the header, held by a committed test with a non-vacuity floor.
+- [x] `registry-tick.js --annotate` on a formerly stranded row answers `annotated`, recorded in the QA report.
+- [x] The placement test fails when one row is moved after `## Notes`, recorded in the QA report with the test that went red.
 
 ### Performance
 
-- [ ] No performance criterion applies. (Not applicable: no bound to meet.)
+- [x] No performance criterion applies. (Not applicable: no bound to meet.)
 
 ### Code Quality
 
-- [ ] `task-registry-drift.test.mjs` and `npm run ci:fast` pass.
+- [x] `task-registry-drift.test.mjs` and `npm run ci:fast` pass.
 
 ### Migration
 
-- [ ] CHANGELOG.md has an `[Unreleased]` entry citing (task 317).
+- [x] CHANGELOG.md has an `[Unreleased]` entry citing (task 317).
 
 ---
 
@@ -252,6 +254,22 @@ None.
 ### Key Findings
 No gate findings. Cycle 1's two findings are fixed. One advisory item (the placement matcher does not trim lines or skip fences) is recorded as a future recommendation.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+All Definition of Done criteria verified (run 1, 2026-11-21):
+
+✅ **Acceptance Criteria:** all 6 met — placement test with a 317-row floor, `--annotate` answers `annotated` on the formerly stranded row, row-300 mutation turns the placement test red, no performance bound, drift file and `ci:fast` pass, CHANGELOG entry
+✅ **QA:** gate 2 PASS 100/100; PR review APPROVE
+✅ **CI:** SUCCESS on `8e884424c704` (all six checks)
+✅ **Documentation:** CHANGELOG and both writers' prose state where a new registry row goes
+✅ **Security / Compliance:** PASS (no boundary) / not applicable
+
+**Detailed Verification Log:** See `task.317.dod.1.task-registry-rows-sit-under-the-table-header.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-21
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -264,6 +282,7 @@ No gate findings. Cycle 1's two findings are fixed. One advisory item (the place
 | 2026-11-21 |         | QA gate CONCERNS (90/100) — 2 findings | qa-task |
 | 2026-11-21 |         | QA findings fixed — cycle 1, 2 findings | qa-fix |
 | 2026-11-21 |         | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-11-21 | 1.2 | Accepted — all 6 criteria met, CI green (PR #928) | finalise |
 <!-- change-log-end -->
 
 ---
