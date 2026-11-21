@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-11-21
-**Next Available Task Number:** **317**
+**Next Available Task Number:** **318**
 
 ## How to use
 
@@ -435,3 +435,4 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 314 | [The security probe engine loads a TypeScript entry](task.314.probe-engine-loads-a-typescript-entry/task.314.probe-engine-loads-a-typescript-entry.md) | accepted | infrastructure | High | 2026-11-20 | — | handoff from a consumer repo: `security-probe.mjs` declines every `.ts` entry, so `/finalise`'s zero-guard fails on TypeScript boundaries · five phases · independent |
 | 315 | [qa-fix Step 4 guard reads quoted gitlink paths](task.315.qa-fix-step4-guard-reads-quoted-gitlink-paths/task.315.qa-fix-step4-guard-reads-quoted-gitlink-paths.md) | planned | refactoring | Low | 2026-11-21 | — | task 286 QA gate 1 residual (introduced by 286): a gitlink path git C-quotes (non-ASCII byte, double quote, backslash) is refused as not checked out; read the listing NUL-delimited · three phases |
 | 316 | [qa-fix Step 4 guard looks inside nested gitlinks](task.316.qa-fix-step4-guard-looks-inside-nested-gitlinks/task.316.qa-fix-step4-guard-looks-inside-nested-gitlinks.md) | planned | refactoring | Low | 2026-11-21 | task.315 | task 286 QA gate 1 residual (pre-existing): a gitlink inside a gitlink is not looked into, so an untracked file two levels down reads clean · three phases |
+| 317 | [Task registry rows sit under the table header](task.317.task-registry-rows-sit-under-the-table-header/task.317.task-registry-rows-sit-under-the-table-header.md) | planned | refactoring | Medium | 2026-11-21 | — | found on task 286's merge step: rows 286–316 sit after the Notes section, so `registry-tick --annotate` answers `no-cell`; move them, add a placement test, say where a row goes · three phases · independent |
