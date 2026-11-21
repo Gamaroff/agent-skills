@@ -69,6 +69,15 @@ The criteria and their records are in [QA report 1](./task.317.qa.1.task-registr
 | Placement test fails when one row is moved after `## Notes` | PASS | QA report 1, record 2 |
 | CHANGELOG entry citing (task 317) | PASS | `changelog-cites.sh` |
 
+**Record for criterion 2, a non-dry run on the committed layout (added at `/finalise`).** In a scratch worktree of the head, with the task 286 PR review document and PR 927:
+
+```text
+node shared/resources/registry-tick.js --annotate --file <task.286 pr-review doc> --pr 927 --registry docs/tasks/task-registry.md --json
+{"reason":"annotated","line":330,"annotated":true}
+```
+
+The row at line 330 gained its annotation (one line changed, the row's notes cell). On the original layout the same call answers `no-cell` at line 407 (QA report 1, record 1). The scratch worktree was removed afterwards.
+
 ---
 
 ## Breaking Changes Validation
