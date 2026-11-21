@@ -1,0 +1,16 @@
+[
+  {
+    "argv": [
+      "--sink",
+      "filename",
+      "--entry",
+      "fence:skills/qa-fix/SKILL.md#Step 4: Validate",
+      "--slot",
+      "{changed-paths}",
+      "--name",
+      "qa-fix step4 changed-paths guard"
+    ],
+    "cases_file": "task.286.dod.2.security.cases.json",
+    "cases_sha256": "bab5c18fb9099bfa6c85969f0a062f36ca967b718aab34cd3940ce41cd745909"
+  }
+]

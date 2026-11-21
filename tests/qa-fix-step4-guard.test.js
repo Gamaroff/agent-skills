@@ -473,7 +473,40 @@ const write = (dir, rel, content = "x\n") => {
   fs.writeFileSync(path.join(dir, rel), content);
 };
 
+// A tracked gitlink at `rel` (a nested repository with one commit, added to the outer index), the
+// shape task 286 measures: `git ls-files --others` of the outer repository does not descend into it.
+// `untracked` puts a file in the nested repository the outer index cannot see; `checkedOut: false`
+// leaves the empty directory an uninitialised submodule leaves.
+function gitlinkAt(d, rel, { untracked = false, checkedOut = true } = {}) {
+  git(d, "init", "-q", rel);
+  git(
+    path.join(d, rel),
+    "-c",
+    "user.name=t",
+    "-c",
+    "user.email=t@t",
+    "commit",
+    "-q",
+    "--allow-empty",
+    "-m",
+    "i",
+  );
+  git(d, "add", rel);
+  if (untracked) write(d, rel + "/untr");
+  if (!checkedOut) {
+    fs.rmSync(path.join(d, rel), { recursive: true });
+    fs.mkdirSync(path.join(d, rel));
+  }
+}
+
 const ADMITTED = [
+  {
+    // Task 286: a directory above a CLEAN checked-out gitlink is admitted. Refusing every gitlink
+    // would block every change to a directory that happens to hold a submodule.
+    id: "clean-gitlink-under-dir",
+    setup: (d) => gitlinkAt(d, "pkg2/sm"),
+    input: () => "pkg2",
+  },
   {
     id: "tracked",
     setup: (d) => {
@@ -593,6 +626,44 @@ test("Step 4 guard: refuses a path below a symlinked directory, naming it", asyn
 // T285-QA-2 (a link back to the root), T285-QA-3 (a link that leaves the repo and returns, a link
 // followed by `..`, a trailing slash on a link).
 const REFUSED = [
+  // Task 286 (CR-1): a changed DIRECTORY whose subtree holds a gitlink. The path's own directory
+  // reports the outer top level, so the nested-repository test passes, and the outer untracked
+  // listing does not descend into the gitlink: both read "clean" with an untracked file inside it.
+  {
+    id: "gitlink-under-dir",
+    setup: (d) => gitlinkAt(d, "pkg2/sm", { untracked: true }),
+    input: () => "pkg2",
+    expect: (r, input) =>
+      r.status === 1 && r.stdout === BOUNDARY_REFUSAL + input + "\n",
+  },
+  {
+    id: "gitlink-under-dir-trailing-slash",
+    setup: (d) => gitlinkAt(d, "pkg2/sm", { untracked: true }),
+    input: () => "pkg2/",
+    expect: (r, input) =>
+      r.status === 1 && r.stdout === BOUNDARY_REFUSAL + input + "\n",
+  },
+  {
+    id: "gitlink-under-dir-from-subdirectory",
+    setup: (d) => {
+      gitlinkAt(d, "pkg2/sm", { untracked: true });
+      write(d, "other/x");
+      git(d, "add", "other/x");
+    },
+    cwd: (d) => path.join(d, "other"),
+    input: () => "../pkg2",
+    expect: (r, input) =>
+      r.status === 1 && r.stdout === BOUNDARY_REFUSAL + input + "\n",
+  },
+  {
+    // The gitlink is in the index but not checked out: git cannot look into it, which is "could not
+    // look", never "clean".
+    id: "gitlink-under-dir-not-checked-out",
+    setup: (d) => gitlinkAt(d, "pkg2/sm", { checkedOut: false }),
+    input: () => "pkg2",
+    expect: (r, input) =>
+      r.status === 1 && r.stdout === BOUNDARY_REFUSAL + input + "\n",
+  },
   {
     id: "rootlink",
     setup: (d) => {
@@ -715,7 +786,12 @@ for (const c of REFUSED) {
   test(`Step 4 guard: does not read ${c.id} as clean`, async () => {
     const block = await stepBlock(SKILL_SRC);
     let input;
-    const results = runDirect(block, c.setup, (d) => (input = c.input(d)));
+    const results = runDirect(
+      block,
+      c.setup,
+      (d) => (input = c.input(d)),
+      c.cwd,
+    );
     for (const r of results) {
       assert.ok(c.expect(r, input), `${r.shell}: ${JSON.stringify(r)}`);
     }
@@ -728,7 +804,7 @@ const REFUSED_BY = (id) => REFUSED.find((c) => c.id === id);
 const COMPARE_CLAUSE =
   'if [ -n "$INSIDE" ] && [ "$PHYS" != "$LEX" ]; then printf \'%s\\n\' "$p"; continue; fi';
 const INSIDE_LINE =
-  'case "$LEX/" in "$TOP"/*) INSIDE=1 ;; *) INSIDE="" ;; esac';
+  'TOPP=${TOP%/}; case "$LEX/" in "$TOPP"/*) INSIDE=1 ;; *) INSIDE="" ;; esac';
 const NEST_CLAUSE =
   'if [ -n "$INSIDE" ] && [ -n "$NEST" ] && [ "$NEST" != "$TOP" ]; then printf \'%s\\n\' "$p"; fi';
 const DIRECT_MUTANTS = [
@@ -811,7 +887,80 @@ const DIRECT_MUTANTS = [
     scenario: ADMITTED.find((c) => c.id === "absolute-inside-repo"),
     broken: (r) => r.status !== 0,
   },
+  // Task 286 (CR-1): one mutant per clause of the gitlink-under-a-directory look.
+  {
+    name: "the untracked-file look inside a gitlink (a gitlink holding an untracked file reads clean)",
+    from: 'if [ -n "$GU" ]; then echo 1; break; fi',
+    to: ":",
+    scenario: REFUSED_BY("gitlink-under-dir"),
+    broken: (r) => r.status === 0,
+  },
+  {
+    name: "the could-not-look test (a gitlink that is not checked out reads clean)",
+    from: 'if [ -z "$GP" ] || [ "$GT" != "$GP" ]; then echo 1; break; fi',
+    to: ":",
+    scenario: REFUSED_BY("gitlink-under-dir-not-checked-out"),
+    broken: (r) => r.status === 0,
+  },
+  {
+    name: "the gitlink listing (no gitlink is found beneath a changed directory)",
+    from: "grep -E '^160000 '",
+    to: "grep -E '^NO-SUCH-MODE '",
+    scenario: REFUSED_BY("gitlink-under-dir"),
+    broken: (r) => r.status === 0,
+  },
+  {
+    name: "the strictly-the-repository's-own-level gate (a gitlink named as the path itself is reported twice)",
+    from: '[ -d "$p" ] && [ "$NEST" = "$TOP" ]',
+    to: '[ -d "$p" ]',
+    scenario: REFUSED_BY("gitlink-as-path"),
+    broken: (r) => r.stdout !== BOUNDARY_REFUSAL + "inner\n",
+  },
 ];
+
+// Task 286 (CR-2): with the repository rooted at `/`, `"$TOP"/*` becomes `//*`, which no normalised
+// path matches, so INSIDE was always empty and the guard judged nothing. The line is run on its own:
+// a repository at the filesystem root cannot be made on this host.
+test("Step 4 guard: the inside test holds when the repository top level is / (CR-2)", () => {
+  assert.ok(SKILL_SRC.includes(INSIDE_LINE), "the line under test is present");
+  const run = (shell, line) =>
+    spawnSync(
+      shell,
+      [
+        ...NO_RC[shell],
+        "-c",
+        `TOP=/; LEX=/a/b; ${line}; printf '[%s]' "$INSIDE"`,
+      ],
+      { encoding: "utf8", env: { PATH: process.env.PATH, LC_ALL: "C" } },
+    ).stdout;
+  // The pre-fix spelling. `"${TOP%/}"/*` written inline is NOT an equivalent fix: bash does not match
+  // it in a case pattern (zsh does), so the stripped value goes through a variable first.
+  const OLD_LINE = 'case "$LEX/" in "$TOP"/*) INSIDE=1 ;; *) INSIDE="" ;; esac';
+  assert.notEqual(OLD_LINE, INSIDE_LINE, "the pre-fix spelling differs");
+  for (const shell of SHELLS) {
+    assert.equal(run(shell, INSIDE_LINE), "[1]", `${shell}: fixed line`);
+    assert.equal(
+      run(shell, OLD_LINE),
+      "[]",
+      `${shell}: the old line is the defect`,
+    );
+  }
+  // An ordinary root is unchanged: a path under /repo is inside /repo, a sibling is not.
+  const ordinary = (shell, lex) =>
+    spawnSync(
+      shell,
+      [
+        ...NO_RC[shell],
+        "-c",
+        `TOP=/repo; LEX=${lex}; ${INSIDE_LINE}; printf '[%s]' "$INSIDE"`,
+      ],
+      { encoding: "utf8", env: { PATH: process.env.PATH, LC_ALL: "C" } },
+    ).stdout;
+  for (const shell of SHELLS) {
+    assert.equal(ordinary(shell, "/repo/x"), "[1]", shell);
+    assert.equal(ordinary(shell, "/repo2/x"), "[]", shell);
+  }
+});
 
 for (const m of DIRECT_MUTANTS) {
   test(`Step 4 guard: caught when the clause is reverted — ${m.name}`, async () => {

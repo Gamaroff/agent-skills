@@ -5,16 +5,19 @@ type: task
 description: "Close the residual false clean left by task 285: a changed directory that contains a gitlink holding an untracked file reads clean in the qa-fix Step 4 guard. Fold in two small advisories from the same QA gate."
 tags: [qa-fix, develop-task, security, deferred-work]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 created: 2026-11-07
-updated: 2026-11-07
+updated: 2026-11-21
+completed_date: 2026-11-21
+pr_number: 927
 estimated_effort_hours: 4
 ---
 
 # Task 286: qa-fix Step 4 guard looks beneath gitlinks
 
-**Status:** Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.286.review.1.qa-fix-step4-guard-looks-beneath-gitlinks.md` implemented 2026-11-20
 
 ---
 
@@ -36,9 +39,9 @@ Task 285 replaced the Step 4 parent walk in `skills/qa-fix/SKILL.md` with a phys
 
 ### Current Problems
 
-1. **CR-1: a directory above a gitlink reads clean.** QA reproduced it on head `4fc3b848` in bash and zsh. With `pkg2/sm` a tracked gitlink and `pkg2/sm/untr` untracked, the inputs `pkg2` and `pkg2/` exit 0 with no output, while `pkg2/sm` exits 1. The nested-repository probe runs `git -C "$DIR" rev-parse --show-toplevel` on the path's own directory only (`skills/qa-fix/SKILL.md:911`, `NEST=$(git -C "$DIR" rev-parse --show-toplevel …)`), and the outer `git ls-files --others` (`SKILL.md:918`) does not descend into a gitlink. The reviewer rated it high severity at medium confidence, so gate 5 recorded it as advisory.
-2. **CR-3: a legitimate external-symlink route is refused.** An absolute path such as `/tmp/x/toSub/s`, where `toSub` is an external symlink to `repo/sub`, is refused by git as "outside repository", while the route through the repository root is admitted. The refusal is fail-loud and safe, but it is neither tested nor described (`SKILL.md:903`, `case "$LEX/" in "$TOP"/*) INSIDE=1 ;;`). Reported by the reviewer; not reproduced by QA.
-3. **CR-2: a root repository disables the check.** When `TOP` is `/`, the pattern `"$TOP"/*` becomes `//*`, which no normalised path matches, so `INSIDE` is always empty (`SKILL.md:903`). Reported at low confidence; a repository at the filesystem root was not available to QA.
+1. **CR-1: a directory above a gitlink reads clean.** QA reproduced it on head `4fc3b848` in bash and zsh. With `pkg2/sm` a tracked gitlink and `pkg2/sm/untr` untracked, the inputs `pkg2` and `pkg2/` exit 0 with no output, while `pkg2/sm` exits 1. The nested-repository probe runs `git -C "$DIR" rev-parse --show-toplevel` on the path's own directory only (`skills/qa-fix/SKILL.md:927`, `NEST=$(git -C "$DIR" rev-parse --show-toplevel …)`), and the outer `git ls-files --others` (`SKILL.md:934`) does not descend into a gitlink. The reviewer rated it high severity at medium confidence, so gate 5 recorded it as advisory.
+2. **CR-3: a legitimate external-symlink route is refused.** An absolute path such as `/tmp/x/toSub/s`, where `toSub` is an external symlink to `repo/sub`, is refused by git as "outside repository", while the route through the repository root is admitted. The refusal is fail-loud and safe, but it is neither tested nor described (`SKILL.md:919`, `case "$LEX/" in "$TOP"/*) INSIDE=1 ;;`). Reported by the reviewer; not reproduced by QA.
+3. **CR-2: a root repository disables the check.** When `TOP` is `/`, the pattern `"$TOP"/*` becomes `//*`, which no normalised path matches, so `INSIDE` is always empty (`SKILL.md:919`). Reported at low confidence; a repository at the filesystem root was not available to QA.
 
 ### Benefits
 
@@ -51,7 +54,7 @@ Task 285 replaced the Step 4 parent walk in `skills/qa-fix/SKILL.md` with a phys
 
 ### Current Architecture
 
-The Step 4 block (`skills/qa-fix/SKILL.md`, the fenced block under `### Step 4: Validate`) takes a list of changed paths and, per path: skips one not on disk (the earlier `--error-unmatch` check at `SKILL.md:890` demands it is tracked), compares a lexical spelling of the path (the working directory's physical path joined with the path, `.` and `..` folded in text) with its physical spelling, and refuses a path whose spelling is inside the repository and differs (`INSIDE`, `SKILL.md:903`). A nested repository is found when `git -C "$DIR" rev-parse --show-toplevel` (`SKILL.md:911`) differs from `TOP` (`SKILL.md:893`). The surviving paths go to `git ls-files --others --exclude-standard` (`SKILL.md:918`).
+The Step 4 block (`skills/qa-fix/SKILL.md`, the fenced block under `### Step 4: Validate`) takes a list of changed paths and, per path: skips one not on disk (the earlier `--error-unmatch` check at `SKILL.md:906` demands it is tracked), compares a lexical spelling of the path (the working directory's physical path joined with the path, `.` and `..` folded in text) with its physical spelling, and refuses a path whose spelling is inside the repository and differs (`INSIDE`, `SKILL.md:919`). A nested repository is found when `git -C "$DIR" rev-parse --show-toplevel` (`SKILL.md:927`) differs from `TOP` (`SKILL.md:909`). The surviving paths go to `git ls-files --others --exclude-standard` (`SKILL.md:934`). Line numbers were re-read against the tree on 2026-11-20 and drift with every edit to the file; locate by the quoted text, not the number.
 
 The block is held by `tests/qa-fix-step4-guard.test.js` (37 tests with `CI=true`). A gitlink as the path itself is held (`id: "gitlink-as-path"`, `tests/qa-fix-step4-guard.test.js:643`, refused at `:788`). No scenario covers a gitlink beneath a changed directory: `git grep -n gitlink -- tests/qa-fix-step4-guard.test.js` returns only the as-path case.
 
@@ -96,33 +99,34 @@ None. The guard becomes stricter only for an input it previously admitted wrongl
 
 **Risk**: Low
 
-- [ ] Reproduce CR-1 in a scratch repository under bash and zsh (`pkg2`, `pkg2/`, `pkg2/sm`).
-- [ ] Try CR-3 and CR-2 (a `TOP` of `/` cannot be made on this host; test the comparison on the extracted `case` line instead) and record whether each reproduces.
-- [ ] Decide look-inside versus refuse for CR-1, and rewrite versus document for CR-3.
+- [x] Reproduce CR-1 in a scratch repository under bash and zsh (`pkg2`, `pkg2/`, `pkg2/sm`).
+- [x] Try CR-3 and CR-2 (a `TOP` of `/` cannot be made on this host; test the comparison on the extracted `case` line instead) and record whether each reproduces.
+- [x] Decide look-inside versus refuse for CR-1, and rewrite versus document for CR-3. **Decided 2026-11-20:** look inside for CR-1; document for CR-3, because `tests/qa-fix-step4-guard.test.js` already holds the external-symlink route as refused ("could not look", the CR-3 test) and a rewrite would admit a path git itself cannot map. CR-3 did not reproduce as a defect.
 
 ### Phase 2: Close CR-1
 
 **Risk**: Medium
 
-- [ ] Add the gitlink listing and the nested untracked check to the Step 4 block.
-- [ ] Keep the block free of positional `$0`–`$9` tokens (the CI guard fails on them).
-- [ ] Update the prose paragraph above the block.
+- [x] Add the gitlink listing and the nested untracked check to the Step 4 block.
+- [x] Keep the block free of positional `$0`–`$9` tokens (the CI guard fails on them).
+- [x] Update the prose paragraph above the block.
 
 ### Phase 3: Hold it with tests
 
 **Risk**: Low
 
-- [ ] Add refused scenarios: gitlink with an untracked file beneath a directory, with and without a trailing slash, and from a subdirectory.
-- [ ] Add admitted scenarios: a clean gitlink beneath a directory; a gitlink that is not checked out is refused as "could not look".
-- [ ] Add one mutant per new clause and confirm each turns a test red.
-- [ ] Add the gitlink-under-a-directory case to the probe cases file.
+- [x] Add refused scenarios: gitlink with an untracked file beneath a directory, with and without a trailing slash, and from a subdirectory.
+- [x] Add admitted scenarios: a clean gitlink beneath a directory; a gitlink that is not checked out is refused as "could not look".
+- [x] Add one mutant per new clause and confirm each turns a test red. Four mutants (the untracked look, the could-not-look test, the gitlink listing, the own-level gate). The listing-failure fallback (`|| { printf …; continue; }` on `git ls-files -s`) has no mutant: git cannot be made to fail there after the earlier checks pass, so it is a defensive fail-closed clause held by inspection only.
+- [x] Add the gitlink-under-a-directory case to the probe cases file. The file for this task is `task.286.dod.1.security.cases.json` beside this document, seeded from task 285's `task.285.dod.1.security.cases.json` (the cases `/finalise` and QA run the `fence:` probe against); commit it so a QA cycle can re-run it. **Limit found:** a case fixture holds text files only, so it cannot hold the outer index entry (mode `160000`) that makes a gitlink. The corpus case added is the nearest expressible shape, a nested repository with no index entry under a changed directory (refused as untracked, `pkg2/sm/`); the true gitlink false clean is held by the Node scenarios, which build the index with git. Probe verdict on the 36-case file: `engages`.
 
 ### Phase 4: Close CR-3 and CR-2
 
 **Risk**: Low
 
-- [ ] Apply the CR-3 decision and add its scenario.
-- [ ] Compare against `${TOP%/}/` for CR-2 and test the comparison with a `TOP` of `/`.
+- [x] Apply the CR-3 decision (documented in the Step 4 prose; the scenario is the existing CR-3 test, which asserts the route is refused with "could not look").
+- [x] Compare against the top level with its trailing `/` stripped for CR-2 and test the comparison with a `TOP` of `/`. **Found while testing:** the inline spelling `"${TOP%/}"/*` in a `case` pattern does not match in bash (it does in zsh), so the stripped value is assigned to `TOPP` first; the test runs both spellings under both shells.
+- [x] Update `INSIDE_LINE` (`tests/qa-fix-step4-guard.test.js:731`), the literal copy of the inside test the direct mutants revert by exact match, in the same edit. Changing the block without it makes the mutant's `from` string absent and its mutant stops mutating anything. Check `COMPARE_CLAUSE` and `NEST_CLAUSE` (`:728-733`) the same way after the CR-1 edit. Measured with `git grep -nF '"$TOP"/*' -- tests`: one hit.
 
 ---
 
@@ -170,23 +174,23 @@ None.
 
 ### Functional
 
-- [ ] A changed directory whose subtree holds a gitlink with an untracked file is refused in bash and zsh (`pkg2`, `pkg2/`), held by a committed scenario.
-- [ ] A changed directory over a clean, checked-out gitlink is admitted, held by a committed scenario.
-- [ ] The CR-3 route behaves as decided in Phase 1 and a scenario holds it.
-- [ ] The inside test works when `TOP` is `/`, held by a committed test of the comparison.
+- [x] A changed directory whose subtree holds a gitlink with an untracked file is refused in bash and zsh (`pkg2`, `pkg2/`), held by a committed scenario.
+- [x] A changed directory over a clean, checked-out gitlink is admitted, held by a committed scenario.
+- [x] The CR-3 route behaves as decided in Phase 1 and a scenario holds it.
+- [x] The inside test works when `TOP` is `/`, held by a committed test of the comparison.
 
 ### Performance
 
-- [ ] No performance criterion; the block runs once per fix cycle.
+- [x] No performance criterion; the block runs once per fix cycle. (Not applicable: no bound to meet; approved by Lorien Gamaroff 2026-11-21.)
 
 ### Code Quality
 
-- [ ] Each new clause has a mutant that turns a committed test red.
-- [ ] `npm run validate -- skills/qa-fix/` and `npm run ci:fast` pass.
+- [x] Each new clause has a mutant that turns a committed test red (one defensive fail-closed fallback excepted, see Phase 3).
+- [x] `npm run validate -- skills/qa-fix/` and `npm run ci:fast` pass. `ci:fast` ran on the LAN server (`npm run test:remote`) after a Prettier fix to the test file: exit 0, 2026-11-20.
 
 ### Migration
 
-- [ ] CHANGELOG.md has an `[Unreleased]` entry citing (task 286).
+- [x] CHANGELOG.md has an `[Unreleased]` entry citing (task 286).
 
 ---
 
@@ -233,22 +237,82 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-20
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.286.qa.1.qa-fix-step4-guard-looks-beneath-gitlinks.md](./task.286.qa.1.qa-fix-step4-guard-looks-beneath-gitlinks.md)
+- **Gate File**: [task.286.gate.1.qa-fix-step4-guard-looks-beneath-gitlinks.yml](./task.286.gate.1.qa-fix-step4-guard-looks-beneath-gitlinks.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 47 (bash and zsh) and 36 boundary probes
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No blocking issues. Two low findings reproduced and are recorded as future work: a gitlink nested inside a gitlink is not looked into (pre-existing), and a non-ASCII gitlink path is refused for the wrong reason (new, safe side).
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+All Definition of Done criteria verified (DoD run 3):
+
+✅ **Acceptance Criteria:** 8 of 8 (#5 recorded as not applicable, approved by Lorien Gamaroff 2026-11-21; #7 graded from CI reading 1)
+✅ **QA gate:** PASS, 95/100 (`task.286.gate.1.qa-fix-step4-guard-looks-beneath-gitlinks.yml`)
+✅ **PR review:** APPROVE (`task.286.pr-review.1.qa-fix-step4-guard-looks-beneath-gitlinks.md`)
+✅ **Security:** boundary held, 36 executed, 0 reproduced
+✅ **Docs:** CHANGELOG entry and skill prose updated
+✅ Compliance: not applicable
+
+**Detailed Verification Log:** See `task.286.dod.3.qa-fix-step4-guard-looks-beneath-gitlinks.md`.
+
+## Definition of Done - Gaps Identified — run 2 (historical, superseded)
+
+**Status:** SUPERSEDED by run 3
+
+DoD run 2: QA gate PASS (95/100) and the security boundary held (36 executed, 0 reproduced). One criterion was open.
+
+### Missing Criteria:
+
+- ⚠️ Success Criteria #5 ("No performance criterion; the block runs once per fix cycle.") is a non-requirement: it states no bound, nothing a test could assert, and its checkbox is unticked.
+
+### Next Steps:
+
+- [ ] Owner decides: tick #5 as not applicable, or reword it; then re-run `/finalise` (document-only, no code change).
+
+**Estimated Effort:** Small (one line).
+
+**Detailed Verification Log:** See `task.286.dod.2.qa-fix-step4-guard-looks-beneath-gitlinks.md`.
+
 ## Change Log
 
 <!-- change-log-start -->
 | Date       | Version | Description    | Author      |
 | ---------- | ------- | -------------- | ----------- |
 | 2026-11-07 | 1.0     | Initial draft — cut from task 285 QA gate 5 (CR-1 reproduced, CR-2 and CR-3 advisory) | create-task |
+| 2026-11-20 | 1.1     | Review passed (8/10) — re-anchored five drifted SKILL.md line numbers, named the probe cases file, added the INSIDE_LINE mutant-literal update to Phase 4 | review-task |
+| 2026-11-20 |         | Status → ready-for-development | review-task |
+| 2026-11-20 |         | Implemented CR-1 (gitlink look), CR-2 (root top level), CR-3 documented; status → ready-for-review | develop |
+| 2026-11-20 |         | QA gate PASS (95/100) — 2 low findings, advisory | qa-task |
+| 2026-11-20 |         | DoD incomplete — 1 gap identified (Success Criteria #5) | finalise |
+| 2026-11-21 | 1.2     | DoD passed — accepted (PR #927); #5 recorded as not applicable, approved by Lorien Gamaroff | finalise |
 <!-- change-log-end -->
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1: Reproduce and decide
-- [ ] Phase 2: Close CR-1
-- [ ] Phase 3: Hold it with tests
-- [ ] Phase 4: Close CR-3 and CR-2
+- [x] Phase 1: Reproduce and decide
+- [x] Phase 2: Close CR-1
+- [x] Phase 3: Hold it with tests
+- [x] Phase 4: Close CR-3 and CR-2
 
 ---
 

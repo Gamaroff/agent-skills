@@ -1,0 +1,63 @@
+schema: 2
+task: 'task.286.qa-fix-step4-guard-looks-beneath-gitlinks'
+task_title: 'qa-fix Step 4 guard looks beneath gitlinks'
+gate: PASS
+status_reason: 'All four success criteria hold with committed tests (47 pass, bash and zsh; four new mutants each turn a test red; probe engine 36/36, 0 reproduced, 0 escaped). Two low findings from the diff review reproduced but stay advisory: one is a pre-existing blind spot one level deeper, one is a safe-side over-refusal on a non-ASCII gitlink path.'
+reviewer: 'QA Engineer'
+head: '66db2d02bb095adb3ea69889e3e4a285cfdffb46'
+updated: '2026-11-20T21:55:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 47
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 36
+    escaped: 0
+    boundary: true
+    boundary_signals: ['fail-closed', 'is refused']
+    notes: 'The Step 4 block is a boundary (refuses or admits a changed path). Probe engine fence form against skills/qa-fix/SKILL.md "Step 4: Validate", 36 cases under bash and zsh: 36 passed, 0 reproduced, 0 overblocked, 0 escaped, 0 declined. The probe corpus cannot hold an index gitlink (text-file fixtures), so the true gitlink false clean is held by the committed Node scenarios, which build the index with git.'
+  performance:
+    status: PASS
+    notes: 'No performance criterion; the block runs once per fix cycle and adds one ls-files call per changed directory.'
+  reliability:
+    status: PASS
+    notes: 'The new look fails closed on every path it can: ls-files failure, a gitlink that is not checked out, an unreadable listing. The ls-files failure fallback has no mutant (recorded in the task).'
+  maintainability:
+    status: PASS
+    notes: 'Prose paragraph documents the gitlink look, the trailing-slash strip and the external-symlink decision; the inside test and compare clauses are mirrored as constants in the test file.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'A gitlink nested inside a checked-out gitlink is not looked into: an untracked file two levels down reads clean. Recurse (git submodule foreach --recursive, or list gitlinks inside each one) or state in the prose that one level is judged. Reproduced by QA (mid-level ls-files --others lists nothing, the nested repository lists untracked.txt); identical on the base, where no gitlink look existed, and outside the task scope (a gitlink beneath a changed directory).'
+      refs: ['skills/qa-fix/SKILL.md']
+      remedy: unverified
+      provenance: pre-existing
+    - action: 'git ls-files -s C-quotes a non-ASCII gitlink path ("pkg/s\303\251"), so cd -P fails and a clean, checked-out gitlink is refused as not checked out. Safe side, wrong reason, and new with this change. Reproduced by QA. Fix: git -c core.quotePath=false ls-files -s, or -z with a NUL-aware read; add a non-ASCII admitted scenario.'
+      refs: ['skills/qa-fix/SKILL.md', 'tests/qa-fix-step4-guard.test.js']
+      remedy: unverified
+      provenance: introduced-by-this-change
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
