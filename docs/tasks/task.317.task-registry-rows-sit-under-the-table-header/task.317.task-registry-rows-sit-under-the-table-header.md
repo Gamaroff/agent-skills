@@ -233,24 +233,24 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-21
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.317.qa.1.task-registry-rows-sit-under-the-table-header.md](./task.317.qa.1.task-registry-rows-sit-under-the-table-header.md)
-- **Gate File**: [task.317.gate.1.task-registry-rows-sit-under-the-table-header.yml](./task.317.gate.1.task-registry-rows-sit-under-the-table-header.yml)
+- **Full Report**: [task.317.qa.2.task-registry-rows-sit-under-the-table-header.md](./task.317.qa.2.task-registry-rows-sit-under-the-table-header.md)
+- **Gate File**: [task.317.gate.2.task-registry-rows-sit-under-the-table-header.yml](./task.317.gate.2.task-registry-rows-sit-under-the-table-header.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 8 (drift file), plus `ci:fast` 8709 pass at develop time
+- **Tests Executed**: 8 (drift file), plus `ci:fast` 8709 pass
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-One MEDIUM (CI link-check red on the implementation report) and one LOW (placement matcher misses a row written `|318|`).
+No gate findings. Cycle 1's two findings are fixed. One advisory item (the placement matcher does not trim lines or skip fences) is recorded as a future recommendation.
 
 ## Change Log
 
@@ -263,6 +263,7 @@ One MEDIUM (CI link-check red on the implementation report) and one LOW (placeme
 | 2026-11-21 |         | Implemented — 6 files (registry rows moved, placement test, two prose rules, CHANGELOG), 2 tests added; ci:fast 8709 pass | develop |
 | 2026-11-21 |         | QA gate CONCERNS (90/100) — 2 findings | qa-task |
 | 2026-11-21 |         | QA findings fixed — cycle 1, 2 findings | qa-fix |
+| 2026-11-21 |         | QA gate PASS (100/100) — 0 findings | qa-task |
 <!-- change-log-end -->
 
 ---

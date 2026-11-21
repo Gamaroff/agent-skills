@@ -98,8 +98,19 @@ _Track each QA review/fix cycle._
 
 #### qa-fix (5b)
 **Fixes Applied**: T317-CI-1 — the LAN host written as a user@host address in this report is now described in words, so CI link-check no longer reads it as a mailto link. T317-CR-1 — the placement matcher is now `/^\|\s*(\d+)\s*\|/`, and the synthetic test carries a `|3|` and a `|  4 |` row below `## Notes`.
-**Verification**: drift file 8 of 8; mutation (matcher reverted to one required space) turns the synthetic placement test red and nothing else; `prettier --check` clean; `doc-links.js` ok on the report and the QA report.
+**Commit**: `dcf4627fa` (fix, gate 1, QA report 1, task Change Log row), then `68b395fbf` (this report). Exception to the one-commit rule: the T317-CI-1 fix is a line in this report, so leaving it out of the fix commit would have left CI link-check red until Step 8; the report was committed on its own and pushed, at the cost of a second push this cycle.
+**Verification**: fast gate exit 0 (8709 pass, 0 fail); drift file 8 of 8; mutation (matcher reverted to one required space) turns the synthetic placement test red and nothing else; `prettier --check` clean; `doc-links.js` ok on the report and the QA report.
 **Probe**: population command not run — neither fix restates a rule in an executed document (a test regex and one report line). Narrowing residue: none (first cycle). Platform variance: no environment-derived value involved.
+
+### QA Cycle 2 — 2026-11-21
+**Gate Result**: PASS (100/100)
+**Issues Found**: 0 in the gate; one advisory item (the placement matcher does not trim lines or skip fences, reviewer anchor line 377 is really 381). QA could not make it diverge from `parseRegistry` or `registry-tick.js` `findHeader`, so it went to `recommendations.future`.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**Traceability**: skipped (same reason as cycle 1)
+**PR Review**: not yet run
+**Loop exit**: gate has no open entry → Step 5c
+**Action**: Handing to `/review-pr` (Step 5c). Cycle 2 was a full-branch refute pass by one Explore subagent (returned in 24 s); CI link-check green on the head, `test` job still pending when read. PR comment posted.
 
 ---
 
