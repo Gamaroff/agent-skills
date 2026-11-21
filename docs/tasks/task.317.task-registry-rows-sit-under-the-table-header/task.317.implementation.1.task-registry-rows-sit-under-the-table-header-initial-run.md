@@ -37,8 +37,8 @@ Move the 31 stranded registry rows (286–316) under the table header, add a pla
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline; 32 rows moved, placement test red→green, mutation caught; ci:fast 8709 pass | —                    | 2026-11-21T19:52Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #928: https://github.com/Gamaroff/agent-skills/pull/928 (no issue linked, comment skipped) | —                    | 2026-11-21T19:53Z |
 | 5–6. qa-task / qa-fix loop | ✅ Done | `task.317.qa.{N}.*.md`; `task.317.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 2 QA cycles; APPROVE at 5c | —                    | 2026-11-21T20:08Z |
-| 7. finalise                | ⏳ Pending | `task.317.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 7. finalise                | ✅ Done | `task.317.dod.{N}.*.md`; task `status: accepted`                       | DoD run 1 ACCEPTED; registry row ticked; acceptance commit `5afd310e6` | —                    | 2026-11-21T20:27Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Report committed and pushed | —                    | 2026-11-21T20:29Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -112,14 +112,22 @@ _Track each QA review/fix cycle._
 **Loop exit**: gate has no open entry → Step 5c → APPROVE → Step 7
 **Action**: Proceeding to 5c, which approved; the run continues to Step 7. Cycle 2 was a full-branch refute pass by one Explore subagent (returned in 24 s); CI link-check green on the head, `test` job still pending when read. PR comment posted.
 
+### Step 7 — finalise — 2026-11-21
+
+- DoD run 1: ACCEPTED, 6 of 6 criteria. Four DoD agents ran in parallel; AC `PARTIAL` until criterion 5 (the `ci:fast` half) was graded from CI reading 1.
+- CI reading 1: SUCCESS @ `8e884424c704` (all six checks). CI reading 2: SUCCESS (tree-equivalent to `68b395fbf975`) @ `5afd310e6ebb`, over 6 checks after 30 s; the delta is documentation only.
+- Criterion 2's committed record was a dry run; a non-dry `annotated` run on the committed layout (line 330) was added to QA report 2 before the AC agent ran.
+- The Change Log engine moved the start marker above its heading and reformatted the table header; restored by hand to the original layout.
+- Registry row 317 ticked by `registry-tick.js --stage`. PR canonical comment posted. No tracker issue linked: tracker comment, close and board move skipped.
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-11-21T20:29Z
+**Final Status**: Completed
 **Branch**: feature/task.317.task-registry-rows-sit-under-the-table-header
 **PR**: https://github.com/Gamaroff/agent-skills/pull/928
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 2
+**DoD Summary**: task.317.dod.1.task-registry-rows-sit-under-the-table-header.md — ACCEPTED
+**Tracker debt**: none (no issue linked)
