@@ -1,8 +1,8 @@
 # Task Registry
 
 **Purpose:** Central tracking for all task numbers in this repo.
-**Last Updated:** 2026-11-20
-**Next Available Task Number:** **315**
+**Last Updated:** 2026-11-21
+**Next Available Task Number:** **317**
 
 ## How to use
 
@@ -401,6 +401,8 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 
 - **Tasks 311–312 were cut from the 2026-11-17 observation review**. Two independent units, one shippable outcome each: 311 is the develop pipelines (sub-skill identity check, record hand-off to QA), 312 is review-task and create-task (allow-list coverage, timing statistic). Neither depends on the other.
 
+- **Tasks 315–316 were cut from task 286's QA gate 1 (`recommendations.future`, 2026-11-21)**. Two units, one shippable outcome each, in dependency order: 315 reads the Step 4 gitlink listing NUL-delimited so a quoted path is entered (a non-ASCII byte, double quote or backslash) and ships alone; 316 recurses into a gitlink nested in a gitlink and depends on 315, because both edit the same gitlink look and 316 recurses over 315's NUL-delimited read.
+
 - Filenames follow `task.[N].[kebab-case-name].md` per [AGENTS.md](../../AGENTS.md#file-naming).
 | 286 | [qa-fix Step 4 guard looks beneath gitlinks](task.286.qa-fix-step4-guard-looks-beneath-gitlinks/task.286.qa-fix-step4-guard-looks-beneath-gitlinks.md) | accepted | refactoring | Medium | 2026-11-07 | 285 | — task 285 QA gate 5 residual: a directory above a gitlink with an untracked file reads clean (CR-1), plus two advisories (CR-2, CR-3) · four phases |
 | 287 | [cases_file accepts only engine-shaped names](task.287.cases-file-accepts-only-engine-shaped-names/task.287.cases-file-accepts-only-engine-shaped-names.md) | planned | refactoring | Low | 2026-11-07 | — | — task 269 gate.4 recommendation: refuse a `cases_file` not named `*.security.cases[.n].json`; no committed plan affected · three phases |
@@ -431,3 +433,5 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 312 | [Allow-list and timing criteria name what they need](task.312.allow-list-and-timing-criteria-name-what-they-need/task.312.allow-list-and-timing-criteria-name-what-they-need.md) | planned | refactoring | Medium | 2026-11-17 | — | observations #159 and #171: a review-task check that an allow-list covers its whole set, and a timing-statistic rule in create-task and review-task · three phases |
 | 313 | [The skill-resolution rule covers a Skill result with no Base directory line](task.313.skill-resolution-rule-covers-a-result-with-no-base-directory-line/task.313.skill-resolution-rule-covers-a-result-with-no-base-directory-line.md) | accepted | documentation | Low | 2026-11-17 | — | task 311 advisory CR-1: one rule paragraph and a re-bundle · independent |
 | 314 | [The security probe engine loads a TypeScript entry](task.314.probe-engine-loads-a-typescript-entry/task.314.probe-engine-loads-a-typescript-entry.md) | accepted | infrastructure | High | 2026-11-20 | — | handoff from a consumer repo: `security-probe.mjs` declines every `.ts` entry, so `/finalise`'s zero-guard fails on TypeScript boundaries · five phases · independent |
+| 315 | [qa-fix Step 4 guard reads quoted gitlink paths](task.315.qa-fix-step4-guard-reads-quoted-gitlink-paths/task.315.qa-fix-step4-guard-reads-quoted-gitlink-paths.md) | planned | refactoring | Low | 2026-11-21 | — | task 286 QA gate 1 residual (introduced by 286): a gitlink path git C-quotes (non-ASCII byte, double quote, backslash) is refused as not checked out; read the listing NUL-delimited · three phases |
+| 316 | [qa-fix Step 4 guard looks inside nested gitlinks](task.316.qa-fix-step4-guard-looks-inside-nested-gitlinks/task.316.qa-fix-step4-guard-looks-inside-nested-gitlinks.md) | planned | refactoring | Low | 2026-11-21 | task.315 | task 286 QA gate 1 residual (pre-existing): a gitlink inside a gitlink is not looked into, so an untracked file two levels down reads clean · three phases |
