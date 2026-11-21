@@ -231,6 +231,27 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-21
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.317.qa.1.task-registry-rows-sit-under-the-table-header.md](./task.317.qa.1.task-registry-rows-sit-under-the-table-header.md)
+- **Gate File**: [task.317.gate.1.task-registry-rows-sit-under-the-table-header.yml](./task.317.gate.1.task-registry-rows-sit-under-the-table-header.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 8 (drift file), plus `ci:fast` 8709 pass at develop time
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+One MEDIUM (CI link-check red on the implementation report) and one LOW (placement matcher misses a row written `|318|`).
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -240,6 +261,8 @@ None.
 | 2026-11-21 | 1.1     | Review passed (9/10) — stale row counts (31 → 32, task 317's own row is stranded too) and the unspecified test floor fixed; `no-cell` and `annotated` reproduced on a scratch copy | review-task |
 | 2026-11-21 |         | Status → ready-for-development | review-task |
 | 2026-11-21 |         | Implemented — 6 files (registry rows moved, placement test, two prose rules, CHANGELOG), 2 tests added; ci:fast 8709 pass | develop |
+| 2026-11-21 |         | QA gate CONCERNS (90/100) — 2 findings | qa-task |
+| 2026-11-21 |         | QA findings fixed — cycle 1, 2 findings | qa-fix |
 <!-- change-log-end -->
 
 ---

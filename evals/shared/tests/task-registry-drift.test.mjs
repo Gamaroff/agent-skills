@@ -378,7 +378,7 @@ function placementOf(text) {
   }
   const rows = [];
   lines.forEach((l, i) => {
-    const m = /^\| (\d+)\s*\|/.exec(l);
+    const m = /^\|\s*(\d+)\s*\|/.exec(l);
     if (m) {
       rows.push({
         line: i + 1,
@@ -419,6 +419,16 @@ test("the placement check flags a row stranded below the Notes section and a hea
   const good = `${head}| 1  | a |\n| 2  | b |\n\n---\n\n## Notes\n\nprose\n`;
   const stranded = `${head}| 1  | a |\n| 2  | b |\n\n---\n\n## Notes\n\nprose\n\n| 3  | c |\n`;
   const headerless = "| 1  | a |\n| 2  | b |\n";
+  // The select-next.mjs parser reads a row with no space after the pipe as a row,
+  // so the placement check must see it too (QA cycle 1, T317-CR-1).
+  const tight = `${head}| 1  | a |\n\n## Notes\n\n|3| c |\n|  4 | d |\n`;
+
+  const t = placementOf(tight);
+  assert.deepEqual(
+    t.stranded.map((r) => r.id),
+    [3, 4],
+    "a stranded row is flagged whatever its spacing after the leading pipe",
+  );
 
   const g = placementOf(good);
   assert.equal(g.sepOk, true);
