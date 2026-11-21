@@ -3,7 +3,7 @@
 **Task**: `task.286.qa-fix-step4-guard-looks-beneath-gitlinks.md`
 **Run Number**: 1
 **Started**: 2026-11-20 21:15
-**Status**: In Progress
+**Status**: Completed
 **Report format**: 2
 
 ---
@@ -37,8 +37,8 @@ Close the qa-fix Step 4 guard's false clean for a directory above a gitlink hold
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Implemented inline (plan + surface map); 47 tests pass; `ci:fast` exit 0 on LAN server | —                    | 2026-11-20T21:50Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #927: https://github.com/Gamaroff/agent-skills/pull/927 (no tracker issue linked; no comment) | —                    | 2026-11-20T21:51Z |
 | 5–6. qa-task / qa-fix loop | ✅ Done | `task.286.qa.{N}.*.md`; `task.286.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 1 QA cycle: gate PASS 95; 5c APPROVE (PC-1 low: task lacks `pr_number`, left to /finalise) | —                    | 2026-11-20T21:57Z |
-| 7. finalise                | ⚠️ HALT | `task.286.dod.{N}.*.md`; task `status: accepted`                       | DoD run 2: 1 gap — Success Criteria #5 (non-requirement, unticked); security 36/0 held; CI reading deferred | —                    | 2026-11-20T21:59Z |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 7. finalise                | ✅ Done | `task.286.dod.{N}.*.md`; task `status: accepted`                       | DoD run 3 ACCEPTED 8/8 (run 2 halted on #5; owner approved N/A); security 36/0; CI readings 1 and 2 SUCCESS | —                    | 2026-11-21T06:33Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Final commit of the report | —                    | 2026-11-21T06:35Z |
 
 ---
 
@@ -60,6 +60,13 @@ Close the qa-fix Step 4 guard's false clean for a directory above a gitlink hold
 - CR-3 decision: documented, not rewritten — the existing CR-3 test already holds the refusal.
 - Loop audit subagent not dispatched; progress read from the task's own checkboxes (all ticked).
 
+### Step 7 — 2026-11-21
+
+- Task completed: DoD run 3 ACCEPTED, 8/8; status `accepted`; registry row 286 ticked.
+- CI reading 1: SUCCESS @ `353ec3fceb09` (all six checks). CI reading 2: SUCCESS (tree-equivalent to `353ec3fceb09`) @ `ae4c52b9d9f4`, the acceptance head.
+- Canonical PR comment posted on #927 (marker `finalise-canonical-summary`).
+- No tracker issue linked; tracker comment, close and board move skipped.
+
 ---
 
 ## Issues Log
@@ -70,6 +77,8 @@ _Problems encountered and how they were resolved or escalated._
 - Step 3: first remote `ci:fast` failed on `prettier --check` of the new test code; fixed with `prettier --write`, re-run green.
 - The probe corpus fixture holds text files only, so it cannot hold a true gitlink (index mode 160000); the corpus case added is the nearest shape, and the Node scenarios hold the real one.
 - Step 7 HALT: `/finalise` (DoD run 2) found one gap. Success Criteria #5, "No performance criterion; the block runs once per fix cycle.", states no bound and has nothing to test, and its checkbox was left `- [ ]`. The AC rules fail a criterion with no bound and no test. Resolving it is the owner's call (tick as N/A or reword); an unapproved reword reads as an amendment. Nothing else is open: gate PASS 95, security 36 executed / 0 reproduced, docs PASS.
+- Step 7 resolved: the owner said "tick #5 as not applicable". The criterion now reads "(Not applicable: no bound to meet; approved by Lorien Gamaroff 2026-11-21.)", which `criteria-drift.js` reads as an approved amendment. DoD run 3 re-judged #5 and #7 only and accepted.
+- The dod.1 probe cases file made the DoD run number 2, not 1; run 1 is skipped (harmless).
 - Observation of process: I typed a Completed (UTC) time from memory once (21:30Z); caught against `date -u` and corrected.
 
 ---
@@ -92,10 +101,10 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-11-21 06:35
+**Final Status**: Completed
 **Branch**: feature/task.286.qa-fix-step4-guard-looks-beneath-gitlinks
 **PR**: https://github.com/Gamaroff/agent-skills/pull/927
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**QA Iterations**: 1 (gate PASS 95; PR review APPROVE)
+**DoD Summary**: ACCEPTED 8/8 — `task.286.dod.3.qa-fix-step4-guard-looks-beneath-gitlinks.md`; security 36 executed, 0 reproduced
+**Tracker debt**: none (no tracker issue linked). Two low QA findings left as advisory future work, not carded.
