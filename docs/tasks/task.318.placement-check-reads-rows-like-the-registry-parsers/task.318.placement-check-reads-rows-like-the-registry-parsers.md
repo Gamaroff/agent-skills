@@ -244,6 +244,27 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-22
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.318.qa.1.placement-check-reads-rows-like-the-registry-parsers.md](./task.318.qa.1.placement-check-reads-rows-like-the-registry-parsers.md)
+- **Gate File**: [task.318.gate.1.placement-check-reads-rows-like-the-registry-parsers.yml](./task.318.gate.1.placement-check-reads-rows-like-the-registry-parsers.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 13
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+One medium finding: no `[Unreleased]` CHANGELOG line cites task 318, and `/finalise` halts without one.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -253,6 +274,8 @@ None.
 | 2026-11-22 | 1.1     | Review passed (9/10) — added the fenced-table-above-header case to Phase 1 and its plan, with the parseRegistry row shape a comparison input needs | review-task |
 | 2026-11-22 |         | Status → ready-for-development | review-task |
 | 2026-11-22 |         | Implemented — 1 test file, 1 new test (4 cases), `placementOf` reads trimmed lines and skips fences | develop |
+| 2026-11-22 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-11-22 |         | QA findings fixed — CHANGELOG line added, 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

@@ -1,0 +1,61 @@
+schema: 2
+task: 'task.318.placement-check-reads-rows-like-the-registry-parsers'
+task_title: 'Placement check reads rows like the registry parsers'
+gate: CONCERNS
+status_reason: 'The helper fix is correct and mutation-proven. One medium finding: no [Unreleased] CHANGELOG line cites task 318, and /finalise 6d halts without one.'
+reviewer: 'QA Engineer'
+head: 'd57f1befd0fc05f061f36a50cf20a0c64c43eba3'
+updated: '2026-11-22T18:50:00Z'
+
+top_issues:
+  - id: 'T318-CL-1'
+    severity: medium
+    file: 'CHANGELOG.md'
+    finding: 'No [Unreleased] entry cites (task 318); changelog-cites.sh answers missing, and /finalise step 6d halts on that.'
+    suggested_action: 'Add one line under [Unreleased] > Fixed citing (task 318): the placement test reads rows like parseRegistry (trims lines, skips fences).'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 13
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    boundary_signals: []
+    notes: 'Test-only change; no boundary. The helper is a test reader, not an accept/reject predicate guarding an action.'
+  performance:
+    status: PASS
+    notes: 'Test reads one file.'
+  reliability:
+    status: PASS
+    notes: 'Committed registry still reports zero stranded rows; non-vacuity floor intact (13/13 pass).'
+  maintainability:
+    status: PASS
+    notes: 'Two readers of one grammar remain; four synthetic cases pin parity with parseRegistry.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Add the CHANGELOG [Unreleased] line citing (task 318).'
+      refs: ['CHANGELOG.md']
+  future: []
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CHANGELOG entry added']
