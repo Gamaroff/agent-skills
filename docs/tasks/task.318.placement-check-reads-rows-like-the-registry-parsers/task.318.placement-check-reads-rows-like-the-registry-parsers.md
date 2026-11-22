@@ -5,16 +5,18 @@ type: task
 description: "The task 317 placement test (placementOf) does not trim lines or skip fenced blocks, while the selector's parseRegistry does both, so it can miss an indented stranded row and flag a fenced sample row; make it read rows the way the parsers do, or record why it need not."
 tags: [task-registry, drift-test, follow-up, task-317]
 category: testing
-status: ready-for-review
+status: accepted
 priority: Low
 created: 2026-11-22
 updated: 2026-11-22
 estimated_effort_hours: 2
+completed_date: 2026-11-22
+pr_number: 929
 ---
 
 # Technical Task: Placement check reads rows like the registry parsers
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 ---
 
@@ -264,12 +266,26 @@ None.
 
 ### Key Findings
 No issues identified. The cycle-1 CHANGELOG finding is fixed.
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report:** `task.318.qa.2.placement-check-reads-rows-like-the-registry-parsers.md`, gate `task.318.gate.2.placement-check-reads-rows-like-the-registry-parsers.yml`: PASS, 100/100.
+
+✅ **Success criteria:** indented row reported stranded; fenced sample row not reported; drift test 13/13 on the committed registry.
+✅ **PR:** #929, 5c review APPROVE, CI green on the head.
+✅ **Documentation:** CHANGELOG `[Unreleased]` cites (task 318).
+⚠️ **Security / compliance:** not applicable (test-only helper).
+
+**Detailed Verification Log:** See `task.318.dod.1.placement-check-reads-rows-like-the-registry-parsers.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-22
 
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-22 | 1.0     | Initial draft | create-task |
 | 2026-11-22 | 1.1     | Review passed (9/10) — added the fenced-table-above-header case to Phase 1 and its plan, with the parseRegistry row shape a comparison input needs | review-task |
 | 2026-11-22 |         | Status → ready-for-development | review-task |
@@ -277,6 +293,7 @@ No issues identified. The cycle-1 CHANGELOG finding is fixed.
 | 2026-11-22 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-11-22 |         | QA findings fixed — CHANGELOG line added, 1 iteration | qa-fix |
 | 2026-11-22 |         | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-11-22 | 1.2 | DoD passed — accepted (PR #929) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -313,4 +330,4 @@ Task 317's QA could not make the helper diverge from the parsers. The two diverg
 
 ---
 
-**Status:** Ready for Review
+**Status:** Accepted
