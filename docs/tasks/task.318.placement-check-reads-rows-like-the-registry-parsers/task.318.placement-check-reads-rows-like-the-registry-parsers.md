@@ -246,15 +246,15 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-22
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.318.qa.1.placement-check-reads-rows-like-the-registry-parsers.md](./task.318.qa.1.placement-check-reads-rows-like-the-registry-parsers.md)
-- **Gate File**: [task.318.gate.1.placement-check-reads-rows-like-the-registry-parsers.yml](./task.318.gate.1.placement-check-reads-rows-like-the-registry-parsers.yml)
+- **Full Report**: [task.318.qa.2.placement-check-reads-rows-like-the-registry-parsers.md](./task.318.qa.2.placement-check-reads-rows-like-the-registry-parsers.md)
+- **Gate File**: [task.318.gate.2.placement-check-reads-rows-like-the-registry-parsers.yml](./task.318.gate.2.placement-check-reads-rows-like-the-registry-parsers.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 13
@@ -263,7 +263,7 @@ None.
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-One medium finding: no `[Unreleased]` CHANGELOG line cites task 318, and `/finalise` halts without one.
+No issues identified. The cycle-1 CHANGELOG finding is fixed.
 
 <!-- change-log-start -->
 ## Change Log
@@ -276,6 +276,7 @@ One medium finding: no `[Unreleased]` CHANGELOG line cites task 318, and `/final
 | 2026-11-22 |         | Implemented — 1 test file, 1 new test (4 cases), `placementOf` reads trimmed lines and skips fences | develop |
 | 2026-11-22 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-11-22 |         | QA findings fixed — CHANGELOG line added, 1 iteration | qa-fix |
+| 2026-11-22 |         | QA gate PASS (100/100) — 0 findings | qa-task |
 <!-- change-log-end -->
 
 ---
