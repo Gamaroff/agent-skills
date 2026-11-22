@@ -5,7 +5,7 @@ type: task
 description: "The task 317 placement test (placementOf) does not trim lines or skip fenced blocks, while the selector's parseRegistry does both, so it can miss an indented stranded row and flag a fenced sample row; make it read rows the way the parsers do, or record why it need not."
 tags: [task-registry, drift-test, follow-up, task-317]
 category: testing
-status: planned
+status: ready-for-review
 priority: Low
 created: 2026-11-22
 updated: 2026-11-22
@@ -14,7 +14,7 @@ estimated_effort_hours: 2
 
 # Technical Task: Placement check reads rows like the registry parsers
 
-**Status:** Planned
+**Status:** Ready for Review
 
 ---
 
@@ -97,8 +97,8 @@ None - the change is inside one test helper.
 - `evals/shared/tests/task-registry-drift.test.mjs`
 
 **Changes**:
-- [ ] Add two synthetic cases to the placement test: an indented row below `## Notes`, and a sample row inside a fence. Run them against the current helper and record which one fails and which one wrongly passes.
-- [ ] Feed the same two inputs to `parseRegistry` and record its answer beside each.
+- [ ] Add three synthetic cases to the placement test: an indented row below `## Notes`, a sample row inside a fence below `## Notes`, and a fenced sample table placed above the real header (the header-search hijack). Run them against the current helper and record which fail and which wrongly pass.
+- [ ] Feed the same three inputs to `parseRegistry` (full eight-column header, each row with a `[title](task.N.x/task.N.x.md)` link and at least five cells, or it reports the row malformed) and record its answer beside each.
 
 **Dependencies**: none
 
@@ -250,6 +250,9 @@ None.
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-11-22 | 1.0     | Initial draft | create-task |
+| 2026-11-22 | 1.1     | Review passed (9/10) — added the fenced-table-above-header case to Phase 1 and its plan, with the parseRegistry row shape a comparison input needs | review-task |
+| 2026-11-22 |         | Status → ready-for-development | review-task |
+| 2026-11-22 |         | Implemented — 1 test file, 1 new test (4 cases), `placementOf` reads trimmed lines and skips fences | develop |
 <!-- change-log-end -->
 
 ---
@@ -257,16 +260,16 @@ None.
 ## Progress Tracking
 
 ### Phase 1: Reproduce
-- [ ] Two synthetic cases added and run against the old helper
-- [ ] `parseRegistry` answer recorded for each
+- [x] Synthetic cases added (`indented`, `fenced`, `fencedTilde`, `fencedHeader`) and run against the old helper: all four red
+- [x] `parseRegistry` answer recorded for each (the test asserts it: rows `[1,3]`, `[1]`, `[1]`, `[1]`)
 
 ### Phase 2: Match the parsers
-- [ ] Trim before the row and header tests
-- [ ] Skip fenced blocks
-- [ ] Committed registry still clean
+- [x] Trim before the row and header tests
+- [x] Skip fenced blocks
+- [x] Committed registry still clean
 
 ### Phase 3: Prove it
-- [ ] Mutation proof per case
+- [x] Mutation proof per case: no trim → only `indented` red; no fence skip → `fenced`, `fencedTilde`, `fencedHeader` red
 - [ ] Test file and fast gate pass
 
 ---
@@ -286,4 +289,4 @@ Task 317's QA could not make the helper diverge from the parsers. The two diverg
 
 ---
 
-**Status:** Planned
+**Status:** Ready for Review

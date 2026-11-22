@@ -22,14 +22,15 @@ Reproduce two suspected divergences between `placementOf` and the selector's `pa
 
 **Exact changes:**
 
-Add two inputs next to `tight`:
+Add three inputs next to `tight`:
 
 ```js
 const indented = `${head}| 1  | a |\n\n## Notes\n\n  | 3 | c |\n`;
 const fenced = `${head}| 1  | a |\n\n## Notes\n\n\`\`\`\n| 4 | d |\n\`\`\`\n`;
+const fencedHeader = `\`\`\`\n| #  | Sample |\n|----|--------|\n| 9  | x |\n\`\`\`\n\n${head}| 1  | a |\n`;
 ```
 
-Expected on the current helper: `indented` reports no stranded row (false negative); `fenced` reports row 4 stranded (false positive). Run both through `parseRegistry` (imported at the top of the same file, line 45) with a full eight-column header, and record its row ids beside each.
+Expected on the current helper: `indented` reports no stranded row (false negative); `fenced` reports row 4 stranded (false positive); `fencedHeader` takes the fenced `| # |` line as the header, so row 1 reads as stranded or the separator check fails (false positive). Run all three through `parseRegistry` (imported at the top of the same file, line 45) with a full eight-column header, every row carrying a `[title](task.N.x/task.N.x.md)` link and at least five cells (a row without them is reported malformed, not read), and record its row ids beside each. Measured 2026-11-22: `parseRegistry` returns rows `[1,3]` for the indented input and `[1]` for the fenced one, with 0 malformed.
 
 ### Phase 2: Match the parsers
 
@@ -42,7 +43,7 @@ Walk the lines once, tracking `fenced` the way `parseRegistry` does (`/^\s*(```|
 
 ### Phase 3: Prove it
 
-Revert the trim, run the file, confirm the `indented` case goes red and nothing else does. Restore it, revert the fence skip, confirm only the fenced cases go red. Restore both.
+Revert the trim, run the file, confirm the `indented` case goes red and nothing else does. Restore it, revert the fence skip, confirm only the fenced cases go red (`fenced` and `fencedHeader`). The header search and the row scan each skip fences, so also revert each skip alone and name which case goes red. Restore both.
 
 ## Key Patterns and References
 
