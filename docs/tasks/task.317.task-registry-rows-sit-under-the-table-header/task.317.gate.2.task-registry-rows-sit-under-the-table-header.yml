@@ -1,0 +1,64 @@
+schema: 2
+task: 'task.317.task-registry-rows-sit-under-the-table-header'
+task_title: 'Task registry rows sit under the table header'
+gate: PASS
+status_reason: 'Both cycle-1 findings are fixed and verified on the head. The full-branch refute pass found one advisory, low-severity matcher difference that QA could not turn into a defect against the real parsers, so it stays advisory.'
+reviewer: 'QA Engineer'
+head: '68b395fbf975aebf4125c04b74ed97e805904948'
+updated: '2026-11-21T20:06:39Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 2
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    notes: 'No input boundary: the change moves documentation rows, adds a test helper that only reads the committed registry, and adds prose. placementOf is a test-side check, not a function whose false prevents an action.'
+  performance:
+    status: PASS
+    notes: 'No performance criterion applies.'
+  reliability:
+    status: PASS
+    notes: 'Rows moved byte for byte (sorted-line diff against origin/develop is empty); the selector picks the same item before and after.'
+  maintainability:
+    status: PASS
+    notes: 'The placement rule is stated once in the standard and once in create-task; the test holds it with a 317-row floor and a synthetic negative case that now covers the |3| and |  4 | spellings.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Optionally make placementOf trim each line and skip fenced blocks, as select-next.mjs parseRegistry does. An indented stranded row is missed by the test, but parseRegistry and registry-tick findHeader also do not treat a row after a blank line as a registry row, so no engine behaviour diverges today.'
+      refs: ['evals/shared/tests/task-registry-drift.test.mjs']
+      remedy: unverified
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-11-21'
+  total_iterations: 1
+  verification_method: 'Fast gate exit 0 (8709 pass); drift file 8 of 8; matcher mutation turns the synthetic placement test red; CI link-check green on the head'

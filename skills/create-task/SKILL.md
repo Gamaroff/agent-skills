@@ -175,6 +175,7 @@ From this, auto-generate:
 - **Directory Path**: `docs/tasks/task.[ID].[kebab-case-name]/`
 - **File Path**: `task.[ID].[kebab-case-name].md`
 - **Registry update** (after the task doc + plan are written, in Step 5): add a new row to `task-registry.md` and increment **Next Available Task Number**. Commit the registry update in the same commit as the new task files.
+  - **Where the row goes.** Insert the new row directly after the last row of the table, never at the end of the file: `registry-tick.js --annotate` finds the notes cell through the row's table header, and a row below the Notes section has none.
   - **Which branch.** That commit belongs on `develop`. When HEAD is a feature branch for a different work item, say so, and hand the commit to the user as a named step: committed there, the docs and the counter bump ride into that branch's PR (obs #188).
   - **An open PR on the row above.** When an earlier task's PR is still open, its `/finalise` tick rewrites that row, and the new row beside it conflicts. File after that PR merges, or expect to merge `develop` into the PR branch keeping both rows (`docs/standards/task-registry.md`, obs #202).
 

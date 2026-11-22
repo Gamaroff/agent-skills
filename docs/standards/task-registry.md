@@ -11,7 +11,7 @@ The task registry is the single source of truth for task numbering and status. T
 Before creating a new task:
 
 1. Read **Next Available Task Number** from the registry — that's your `task.{N}`.
-2. Run `/create-task`, which appends a row to the registry table.
+2. Run `/create-task`, which appends a row to the registry table. Insert the new row directly after the last row of the table, never at the end of the file: `registry-tick.js --annotate` finds the notes cell through the row's table header, and a row below the Notes section has none. `evals/shared/tests/task-registry-drift.test.mjs` fails on a row that sits outside the table.
 3. Increment **Next Available Task Number**.
 4. Commit the registry update **in the same commit** as the new task files — atomic.
 

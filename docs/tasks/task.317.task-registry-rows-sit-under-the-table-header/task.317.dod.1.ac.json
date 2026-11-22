@@ -1,0 +1,110 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "1970fe3fcac935f65d9de8b947080ec4bae0d800",
+  "dirty_paths": [],
+  "document": "docs/tasks/task.317.task-registry-rows-sit-under-the-table-header/task.317.task-registry-rows-sit-under-the-table-header.md",
+  "result": {
+    "bytes": 6252,
+    "sha256": "8c35aaf06521e2cf023fd2605be86ea51843fab5d2d326a289a4e2bc6517d77f",
+    "verified": true
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 6,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "47b9019f5f6c6b7b88c49180489075f2f6f7af6f2284d5ee3edbba445d2027d2",
+      "status": "PASS",
+      "description": "Every registry row lies inside the one table block under the header, test-held",
+      "code_citation": "docs/tasks/task-registry.md:43",
+      "test_citation": "evals/shared/tests/task-registry-drift.test.mjs:393",
+      "members": [
+        {
+          "member": "rows 286-316 and task 317's own row (32 rows), lines 330-361, above the line-377 Notes heading",
+          "evidence": "docs/tasks/task-registry.md:330-361",
+          "status": "PASS"
+        },
+        {
+          "member": "all other rows, held by the 317-row floor (PLACEMENT_MIN_ROWS) in the placement test",
+          "evidence": "evals/shared/tests/task-registry-drift.test.mjs:365",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Header at line 43, Notes heading at line 377, rows 286 to 317 at lines 330 to 361, all inside the table block. The placement test at :393 uses placementOf (:366) and a non-vacuity floor of 317 rows (:365). I ran the drift file at HEAD: 8 of 8 pass. The test lives in evals/shared/tests/*.test.mjs, which is in the test:suite glob that `npm test` runs; test.yml has no path filter and runs `npm test` at line 58. So the test runs per PR."
+    },
+    {
+      "id": "#2",
+      "text_hash": "8af84ca3e11a98248dc0766717b183419b2dbbd87a0d75160972e1cc3c92b2b6",
+      "status": "PASS",
+      "description": "registry-tick.js --annotate on a formerly stranded row answers annotated, recorded in QA report",
+      "code_citation": "docs/tasks/task.317.task-registry-rows-sit-under-the-table-header/task.317.qa.2.task-registry-rows-sit-under-the-table-header.md:76",
+      "test_citation": "shared/resources/tests/registry-tick.test.mjs:518",
+      "members": [],
+      "non_member_fail": null,
+      "note": "qa.2:75-76 records the real run on the formerly stranded task 286 row: {reason:annotated, line:330, annotated:true}. qa.1 records the pre-move `no-cell` at line 407 and a `dry-run`. registry-tick.test.mjs asserts reason annotated for a row under its header; its path is in the test:suite glob `shared/resources/tests/*.test.mjs`. The placement test at drift.test.mjs:393 holds the precondition. This test does not exercise the actual registry, so the QA record carries the real-row claim."
+    },
+    {
+      "id": "#3",
+      "text_hash": "2e6b6666f7a4a666563956713212aed0b3dd1038e2c9d80914f594f2be5e241a",
+      "status": "PASS",
+      "description": "Placement test fails when a row is moved after ## Notes, recorded with the red test",
+      "code_citation": "docs/tasks/task.317.task-registry-rows-sit-under-the-table-header/task.317.qa.1.task-registry-rows-sit-under-the-table-header.md:79",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "row 300 moved below ## Notes in a scratch worktree",
+          "evidence": "docs/tasks/task.317.task-registry-rows-sit-under-the-table-header/task.317.qa.1.task-registry-rows-sit-under-the-table-header.md:72-79",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "qa.1:72-79 names the moved row (300), the command, the red test (`every registry row sits in the one table block under the header (task.317)`), and that the other 7 stayed green and the file was 8 of 8 after restore. The task has one unit, so one member. The synthetic stranded-row test at drift.test.mjs:417 gives standing per-PR coverage of the same behaviour."
+    },
+    {
+      "id": "#4",
+      "text_hash": "f1bd79eec63045b089f766200cc82b24b05b8fee98e355f5c4f3b1b5959f3e93",
+      "status": "PASS",
+      "description": "No performance criterion applies (not applicable: no bound)",
+      "code_citation": "docs/tasks/task.317.task-registry-rows-sit-under-the-table-header/task.317.task-registry-rows-sit-under-the-table-header.md:179",
+      "test_citation": "NOT_APPLICABLE: task states no performance criterion applies",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Line 179 says explicitly that no performance criterion applies and no bound exists. Nothing numeric to measure; a per-PR test could not assert a bound that does not exist."
+    },
+    {
+      "id": "#5",
+      "text_hash": "abb24f56789a10eed4570d845fa23a2ed06c0f2743330259b620bca650f1d479",
+      "status": "PASS",
+      "description": "task-registry-drift.test.mjs and npm run ci:fast pass",
+      "code_citation": ".github/workflows/test.yml:55",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 8e884424c7042beb14bb38667fd9babf2d869205 — The drift half I checked locally: `node --test evals/shared/tests/task-registry-drift.test.mjs` is 8 of 8 at HEAD. The ci:fast half (format:check plus npm test) is what the CI `test` job runs at test.yml:55 and :58. That job was still pending, so I return it ungraded. QA recorded ci:fast as 8709 pass locally via TEST_LOCAL=1 (qa.1:85), but that is not the CI reading.",
+      "ci_reading": "CI reading 1: SUCCESS @ 8e884424c7042beb14bb38667fd9babf2d869205"
+    },
+    {
+      "id": "#6",
+      "text_hash": "9897b83a67627787400e14303293e7ec90ffb286dc885ac1e3ccab01f2bd53bd",
+      "status": "PASS",
+      "description": "CHANGELOG.md [Unreleased] entry cites (task 317)",
+      "code_citation": "CHANGELOG.md:9",
+      "test_citation": "evals/shared/tests/changelog-entry-drift.test.mjs:1",
+      "members": [],
+      "non_member_fail": null,
+      "note": "CHANGELOG.md:9 sits under `## [Unreleased]` / `### Fixed` and opens `**Task registry rows sit under the table header (task 317).**`. It says the rows are back in the one table, that the drift test fails on a stray row, and that /create-task and the standard state where a new row goes. That meets the criterion. changelog-entry-drift.test.mjs requires every accepted task merged since the last tag to be cited under [Unreleased], so it only bites once task 317 is accepted and merged. It is a post-merge backstop."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#1",
+      "note": "The qa.2 advisory stands: placementOf does not trim lines or skip code fences. QA could not make it diverge from parseRegistry or from registry-tick's findHeader, and it is recorded as a future recommendation, so it does not affect the verdict."
+    }
+  ]
+}

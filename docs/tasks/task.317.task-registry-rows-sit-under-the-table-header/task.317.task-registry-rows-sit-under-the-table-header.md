@@ -2,31 +2,34 @@
 id: task.317
 title: "Task registry rows sit under the table header"
 type: task
-description: "Move the 31 registry rows stranded after the Notes section back under the table header, add a test that holds every row in one contiguous block, and say in the writers' prose where a new row goes, so registry-tick --annotate can find the notes cell again."
+description: "Move the registry rows stranded after the Notes section (tasks 286 onward) back under the table header, add a test that holds every row in one contiguous block, and say in the writers' prose where a new row goes, so registry-tick --annotate can find the notes cell again."
 tags: [task-registry, registry-tick, develop-next, deferred-work]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 created: 2026-11-21
 updated: 2026-11-21
+completed_date: 2026-11-21
+pr_number: 928
 estimated_effort_hours: 2
 ---
 
 # Task 317: Task registry rows sit under the table header
 
-**Status:** Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.317.review.1.task-registry-rows-sit-under-the-table-header.md` implemented 2026-11-21
 
 ---
 
 ## 1. Overview
 
-`docs/tasks/task-registry.md` holds one table, but its last 31 rows (tasks 286–316) sit after the `## Notes` section, separated from the table header by about 80 lines of prose. `registry-tick.js --annotate` finds a row's notes cell by walking up from the row to its table header, so it answers `no-cell` for every one of those rows and records nothing. It surfaced on task 286: the merge step reported `no-cell` ("no table header above the row") and made no commit.
+`docs/tasks/task-registry.md` holds one table, but its last rows (tasks 286 onward: 32 at review time, task 317's own row among them) sit after the `## Notes` section, separated from the table header by about 80 lines of prose. `registry-tick.js --annotate` finds a row's notes cell by walking up from the row to its table header, so it answers `no-cell` for every one of those rows and records nothing. It surfaced on task 286: the merge step reported `no-cell` ("no table header above the row") and made no commit.
 
 **Scope**: `docs/tasks/task-registry.md` (move rows), one test under `evals/shared/tests/`, and the prose that tells a writer where a new row goes (`skills/create-task/SKILL.md`, `docs/standards/task-registry.md`).
 
 **Key deliverables**:
 
-1. Rows 286–316 sit directly under row 285, inside the table.
+1. Rows 286 onward (every row that sits after `## Notes`) sit directly under row 285, inside the table.
 2. A committed test fails when any registry row sits outside the one table block.
 3. The writers' prose says a new row goes after the last row of the table, never at the end of the file.
 
@@ -36,7 +39,7 @@ estimated_effort_hours: 2
 
 ### Current Problems
 
-1. **`--annotate` cannot annotate 31 rows.** `findHeader` walks up from the row over table lines only and returns `null` at the first line that is not a table row (`shared/resources/registry-tick.js:1016`, `if (!/^\s*\|/.test(line)) return null;`), and `annotateRow` then answers `no-cell` (`:1080`). Run on task 286's row on 2026-11-21 it returned `reason: no-cell`, `line: 405`, `stageReason: not-attempted`. Every task from 286 on has the same fate, so a merged PR is never recorded on its row.
+1. **`--annotate` cannot annotate any stranded row.** `findHeader` walks up from the row over table lines only and returns `null` at the first line that is not a table row (`shared/resources/registry-tick.js:1016`, `if (!/^\s*\|/.test(line)) return null;`), and `annotateRow` then answers `no-cell` (`:1080`). Run on task 286's row on 2026-11-21 it returned `reason: no-cell`, `line: 405`, `stageReason: not-attempted`. Every task from 286 on has the same fate, so a merged PR is never recorded on its row.
 2. **Nothing catches it.** `evals/shared/tests/task-registry-drift.test.mjs` passes (6 of 6, run 2026-11-21) with the rows stranded: it reads the whole file for rows and compares their status with the documents, and never asks where a row sits. `select-next.mjs` also reads the stranded rows (it selected T290, line 409). So the defect is silent everywhere except the one place it bites.
 3. **Writers have no placement rule.** `/create-task` "appends a row" (`skills/create-task/SKILL.md:177`, `docs/standards/task-registry.md:14`) and says nothing of where. Row 285 landed in the table (commit `18c46cd66`), and row 286 at the end of the file (commit `2b5a025da`); every row since followed the last one.
 
@@ -57,7 +60,7 @@ Population, measured 2026-11-21 (the test records the count, not this prose):
 awk '/^\| [0-9]+ \|/{split($0,a,"|"); id=a[2]+0; if(NR!=last+1){ if(start) print "rows "sid"-"lid" at lines "start"-"last; start=NR; sid=id } last=NR; lid=id } END{print "rows "sid"-"lid" at lines "start"-"last}' docs/tasks/task-registry.md
 ```
 
-Output: `rows 10-285 at lines 54-329` and `rows 286-316 at lines 407-437`. The header is at line 43 (`| #  | Title | Status …`), the separator at line 44, `## Notes` at line 345. Rows 1–9 sit at lines 45–53 and the first run starts at 54 only because the awk pattern needs a two-space id match; the block is contiguous. The 31 stranded rows are the second run.
+Output at review time (2026-11-21, after task 317's own row was added): `rows 10-285 at lines 54-329` and `rows 286-317 at lines 407-438`. The header is at line 43 (`| #  | Title | Status …`), the separator at line 44, `## Notes` at line 345. Rows 1–9 sit at lines 45–53 and the awk's first run starts at 54 only because its pattern needs a one-space id match (rows 1–9 are written `| 1  |`); the block is contiguous. The stranded rows are the second run: 32 at review time. The figure is a measurement that decays as tasks are added, so re-run the awk and the placement test's own count rather than trusting it. A scratch-copy run at review time reproduced `no-cell` on row 286 in the original layout and `annotated` once the rows were moved.
 
 `registry-tick.js` resolves the notes cell from the row's own table header (`findHeader`, `shared/resources/registry-tick.js:1016`), and `annotateRow` returns `no-cell` when it finds none (`:1080`, `has no table header above it — cannot tell which cell is the notes cell`). A test already holds that behaviour for a headerless table (`shared/resources/tests/registry-tick.test.mjs:830`), so the engine is correct and the file is wrong.
 
@@ -69,7 +72,7 @@ One contiguous table: header, separator, then every row in number order, then th
 
 - **Property claimed, then run.** The `no-cell` answer was reproduced on row 286 and the drift test was run green over the stranded layout before either was written down.
 - **No engine change.** `registry-tick.js` is correct to refuse; the task does not teach it to guess a header further up.
-- **Concurrent edits.** Moving 31 rows touches a file other sessions edit. Phase 2 lands in one commit on `develop` with the tree clean, and an open PR whose branch edits the registry takes the "keep both rows" merge the standard already describes.
+- **Concurrent edits.** Moving the stranded rows touches a file other sessions edit. Phase 2 lands in one commit on `develop` with the tree clean, and an open PR whose branch edits the registry takes the "keep both rows" merge the standard already describes.
 
 ---
 
@@ -77,14 +80,14 @@ One contiguous table: header, separator, then every row in number order, then th
 
 ### In Scope
 
-✅ Moving rows 286–316 (and any row stranded by the time Phase 2 runs) under the header, byte for byte.
+✅ Moving every row stranded after `## Notes` (rows 286–317 at review time, plus any added by the time Phase 2 runs) under the header, byte for byte.
 ✅ A test that holds every row in the one table block, and a mutation that strands one.
 ✅ The placement sentence in `skills/create-task/SKILL.md` and `docs/standards/task-registry.md`, and a bundle run if a `references/` copy changes.
 
 ### Out of Scope
 
 ❌ An engine that appends a row (a possible later task; the test is the guard this task adds).
-❌ Re-annotating the 31 rows with "PR #N merged" notes (the repaired layout lets `--annotate` do it going forward; a back-fill is a separate decision).
+❌ Re-annotating the moved rows with "PR #N merged" notes (the repaired layout lets `--annotate` do it going forward; a back-fill is a separate decision).
 ❌ Any change to `registry-tick.js`.
 
 ---
@@ -103,24 +106,24 @@ None. Row content is unchanged; only its position moves.
 
 **Risk**: Low
 
-- [ ] Re-run the awk measurement and the `--annotate` call on one stranded row, and record both.
-- [ ] Decide the placement rule for writers (after the last table row) and confirm no tool reads the file by line position.
+- [x] Re-run the awk measurement and the `--annotate` call on one stranded row, and record both.
+- [x] Decide the placement rule for writers (after the last table row) and confirm no tool reads the file by line position.
 
 ### Phase 2: Move the rows
 
 **Risk**: Medium
 
-- [ ] With a clean tree, move every stranded row to directly after the last in-table row, unchanged and in number order.
-- [ ] Run `registry-tick.js --annotate` against one moved row in a scratch copy and confirm it answers `annotated`, not `no-cell`.
-- [ ] Run `task-registry-drift.test.mjs` and the selector's dry run and confirm both are unchanged.
+- [x] With a clean tree, move every stranded row to directly after the last in-table row, unchanged and in number order.
+- [x] Run `registry-tick.js --annotate` against one moved row in a scratch copy and confirm it answers `annotated`, not `no-cell`.
+- [x] Run `task-registry-drift.test.mjs` and the selector's dry run and confirm both are unchanged.
 
 ### Phase 3: Hold it
 
 **Risk**: Low
 
-- [ ] Add a test that every registry row lies inside the one table block under the header, with a floor on the count.
-- [ ] Mutation-prove it: move one row after `## Notes` in a scratch copy and confirm the test fails.
-- [ ] Write the placement sentence in the two writers' prose and re-run `npm run bundle`.
+- [x] Add a test that every registry row lies inside the one table block under the header, with a floor on the count.
+- [x] Mutation-prove it: move one row after `## Notes` in a scratch copy and confirm the test fails.
+- [x] Write the placement sentence in the two writers' prose and re-run `npm run bundle`.
 
 ---
 
@@ -169,21 +172,21 @@ None.
 
 ### Functional
 
-- [ ] Every registry row lies inside the one table block directly under the header, held by a committed test with a non-vacuity floor.
-- [ ] `registry-tick.js --annotate` on a formerly stranded row answers `annotated`, recorded in the QA report.
-- [ ] The placement test fails when one row is moved after `## Notes`, recorded in the QA report with the test that went red.
+- [x] Every registry row lies inside the one table block directly under the header, held by a committed test with a non-vacuity floor.
+- [x] `registry-tick.js --annotate` on a formerly stranded row answers `annotated`, recorded in the QA report.
+- [x] The placement test fails when one row is moved after `## Notes`, recorded in the QA report with the test that went red.
 
 ### Performance
 
-- [ ] No performance criterion applies. (Not applicable: no bound to meet.)
+- [x] No performance criterion applies. (Not applicable: no bound to meet.)
 
 ### Code Quality
 
-- [ ] `task-registry-drift.test.mjs` and `npm run ci:fast` pass.
+- [x] `task-registry-drift.test.mjs` and `npm run ci:fast` pass.
 
 ### Migration
 
-- [ ] CHANGELOG.md has an `[Unreleased]` entry citing (task 317).
+- [x] CHANGELOG.md has an `[Unreleased]` entry citing (task 317).
 
 ---
 
@@ -230,21 +233,65 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-21
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.317.qa.2.task-registry-rows-sit-under-the-table-header.md](./task.317.qa.2.task-registry-rows-sit-under-the-table-header.md)
+- **Gate File**: [task.317.gate.2.task-registry-rows-sit-under-the-table-header.yml](./task.317.gate.2.task-registry-rows-sit-under-the-table-header.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 8 (drift file), plus `ci:fast` 8709 pass
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No gate findings. Cycle 1's two findings are fixed. One advisory item (the placement matcher does not trim lines or skip fences) is recorded as a future recommendation.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+All Definition of Done criteria verified (run 1, 2026-11-21):
+
+✅ **Acceptance Criteria:** all 6 met — placement test with a 317-row floor, `--annotate` answers `annotated` on the formerly stranded row, row-300 mutation turns the placement test red, no performance bound, drift file and `ci:fast` pass, CHANGELOG entry
+✅ **QA:** gate 2 PASS 100/100; PR review APPROVE
+✅ **CI:** SUCCESS on `8e884424c704` (all six checks)
+✅ **Documentation:** CHANGELOG and both writers' prose state where a new registry row goes
+✅ **Security / Compliance:** PASS (no boundary) / not applicable
+
+**Detailed Verification Log:** See `task.317.dod.1.task-registry-rows-sit-under-the-table-header.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-21
+
 ## Change Log
 
 <!-- change-log-start -->
 | Date       | Version | Description    | Author      |
 | ---------- | ------- | -------------- | ----------- |
 | 2026-11-21 | 1.0     | Initial draft — found when `registry-tick --annotate` answered `no-cell` on task 286's row during its merge step | create-task |
+| 2026-11-21 | 1.1     | Review passed (9/10) — stale row counts (31 → 32, task 317's own row is stranded too) and the unspecified test floor fixed; `no-cell` and `annotated` reproduced on a scratch copy | review-task |
+| 2026-11-21 |         | Status → ready-for-development | review-task |
+| 2026-11-21 |         | Implemented — 6 files (registry rows moved, placement test, two prose rules, CHANGELOG), 2 tests added; ci:fast 8709 pass | develop |
+| 2026-11-21 |         | QA gate CONCERNS (90/100) — 2 findings | qa-task |
+| 2026-11-21 |         | QA findings fixed — cycle 1, 2 findings | qa-fix |
+| 2026-11-21 |         | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-11-21 | 1.2 | Accepted — all 6 criteria met, CI green (PR #928) | finalise |
 <!-- change-log-end -->
 
 ---
 
 ## Progress Tracking
 
-- [ ] Phase 1: Measure and decide
-- [ ] Phase 2: Move the rows
-- [ ] Phase 3: Hold it
+- [x] Phase 1: Measure and decide
+- [x] Phase 2: Move the rows
+- [x] Phase 3: Hold it
 
 ---
 

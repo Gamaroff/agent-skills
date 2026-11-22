@@ -6,6 +6,11 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **Task registry rows sit under the table header (task 317).** Every row from task 286 on sat after
+  the `## Notes` section, so `registry-tick.js --annotate` found no table header above it and
+  answered `no-cell`; the rows are back in the one table, `task-registry-drift.test.mjs` fails on a
+  row outside it, and `/create-task` and the registry standard say a new row goes after the last
+  row of the table.
 - **`qa-fix` Step 4 guard looks beneath gitlinks (task 286).** A changed directory whose subtree
   holds a gitlink with an untracked file read clean; the guard now lists the gitlinks at or beneath
   each changed directory and refuses one that is not checked out or holds an untracked file, and
