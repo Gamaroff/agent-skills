@@ -1295,6 +1295,23 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
       a command left unrun for want of a safe form. This is not check 11, which runs a property of an
       *existing function* on new inputs; this runs *the plan's own command*. `create-task` § 3.5 asks
       the author for the matching environment-parity line
+32. **An allow-list replacing a deny-list covers the whole set it gates** (obs #159):
+    - Trigger: the plan replaces a deny-list with an allow-list — a command runner that refuses a
+      named set and will now admit a named set, a path filter, a permission table
+    - Coverage: the table lists every member of the set the list gates, or states the member count and
+      the command that measured it (`ls`, `git ls-files`, a `grep -c`). A table that names some members
+      and leaves the rest on "today's behaviour" is a deny-list for the rest
+    - Probe: for each member left on today's behaviour, run a **write-by-operand** probe, not only a
+      flag probe. A flag table cannot express a write through an operand. Run it in a scratch
+      directory, never the real target, as check 31 does: `uniq in.txt out.txt` creates `out.txt`
+      (`ls out.txt` after it shows the file), a write no flag table lists
+    - Worked example: task.289's plan tabled three commands of a 31-member allow-list for the QA
+      snippet runner and left the other 28 on today's behaviour. Running the plan's own gap blocks
+      found `uniq in out` creating a file
+    - Flag as **Important** a member that no row covers or that was not probed. Never auto-fix: put
+      the member to the author as "in the table — add it" or "left open — state why". This is not a
+      task that adds an allow-list where none existed: no deny-list is replaced, so the check does not
+      fire
 
 **Common Hallucination Patterns to Detect**:
 
@@ -1323,11 +1340,12 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 - ❌ A planned temp directory with no removal (check 28)
 - ❌ A new write into a directory whose other readers the plan does not name (check 29)
 - ❌ A command the plan names that moves or builds something, never run once in a dry-run or scratch form (check 31)
+- ❌ An allow-list that replaces a deny-list and tables only some members, with no write-by-operand probe for the rest (check 32)
 
 **Issues to Flag**:
 
 - **Critical**: Invented libraries/APIs, incorrect paths, wrong patterns, a falsified invariant (check 11)
-- **Important**: Unverified technical claims, inconsistent approaches, and the plan shapes of checks 15–20 (an unsearched removed literal, an unnamed writer in a replaced region, a pattern identity key, an unreached test file, unlisted reconstruction states, a site list without its search), and of checks 23–29 (a parity claim without a guard list, a self-rewriting writer's refusal not applied to its output, an enumerated class's tests unnamed, a fixture literal the banned-name guard matches, an early asynchronous read, a temp directory without removal, a directory reader unnamed), and of check 31 (a plan's own command that was run once in a dry-run or scratch form and did not do what the plan says)
+- **Important**: Unverified technical claims, inconsistent approaches, and the plan shapes of checks 15–20 (an unsearched removed literal, an unnamed writer in a replaced region, a pattern identity key, an unreached test file, unlisted reconstruction states, a site list without its search), and of checks 23–29 (a parity claim without a guard list, a self-rewriting writer's refusal not applied to its output, an enumerated class's tests unnamed, a fixture literal the banned-name guard matches, an early asynchronous read, a temp directory without removal, a directory reader unnamed), and of check 31 (a plan's own command that was run once in a dry-run or scratch form and did not do what the plan says), and of check 32 (an allow-list member no row covers, or one never probed for a write by operand)
 - **Optional**: Could be more specific or cite sources; a plan's command left unrun for want of a safe form (check 31)
 
 **Output**: Technical accuracy report with hallucinations identified
@@ -1485,7 +1503,7 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
        passes as a measured criterion on its committed measurement. For a wall-clock bound the
        command records the load it ran under (`uptime` beside `time`), and finalise fails a figure
        not taken on the PR's head commit (obs #268). Prefer a bound a test can assert (an operation
-       count, per-document work) over seconds.
+       count, per-document work) over seconds. A wall-clock bound names where it is measured and how load is controlled, and on a shared host prefers a paired, interleaved ratio or CPU time (user + sys) over a ratio of medians (obs #171): on task 306, ten interleaved runs gave a ratio of medians of 1.22, a paired-ratio median of 1.07 and CPU time of 1.016, with load from 2 to 20.
      - **A criterion that states no numeric bound** is held by its planned per-PR test: finalise
        sends it down the behaviour path and passes it on that test.
 
@@ -2516,6 +2534,7 @@ This skill implements rigorous safeguards to DETECT hallucinations:
 13. **Reconstruction-State Verification**: A changed resume or reconstruction rule MUST list the states it must hold in (Step 3 check 19)
 14. **Site-List Verification**: A hand-written site list MUST carry the search that defines it (Step 3 check 20)
 15. **Command Verification**: A command the plan names that moves or builds something MUST be run once, with a dry-run flag or against a scratch target, and left unrun with `unrun — no safe form` when it has neither (Step 3 check 31)
+16. **Allow-List Verification**: An allow-list that replaces a deny-list MUST table every member of the set it gates, or state the count and the command that measured it, and each member left open MUST be probed for a write by operand (Step 3 check 32)
 
 ### Reporting Hallucinations
 
