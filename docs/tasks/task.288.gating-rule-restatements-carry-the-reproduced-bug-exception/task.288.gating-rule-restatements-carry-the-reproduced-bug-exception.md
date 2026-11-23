@@ -282,6 +282,7 @@ Cycle 1's fix holds. The cycle-2 refute pass found two medium defects in the gua
 | 2026-11-23 |         | QA gate FAIL (80/100) — 1 finding (T288-CR-1, reproduced); status → in-progress | qa-task |
 | 2026-11-23 |         | QA findings fixed — T288-CR-1 closed (guard test keys "advisory unless"), 1 iteration | qa-fix |
 | 2026-11-23 |         | QA gate CONCERNS (90/100) — 2 findings (T288-C2-1, T288-C2-2) | qa-task |
+| 2026-11-23 |         | QA findings fixed — T288-C2-1 and T288-C2-2 closed (docs-only prompt reworded, false exemption removed, T273-CR-6 assertion checks every "advisory unless" sentence), 1 iteration | qa-fix |
 
 <!-- change-log-end -->
 

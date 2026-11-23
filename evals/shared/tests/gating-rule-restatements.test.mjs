@@ -188,13 +188,6 @@ export const EXEMPT = [
       "a bullet of the canonical resolution inside the 'Opt-in to blocking' section; it names the opt-in branch, and the exception is item 4 under 'QA use' in the same file",
   },
   {
-    file: "shared/resources/qa-docs-only-review-prompt.md",
-    startsWith:
-      "When unsure a claim is false, set confidence: low (it will not gate).",
-    reason:
-      "the docs-only lens reports claims about a diff, not bugs QA can reproduce by execution, and it writes no gate; the exception (a reproduced bug) does not apply to what it reports",
-  },
-  {
     file: "skills/qa-story/SKILL.md",
     startsWith:
       "When `CR_BLOCKING=true`, append each `category: bug` + `confidence: high`",
@@ -289,13 +282,21 @@ test("the four report-template 'advisory unless' lines are in the keyed populati
 });
 
 test("'advisory unless' names how blocking is resolved, not only the document's flag (T273-CR-6)", () => {
-  const bad = keyed.filter(
+  // Every 'advisory unless' sentence is checked, whether or not it names the flag: the report-template
+  // lines name none, and a flag filter here made the assertion run over an empty set (T288-C2-2).
+  // The one sentence that is about the standalone case ("Absent for standalone runs → ...") is
+  // skipped: it describes a run with no run-level argument, so "unless the doc opts in" is complete.
+  const checked = keyed.filter(
     (k) =>
       /advisory unless/i.test(k.sentence) &&
-      FLAG.test(k.sentence) &&
-      !HOW_RESOLVED.test(k.sentence) &&
+      !/^Absent for standalone runs/.test(k.sentence) &&
       !isExempt(k),
   );
+  assert.ok(
+    checked.length >= 4,
+    `expected at least four 'advisory unless' sentences to be checked, found ${checked.length}`,
+  );
+  const bad = checked.filter((k) => !HOW_RESOLVED.test(k.sentence));
   assert.deepEqual(
     bad.map((k) => `${k.file}: ${k.sentence.slice(0, 160)}`),
     [],
