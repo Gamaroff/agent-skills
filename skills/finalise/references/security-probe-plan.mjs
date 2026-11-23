@@ -170,12 +170,20 @@ export function ownedFlagIn(argv) {
   return null;
 }
 
+// The names the engine writes: `<casesBase>.json`, or `<casesBase>.<i>.json` for entry i of several,
+// with `casesBase` = `<stem>.dod.<N>.security.cases`. The pattern keys on the suffix only, so any
+// stem (a dotted one included) passes. Task 287.
+const CASES_FILE_NAME = /\.security\.cases(\.[0-9]+)?\.json$/;
+
 /**
  * A cases file the plan names, resolved under the work-item directory only. `{ok:true, file, bytes,
  * sha256}` with `file` the real path, or `{ok:false, why}`. Refused: a non-string or empty name, an
- * absolute path or one that climbs out (`..`), a symlink (the link, or a parent that resolves outside),
- * and anything that is not a regular file. The check runs on real paths: a name that merely looks
- * inside the directory is not the test (task 269).
+ * absolute path or one that climbs out (`..`), a name whose basename is not one the engine writes
+ * (`bad-name-shape`, task 287), a symlink (the link, or a parent that resolves outside), and anything
+ * that is not a regular file. The check runs on real paths: a name that merely looks inside the
+ * directory is not the test (task 269). The shape check follows the confinement checks, so an escaping
+ * name keeps answering `outside-work-dir`, and precedes every file read, so a bad shape never reaches
+ * `lstat`.
  */
 export function resolveCasesFile(name, workDir) {
   if (typeof name !== "string" || name === "" || name.includes("\0"))
@@ -191,6 +199,8 @@ export function resolveCasesFile(name, workDir) {
   const rel = path.relative(root, joined);
   if (rel === "" || rel.startsWith("..") || path.isAbsolute(rel))
     return { ok: false, why: "outside-work-dir" };
+  if (!CASES_FILE_NAME.test(path.basename(joined)))
+    return { ok: false, why: "bad-name-shape" };
   let st;
   try {
     st = fs.lstatSync(joined);

@@ -16,6 +16,15 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The security probe plan's `cases_file` refuses a name the engine does not write (task 287).**
+  `resolveCasesFile` accepted any regular JSON-array file in the work-item directory. It now also
+  requires the basename to end `.security.cases.json` or `.security.cases.<n>.json`, and answers
+  `bad-name-shape` (surfacing as `plan-entry-cases-file-bad-name-shape` and
+  `cases-file-bad-name-shape`) before any file read. Breaking for a hand-authored plan naming a
+  hand-named file: rename the file to the engine shape or put the cases inline. One committed plan
+  is affected (`task.304.dod.1.security.plan.json`), and it was already not reusable because its
+  file is untracked; only the reason changes. The `/finalise` security prompt and `SKILL.md` state
+  the shape. Tests: `shared/resources/tests/security-probe-plan-cases-file.test.mjs`.
 - **Jira sync maps the `superseded` task status (task 305).** `superseded` had no key in the Jira
   status map and sat in neither terminal set, so a superseded task looked for a Jira transition
   literally named "Superseded" and could not use the done-category fallback. It now resolves to the
