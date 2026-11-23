@@ -5,7 +5,7 @@ type: task
 description: "Reword the two LOW residues task 273 left (T273-CR-5, T273-CR-6) and add a guard test so a restatement of the code-review gating rule cannot drop the reproduced-bug (5d) exception again."
 tags: [qa, code-review, guard-test]
 category: testing
-status: ready-for-review
+status: in-progress
 priority: Low
 created: 2026-11-09
 updated: 2026-11-23
@@ -16,7 +16,7 @@ github_issue: 862
 
 # Technical Task: Gating-rule restatements carry the reproduced-bug exception
 
-**Status:** Ready for Review
+**Status:** In Progress
 **Review**: ✅ All review recommendations from `task.288.review.1.gating-rule-restatements.md` implemented 2026-11-23
 **GitHub Issue**: [#862](https://github.com/Gamaroff/agent-skills/issues/862)
 
@@ -248,6 +248,27 @@ A false positive is fixed by an exemption with a reason, not by deleting the tes
 
 ---
 
+## QA Testing Results
+
+**QA Status**: FAIL
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-23
+**Quality Score**: 80/100
+**Gate Decision**: FAIL
+
+### QA Report
+- **Full Report**: [task.288.qa.1.gating-rule-restatements.md](./task.288.qa.1.gating-rule-restatements.md)
+- **Gate File**: [task.288.gate.1.gating-rule-restatements.yml](./task.288.gate.1.gating-rule-restatements.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 8744
+- **Phases Verified**: 3/3
+- **Critical Issues**: 1
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+T288-CR-1 (high, reproduced by QA): the four rewritten report-template lines are not keyed by the guard test, so dropping their 5d clause leaves it green.
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -258,6 +279,7 @@ A false positive is fixed by an exemption with a reason, not by deleting the tes
 | 2026-11-23 | 1.1     | Review passed (8/10): re-measured drifted anchors (CR-5 `:92`→`:96`; template lines `:1622/:1936/:2479`→`:1633/:1953/:2495`; `qa-task:1050` dropped, the phrase lives at `qa-runnable-prose-detection.md:683`), required a case-insensitive grep for the four template lines, added two unqualified "will not gate" sites to Phase 2, and tied the exemption criterion to its test | review-task |
 | 2026-11-23 |         | Status → ready-for-development | review-task |
 | 2026-11-23 | 1.2     | Implemented inline: CR-5, CR-6 (four lines) and nine more restatement sentences reworded; guard test `gating-rule-restatements.test.mjs` added (template fences read, 7 reasoned exemptions, floor 24); bundled; CHANGELOG. Status → ready-for-review | develop-task |
+| 2026-11-23 |         | QA gate FAIL (80/100) — 1 finding (T288-CR-1, reproduced); status → in-progress | qa-task |
 
 <!-- change-log-end -->
 
