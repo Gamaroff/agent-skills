@@ -35,10 +35,10 @@ Add a basename-shape check to `resolveCasesFile` so the security probe plan's `c
 | 1. create-branch           | ✅ Done    | Branch `feature/task.287.*` exists in git                              | Branch created at `6c867b9a6` | —                    | 2026-11-23T12:45Z |
 | 2. review-task             | ✅ Done    | `task.287.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT, 8/10; 0 critical, 4 important, 2 optional, all applied | —                    | 2026-11-23T12:58Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 1 iteration, inline; fast gate green (8741 tests, 0 fail) | —                    | 2026-11-23T13:03Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.287.qa.{N}.*.md`; `task.287.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.287.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #933 | —                    | 2026-11-23T13:12Z |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.287.qa.{N}.*.md`; `task.287.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 1 cycle, gate PASS 95; 5c APPROVE | —                    | 2026-11-23T13:11Z |
+| 7. finalise                | ✅ Done    | `task.287.dod.{N}.*.md`; task `status: accepted`                       | ACCEPTED, 13/13 AC; CI reading 1 SUCCESS @ `4b72c73bd35f`, reading 2 SUCCESS @ `475d85055` (tree-equivalent to `62d5eb096d6d`); canonical PR comment posted | —                    | 2026-11-23T14:44Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Final report committed with this row | —                    | 2026-11-23T14:44Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -84,11 +84,29 @@ Add a basename-shape check to `resolveCasesFile` so the security probe plan's `c
 - Change Log row written once (inline path).
 - Tracker comment skipped: no linked issue.
 
+### Step 4 — Create PR
+
+- SCOPE_PATHS: the task dir, `CHANGELOG.md`, `shared/resources`, `shared/resources/tests`, `skills/finalise`, `skills/finalise/references`, `skills/qa-story/references`, `skills/qa-task/references`.
+- Pre-flight guard: no out-of-scope untracked files; nothing held. Leak check: none.
+- Report links checked before the push: `doc-links.js` exit 0.
+- Two commits on the branch: `51679a8da` (code) and `62d5eb096` (task documents). PR body written to a file with the file tool; no `--issue` (no linked issue); the in-review tracker comment was skipped for the same reason.
+- PR created: https://github.com/Gamaroff/agent-skills/pull/933 (base `develop`). Post-PR state: OPEN. Explore state-poller subagent not dispatched; state read with `gh pr view`.
+
+### Steps 5–6 — QA loop
+
+- Cycle 1: `/qa-task` gate PASS (95/100), 0 open entries, so the route went straight to 5c; no `/qa-fix` ran. Code review by one Explore subagent (1 low advisory finding, CR-1); mutation proof 4 of 5 red; security probe engaged, 8 executed, 0 reproduced; read-back clean.
+- Gate and QA report committed and pushed once (`4b72c73bd`) before 5c; trail asserted on the branch.
+- 5c: `/review-pr --effort medium --comment --no-code` (conformance lens only, one Explore subagent): APPROVE, 2 low consistency findings (no `pr_number` in frontmatter; Success Criteria boxes unticked). `OPEN_COVERAGE=0`. Not fixed in 5c: `/finalise` records the PR number and ticks the criteria itself. Review comment posted to PR #933.
+- The traceability mapper and `record_criteria` token were not passed (see the Issues Log).
+
 ---
 
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
+
+- **QA cycle 1 was dispatched without the pipeline's args.** `/qa-task` ran with the bare task path, so `code_review_blocking=true` and `record_criteria` were not passed. Effect measured afterwards: the only code-review finding (CR-1) is low severity and medium confidence, so a blocking resolution would not have changed the gate; and the two criteria that name the QA report as their record (the slowest-test timing and the mutation proof) were written there anyway, and `finalise-record-preflight.js check` lists exactly those two. Cycle 2 and later runs pass the tokens.
+- **The stock `path` probe corpus now reads `unverifiable`** (`rejects-every-input`) against `casesFileAccepted`, because its legitimate names are not engine-shaped. That is the intended effect of this task. QA probed with a cases file instead (8 executed, 0 reproduced); a DoD probe of the same entry will need one too.
 
 ---
 
@@ -96,14 +114,24 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-11-23
+**Gate Result**: PASS
+**Issues Found**: none blocking; 1 advisory (CR-1, the pattern also accepts the bare name `.security.cases.json` and zero-padded indices) carried to `recommendations.future`
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**Traceability**: skipped (no Success Criteria table)
+**PR Review**: APPROVE
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-11-23T14:44Z
+**Final Status**: Completed
 **Branch**: feature/task.287.cases-file-accepts-only-engine-shaped-names
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**PR**: #933 — https://github.com/Gamaroff/agent-skills/pull/933
+**QA Iterations**: 1
+**DoD Summary**: `task.287.dod.1.cases-file-accepts-only-engine-shaped-names.md` — ACCEPTED
+**Tracker debt**: none (the task has no tracker issue)
