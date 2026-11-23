@@ -29,7 +29,7 @@ Grep each `sync-jira-{bug,epic,story,task}` entry point for `DEFAULT_STATUS_MAP`
 
 ### Phase 3: The GitHub path
 
-Read `shared/resources/tracker-workflow.js` lines 398-412 first. If an unknown `documentStatus` key is rejected, add `superseded` to the allowed set; if it is accepted, add `superseded: ...` to the scaffold in `shared/resources/gh-stage.js` (`:1946`, beside `cancelled`) using the same `resolved("done") || last` target. Pick one and test it.
+`shared/resources/tracker-workflow.js:405` accepts any `documentStatus` key (verified at review, 2026-11-23), so add `superseded: ...` to the scaffold in `shared/resources/gh-stage.js` (`:1944`, beside `cancelled`) using the same `resolved("done") || last` target, and test that the scaffold output carries it. Then add a `superseded` → `Cancelled` row to the Jira mapping table in `shared/resources/document-status-lifecycle.md` (Phase 3b of the task).
 
 ### Phase 4: Bundle and mutation
 

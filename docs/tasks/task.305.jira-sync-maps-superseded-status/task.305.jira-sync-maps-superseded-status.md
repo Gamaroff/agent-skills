@@ -5,16 +5,18 @@ type: task
 description: "Follow-up to PR 878: superseded is now a valid terminal task status, but the Jira status map has no entry for it, so a superseded task finds no Jira transition. Map it, decide the Jira state it lands in, and check the GitHub ladder for the same gap."
 tags: [jira, sync, status-lifecycle]
 category: other
-status: planned
+status: ready-for-review
 priority: Medium
 created: 2026-11-11
-updated: 2026-11-11
+updated: 2026-11-23
 estimated_effort_hours: 4
 ---
 
 # Technical Task: Jira sync maps the superseded status
 
-**Status:** Planned
+**Status:** Ready for Review
+
+**Review**: ✅ All review recommendations from `task.305.review.1.jira-sync-maps-superseded-status.md` implemented 2026-11-23
 
 Follow-up to PR #878 (`fix/superseded-task-status`), which made `superseded` a valid terminal task status in the selector and in `document-status-lifecycle.md`. That PR left the tracker side alone on purpose. This task covers it.
 
@@ -31,7 +33,7 @@ A task whose frontmatter says `status: superseded` has no mapped Jira transition
 
 ## 2. Motivation
 
-- `mapStatusCandidates` returns the raw word when the map has no key (`shared/resources/jira-sync.js:3857`, `if (hit == null) return [stripped];`). A superseded task therefore looks for a Jira transition literally named "Superseded". Boards rarely have one, so the sync finds no transition for it.
+- `mapStatusCandidates` returns the raw word when the map has no key (`shared/resources/jira-sync.js:3859`, `if (hit == null) return [stripped];`). A superseded task therefore looks for a Jira transition literally named "Superseded". Boards rarely have one, so the sync finds no transition for it.
 - `isTerminalLocalStatus` and `isNegativeLocalStatus` (`jira-sync.js:3876`, `:3880`) read `TERMINAL_LOCAL_STATUSES` (`:3505`) and `NEGATIVE_LOCAL_STATUSES` (`:3524`). `superseded` is in neither, so the `statusCategory=done` fallback is not used and no negative resolution is chosen.
 - tinker-city already files replaced tasks as `superseded` (task.24, task.48), so this is a live gap, not a hypothetical.
 
@@ -42,11 +44,12 @@ A task whose frontmatter says `status: superseded` has no mapped Jira transition
 - `DEFAULT_STATUS_MAP`: `shared/resources/jira-sync.js:3459`. Keys today: the canonical lifecycle plus `cancelled: CANCELLED_CANDIDATES` (`:3467`) and aliases. No `superseded`.
 - `CANCELLED_CANDIDATES`: `jira-sync.js:3264` = Cancelled, Canceled, Won't Do, Rejected, Closed.
 - `TERMINAL_LOCAL_STATUSES` `:3505`, `NEGATIVE_LOCAL_STATUSES` `:3524`: neither holds `superseded`.
-- The GitHub ladder scaffold: `shared/resources/gh-stage.js:1946` writes `cancelled: ...` under `documentStatus:` and no `superseded`.
-- `documentStatus` in `shared/resources/tracker-workflow.js:398-412` is read as an open map of local status to target. Whether a key outside the lifecycle is accepted is `(unverified)`; read it before Phase 3.
-- Existing tests that read the map: `shared/resources/tests/jira-ready-for-development-candidates.test.mjs` (names `DEFAULT_STATUS_MAP`). The `sync-jira-*` scripts take the map from `jira-sync.js` (`(unverified)`: confirm each of the four imports it rather than carrying a copy).
+- The GitHub ladder scaffold: `shared/resources/gh-stage.js:1944` writes `cancelled: ...` under `documentStatus:` and no `superseded`.
+- `documentStatus` in `shared/resources/tracker-workflow.js:398-412` is an open map: the loop at `:405` stores every non-empty `local: target` pair and checks no key against the lifecycle (verified at review, 2026-11-23). So an unknown key is accepted, and Phase 3 adds a scaffold line; it does not widen an allowed set.
+- Existing tests that read the map: `shared/resources/tests/jira-ready-for-development-candidates.test.mjs` (names `DEFAULT_STATUS_MAP`). All four `sync-jira-*` scripts reference `jira-sync.js` (`grep -l jira-sync skills/sync-jira-*/scripts/*.js`); `sync-jira-task.js:1081` passes `lib.DEFAULT_STATUS_MAP`. Phase 2 still confirms each by a test rather than by this grep.
+- The documented Jira mapping: `shared/resources/document-status-lifecycle.md`, section "External Tracker Mapping (Jira)", lists `cancelled` → `Cancelled` and no `superseded` row. It links to `docs/reference/configuration.md#jira-status-mapping`.
 
-**Owner decision, needed before Phase 1.** Jira workflows differ, so two options exist:
+**Owner decision (resolved).** Jira workflows differ, so two options exist. **Option A was taken on 2026-11-23** by the autonomous `/develop-next --defaults` run, on the recommendation below; the config override keeps B available to any board, and the owner can overrule it at review of the PR:
 
 | Option | Lands in | Resolution | Trade-off |
 |---|---|---|---|
@@ -57,7 +60,7 @@ Recommendation: A, with `superseded` added to both terminal sets. A `jira-sync` 
 
 ## 4. Scope
 
-**In scope:** ✅ `jira-sync.js` map and terminal sets ✅ the GitHub `documentStatus` scaffold ✅ tests with a mutation ✅ bundled copies.
+**In scope:** ✅ `jira-sync.js` map and terminal sets ✅ the GitHub `documentStatus` scaffold ✅ the `superseded` row in the Jira mapping table of `document-status-lifecycle.md` ✅ tests with a mutation ✅ bundled copies.
 
 **Out of scope:** ❌ the bug lifecycle map (bugs have their own statuses) ❌ the selector (done in PR #878) ❌ re-vendoring into a consumer repository.
 
@@ -73,32 +76,40 @@ None. A task that was `superseded` already failed to find a transition; it now f
 
 **Files:** `shared/resources/jira-sync.js`
 
-- [ ] Add `superseded: CANCELLED_CANDIDATES` to `DEFAULT_STATUS_MAP` (owner decision A).
-- [ ] Add `"superseded"` to `TERMINAL_LOCAL_STATUSES` and `NEGATIVE_LOCAL_STATUSES`.
-- [ ] Tests: `mapStatusCandidates("superseded")` returns the cancelled family; `isTerminalLocalStatus` and `isNegativeLocalStatus` are true for it.
+- [x] Add `superseded: CANCELLED_CANDIDATES` to `DEFAULT_STATUS_MAP` (owner decision A).
+- [x] Add `"superseded"` to `TERMINAL_LOCAL_STATUSES` and `NEGATIVE_LOCAL_STATUSES`.
+- [x] Tests: `mapStatusCandidates("superseded")` returns the cancelled family; `isTerminalLocalStatus` and `isNegativeLocalStatus` are true for it.
 
 ### Phase 2: One definition, four scripts — Risk: Low
 
-- [ ] Confirm each of the four `sync-jira-*` scripts reads the shared map and carries no copy. A test drives each with `status: superseded` and asserts the resolved candidates.
+- [x] Confirm each of the four `sync-jira-*` scripts reads the shared map and carries no copy. A test drives each with `status: superseded` and asserts the resolved candidates.
 
 ### Phase 3: The GitHub path — Risk: Low
 
 **Files:** `shared/resources/gh-stage.js`, possibly `shared/resources/tracker-workflow.js`
 
-- [ ] Read `tracker-workflow.js:398-412` and decide: add `superseded: ...` to the scaffold ladder next to `cancelled`, or record that an absent key is already handled.
-- [ ] A test holds whichever is chosen.
+- [x] Add `superseded: ...` to the scaffold ladder in `gh-stage.js` next to `cancelled`, with the same `resolved("done") || last` target. (`tracker-workflow.js:405` accepts any key, so no allow-list changes.)
+- [x] A test calls the scaffold builder and asserts the output carries a `superseded:` line whose target equals the `cancelled:` line's. Run `shared/resources/tests/gh-stage.test.mjs` whole: it is the existing suite for that file.
+
+### Phase 3b: The documented mapping — Risk: Low
+
+**Files:** `shared/resources/document-status-lifecycle.md`
+
+- [x] Add a `superseded` → `Cancelled` row to the "External Tracker Mapping (Jira)" table, beside `cancelled`. Check `docs/reference/configuration.md#jira-status-mapping` for a default-mapping table and add the same row if it lists `cancelled`.
 
 ### Phase 4: Bundle and mutation — Risk: Low
 
-- [ ] `npm run bundle`, `npm run bundle:check`.
-- [ ] Mutation: remove the map key, then each set entry, then the ladder line. Each turns one named test red.
+- [x] `npm run bundle`, `npm run bundle:check`.
+- [x] Mutation: remove the map key, then each set entry, then the ladder line. Each turns one named test red.
 
 ## 7. Files Summary
 
 1. ✅ `shared/resources/jira-sync.js`
-2. ✅ `shared/resources/gh-stage.js` (scaffold line, if Phase 3 adds one)
-3. ✅ `shared/resources/tests/jira-sync-superseded-status.test.mjs` (new)
-4. ✅ bundled `references/jira-sync.js` copies under `skills/*/references/`, regenerated by `npm run bundle`
+2. ✅ `shared/resources/gh-stage.js` (one scaffold line)
+3. ✅ `shared/resources/tests/jira-sync-superseded-status.test.mjs` (new; reached by the `shared/resources/tests/*.test.mjs` glob in `npm run test:suite`)
+4. ✅ `shared/resources/document-status-lifecycle.md` (one table row) and `docs/reference/configuration.md` (the default-mapping row and the terminal-fallback sentence)
+5. ✅ bundled `references/jira-sync.js`, `gh-stage.js` and `document-status-lifecycle.md` copies under `skills/*/references/`, regenerated by `npm run bundle`
+6. ✅ `CHANGELOG.md` (`[Unreleased]`)
 
 ## 8. Testing Strategy
 
@@ -108,21 +119,21 @@ Behaviour, not source text: call `mapStatusCandidates`, `isTerminalLocalStatus` 
 
 **Functional**
 
-- [ ] `mapStatusCandidates("superseded")` returns the cancelled family. Held by a test.
-- [ ] A superseded task chooses a negative resolution and may use the `statusCategory=done` fallback. Held by a test.
-- [ ] The GitHub ladder either carries `superseded` or a test states why it does not.
+- [x] `mapStatusCandidates("superseded")` returns the cancelled family. Held by a test.
+- [x] A superseded task chooses a negative resolution and may use the `statusCategory=done` fallback. Held by a test.
+- [x] The GitHub scaffold carries `superseded` with the same target as `cancelled`. Held by a test that calls the scaffold builder.
 
 **Performance**
 
-- [ ] No extra network calls: the stubbed transition-lookup count is unchanged for non-superseded statuses.
+- [x] No extra network calls: held by a test in `jira-sync-superseded-status.test.mjs` that drives the transition lookup for `accepted` and `cancelled` with a stub and asserts the same number of lookups as before the change (a constant in the test, taken from `develop` before the edit).
 
 **Code quality**
 
-- [ ] `npm run bundle:check` clean; `CI=true npm run test:remote` green.
+- [x] `npm run bundle:check` clean; `CI=true npm run test:remote` green.
 
 **Migration**
 
-- [ ] `CHANGELOG.md` entry; one line in `docs/reference` where the Jira status map is documented (`(unverified)`: grep for it).
+- [x] `CHANGELOG.md` entry under `[Unreleased]`; the `superseded` row in `document-status-lifecycle.md` (Phase 3b) is the documentation of the Jira default map.
 
 ## 10. Risk Assessment
 
@@ -141,12 +152,15 @@ Revert the commit and re-run `npm run bundle`. Trigger: a board that now moves s
 | Date       | Version | Description   | Author      |
 | ---------- | ------- | ------------- | ----------- |
 | 2026-11-11 | 1.0     | Initial draft | create-task |
+| 2026-11-23 | 1.1     | Review passed (9/10) — owner decision A taken; Phase 3 resolved (documentStatus is an open map); Phase 3b added for the lifecycle doc's Jira table; performance and migration criteria given a held test and a location; line anchors corrected | review-task |
+| 2026-11-23 |         | Status → ready-for-development | review-task |
+| 2026-11-23 |         | Implemented — 4 source and doc files plus bundled copies, 8 new tests; fast gate 8725 tests, 0 failed | develop |
 
 <!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phases 1 to 4
+- [x] Phases 1 to 4
 
 ## References
 

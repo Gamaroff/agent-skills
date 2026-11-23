@@ -3466,6 +3466,10 @@ const DEFAULT_STATUS_MAP = {
   "ready-for-review": REVIEW_CANDIDATES,
   accepted: DONE_CANDIDATES,
   cancelled: CANCELLED_CANDIDATES,
+  // Replaced by newer work, not delivered: the same Jira states as cancelled
+  // (task.305, owner decision A). A board that wants it elsewhere overrides it
+  // in jira.statusMap.
+  superseded: CANCELLED_CANDIDATES,
   // aliases
   // Must stay bound to the same list as the canonical "ready-for-development"
   // key above — two spellings of one status resolving differently is a worse
@@ -3511,6 +3515,7 @@ const TERMINAL_LOCAL_STATUSES = new Set([
   "closed",
   "cancelled",
   "canceled",
+  "superseded",
   "done",
   "completed",
   "complete",
@@ -3525,6 +3530,7 @@ const TERMINAL_LOCAL_STATUSES = new Set([
 const NEGATIVE_LOCAL_STATUSES = new Set([
   "cancelled",
   "canceled",
+  "superseded",
   "won't do",
   "wont do",
   "won't fix",
