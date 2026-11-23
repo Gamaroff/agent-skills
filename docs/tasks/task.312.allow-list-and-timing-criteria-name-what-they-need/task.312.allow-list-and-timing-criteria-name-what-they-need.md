@@ -5,7 +5,9 @@ type: task
 description: "review-task has no check that an allow-list replacing a deny-list covers the whole set it gates, and neither create-task nor review-task steers a wall-time bound to a paired ratio or CPU time; this task adds both."
 tags: [review-task, create-task, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
+completed_date: 2026-11-23
+pr_number: 932
 priority: Medium
 created: 2026-11-17
 updated: 2026-11-23
@@ -14,7 +16,7 @@ estimated_effort_hours: 4
 
 # Technical Task: Allow-list and timing criteria name what they need
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 ---
 
@@ -235,10 +237,24 @@ None.
 
 ### Key Findings
 No critical issues identified. One LOW cosmetic note: the timing sentence is one unwrapped line.
+## Definition of Done - PASSED ✅
 
-## Change Log
+**Status:** ACCEPTED
+
+**QA Report:** `task.312.qa.1.allow-list-and-timing-criteria-name-what-they-need.md` · **Gate:** PASS (95/100) · **PR review:** APPROVE
+
+✅ **Success criteria:** 6 of 6 met, each cited to code and a committed test
+✅ **PR #932:** all 6 CI checks SUCCESS on `0c40c40e1fd6` (reading 1)
+✅ **Documentation:** CHANGELOG entry cites (task 312); bundled copies in sync
+✅ **Security review:** no boundary function added; the one executed command runs in a removed temp directory
+⚠️ **Compliance:** not applicable
+
+**Detailed Verification Log:** See `task.312.dod.1.allow-list-and-timing-criteria-name-what-they-need.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-23
 
 <!-- change-log-start -->
+## Change Log
 
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
@@ -247,6 +263,7 @@ No critical issues identified. One LOW cosmetic note: the timing sentence is one
 | 2026-11-23 |  | Status → ready-for-development | review-task |
 | 2026-11-23 |  | Implemented check 32, the timing sentence and `tests/review-allow-list-timing-checks.test.js`; status → ready-for-review | develop |
 | 2026-11-23 |  | QA gate PASS (95/100) — 0 findings, 1 LOW | qa-task |
+| 2026-11-23 | 1.2 | DoD passed — accepted (PR #932) | finalise |
 <!-- change-log-end -->
 
 ---
