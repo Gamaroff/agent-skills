@@ -796,7 +796,8 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
    `.claude/state/probe-plan.json`, check them against the code or a committed cases file, and re-run.
    An entry may name a committed cases file with `cases_file` instead of carrying `cases`; the runner
    copies its bytes (so U+0085, U+2028, VT, FF and a lone CR survive) and refuses a name that is
-   absolute, climbs out, is a symlink or is not a JSON array. Cases that carry an HTML entity are
+   absolute, climbs out, is a symlink or is not a JSON array, and a name the engine does not write
+   (anything but `…security.cases.json` or `…security.cases.<n>.json`) as `bad-name-shape`. Cases that carry an HTML entity are
    refused as `plan-entry-cases-html-entity` when the plan has no literal `<` and the entry's own source
    file does not carry that entity. `--reusable-plan` writes the plan as it ran, each inline `cases`
    replaced by its committed file and hash; commit it beside the record, because the next run's `reuse`

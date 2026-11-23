@@ -1,0 +1,16 @@
+[
+  {
+    "argv": [
+      "--sink",
+      "path",
+      "--entry",
+      "shared/resources/security-probe-plan.mjs#casesFileAccepted",
+      "--args-json",
+      "[\"/home/gamaroff/Development/agent-skills/docs/tasks/task.287.cases-file-accepts-only-engine-shaped-names\"]",
+      "--name",
+      "casesFileAccepted"
+    ],
+    "cases_file": "task.287.dod.1.security.cases.json",
+    "cases_sha256": "e45838e9c97d76e61403a679583e93160c1618a34f8650c73a55a08ecde5fb13"
+  }
+]

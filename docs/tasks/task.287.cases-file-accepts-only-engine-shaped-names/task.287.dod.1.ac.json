@@ -1,0 +1,185 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "4b72c73bd35fe7dba633ff69f8485782d741f3b9",
+  "dirty_paths": [
+    "docs/tasks/task.287.cases-file-accepts-only-engine-shaped-names/task.287.implementation.1.cases-file-accepts-only-engine-shaped-names-initial-run.md",
+    "docs/tasks/task.287.cases-file-accepts-only-engine-shaped-names/task.287.pr-review.1.cases-file-accepts-only-engine-shaped-names.md"
+  ],
+  "document": "docs/tasks/task.287.cases-file-accepts-only-engine-shaped-names/task.287.cases-file-accepts-only-engine-shaped-names.md",
+  "result": {
+    "bytes": 9126,
+    "sha256": "77e8c6e980dd88a6a9a9e2e58c3bc2535f006945523f92cf031d7dce7c866d0e",
+    "verified": true
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 13,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "612158a5899f33800363799ca4bd2e0dcfc9a335aa2c10bc15e8c1d6f06aa411",
+      "status": "PASS",
+      "description": "Engine-shaped cases_file names (.cases.json, .cases.2.json) are accepted",
+      "code_citation": "shared/resources/security-probe-plan.mjs:175",
+      "test_citation": "shared/resources/tests/security-probe-plan-cases-file.test.mjs:354",
+      "members": [],
+      "non_member_fail": null,
+      "note": "CASES_FILE_NAME matches both shapes. The test asserts ok:true for x.dod.1.security.cases.json, x.dod.1.security.cases.2.json and a dotted stem. The file sits in shared/resources/tests/*.test.mjs, which test:suite selects, and test.yml runs npm test on every pull_request. Criteria-drift is clean."
+    },
+    {
+      "id": "#2",
+      "text_hash": "c9d89a9bd17ca197f2c35bd5290f716d909409ab2f47efca854c3f5abd1caa1e",
+      "status": "PASS",
+      "description": "x.json and x.security.cases.a.json refused as plan-entry-cases-file-bad-name-shape",
+      "code_citation": "shared/resources/security-probe-plan.mjs:201",
+      "test_citation": "shared/resources/tests/security-probe-plan-cases-file.test.mjs:366",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolveCasesFile is the single decision point and returns bad-name-shape for both names (test line 366, with the files present). The plan-entry reason string plan-entry-cases-file-bad-name-shape is asserted for x.json at line 403. The caller prefixes the reason with no other change, and the test file sits in the per-PR lane."
+    },
+    {
+      "id": "#3",
+      "text_hash": "73d6c15202f8e7823918c343ae0a163161caeecc320e31ab4deb227480ff170f",
+      "status": "PASS",
+      "description": "Reuse check answers cases-file-bad-name-shape for a prior plan naming a bad shape",
+      "code_citation": "shared/resources/security-probe-plan.mjs:201",
+      "test_citation": "shared/resources/tests/security-probe-plan-cases-file.test.mjs:403",
+      "members": [],
+      "non_member_fail": null,
+      "note": "reusePlan is asserted to return {reason:'not-reusable', why:'cases-file-bad-name-shape'} for a prior plan naming x.json."
+    },
+    {
+      "id": "#4",
+      "text_hash": "f17b7038f043d7eb068ef2c32d2585c2ce1ba3bcaea062873070f05e15d0f241",
+      "status": "PASS",
+      "description": "Task 269's two committed plans still reuse",
+      "code_citation": "shared/resources/security-probe-plan.mjs:201",
+      "test_citation": "shared/resources/tests/security-probe-plan-cases-file.test.mjs:431",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The corpus control runs reusePlan over every committed plan and asserts only task.304 is refused with cases-file-bad-name-shape, so the task.269 plans still reuse. It asserts at least 20 plans and at least one reaching the engine-path stage. QA report line 66 confirms it over 31 plans. This is read from the test source and the QA record, and I did not re-run the test."
+    },
+    {
+      "id": "#5",
+      "text_hash": "1104f349349c2e46fff71bbb94369ada38daeb002a49b2f21e98e14529baf652",
+      "status": "PASS",
+      "description": "task.304 plan answers cases-file-bad-name-shape and stays not-reusable",
+      "code_citation": "shared/resources/security-probe-plan.mjs:201",
+      "test_citation": "shared/resources/tests/security-probe-plan-cases-file.test.mjs:431",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The corpus control asserts the refused list equals exactly ['task.304.dod.1.security.plan.json'], and the reason is the bad-name-shape one."
+    },
+    {
+      "id": "#6",
+      "text_hash": "31b4474a6e82907bc79f673f4dee6843758de57ea9276e9c9a443f909dd28b46",
+      "status": "PASS",
+      "description": "No new test case runs over one second (five runs, loadavg recorded)",
+      "code_citation": "docs/tasks/task.287.cases-file-accepts-only-engine-shaped-names/task.287.qa.1.cases-file-accepts-only-engine-shaped-names.md:70",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Bound is under 1 s. The committed QA report records the slowest of five runs at 568-853 ms, with loadavg 5.4-5.6 beside each run. The QA report was measured on 62d5eb09, and finalise-delta.js docs-only gives tree-equivalent to the head 4b72c73b (6 docs-only paths), so it counts as measured on M, tree-equivalent to head. Even the slowest run is under the bound, so the median is too."
+    },
+    {
+      "id": "#7",
+      "text_hash": "ff21b0e7c2a5a90dcde2ac6dbcbe698742f61746205f7ba8dc64c0e32b7b89ab",
+      "status": "PASS",
+      "description": "Bad-shape name never reaches lstat; named test holds it",
+      "code_citation": "shared/resources/security-probe-plan.mjs:201",
+      "test_citation": "shared/resources/tests/security-probe-plan-cases-file.test.mjs:384",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The shape refusal at line 201 comes after the outside-work-dir check and before lstatSync. The test asserts that a missing bad-shape name answers bad-name-shape and a missing good-shape name answers missing. The criterion is a behaviour criterion, and it is covered by a per-PR test."
+    },
+    {
+      "id": "#8",
+      "text_hash": "3e41034846b3fe9b920d1df859b88f288306d3cd79a2504bd0d74b87b6232921",
+      "status": "PASS",
+      "description": "New refusal has revert-and-red mutation proof recorded in QA report",
+      "code_citation": "docs/tasks/task.287.cases-file-accepts-only-engine-shaped-names/task.287.qa.1.cases-file-accepts-only-engine-shaped-names.md:132",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "the shape check (bad-name-shape refusal)",
+          "evidence": "docs/tasks/task.287.cases-file-accepts-only-engine-shaped-names/task.287.qa.1.cases-file-accepts-only-engine-shaped-names.md:132",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Line 132 names the mutant (if (false && ...) at security-probe-plan.mjs:201) and the four tests that went red. It records that the accepted-shape test stayed green and that the file was restored (cmp clean, 16/16 pass)."
+    },
+    {
+      "id": "#9",
+      "text_hash": "5f5c9cd44a26c58a5254048a3b43f52a88933329726282485d258878678975a5",
+      "status": "PASS",
+      "description": "CI=true npm run ci:fast passes",
+      "code_citation": ".github/workflows/test.yml:1",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 4b72c73bd35fe7dba633ff69f8485782d741f3b9 — The evidence is the CI run of format:check plus npm test on the PR head. test.yml runs these on pull_request. The QA report records a local ci:fast-parity pass (8741 tests, 0 fail), but the grade is /finalise's CI reading.",
+      "ci_reading": "CI reading 1: SUCCESS @ 4b72c73bd35fe7dba633ff69f8485782d741f3b9"
+    },
+    {
+      "id": "#10",
+      "text_hash": "738ccff782bc48d8739cc8cad0f2924ac3a56d33e07ad63074b215431cf87dfe",
+      "status": "PASS",
+      "description": "quick_validate.py skills/finalise passes",
+      "code_citation": ".github/workflows/validate.yml:73",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 4b72c73bd35fe7dba633ff69f8485782d741f3b9 — validate.yml runs quick_validate.py per skill on the PR, and that run is the criterion's only gating evidence. The QA report records a local pass.",
+      "ci_reading": "CI reading 1: SUCCESS @ 4b72c73bd35fe7dba633ff69f8485782d741f3b9"
+    },
+    {
+      "id": "#11",
+      "text_hash": "275ede806bae5fce269ff56b220751a4fb4ca07bbfe5231ba95d4bff9d5d57ab",
+      "status": "PASS",
+      "description": "npm run bundle -- --check reports 0 problems",
+      "code_citation": ".github/workflows/validate.yml:57",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 4b72c73bd35fe7dba633ff69f8485782d741f3b9 — validate.yml runs the bundle check on the PR, and that run is the criterion's only gating evidence. The QA report records 0 problems, and the generated copies are in the diff.",
+      "ci_reading": "CI reading 1: SUCCESS @ 4b72c73bd35fe7dba633ff69f8485782d741f3b9"
+    },
+    {
+      "id": "#12",
+      "text_hash": "dd422b304379cf5a3f0092e4a0d532c0c43b87a26e38fe666faba8e6be23585f",
+      "status": "PASS",
+      "description": "CHANGELOG.md has an entry citing task 287",
+      "code_citation": "CHANGELOG.md:19",
+      "test_citation": "shared/resources/tests/changelog-cites.test.mjs:1",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Line 19 reads 'The security probe plan's cases_file refuses a name the engine does not write (task 287)', which is a changelog entry citing task 287. I ran shared/resources/changelog-cites.sh task.287 and it answered 'cites (task 287)' with exit 0. changelog-cites.test.mjs pins that script in the per-PR npm test lane."
+    },
+    {
+      "id": "#13",
+      "text_hash": "bc66c8bd61428628bbcf5aa814d9765875e17f31f6b3f086e24ef909e04f955d",
+      "status": "PASS",
+      "description": "The prompt and SKILL.md state the accepted shape",
+      "code_citation": "shared/resources/finalise-dod-security-prompt.md:431",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The prompt line 431 says the name must be '<stem>.dod.<N>.security.cases.json' or '...cases.<n>.json', and any other name is refused as bad-name-shape. skills/finalise/SKILL.md:800 states the same shape. The generated copies are in the diff, and the bundle check is covered by #11."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#1",
+      "note": "The QA code review (CR-1, low) records that CASES_FILE_NAME (security-probe-plan.mjs:175) also accepts an empty-stem name '.security.cases.json' and zero-padded indices such as '.01.', which the engine never writes. Confinement and the regular-file check still apply, so nothing unsafe is admitted. It is recorded in the gate's recommendations.future and does not fail any criterion."
+    },
+    {
+      "ac_id": "#2",
+      "note": "The tests at line 366 cover the near-miss 'x.security.cases.a.json' at the resolveCasesFile level only. The plan-entry-level reason string is asserted only for x.json (line 403). Both go through the same single decision point, so I judged this as met."
+    }
+  ]
+}
