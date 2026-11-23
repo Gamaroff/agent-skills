@@ -1,0 +1,66 @@
+[
+  {
+    "id": "cf-plain-name",
+    "direction": "hostile",
+    "input": "x.json",
+    "why": "A name the engine never writes: only the shape check can refuse it.",
+    "correct": "Refuse: the basename is not an engine-written cases-file name.",
+    "spec_ref": "docs/tasks/task.287.cases-file-accepts-only-engine-shaped-names/task.287.cases-file-accepts-only-engine-shaped-names.md:98"
+  },
+  {
+    "id": "cf-existing-wrong-shape",
+    "direction": "hostile",
+    "input": "task.287.qa.1.security.run.json",
+    "why": "A regular file that exists in the work directory but is not a cases file; only the shape check refuses it.",
+    "correct": "Refuse: the name does not end in .security.cases.json.",
+    "spec_ref": "docs/tasks/task.287.cases-file-accepts-only-engine-shaped-names/task.287.cases-file-accepts-only-engine-shaped-names.md:98"
+  },
+  {
+    "id": "cf-near-miss-infix",
+    "direction": "hostile",
+    "input": "x.security.cases.new.json",
+    "why": "Close to the engine's name but with a non-numeric index.",
+    "correct": "Refuse: the index must be digits.",
+    "spec_ref": "docs/tasks/task.287.cases-file-accepts-only-engine-shaped-names/task.287.cases-file-accepts-only-engine-shaped-names.md:98"
+  },
+  {
+    "id": "cf-near-miss-suffix",
+    "direction": "hostile",
+    "input": "task.287.qa.1.security.cases.json.bak",
+    "why": "The name of an existing cases file with a trailing extension.",
+    "correct": "Refuse: the name must end in .json.",
+    "spec_ref": "docs/tasks/task.287.cases-file-accepts-only-engine-shaped-names/task.287.cases-file-accepts-only-engine-shaped-names.md:98"
+  },
+  {
+    "id": "cf-trailing-newline",
+    "direction": "hostile",
+    "input": "task.287.qa.1.security.cases.json\n",
+    "why": "A trailing newline must not slip past an end anchor, or resolve to the existing file.",
+    "correct": "Refuse: the name does not end in .json.",
+    "spec_ref": "docs/tasks/task.287.cases-file-accepts-only-engine-shaped-names/task.287.cases-file-accepts-only-engine-shaped-names.md:98"
+  },
+  {
+    "id": "cf-climb-engine-shaped",
+    "direction": "hostile",
+    "input": "../x.dod.1.security.cases.json",
+    "why": "An engine-shaped name that climbs out of the work directory: the shape check must not replace confinement.",
+    "correct": "Refuse: the resolved path is outside the work directory.",
+    "spec_ref": "docs/tasks/task.287.cases-file-accepts-only-engine-shaped-names/task.287.cases-file-accepts-only-engine-shaped-names.md:98"
+  },
+  {
+    "id": "cf-absolute-engine-shaped",
+    "direction": "hostile",
+    "input": "/tmp/x.dod.1.security.cases.json",
+    "why": "An absolute engine-shaped name.",
+    "correct": "Refuse: an absolute name is outside the work directory.",
+    "spec_ref": "docs/tasks/task.287.cases-file-accepts-only-engine-shaped-names/task.287.cases-file-accepts-only-engine-shaped-names.md:98"
+  },
+  {
+    "id": "cf-legit-existing-engine-shaped",
+    "direction": "legitimate",
+    "input": "task.287.qa.1.security.cases.json",
+    "why": "An engine-shaped name for a regular file that exists in the work-item directory.",
+    "correct": "Accept.",
+    "spec_ref": "docs/tasks/task.287.cases-file-accepts-only-engine-shaped-names/task.287.cases-file-accepts-only-engine-shaped-names.md:98"
+  }
+]

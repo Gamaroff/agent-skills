@@ -5,16 +5,18 @@ type: task
 description: "Make the security probe plan's cases_file route refuse any file whose name is not one the engine itself writes, so a plan cannot point the runner at an arbitrary JSON array in the work-item directory."
 tags: [finalise, security-probe, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Low
 created: 2026-11-07
 updated: 2026-11-23
+completed_date: 2026-11-23
+pr_number: 933
 estimated_effort_hours: 2
 ---
 
 # Task 287: cases_file accepts only engine-shaped names
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.287.review.1.cases-file-accepts-only-engine-shaped-names.md` implemented 2026-11-23
 
 ---
@@ -175,28 +177,28 @@ Regression:
 
 **Functional**
 
-- [ ] `cases_file: "x.dod.1.security.cases.json"` and `"x.dod.1.security.cases.2.json"` are accepted
-- [ ] `cases_file: "x.json"` and `"x.security.cases.a.json"` are refused as `plan-entry-cases-file-bad-name-shape`
-- [ ] The reuse check answers `cases-file-bad-name-shape` for a prior plan naming a bad shape
-- [ ] Task 269's two committed plans still reuse
-- [ ] `task.304.dod.1.security.plan.json` answers `cases-file-bad-name-shape` and stays not-reusable (held by the corpus control case in Testing Strategy)
+- [x] `cases_file: "x.dod.1.security.cases.json"` and `"x.dod.1.security.cases.2.json"` are accepted
+- [x] `cases_file: "x.json"` and `"x.security.cases.a.json"` are refused as `plan-entry-cases-file-bad-name-shape`
+- [x] The reuse check answers `cases-file-bad-name-shape` for a prior plan naming a bad shape
+- [x] Task 269's two committed plans still reuse
+- [x] `task.304.dod.1.security.plan.json` answers `cases-file-bad-name-shape` and stays not-reusable (held by the corpus control case in Testing Strategy)
 
 **Performance**
 
-- [ ] No new test case runs over one second (five runs, slowest recorded in the QA report with `/proc/loadavg` beside each)
-- [ ] A bad-shape name never reaches `lstat`: the test "a bad-shape name whose file does not exist answers `bad-name-shape`, not `missing`" holds it
+- [x] No new test case runs over one second (five runs, slowest recorded in the QA report with `/proc/loadavg` beside each)
+- [x] A bad-shape name never reaches `lstat`: the test "a bad-shape name whose file does not exist answers `bad-name-shape`, not `missing`" holds it
 
 **Code Quality**
 
-- [ ] The new refusal has a revert-and-red mutation proof recorded in the QA report
-- [ ] `CI=true npm run ci:fast` passes
-- [ ] `python3 skills/create-skill/scripts/quick_validate.py skills/finalise` passes
+- [x] The new refusal has a revert-and-red mutation proof recorded in the QA report
+- [x] `CI=true npm run ci:fast` passes
+- [x] `python3 skills/create-skill/scripts/quick_validate.py skills/finalise` passes
 
 **Migration**
 
-- [ ] `npm run bundle -- --check` reports 0 problems
-- [ ] `CHANGELOG.md` has an entry citing task 287
-- [ ] The prompt and `SKILL.md` state the accepted shape
+- [x] `npm run bundle -- --check` reports 0 problems
+- [x] `CHANGELOG.md` has an entry citing task 287
+- [x] The prompt and `SKILL.md` state the accepted shape
 
 ---
 
@@ -231,6 +233,22 @@ Triggers: a `/finalise` run refusing a plan whose file the engine wrote (revert 
 
 ---
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+**QA Report**: `task.287.qa.1.cases-file-accepts-only-engine-shaped-names.md`; **Gate**: `task.287.gate.1.cases-file-accepts-only-engine-shaped-names.yml` — PASS, 95/100.
+
+- ✅ **Acceptance Criteria:** all 13 met (10 by code and test evidence, 3 by green CI on the PR head)
+- ✅ **PR:** #933, review report APPROVE (`task.287.pr-review.1.cases-file-accepts-only-engine-shaped-names.md`); CI green on `4b72c73bd`
+- ✅ **Documentation:** CHANGELOG entry cites task 287; SKILL.md and the security prompt state the shape
+- ✅ **Security:** boundary probed by `/finalise` — 8 executed, 0 reproduced, 0 escapes
+- ✅ **Compliance:** not applicable (internal tooling)
+
+**Detailed Verification Log:** see `task.287.dod.1.cases-file-accepts-only-engine-shaped-names.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-23
+
 ## QA Testing Results
 
 **QA Status**: PASS
@@ -251,19 +269,17 @@ Triggers: a `/finalise` run refusing a plan whose file the engine wrote (revert 
 
 ### Key Findings
 No blocking issues. One advisory note: the pattern also accepts the bare name `.security.cases.json` and zero-padded indices, which the engine never writes.
-
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
-
-| Date       | Version | Description                                                                          | Author      |
-| ---------- | ------- | ------------------------------------------------------------------------------------ | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-07 | 1.0     | Initial draft, cut from task 269 `gate.4` `recommendations.future` and DoD run 1     | create-task |
 | 2026-11-23 | 1.1     | Review passed (8/10): population re-measured (31 plans, one names a non-engine file), probe-engine test added to Phase 2, "no filesystem call" criterion made testable, line anchors refreshed | review-task |
 | 2026-11-23 |         | Status → ready-for-development                                                       | review-task |
 | 2026-11-23 |         | Implemented — 8 source files + 3 generated copies, 5 new tests, 4 mutation-red       | develop     |
 | 2026-11-23 |         | QA gate PASS (95/100) — 0 blocking findings, 1 advisory                              | qa-task     |
-
+| 2026-11-23 | 1.2 | DoD passed — accepted (PR #933) | finalise |
 <!-- change-log-end -->
 
 ---
