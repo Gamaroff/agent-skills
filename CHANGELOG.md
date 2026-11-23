@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Added
+
+- **`review-task` check 32: an allow-list that replaces a deny-list covers the whole set (task 312).**
+  The review now asks that the table list every member of the set it gates, or state the count and
+  the command that measured it, and probes each member left on today's behaviour for a write by
+  operand (`uniq in out` creates `out`, which no flag table lists). `review-story` carries the
+  sibling note. A wall-clock bound in `create-task` § 3.5 and `review-task` check 4 now names where
+  it is measured and how load is controlled, and on a shared host prefers a paired, interleaved
+  ratio or CPU time over a ratio of medians. Presence tests: `tests/review-allow-list-timing-checks.test.js`.
+
 ### Fixed
 
 - **Jira sync maps the `superseded` task status (task 305).** `superseded` had no key in the Jira
