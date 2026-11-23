@@ -48,7 +48,7 @@ Skill(qa-task, args="traceability_matrix=<path> code_review_blocking=true record
 
 - `traceability_matrix=<path>` — a pre-built traceability matrix (see Step 5 / traceability handling); absent → internal mapping.
 - `record_criteria=<path>` — the listing the orchestrator saved from `finalise-record-preflight.js check --json`: every success criterion that says where its record lives, with `index`, `criterion`, `location` and `state`. Absent or empty `listed` → nothing extra to write. For each `listed` entry, write the record **into the report its `location` names** (`qa-report` is this run's QA report) as the step that produces the evidence runs, with the command and its output, and cite it from the Findings table. A `state` of `location-absent` for `qa-report` is expected while the report is being written. **Never edit a criterion's wording to fit the evidence**: the evidence moves, the criterion does not. A mutation-proof record names the **test that went red**, not only that one did.
-- `code_review_blocking=true` — run-level override. Set `CODE_REVIEW_BLOCKING_ARG` from this token (default empty when absent). It feeds the canonical resolution in **Step 3b step 6 (Gate mapping)** so high-confidence code-review bugs gate the build (and thus get fixed in the qa-fix loop) without needing per-task frontmatter. A task still opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch). Absent for standalone runs → code review stays advisory unless the task opts in via frontmatter, except a bug QA reproduces by execution (step 5d).
+- `code_review_blocking=true` — run-level override. Set `CODE_REVIEW_BLOCKING_ARG` from this token (default empty when absent). It feeds the canonical resolution in **Step 3b step 6 (Gate mapping)** so high-confidence code-review bugs gate the build (and thus get fixed in the qa-fix loop) without needing per-task frontmatter; a bug QA reproduces by execution gates at any confidence (step 5d). A task still opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch). Absent for standalone runs → code review stays advisory unless the task opts in via frontmatter, except a bug QA reproduces by execution (step 5d).
 
 ## When to Use This Skill
 
@@ -1049,7 +1049,7 @@ finding (obs #143).
   shell disagreement)
 
 An execution failure is eligible for gate `top_issues[]` under `code_review_blocking` exactly like any
-other `category: bug` finding. No new report or gate schema.
+other `category: bug` finding (a bug QA reproduces by execution gates at any confidence: 5d). No new report or gate schema.
 
 > **A run where zero blocks executed is never a pass — but it is two states, and the engine tells them
 > apart for you.** Report whichever it emits; do not suppress either, and do not convert one into the
@@ -1630,7 +1630,7 @@ Re-enumerated {the boundary's inputs, named} and tested each against the current
 
 ## Code Review
 
-{From Step 3b — advisory unless the doc opted in via `code_review_blocking: true` or QA reproduced the finding (5d). Omit the section if the diff had no reviewable code and no documentation claims to check; a docs-only change set takes the claim-check route, so its section is present.}
+{From Step 3b — advisory unless blocking resolves to true (run-level arg or frontmatter) or QA reproduced the finding (5d). Omit the section if the diff had no reviewable code and no documentation claims to check; a docs-only change set takes the claim-check route, so its section is present.}
 
 **Correctness bugs ({count}):**
 {for each bug finding:}
@@ -1950,7 +1950,7 @@ placeholder filled in textually. Nothing expands here: the file tool writes the 
 
 ### Code Review Findings
 
-{Top correctness bugs + notable cleanups from Step 3b, each `file:line — finding`. 'None identified' if empty. Advisory unless the doc opted in via code_review_blocking or QA reproduced the finding (5d).}
+{Top correctness bugs + notable cleanups from Step 3b, each `file:line — finding`. 'None identified' if empty. Advisory unless blocking resolves to true (run-level arg or frontmatter) or QA reproduced the finding (5d).}
 
 ### Critical Issues
 

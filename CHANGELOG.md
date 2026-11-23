@@ -16,6 +16,18 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **Gating-rule restatements carry the reproduced-bug exception, and a test holds them (task 288).**
+  Task 273 added the exception (a `category: bug` finding QA reproduces by execution gates at any
+  reviewer confidence, step 5d) and needed five QA cycles to find the restatements that dropped it.
+  The reviewer prompt's `(it will not gate)` now reads `(it will not gate on the reviewer claim
+  alone)`; the four report-template lines in `qa-task` and `qa-story` say `advisory unless blocking
+  resolves to true (run-level arg or frontmatter) or QA reproduced the finding (5d)` instead of
+  naming only the document's flag; and nine more restatement sentences (`review-code`, `qa-task`,
+  `qa-story`, `pr-conformance-prompt.md`, `qa-runnable-prose-detection.md`, the QA-loop step doc)
+  carry the exception or point at it. `evals/shared/tests/gating-rule-restatements.test.mjs` reads
+  the sources: it keys sentences that name the flag, `high-confidence` or `will not gate` and fails
+  on one that omits the exception. Known limit: a restatement that avoids all three keys is not seen.
+
 - **The security probe plan's `cases_file` refuses a name the engine does not write (task 287).**
   `resolveCasesFile` accepted any regular JSON-array file in the work-item directory. It now also
   requires the basename to end `.security.cases.json` or `.security.cases.<n>.json`, and answers
