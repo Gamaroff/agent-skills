@@ -3,7 +3,7 @@
 **Task**: `task.288.gating-rule-restatements-carry-the-reproduced-bug-exception.md`
 **Run Number**: 1
 **Started**: 2026-11-23 15:12
-**Status**: In Progress
+**Status**: Completed
 **Report format**: 2
 
 ---
@@ -35,10 +35,10 @@ Reword T273-CR-5 and T273-CR-6, fix the other gating-rule restatements that omit
 | 1. create-branch           | ✅ Done    | Branch `feature/task.288.*` exists in git                              | Branch created at `ed74c9934` | —                    | 2026-11-23T15:13Z |
 | 2. review-task             | ✅ Done    | `task.288.review.{N}.{name}.md` exists (or skip logged)                | READY TO IMPLEMENT 8/10; Planned promoted to Ready for Development | —                    | 2026-11-23T15:16Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline; commits `2ac507532`, `e97e58db8`; remote ci:fast 8744 pass / 0 fail | —                    | 2026-11-23T15:47Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.288.qa.{N}.*.md`; `task.288.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.288.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #934 → develop; issue #862 commented | —                    | 2026-11-23T15:48Z |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.288.qa.{N}.*.md`; `task.288.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 3 QA cycles: FAIL 80, CONCERNS 90, PASS 95; 5c CONCERNS, no coverage finding | —                    | 2026-11-23T18:45Z |
+| 7. finalise                | ✅ Done    | `task.288.dod.{N}.*.md`; task `status: accepted`                       | DoD 1 ACCEPTED, 8 of 8; acceptance commit `951dcce2d`; CI reading 1 SUCCESS @ `184e239f4`, reading 2 SUCCESS (tree-equivalent to `085c54e6a`) @ `951dcce2d`; issue #862 closed, board Done | —                    | 2026-11-23T18:48Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Report committed last | —                    | 2026-11-23T18:50Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -88,14 +88,39 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1
+
+**Gate**: FAIL (80/100) — `task.288.gate.1.gating-rule-restatements.yml`
+**Findings**: T288-CR-1 (high, reproduced by QA): the four report-template lines were not keyed by the guard test.
+**Traceability**: skipped (task QA; success criteria checked directly in the QA report)
+**Action**: Running qa-fix
+**Fix**: key D (`advisory unless`) added to the guard test, with a floor test; mutation-proved red. Commit `1d86a09c2`. Full gate: 8745 pass, 0 fail.
+
+### QA Cycle 2
+
+**Gate**: CONCERNS (90/100) — `task.288.gate.2.gating-rule-restatements.yml`
+**Findings**: T288-C2-1 (medium): the docs-only prompt exemption reason was contradicted by that file. T288-C2-2 (medium, reproduced): the T273-CR-6 assertion checked zero sentences.
+**Traceability**: skipped (task QA; success criteria checked directly in the QA report)
+**Action**: Running qa-fix
+**Fix**: prompt reworded and the false exemption deleted; T273-CR-6 now checks every `advisory unless` sentence with a floor of four; both mutation-proved red. Commit `144f2a1dd`. Full gate: 8745 pass, 0 fail.
+
+### QA Cycle 3
+
+**Gate**: PASS (95/100) — `task.288.gate.3.gating-rule-restatements.yml`
+**Findings**: none open; two advisory cleanups (C3-1, C3-2) carried to `recommendations.future`.
+**Traceability**: skipped (task QA; success criteria checked directly in the QA report)
+**Action**: Proceeding to 5c
+**PR Review**: CONCERNS — PC-1 (medium, `pr_number` absent) and PC-2 (low, Scope line understated the footprint); neither is a coverage finding, both documentation-only and fixed in the work item. Report: `task.288.pr-review.1.gating-rule-restatements.md`.
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-11-23 18:50
+**Final Status**: Completed
 **Branch**: feature/task.288.gating-rule-restatements-carry-the-reproduced-bug-exception
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/934
+**QA Iterations**: 3 (FAIL 80, CONCERNS 90, PASS 95)
+**DoD Summary**: `task.288.dod.1.gating-rule-restatements-carry-the-reproduced-bug-exception.md` — ACCEPTED, 8 of 8 criteria. The first AC pass failed #3, #4 and #8 for want of a committed record; the records were produced (two mutations re-run and red, five-run timing at load 0.98, carried 273 entries tabled) and committed in `184e239f4` before the second pass.
+**CI readings**: reading 1 SUCCESS @ `184e239f490b` over 6 checks; reading 2 SUCCESS (tree-equivalent to `085c54e6ac2d`) @ `951dcce2d136` over 6 checks.
+**Tracker debt**: none (comment posted, issue #862 closed, board already at Done)
