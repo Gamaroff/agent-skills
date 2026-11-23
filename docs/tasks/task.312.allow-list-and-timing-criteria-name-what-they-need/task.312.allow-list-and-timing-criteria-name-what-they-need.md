@@ -215,6 +215,27 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-23
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.312.qa.1.allow-list-and-timing-criteria-name-what-they-need.md](./task.312.qa.1.allow-list-and-timing-criteria-name-what-they-need.md)
+- **Gate File**: [task.312.gate.1.allow-list-and-timing-criteria-name-what-they-need.yml](./task.312.gate.1.allow-list-and-timing-criteria-name-what-they-need.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 16
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues identified. One LOW cosmetic note: the timing sentence is one unwrapped line.
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -225,6 +246,7 @@ None.
 | 2026-11-23 | 1.1 | Review passed (8/10) — 6 fixes applied: stale line anchors, test moved to `tests/` (the runner reaches no `skills/review-task/tests/`), fixture criterion re-scoped to presence tests, check 32's three companion edits added, review-story is Step 4 | review-task |
 | 2026-11-23 |  | Status → ready-for-development | review-task |
 | 2026-11-23 |  | Implemented check 32, the timing sentence and `tests/review-allow-list-timing-checks.test.js`; status → ready-for-review | develop |
+| 2026-11-23 |  | QA gate PASS (95/100) — 0 findings, 1 LOW | qa-task |
 <!-- change-log-end -->
 
 ---
