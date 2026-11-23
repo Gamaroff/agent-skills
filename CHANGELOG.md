@@ -25,8 +25,9 @@ All notable changes to this project will be documented in this file. Format foll
   naming only the document's flag; and nine more restatement sentences (`review-code`, `qa-task`,
   `qa-story`, `pr-conformance-prompt.md`, `qa-runnable-prose-detection.md`, the QA-loop step doc)
   carry the exception or point at it. `evals/shared/tests/gating-rule-restatements.test.mjs` reads
-  the sources: it keys sentences that name the flag, `high-confidence` or `will not gate` and fails
-  on one that omits the exception. Known limit: a restatement that avoids all three keys is not seen.
+  the sources: it keys sentences that name the flag, `high-confidence`, `will not gate` or
+  `advisory unless` and fails on one that omits the exception. Known limit: a restatement that
+  avoids all four keys is not seen.
 
 - **The security probe plan's `cases_file` refuses a name the engine does not write (task 287).**
   `resolveCasesFile` accepted any regular JSON-array file in the work-item directory. It now also

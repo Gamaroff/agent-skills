@@ -28,7 +28,8 @@
  *   (A) names the flag (`code_review_blocking`, `CODE_REVIEW_BLOCKING_ARG`, `CR_BLOCKING`) together
  *       with a gating word (gate, gates, gated, gating, advisory), or
  *   (B) names `high-confidence` / `confidence: high` together with a gating word, or
- *   (C) says `will not gate`.
+ *   (C) says `will not gate`, or
+ *   (D) says `advisory unless` (the report-template lines name no flag, so A-C missed them).
  * A keyed sentence must CARRY the exception, or point at the section that states it: `5d`,
  * `reproduc…`, `item 4`, `Opt-in to blocking`, `resolution matrix`, or `claim alone` (the
  * qualified "will not gate on the reviewer claim alone": it names the gate as being about the
@@ -42,7 +43,7 @@
  * `blocking resolves`). "Advisory unless the doc opted in" read as if the document's flag were the
  * only input, which ignores the run-level argument the develop pipelines always pass.
  *
- * KNOWN LIMIT, stated rather than hidden: a restatement that avoids all three keys (for example
+ * KNOWN LIMIT, stated rather than hidden: a restatement that avoids all four keys (for example
  * "bugs above 80% confidence block the merge") is invisible to this test. It holds the wordings
  * the population already uses and the one a copy-edit would most plausibly reuse; it does not
  * claim to find a restatement phrased from scratch. The non-vacuity floor below turns a key that
@@ -75,6 +76,9 @@ const KEYS = [
     (s) => /high-confidence|confidence:\s*high/i.test(s) && GATING_WORD.test(s),
   ],
   ["C", (s) => /will not gate/i.test(s)],
+  // D: the report-template lines say "advisory unless <how blocking resolves>" and name no flag, so
+  // keys A-C never saw them: dropping their 5d clause left the guard green (T288-CR-1, QA cycle 1).
+  ["D", (s) => /advisory unless/i.test(s)],
 ];
 const CARRIES =
   /\b5d\b|reproduc|item 4|Opt-in to blocking|resolution matrix|claim alone/i;
@@ -269,6 +273,18 @@ test("every restatement of the gating rule carries the reproduced-bug exception 
     [],
     "restates the gating rule without the reproduced-bug exception (step 5d) or a pointer to " +
       "'Opt-in to blocking' in code-review-prompt.md. Add the exception, or exempt the sentence in EXEMPT with a reason.",
+  );
+});
+
+test("the four report-template 'advisory unless' lines are in the keyed population (T288-CR-1)", () => {
+  const lines = keyed.filter(
+    (k) =>
+      /advisory unless/i.test(k.sentence) &&
+      /^skills\/qa-(task|story)\/SKILL\.md$/.test(k.file),
+  );
+  assert.ok(
+    lines.length >= 4,
+    `expected the four qa-task/qa-story report-template lines keyed by 'advisory unless', found ${lines.length}`,
   );
 });
 
