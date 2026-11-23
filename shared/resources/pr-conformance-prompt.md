@@ -191,7 +191,7 @@ The subagent returns the `pr_conformance:` YAML. `/review-pr`:
 ### Why this lens does not write to `top_issues[]`
 
 `code-review-prompt.md` maps high-confidence bugs into the QA gate's `top_issues[]` when a document
-opts in, because those findings describe defects `/qa-fix` can act on. Conformance findings mostly
+opts in (or when QA reproduces the bug by execution: § Opt-in to blocking there), because those findings describe defects `/qa-fix` can act on. Conformance findings mostly
 describe **the document or the trail** being wrong rather than the code, and `/qa-fix` fixes code.
 Routing them into the gate would ask the wrong skill to resolve them. If that changes, the shape is
 already compatible — the mapping would be additive.

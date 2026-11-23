@@ -1,0 +1,64 @@
+schema: 2
+task: 'task.288.gating-rule-restatements-carry-the-reproduced-bug-exception'
+task_title: 'Gating-rule restatements carry the reproduced-bug exception'
+gate: PASS
+status_reason: 'Both cycle-2 findings are closed and mutation-proved. The scoped cycle-3 review found two low cleanups, both advisory. Full gate green on the LAN server at 8745 tests, bundle clean.'
+reviewer: 'QA Engineer'
+head: '144f2a1dd1b9c8b836cbc83dbd76d24ae431b68e'
+updated: '2026-11-23T18:26:03Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 8745
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: false
+    boundary_signals: []
+    notes: 'No boundary: prose rewording plus a read-only test. Criteria classifier found no boundary signal (unchanged).'
+  performance:
+    status: PASS
+    notes: 'Guard test runs in about 0.4 s.'
+  reliability:
+    status: PASS
+    notes: 'Population floor 24 of 29 measured; T273-CR-6 now checks four sentences with a floor of four.'
+  maintainability:
+    status: PASS
+    notes: 'Two low cleanups on the guard test, advisory.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'C3-1: limit the "Absent for standalone runs" skip in T273-CR-6 to the two known sentences (by file), or assert exactly two are skipped, so a later sentence with that prefix is not skipped unnoticed.'
+      refs: ['evals/shared/tests/gating-rule-restatements.test.mjs']
+      remedy: unverified
+    - action: 'C3-2: the T273-CR-6 floor of four equals the current count and repeats the T288-CR-1 floor; keep one, or assert the four template lines are in the checked set.'
+      refs: ['evals/shared/tests/gating-rule-restatements.test.mjs']
+      remedy: unverified
+    - action: 'Cycle 1 CR-3 (follower rule ignores block boundaries; "reproduc" is broad) and CR-4 (splitter edge cases), and cycle 2 C2-3 (per-file floors) remain open and advisory.'
+      refs: ['evals/shared/tests/gating-rule-restatements.test.mjs']
+      remedy: unverified
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

@@ -93,7 +93,7 @@ E. UNBOUND READS IN EXECUTED PROSE (category: bug):
 - VERIFY every candidate against the actual surrounding code before reporting — read the lines,
   trace the call. Do NOT flag on a pattern/name match alone.
 - Prefer a FEW high-confidence findings over noise. When unsure a bug is real, set
-  confidence: low (it will not gate) rather than inflating severity.
+  confidence: low (it will not gate on the reviewer claim alone) rather than inflating severity.
 - Only report issues attributable to THIS diff. Do not report pre-existing debt in unchanged code.
 - If the diff is empty, unreadable, or touches no reviewable code: return an empty findings list.
   Never invent issues.

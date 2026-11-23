@@ -56,7 +56,7 @@ claim against it:
 ## Discipline (mandatory)
 - VERIFY every candidate by reading the source. Do NOT flag on a name or pattern match alone.
 - Prefer a FEW high-confidence findings over noise. When unsure a claim is false, set
-  confidence: low (it will not gate).
+  confidence: low (it will not gate on the reviewer claim alone).
 - Only report claims this diff adds or changes. Do not report pre-existing errors in unchanged text.
 - If the diff is empty or unreadable: return an empty findings list. Never invent findings.
 - An empty findings list is a claim about the diff. Before returning one, confirm the diff was

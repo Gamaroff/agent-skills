@@ -617,7 +617,7 @@ for, and it stays a finding.
 
 Its `confidence` is **`medium`**, unlike the two findings in §3. It is a statement about *coverage* —
 this gate did nothing here — not a defect in the work item, and `confidence: high` on a `category: bug`
-is what makes a finding gate-blocking. A skill whose every snippet reads a caller variable would
+is what makes a finding gate-blocking on the reviewer's claim (a reproduction is the exception: item 4 under "QA use" in the code-review prompt). A skill whose every snippet reads a caller variable would
 otherwise block its own pull request for needing bindings the run did not supply. Measured: `qa-task`
 and `qa-story` both classify **0 runnable** without bindings, so at `high` this step would have blocked
 the very change that introduced it.
@@ -681,7 +681,7 @@ The QA report records, for the file under review:
   file it fully covered
 
 No new report or gate schema. An execution failure is eligible for `top_issues[]` under
-`code_review_blocking` exactly like any other `category: bug` finding.
+`code_review_blocking` exactly like any other `category: bug` finding (a bug QA reproduces by execution gates at any reviewer confidence: item 4 under "QA use" in the code-review prompt).
 
 ---
 
