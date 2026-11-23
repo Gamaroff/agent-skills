@@ -1,0 +1,52 @@
+schema: 2
+task: 'task.318.placement-check-reads-rows-like-the-registry-parsers'
+task_title: 'Placement check reads rows like the registry parsers'
+gate: PASS
+status_reason: 'T318-CL-1 fixed: the CHANGELOG cites task 318 (changelog-cites.sh: cites). No new findings on the whole-branch refute pass.'
+reviewer: 'QA Engineer'
+head: '83e813ff9549f29a5958633fc8bc6b5271fd7bad'
+updated: '2026-11-22T20:32:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 13
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    boundary_signals: []
+    notes: 'Test-only change; no accept/reject boundary.'
+  performance:
+    status: PASS
+    notes: 'Test reads one file.'
+  reliability:
+    status: PASS
+    notes: 'Committed registry placement test passes; 13/13.'
+  maintainability:
+    status: PASS
+    notes: 'Parity with parseRegistry pinned by four cases.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future: []
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

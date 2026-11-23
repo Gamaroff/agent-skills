@@ -365,14 +365,25 @@ test("cancelled and in-flight rows do not trip the agreement check", () => {
 const PLACEMENT_MIN_ROWS = 317;
 
 function placementOf(text) {
-  const lines = text.split("\n");
+  // Read a line the way `parseRegistry` (select-next.mjs) does (task.318): trim it before the
+  // row and header tests, and skip a fenced block whole. A fence delimiter and the lines inside
+  // are "fenced" and read as nothing, so a sample table in a fence is neither a row nor the
+  // header, and the fence line ends the table block like any other non-table line.
+  const raw = text.split("\n");
+  let inFence = false;
+  const lines = raw.map((l) => {
+    if (/^\s*(```|~~~)/.test(l)) {
+      inFence = !inFence;
+      return "";
+    }
+    return inFence ? "" : l.trim();
+  });
   const header = lines.findIndex((l) => /^\|\s*#\s*\|/.test(l));
-  const sepOk =
-    header !== -1 && /^\s*\|[\s:|-]+\|\s*$/.test(lines[header + 1] ?? "");
+  const sepOk = header !== -1 && /^\|[\s:|-]+\|$/.test(lines[header + 1] ?? "");
   let blockEnd = -1; // index of the first non-table line after the separator
   if (sepOk) {
     blockEnd = header + 2;
-    while (blockEnd < lines.length && /^\s*\|/.test(lines[blockEnd])) {
+    while (blockEnd < lines.length && lines[blockEnd].startsWith("|")) {
       blockEnd += 1;
     }
   }
@@ -449,6 +460,73 @@ test("the placement check flags a row stranded below the Notes section and a hea
     2,
     "every row of a headerless table is stranded",
   );
+});
+
+test("the placement check reads rows the way parseRegistry does: trimmed lines, fences skipped (task.318)", async (t) => {
+  // A row needs a `[title](task.N.x/task.N.x.md)` link and at least five cells, or
+  // parseRegistry reports it malformed instead of reading it.
+  const head =
+    "| # | Title | Status | Category | Priority | Created | Depends on | Notes |\n" +
+    "|---|-------|--------|----------|----------|---------|------------|-------|\n";
+  const row = (n) =>
+    `| ${n} | [t](task.${n}.x/task.${n}.x.md) | planned | testing | Low | 2026-11-22 | — | n |`;
+  const parserIds = (text) =>
+    parseRegistry(text, "task", "docs/tasks/task-registry.md")
+      .rows.map((r) => r.n)
+      .sort((a, b) => a - b);
+  const placementIds = (text) =>
+    placementOf(text)
+      .rows.map((r) => r.id)
+      .sort((a, b) => a - b);
+
+  // The registry's own sample block is fenced, and a fence can hold a whole table.
+  const fenceBlock = (body) => `\`\`\`\n${body}\n\`\`\`\n`;
+  const cases = {
+    // `parseRegistry` trims each line, so an indented row below `## Notes` is a row it reads.
+    indented: {
+      text: `${head}${row(1)}\n\n## Notes\n\nprose\n\n  ${row(3)}\n`,
+      rows: [1, 3],
+      stranded: [3],
+    },
+    // A sample row inside a fence is an example: `parseRegistry` skips it.
+    fenced: {
+      text: `${head}${row(1)}\n\n## Notes\n\n${fenceBlock(row(4))}`,
+      rows: [1],
+      stranded: [],
+    },
+    fencedTilde: {
+      text: `${head}${row(1)}\n\n## Notes\n\n~~~\n${row(4)}\n~~~\n`,
+      rows: [1],
+      stranded: [],
+    },
+    // A fenced table above the real header must not be taken for the header.
+    fencedHeader: {
+      text: `${fenceBlock(`${head}${row(9)}`)}\n${head}${row(1)}\n`,
+      rows: [1],
+      stranded: [],
+    },
+  };
+
+  // One subtest per case, so a revert of the trim or of a fence skip names the case it breaks.
+  for (const [name, c] of Object.entries(cases)) {
+    await t.test(name, () => {
+      assert.deepEqual(
+        parserIds(c.text),
+        c.rows,
+        "the case is wrong if the parser it mirrors does not read these rows",
+      );
+      assert.deepEqual(
+        placementIds(c.text),
+        c.rows,
+        "placementOf must see the rows parseRegistry sees",
+      );
+      assert.deepEqual(
+        placementOf(c.text).stranded.map((r) => r.id),
+        c.stranded,
+        "stranded rows",
+      );
+    });
+  }
 });
 
 test("every declared dependency resolves to a registry row — the notes half of the cell is never a dependency (obs #74, task.127)", () => {

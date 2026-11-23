@@ -6,6 +6,10 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **The registry placement test reads rows like the registry parsers (task 318).** `placementOf` in
+  `task-registry-drift.test.mjs` now trims each line and skips fenced blocks, as `parseRegistry`
+  does, so an indented stranded row is flagged and a sample table in a fence is not mistaken for a
+  row or the header.
 - **Task registry rows sit under the table header (task 317).** Every row from task 286 on sat after
   the `## Notes` section, so `registry-tick.js --annotate` found no table header above it and
   answered `no-cell`; the rows are back in the one table, `task-registry-drift.test.mjs` fails on a
