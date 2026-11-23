@@ -250,24 +250,24 @@ A false positive is fixed by an exemption with a reason, not by deleting the tes
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-23
-**Quality Score**: 80/100
-**Gate Decision**: FAIL
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.288.qa.1.gating-rule-restatements.md](./task.288.qa.1.gating-rule-restatements.md)
-- **Gate File**: [task.288.gate.1.gating-rule-restatements.yml](./task.288.gate.1.gating-rule-restatements.yml)
+- **Full Report**: [task.288.qa.2.gating-rule-restatements.md](./task.288.qa.2.gating-rule-restatements.md)
+- **Gate File**: [task.288.gate.2.gating-rule-restatements.yml](./task.288.gate.2.gating-rule-restatements.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 8744
+- **Tests Executed**: 8745
 - **Phases Verified**: 3/3
-- **Critical Issues**: 1
+- **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-T288-CR-1 (high, reproduced by QA): the four rewritten report-template lines are not keyed by the guard test, so dropping their 5d clause leaves it green.
+Cycle 1's fix holds. The cycle-2 refute pass found two medium defects in the guard test: T288-C2-1 (the docs-only prompt's exemption reason is contradicted by that file) and T288-C2-2 (the T273-CR-6 assertion checks zero sentences, reproduced).
 
 ## Change Log
 
@@ -281,6 +281,7 @@ T288-CR-1 (high, reproduced by QA): the four rewritten report-template lines are
 | 2026-11-23 | 1.2     | Implemented inline: CR-5, CR-6 (four lines) and nine more restatement sentences reworded; guard test `gating-rule-restatements.test.mjs` added (template fences read, 7 reasoned exemptions, floor 24); bundled; CHANGELOG. Status → ready-for-review | develop-task |
 | 2026-11-23 |         | QA gate FAIL (80/100) — 1 finding (T288-CR-1, reproduced); status → in-progress | qa-task |
 | 2026-11-23 |         | QA findings fixed — T288-CR-1 closed (guard test keys "advisory unless"), 1 iteration | qa-fix |
+| 2026-11-23 |         | QA gate CONCERNS (90/100) — 2 findings (T288-C2-1, T288-C2-2) | qa-task |
 
 <!-- change-log-end -->
 

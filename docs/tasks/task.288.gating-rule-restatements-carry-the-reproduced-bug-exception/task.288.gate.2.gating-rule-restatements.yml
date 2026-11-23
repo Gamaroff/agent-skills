@@ -1,0 +1,77 @@
+schema: 2
+task: 'task.288.gating-rule-restatements-carry-the-reproduced-bug-exception'
+task_title: 'Gating-rule restatements carry the reproduced-bug exception'
+gate: CONCERNS
+status_reason: 'Cycle 1 fix (key D) holds. The cycle-2 refute pass found two medium defects in the guard test: its T273-CR-6 assertion checks zero sentences (reproduced), and one exemption reason is contradicted by the exempted file. Full gate was green at 8745 tests on the LAN server.'
+reviewer: 'QA Engineer'
+head: 'b7bc2f0497739a43d69156ef951408b8d4457ee7'
+updated: '2026-11-23T16:59:17Z'
+
+top_issues:
+  - id: 'T288-C2-1'
+    severity: medium
+    file: 'shared/resources/qa-docs-only-review-prompt.md'
+    finding: 'The line "When unsure a claim is false, set confidence: low (it will not gate)." is a bare gating restatement. The guard exempts it on the reason that the reproduction exception does not apply and the lens writes no gate, but line 25 of the same file says the caller gate mapping and the reproduction rule (item 4) all apply as written. The exemption reason is false by the file own text. origin: code-review, reviewer confidence high (previously advisory CR-2 at cycle 1).'
+    suggested_action: 'Reword to "it will not gate on the reviewer claim alone" (the claim-alone marker satisfies the guard) and delete the EXEMPT entry for this file in the guard test.'
+    suggested_owner: dev
+    status: open
+  - id: 'T288-C2-2'
+    severity: medium
+    file: 'evals/shared/tests/gating-rule-restatements.test.mjs'
+    finding: 'The T273-CR-6 assertion filters to sentences that match both "advisory unless" and the flag pattern. QA counted those sentences with a probe copy of the test: PROBE_COUNT=0. The assertion passes over an empty set with no floor, and the "advisory unless" lines it was written for name no flag, so it checks nothing. origin: code-review, reproduced by QA. Reviewer confidence high.'
+    suggested_action: 'Drop the flag filter and test every "advisory unless" sentence for HOW_RESOLVED directly, asserting at least one sentence is checked.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 8745
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: false
+    boundary_signals: []
+    notes: 'No boundary: prose rewording plus a read-only test. Criteria classifier found no boundary signal (unchanged since cycle 1).'
+  performance:
+    status: PASS
+    notes: 'Guard test runs in well under 1 s; no change since cycle 1.'
+  reliability:
+    status: PASS
+    notes: 'Population floor 24 of 29 measured; per-file floors are advisory (C2-3).'
+  maintainability:
+    status: CONCERNS
+    notes: 'One false exemption reason and one vacuous assertion in the guard test (T288-C2-1, T288-C2-2).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T288-C2-1 and T288-C2-2 in the guard test and the docs-only prompt.'
+      refs: ['shared/resources/qa-docs-only-review-prompt.md', 'evals/shared/tests/gating-rule-restatements.test.mjs']
+  future:
+    - action: 'C2-3: the "at least four template lines" check counts sentences, not lines (6 found); assert per-file minimums for qa-task and qa-story and a per-file keyed floor so an unclosed fence in a small file is noticed.'
+      refs: ['evals/shared/tests/gating-rule-restatements.test.mjs']
+      remedy: unverified
+    - action: 'Cycle 1 CR-3 (follower rule ignores block boundaries; "reproduc" is broad) and CR-4 (splitter edge cases) remain open and advisory.'
+      refs: ['evals/shared/tests/gating-rule-restatements.test.mjs']
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T288-C2-1 and T288-C2-2 fixed']
