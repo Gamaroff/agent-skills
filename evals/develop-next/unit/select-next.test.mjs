@@ -1888,6 +1888,37 @@ test("15/SC6: selection short-circuits, lint evaluates everything", () => {
   assert.equal(lint.passedOver[0].eligible, true);
 });
 
+test("obs 174: a row whose notes cell records a merged PR is not re-selected, whatever the document says", () => {
+  // T1 mirrors T290: merged under a waiver, document left in-progress, row annotated.
+  const rows = [
+    taskRow(1, "a", "planned", "High", "· PR #867 merged"),
+    taskRow(2, "b", "ready-for-development"),
+  ];
+  const docs = {
+    "docs/tasks/task.1.a/task.1.a.md": "in-progress",
+    "docs/tasks/task.2.b/task.2.b.md": "ready-for-development",
+  };
+  const { opts } = registryOpts({ tasks: taskRegistry(rows), docs });
+
+  const sel = registryFrontier(opts.registries);
+  assert.equal(
+    sel.selected.id,
+    "T2",
+    "the merged row is skipped, the next one wins",
+  );
+  const skipped = sel.passedOver.find((p) => p.n === 1);
+  assert.equal(skipped.eligible, false);
+  assert.match(skipped.reason, /PR #867 merged/);
+});
+
+test("obs 174: a row with no merge note and an in-progress document is still selected", () => {
+  // The negative half: the check must not widen into skipping all in-progress work.
+  const rows = [taskRow(1, "a", "planned", "High", "task 5")];
+  const docs = { "docs/tasks/task.1.a/task.1.a.md": "in-progress" };
+  const { opts } = registryOpts({ tasks: taskRegistry(rows), docs });
+  assert.equal(registryFrontier(opts.registries).selected.id, "T1");
+});
+
 // ── SC7: absent, empty and malformed registries degrade, never halt ──────────
 
 test("15/SC7: an absent or empty registry yields no rows and never throws", () => {
