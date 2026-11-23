@@ -1945,6 +1945,7 @@ function renderWorkflowFile(optionNames, moments) {
   );
   lines.push(`  accepted: ${q(resolved("done") || last)}`);
   lines.push(`  cancelled: ${q(resolved("done") || last)}`);
+  lines.push(`  superseded: ${q(resolved("done") || last)}`);
   return lines.join("\n") + "\n";
 }
 

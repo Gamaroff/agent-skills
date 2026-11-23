@@ -6,6 +6,12 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **Jira sync maps the `superseded` task status (task 305).** `superseded` had no key in the Jira
+  status map and sat in neither terminal set, so a superseded task looked for a Jira transition
+  literally named "Superseded" and could not use the done-category fallback. It now resolves to the
+  `cancelled` family as a negative terminal (a board that wants it elsewhere sets `jira.statusMap`),
+  `gh-stage --init-workflow` writes a `superseded:` line beside `cancelled:`, and the lifecycle and
+  configuration docs list it.
 - **The registry placement test reads rows like the registry parsers (task 318).** `placementOf` in
   `task-registry-drift.test.mjs` now trims each line and skips fenced blocks, as `parseRegistry`
   does, so an indented stranded row is flagged and a sample table in a fence is not mistaken for a

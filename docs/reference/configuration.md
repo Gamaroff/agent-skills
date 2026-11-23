@@ -746,7 +746,7 @@ hardcoded name silently skipped the status change on every board that chose a di
 | `in-progress`                               | `In Progress`, `Doing`, `Started`, `Development`                                              |
 | `ready-for-review`                          | `In Review`, `Code Review`, `Ready for Review`, `Waiting for Review`, `Peer Review`, `Review` |
 | `accepted`                                  | `Done`, `Closed`, `Resolved`, `Complete`, `Completed`                                         |
-| `cancelled`                                 | `Cancelled`, `Canceled`, `Won't Do`, `Rejected`, `Closed`                                     |
+| `cancelled`, `superseded`                   | `Cancelled`, `Canceled`, `Won't Do`, `Rejected`, `Closed`                                     |
 
 Most projects need **no `statusMap` at all**. Run `--probe-workflow` (below) before writing one.
 
@@ -757,7 +757,7 @@ Most projects need **no `statusMap` at all**. Run `--probe-workflow` (below) bef
 2. **Destination match** — a transition whose `to.name` equals a candidate, candidates in order.
 3. **Action match** — a transition whose own `name` equals a candidate. Catches workflows that name
    the action rather than the destination (an `Implemented` transition leading to `Waiting for Review`).
-4. **Terminal-only category fallback** — for `accepted`/`cancelled` only, and only when _exactly one_
+4. **Terminal-only category fallback** — for `accepted`/`cancelled`/`superseded` only, and only when _exactly one_
    available transition leads to the `done` status category.
 5. Otherwise **skip**, listing the candidates tried and the transitions available.
 
