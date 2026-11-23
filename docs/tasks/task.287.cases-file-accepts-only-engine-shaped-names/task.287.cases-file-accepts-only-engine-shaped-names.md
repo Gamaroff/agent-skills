@@ -5,16 +5,17 @@ type: task
 description: "Make the security probe plan's cases_file route refuse any file whose name is not one the engine itself writes, so a plan cannot point the runner at an arbitrary JSON array in the work-item directory."
 tags: [finalise, security-probe, observation]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Low
 created: 2026-11-07
-updated: 2026-11-07
+updated: 2026-11-23
 estimated_effort_hours: 2
 ---
 
 # Task 287: cases_file accepts only engine-shaped names
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.287.review.1.cases-file-accepts-only-engine-shaped-names.md` implemented 2026-11-23
 
 ---
 
@@ -32,7 +33,7 @@ This task adds that check: the basename must match a name the engine itself writ
 
 ### Current Problems
 
-1. **The accepted set is wider than the written set.** The engine writes `<stem>.dod.<N>.security.cases.json`, or `<stem>.dod.<N>.security.cases.<i>.json` when a plan has several entries (`security-probe-plan.mjs:455-456`). `resolveCasesFile` accepts any other regular file too (`security-probe-plan.mjs:175`).
+1. **The accepted set is wider than the written set.** The engine writes `<stem>.dod.<N>.security.cases.json`, or `<stem>.dod.<N>.security.cases.<i>.json` when a plan has several entries (`security-probe-plan.mjs:467-468`). `resolveCasesFile` accepts any other regular file too (`security-probe-plan.mjs:179`).
 2. **The only remaining bounds are indirect.** A wrong file is stopped by the JSON-array parse and, when the plan carries one, `cases_sha256`. Neither says "this is a cases file".
 3. **Found by review, not by incident.** DoD run 1 of task 269 raised it as a spec challenge and `gate.4` recorded it under `recommendations.future`. Nothing has gone wrong.
 
@@ -48,22 +49,23 @@ This task adds that check: the basename must match a name the engine itself writ
 
 ### Current Architecture
 
-- `resolveCasesFile(name, workDir)` is the single decision point (`security-probe-plan.mjs:175`). `casesFileAccepted` wraps it as a boolean for the probe engine (`security-probe-plan.mjs:225`).
-- Two callers: the plan-entry validator (`security-probe-plan.mjs:395`) and the reuse check (`security-probe-plan.mjs:611`).
+- `resolveCasesFile(name, workDir)` is the single decision point (`security-probe-plan.mjs:179`). `casesFileAccepted` wraps it as a boolean for the probe engine (`security-probe-plan.mjs:229`).
+- Two callers: the plan-entry validator (`security-probe-plan.mjs:407`) and the reuse check (`security-probe-plan.mjs:625`).
 - Refusals today: `bad-name`, `outside-work-dir`, `unreadable`, `missing`, `symlink`, `not-a-file`. The caller prefixes them as `plan-entry-cases-file-<why>` and `cases-file-<why>`.
-- The engine's own names: `${opts.casesBase}.json`, or `${opts.casesBase}.${i + 1}.json` (`security-probe-plan.mjs:455-456`), with `casesBase` = `<stem>.dod.<N>.security.cases` (`skills/finalise/SKILL.md:707`).
+- The engine's own names: `${opts.casesBase}.json`, or `${opts.casesBase}.${i + 1}.json` (`security-probe-plan.mjs:467-468`), with `casesBase` = `<stem>.dod.<N>.security.cases` (`--cases-base` at `skills/finalise/SKILL.md:763`).
 
-### Measured population (2026-11-07)
+### Measured population (re-measured 2026-11-23, review 1)
 
-Command: `git ls-files 'docs/**/*security*cases*.json'` — 284 files. Of those, 279 match `\.security\.cases(\.[0-9]+)?\.json$` and 5 do not:
+The draft measured this on 2026-11-07 (284 files, two plans). It had moved by review time; the figures below are the re-measure, and the commands are the definition — re-run them rather than trusting the numbers.
+
+Files. Command: `git ls-files 'docs/**/*security*cases*.json'` — 355 files. Of those, 344 match `\.security\.cases(\.[0-9]+)?\.json$` and 11 do not:
 
 - `task.154.security-probe-cases.json`
-- `task.200.qa.4.security.cases.bug.json`
-- `task.200.qa.4.security.cases.story.json`
-- `task.204.dod.1.security.cases.domain.json`
-- `task.204.dod.1.security.cases.slug.json`
+- `task.200.qa.4.security.cases.bug.json`, `task.200.qa.4.security.cases.story.json`
+- `task.204.dod.1.security.cases.domain.json`, `task.204.dod.1.security.cases.slug.json`
+- `task.271.qa.{2,3,4}.security.{delta,match}.cases.json` (six files)
 
-All five predate the `cases_file` route, and no committed plan names any of them: `git ls-files 'docs/**/*.security.plan.json'` finds two plans (task 269's), each naming a matching file. So the pattern breaks no recorded plan.
+Plans. Command: `git ls-files 'docs/**/*.security.plan.json'` — 31 plans, and `jq -r '.[]? | select(.cases_file!=null) | .cases_file'` over them lists 54 `cases_file` entries. 53 match the pattern. **One does not: `task.304.dod.1.security.plan.json` names `task.304.dod.1.security.cases.new.json`**, and that file is not tracked (`git ls-files` does not list it), so the plan is already `not-reusable` today as `cases-file-missing`. After this task it answers `cases-file-bad-name-shape` instead. The outcome is the same (the caller plans afresh) and only the reason changes. No other committed plan is affected. None of the 11 non-matching files is named by a plan.
 
 ### Target Architecture
 
@@ -94,7 +96,7 @@ Out of Scope:
 
 - Before: any regular file in the work-item directory holding a JSON array of cases.
 - After: only a file named `*.security.cases.json` or `*.security.cases.<n>.json`.
-- Affected: a hand-authored plan naming a hand-named file. None is committed (measured above). The security agent's prompt tells it to name the engine's file.
+- Affected: a hand-authored plan naming a hand-named file. One committed plan does (`task.304.dod.1.security.plan.json`, measured above), and it was already not reusable because its file is not tracked; only the refusal reason changes. The security agent's prompt tells it to name the engine's file.
 - Migration: rename the file to the engine shape and re-run, or put the cases inline. The refusal reason names the shape.
 
 ---
@@ -107,26 +109,27 @@ Out of Scope:
 
 Files: `shared/resources/security-probe-plan.mjs`
 
-- [ ] Add the basename pattern as a named constant beside `resolveCasesFile`
-- [ ] Return `bad-name-shape` after the `outside-work-dir` check and before any filesystem call
-- [ ] Update the function's doc comment to list the new refusal
+- [x] Add the basename pattern as a named constant beside `resolveCasesFile`
+- [x] Return `bad-name-shape` after the `outside-work-dir` check and before any filesystem call
+- [x] Update the function's doc comment to list the new refusal
 
 ### Phase 2: Tests (Risk: Low)
 
 Files: `shared/resources/tests/security-probe-plan-cases-file.test.mjs`
 
-- [ ] Re-point the fixtures that use `ok.json`, `mixed.json`, `only.json`, `esc.json` and `obj.json` at engine-shaped names
-- [ ] Add one test per accepted shape (`…security.cases.json`, `…security.cases.2.json`)
-- [ ] Add one refusal test for a plain `x.json` and for a near miss (`x.security.cases.json.bak`, `x.security.cases.a.json`)
-- [ ] Mutation-prove it: remove the check and confirm the refusal tests go red
+- [x] Re-point every fixture name in the file at an engine-shaped name: `ok.json`, `mixed.json`, `only.json`, `esc.json`, `obj.json`, `missing.json`, `link.json` (the plan-entry tests, about lines 95-195) **and the probe-engine test `casesFileAccepted: the probe engine executes hostile and legitimate names` (about lines 282-310)**, whose `link.json` and `sub` cases would otherwise pass as `bad-name-shape` and stop exercising the symlink and not-a-file refusals
+- [x] Add one test per accepted shape (`…security.cases.json`, `…security.cases.2.json`)
+- [x] Add one refusal test for a plain `x.json` and for a near miss (`x.security.cases.json.bak`, `x.security.cases.a.json`)
+- [x] Add one test that a bad-shape name whose file does not exist answers `bad-name-shape`, not `missing`, so the check provably runs before `lstat`
+- [x] Mutation-prove it: remove the check and confirm the refusal tests go red
 
 ### Phase 3: Wording, bundle, changelog (Risk: Low)
 
 Files: `shared/resources/finalise-dod-security-prompt.md`, `skills/finalise/SKILL.md`, `CHANGELOG.md`
 
-- [ ] State the accepted shape where `cases_file` is described (`finalise-dod-security-prompt.md:428`, `skills/finalise/SKILL.md:741`)
-- [ ] `npm run bundle`, then `npm run bundle -- --check`
-- [ ] Add a `CHANGELOG.md` entry citing task 287
+- [x] State the accepted shape where `cases_file` is described (`finalise-dod-security-prompt.md:430`, `skills/finalise/SKILL.md:797`)
+- [x] `npm run bundle`, then `npm run bundle -- --check`
+- [x] Add a `CHANGELOG.md` entry citing task 287
 
 ---
 
@@ -156,7 +159,7 @@ Unit Tests:
 - Scope: `resolveCasesFile` and the two callers' reasons.
 - Command: `CI=true command node --test shared/resources/tests/security-probe-plan-cases-file.test.mjs`
 - Accepted: both engine shapes. Refused: a plain name, a near miss, an engine shape in a sub-directory path (already refused as a non-basename by confinement).
-- Control case: the reuse check keeps accepting task 269's two committed plans, which name matching files.
+- Control case: the reuse check keeps accepting task 269's two committed plans, which name matching files. Corpus control: `reusePlan` is run (in the test, over a copy of the plan and its files in a temp directory) for the committed plans whose `cases_file` entries all exist, and none of them changes answer; `task.304.dod.1.security.plan.json` answers `cases-file-bad-name-shape` (it answered `cases-file-missing`).
 
 Mutation proof:
 
@@ -176,11 +179,12 @@ Regression:
 - [ ] `cases_file: "x.json"` and `"x.security.cases.a.json"` are refused as `plan-entry-cases-file-bad-name-shape`
 - [ ] The reuse check answers `cases-file-bad-name-shape` for a prior plan naming a bad shape
 - [ ] Task 269's two committed plans still reuse
+- [ ] `task.304.dod.1.security.plan.json` answers `cases-file-bad-name-shape` and stays not-reusable (held by the corpus control case in Testing Strategy)
 
 **Performance**
 
 - [ ] No new test case runs over one second (five runs, slowest recorded in the QA report with `/proc/loadavg` beside each)
-- [ ] The check adds no filesystem call
+- [ ] A bad-shape name never reaches `lstat`: the test "a bad-shape name whose file does not exist answers `bad-name-shape`, not `missing`" holds it
 
 **Code Quality**
 
@@ -234,6 +238,9 @@ Triggers: a `/finalise` run refusing a plan whose file the engine wrote (revert 
 | Date       | Version | Description                                                                          | Author      |
 | ---------- | ------- | ------------------------------------------------------------------------------------ | ----------- |
 | 2026-11-07 | 1.0     | Initial draft, cut from task 269 `gate.4` `recommendations.future` and DoD run 1     | create-task |
+| 2026-11-23 | 1.1     | Review passed (8/10): population re-measured (31 plans, one names a non-engine file), probe-engine test added to Phase 2, "no filesystem call" criterion made testable, line anchors refreshed | review-task |
+| 2026-11-23 |         | Status → ready-for-development                                                       | review-task |
+| 2026-11-23 |         | Implemented — 8 source files + 3 generated copies, 5 new tests, 4 mutation-red       | develop     |
 
 <!-- change-log-end -->
 
@@ -241,9 +248,9 @@ Triggers: a `/finalise` run refusing a plan whose file the engine wrote (revert 
 
 ## Progress Tracking
 
-- [ ] Phase 1: The check
-- [ ] Phase 2: Tests
-- [ ] Phase 3: Wording, bundle, changelog
+- [x] Phase 1: The check
+- [x] Phase 2: Tests
+- [x] Phase 3: Wording, bundle, changelog
 
 ---
 
