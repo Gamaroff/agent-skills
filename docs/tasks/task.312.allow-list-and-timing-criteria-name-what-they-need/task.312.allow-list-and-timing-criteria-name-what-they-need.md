@@ -24,7 +24,7 @@ estimated_effort_hours: 4
 
 Two authoring and review gaps found on tasks 289 and 306 (observations #159 and #171). A task that replaces a deny-list with an allow-list tabled three members and left the other 28 on "today's behaviour"; nothing required the table to cover the set, and a write by operand slipped past a flag table. A task that bounded suite wall time at 1.10x the prior median could not be settled on the shared LAN server and was amended at `/finalise`.
 
-**Scope**: one new `review-task` Step 3 check for allow-lists (Phase 1), and a statistic rule added to `create-task` 3.5 and `review-task` check 22's wall-clock note (Phase 2).
+**Scope**: one new `review-task` Step 3 check for allow-lists (Phase 1), and a statistic rule added to `create-task` 3.5 and `review-task` Step 6 check 4's wall-clock note (Phase 2).
 
 ---
 
@@ -53,7 +53,7 @@ Two authoring and review gaps found on tasks 289 and 306 (observations #159 and 
 
 ### Target Architecture
 
-`review-task` gains check 32: when a task replaces a deny-list with an allow-list, the table covers the whole set it gates, and the unaudited members are probed for writes by operand as well as by flag. `create-task` 3.5 and check 22's wall-clock note gain the statistic: say where it is measured and how load is controlled, and prefer a paired interleaved ratio or CPU time over a ratio of medians on a shared host.
+`review-task` gains check 32: when a task replaces a deny-list with an allow-list, the table covers the whole set it gates, and the unaudited members are probed for writes by operand as well as by flag. `create-task` 3.5 and Step 6 check 4's wall-clock note gain the statistic: say where it is measured and how load is controlled, and prefer a paired interleaved ratio or CPU time over a ratio of medians on a shared host.
 
 ---
 
@@ -62,7 +62,7 @@ Two authoring and review gaps found on tasks 289 and 306 (observations #159 and 
 ### In Scope
 
 ✅ **review-task check 32** and its `review-story` sibling note.
-✅ **create-task 3.5** timing bullet and **review-task check 22** wall-clock note.
+✅ **create-task 3.5** timing bullet and **review-task Step 6 check 4** wall-clock note.
 ✅ **Bundled copies**, `CHANGELOG.md`.
 
 ### Out of Scope
@@ -106,11 +106,11 @@ None - API stable. Both are added review checks and authoring prompts; a task th
 **Risk Level**: Low
 
 **Files**:
-- `skills/create-task/SKILL.md`, `skills/review-task/SKILL.md` (check 22 note)
+- `skills/create-task/SKILL.md`, `skills/review-task/SKILL.md` (Step 6 check 4 note)
 
 **Changes**:
 - [x] Extend the obs #31 bullet: name where the bound is measured and how load is controlled; prefer a paired interleaved ratio or CPU time over a ratio of medians on a shared host.
-- [x] Mirror the sentence in check 22's wall-clock note.
+- [x] Mirror the sentence in Step 6 check 4's wall-clock note.
 - [x] Test that the two sentences stay one rule (the existing parity-test pattern).
 
 **Dependencies**: independent of Phase 1.
@@ -132,7 +132,7 @@ None - API stable. Both are added review checks and authoring prompts; a task th
 
 ### Files to Modify (Core Implementation)
 
-1. ✅ `skills/review-task/SKILL.md` - check 32 and the check 22 note
+1. ✅ `skills/review-task/SKILL.md` - check 32 and the Step 6 check 4 note
 2. ✅ `skills/review-story/SKILL.md` - sibling note
 3. ✅ `skills/create-task/SKILL.md` - timing statistic
 
@@ -170,7 +170,7 @@ Remove check 32's coverage rule and name the red test; remove the statistic from
 
 - [x] `review-task` check 32 states its trigger (a deny-list replaced by an allow-list), the coverage rule (the table lists every member or states the count and the command), and Important severity; the test is `tests/review-allow-list-timing-checks.test.js`, and removing the coverage rule turns it red (mutation-proved, red test named in the QA report's Findings table).
 - [x] Check 32 requires a write-by-operand probe for each unaudited member, with `uniq in out` as the fixture.
-- [x] `create-task` 3.5 and `review-task` check 22 carry the same timing-statistic rule, held by a parity test.
+- [x] `create-task` 3.5 and `review-task` Step 6 check 4 carry the same timing-statistic rule, held by a parity test.
 
 ### Performance
 
