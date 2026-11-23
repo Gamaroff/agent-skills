@@ -3,7 +3,7 @@
 **Task**: `task.305.jira-sync-maps-superseded-status.md`
 **Run Number**: 1
 **Started**: 2026-11-23 06:20
-**Status**: In Progress
+**Status**: Completed
 **Report format**: 2
 
 ---
@@ -35,10 +35,10 @@ Map `superseded` in the Jira status map and terminal sets, and close or record t
 | 1. create-branch           | ✅ Done | Branch `feature/task.305.*` exists in git                             | Branch created at `6013cd0b9` | —                    | 2026-11-23T06:12Z |
 | 2. review-task             | ✅ Done | `task.305.review.{N}.{name}.md` exists (or skip logged)               | Review 1, READY TO IMPLEMENT 9/10; 0 critical, 4 important fixed; status → ready-for-development | —                    | 2026-11-23T06:14Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline; 8 new tests; fast gate 8725 tests, 0 failed; 4 mutations red | —                    | 2026-11-23T06:30Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.305.qa.{N}.*.md`; `task.305.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.305.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #930, commit d8f914c75; no issue comment (no tracker issue) | —                    | 2026-11-23T06:45Z |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.305.qa.{N}.*.md`; `task.305.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 1 cycle: gate PASS 100, 5c APPROVE; PR #930 commented twice (QA, review) | —                    | 2026-11-23T06:35Z |
+| 7. finalise                | ✅ Done | `task.305.dod.{N}.*.md`; task `status: accepted`                      | DoD accepted 6/6; CI readings 1 and 2 SUCCESS; canonical PR comment posted | —                    | 2026-11-23T08:31Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Report committed and pushed | —                    | 2026-11-23T08:33Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -71,7 +71,15 @@ Map `superseded` in the Jira status map and terminal sets, and close or record t
 - Scope addition recorded: `docs/reference/configuration.md` had the default-mapping row and the terminal-fallback sentence; both now name `superseded`. The task's own Phase 3b told the developer to check it.
 - A test could not assert reference identity of the sync scripts' status map to the library's (each script loads its own bundled copy), so it asserts value equality; `bundle:check` holds the copy to its source.
 - CHANGELOG placement check: entry added under `[Unreleased]`, above the first release heading (the placement block's own count: 974 bullets below the first release heading at the merge base and 974 now).
+- Step 4 SCOPE_PATHS: 36 entries (work-item dir, CHANGELOG.md, docs/reference, shared/resources, shared/resources/tests, and 31 skills/*/references dirs). Pre-flight guard: nothing untracked outside scope, nothing held. Leak check: OK. Report link check: 0 links, ok.
+- PR created: #930 https://github.com/Gamaroff/agent-skills/pull/930 (base develop). Post-PR state check inline: state OPEN, mergeStateStatus UNSTABLE (CI running), no Explore poller dispatched. Tracker: no issue linked, so no board or comment action.
+- Step 5a: traceability mapper skipped (no Success Criteria table). Record-criteria preflight: nothing listed. QA ran inline (no Explore subagent for the diff review, so independent review did not run). Gate 1 PASS 100/100; committed with the QA report as b94e76646 and pushed once.
+- Step 5c: `/review-pr --effort medium --comment --no-code` on PR #930, conformance lens run inline (independent review did not run). Verdict APPROVE, 1 low coverage finding (PC-1, anchored on a test file, so recorded and not fixed). `open-coverage.js` read OPEN_COVERAGE=1; that routes only a CONCERNS verdict, and this one is APPROVE. Report: task.305.pr-review.1.jira-sync-maps-superseded-status.md, staged and carried into the acceptance commit. ready-for-merge stage: skipped (no tracker issue).
 - Owner decision A/B in the task (Jira landing state): the task document recommends A (cancelled family, negative resolution). Taken as the plan of record under `--defaults`; the config override remains for a board that wants B.
+- Step 7 finalise (inline; independent review did not run for the DoD lenses): DoD `task.305.dod.1.*` ACCEPTED, 6/6 criteria, security and compliance not applicable. Acceptance commit d4ba0cb02 pushed. CHANGELOG citation check (6d) passed.
+- CI reading 1: SUCCESS at b94e76646355 (6 checks), the acceptance decision.
+- CI reading 2: SUCCESS at d4ba0cb02523 (6 checks, tree equal to reading 1), gating publication.
+- Canonical PR comment posted on #930: https://github.com/Gamaroff/agent-skills/pull/930#issuecomment-7095541362. No tracker issue, so no close or board move.
 
 ---
 
@@ -85,14 +93,24 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-11-23
+**Gate Result**: PASS (100/100)
+**Issues Found**: none blocking; 2 LOW follow-ups in the gate's `recommendations.future` (`--probe-workflow` status list lacks superseded; lifecycle ALLOW snippet lacks it, pre-existing since PR #878)
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**Traceability**: skipped (no Success Criteria table)
+**PR Review**: APPROVE
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-11-23 08:33
+**Final Status**: Completed
 **Branch**: feature/task.305.jira-sync-maps-superseded-status
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**PR**: #930 — https://github.com/Gamaroff/agent-skills/pull/930
+**QA Iterations**: 1
+**DoD Summary**: ACCEPTED, 6/6 criteria, CI SUCCESS on both readings
+**Tracker debt**: none
