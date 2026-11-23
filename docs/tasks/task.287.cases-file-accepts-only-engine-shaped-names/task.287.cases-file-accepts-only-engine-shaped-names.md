@@ -231,6 +231,27 @@ Triggers: a `/finalise` run refusing a plan whose file the engine wrote (revert 
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-23
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.287.qa.1.cases-file-accepts-only-engine-shaped-names.md](./task.287.qa.1.cases-file-accepts-only-engine-shaped-names.md)
+- **Gate File**: [task.287.gate.1.cases-file-accepts-only-engine-shaped-names.yml](./task.287.gate.1.cases-file-accepts-only-engine-shaped-names.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 16 in the changed file; fast gate 8741, 0 fail
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No blocking issues. One advisory note: the pattern also accepts the bare name `.security.cases.json` and zero-padded indices, which the engine never writes.
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -241,6 +262,7 @@ Triggers: a `/finalise` run refusing a plan whose file the engine wrote (revert 
 | 2026-11-23 | 1.1     | Review passed (8/10): population re-measured (31 plans, one names a non-engine file), probe-engine test added to Phase 2, "no filesystem call" criterion made testable, line anchors refreshed | review-task |
 | 2026-11-23 |         | Status → ready-for-development                                                       | review-task |
 | 2026-11-23 |         | Implemented — 8 source files + 3 generated copies, 5 new tests, 4 mutation-red       | develop     |
+| 2026-11-23 |         | QA gate PASS (95/100) — 0 blocking findings, 1 advisory                              | qa-task     |
 
 <!-- change-log-end -->
 
