@@ -35,10 +35,10 @@ Add review-task check 32 (allow-list covers the whole set it gates) and a timing
 | 1. create-branch           | ✅ Done | Branch `feature/task.{id}.*` exists in git                             | Branch created at `576859854` |  —                    | 2026-11-23T10:50Z |
 | 2. review-task             | ✅ Done | `task.{id}.review.{N}.{name}.md` exists (or skip logged)               | 8/10 READY TO IMPLEMENT; 4 Important fixed; status → ready-for-development |  —                    | 2026-11-23T10:52Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline; 1 iteration; ci:fast on LAN server 8733 pass / 0 fail; 2 mutations red→green |  —                    | 2026-11-23T11:10Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #932; no tracker issue linked, so no issue comment |  —                    | 2026-11-23T11:20Z |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.{id}.qa.{N}.*.md`; `task.{id}.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 1 cycle, PASS 95/100; 5c PR review APPROVE (1 low consistency note) | —                    | 2026-11-23T11:16Z |
+| 7. finalise                | ✅ Done | `task.{id}.dod.{N}.*.md`; task `status: accepted`                      | DoD ACCEPTED; CI reading 1 SUCCESS @ 0c40c40e1fd6; reading 2 SUCCESS (tree-equivalent to aee26acd5d5b) @ e9559431ba80; four DoD checks run inline, so independent review did not run | —                    | 2026-11-23T11:29Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Implementation report committed and pushed | —                    | 2026-11-23T11:31Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -79,14 +79,24 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-11-23
+**Gate Result**: PASS
+**Issues Found**: none (1 LOW cosmetic note in the report only, not in `top_issues[]`)
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**Traceability**: skipped (no Success Criteria table)
+**PR Review**: APPROVE
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
-**Branch**: {populated after Step 1}
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**Finished**: 2026-11-23T11:30Z
+**Final Status**: Completed
+**Branch**: feature/task.312.allow-list-and-timing-criteria-name-what-they-need
+**PR**: #932 (https://github.com/Gamaroff/agent-skills/pull/932)
+**QA Iterations**: 1 (PASS 95/100; 5c APPROVE)
+**DoD Summary**: ACCEPTED — task.312.dod.1.allow-list-and-timing-criteria-name-what-they-need.md
+**Tracker debt**: none (no tracker issue linked)
