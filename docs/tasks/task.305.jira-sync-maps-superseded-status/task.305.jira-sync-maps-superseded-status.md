@@ -5,16 +5,18 @@ type: task
 description: "Follow-up to PR 878: superseded is now a valid terminal task status, but the Jira status map has no entry for it, so a superseded task finds no Jira transition. Map it, decide the Jira state it lands in, and check the GitHub ladder for the same gap."
 tags: [jira, sync, status-lifecycle]
 category: other
-status: ready-for-review
+status: accepted
 priority: Medium
 created: 2026-11-11
 updated: 2026-11-23
+completed_date: 2026-11-23
+pr_number: 930
 estimated_effort_hours: 4
 ---
 
 # Technical Task: Jira sync maps the superseded status
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.305.review.1.jira-sync-maps-superseded-status.md` implemented 2026-11-23
 
@@ -166,18 +168,31 @@ Revert the commit and re-run `npm run bundle`. Trigger: a board that now moves s
 ### Key Findings
 No critical issues identified. Two LOW follow-ups are recorded in the gate (the `--probe-workflow` status list and the lifecycle `ALLOW` snippet).
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+- ✅ **Acceptance Criteria:** all 6 met (see the DoD file).
+- ✅ **QA gate:** PASS 100/100 (`task.305.gate.1.jira-sync-maps-superseded-status.yml`).
+- ✅ **PR review:** PR #930, 5c report APPROVE (`task.305.pr-review.1.jira-sync-maps-superseded-status.md`).
+- ✅ **Documentation:** CHANGELOG, lifecycle table and configuration reference updated.
+- ⚠️ **Security and compliance:** not applicable (no input boundary, no personal data).
+- ✅ **CI:** all six checks green on `b94e76646355`.
+
+**Detailed Verification Log:** see `task.305.dod.1.jira-sync-maps-superseded-status.md`.
+
+**Task marked as ACCEPTED on:** 2026-11-23
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
-
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-11 | 1.0     | Initial draft | create-task |
 | 2026-11-23 | 1.1     | Review passed (9/10) — owner decision A taken; Phase 3 resolved (documentStatus is an open map); Phase 3b added for the lifecycle doc's Jira table; performance and migration criteria given a held test and a location; line anchors corrected | review-task |
 | 2026-11-23 |         | Status → ready-for-development | review-task |
 | 2026-11-23 |         | Implemented — 4 source and doc files plus bundled copies, 8 new tests; fast gate 8725 tests, 0 failed | develop |
 | 2026-11-23 |         | QA gate PASS (100/100) — 0 findings blocking, 2 LOW follow-ups | qa-task |
-
+| 2026-11-23 | 1.2 | DoD passed — accepted (PR #930) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
