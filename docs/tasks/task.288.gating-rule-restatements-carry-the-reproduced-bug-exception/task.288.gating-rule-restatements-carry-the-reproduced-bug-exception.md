@@ -5,7 +5,7 @@ type: task
 description: "Reword the two LOW residues task 273 left (T273-CR-5, T273-CR-6) and add a guard test so a restatement of the code-review gating rule cannot drop the reproduced-bug (5d) exception again."
 tags: [qa, code-review, guard-test]
 category: testing
-status: in-progress
+status: ready-for-review
 priority: Low
 created: 2026-11-09
 updated: 2026-11-23
@@ -16,7 +16,7 @@ github_issue: 862
 
 # Technical Task: Gating-rule restatements carry the reproduced-bug exception
 
-**Status:** In Progress
+**Status:** Ready for Review
 **Review**: ✅ All review recommendations from `task.288.review.1.gating-rule-restatements.md` implemented 2026-11-23
 **GitHub Issue**: [#862](https://github.com/Gamaroff/agent-skills/issues/862)
 
@@ -280,6 +280,7 @@ T288-CR-1 (high, reproduced by QA): the four rewritten report-template lines are
 | 2026-11-23 |         | Status → ready-for-development | review-task |
 | 2026-11-23 | 1.2     | Implemented inline: CR-5, CR-6 (four lines) and nine more restatement sentences reworded; guard test `gating-rule-restatements.test.mjs` added (template fences read, 7 reasoned exemptions, floor 24); bundled; CHANGELOG. Status → ready-for-review | develop-task |
 | 2026-11-23 |         | QA gate FAIL (80/100) — 1 finding (T288-CR-1, reproduced); status → in-progress | qa-task |
+| 2026-11-23 |         | QA findings fixed — T288-CR-1 closed (guard test keys "advisory unless"), 1 iteration | qa-fix |
 
 <!-- change-log-end -->
 
