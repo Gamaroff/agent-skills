@@ -62,3 +62,27 @@ Security PASS (reasoned, no boundary). Performance PASS. Reliability PASS. Maint
 ```bash
 npm run test:remote   # 8745 pass, 0 fail (in the qa-fix cycle, at the head before this QA commit)
 ```
+
+---
+
+## Closing Record (written at finalise, 2026-11-23, head 085c54e6a)
+
+Added so each success criterion that asks for a record has one in a committed QA artifact (the implementation report is committed last and does not count).
+
+**Mutation proofs, one per unit of SC-3.** Each was applied with an in-place edit, the test run, then the file restored from a `cp` snapshot (`cmp` clean). Command: `command node --test evals/shared/tests/gating-rule-restatements.test.mjs`.
+
+| Mutation | Edit | Test that went red | Baseline after restore |
+| --- | --- | --- | --- |
+| (a) | `shared/resources/code-review-prompt.md:96`: "it will not gate on the reviewer claim alone" back to "it will not gate" | `every restatement of the gating rule carries the reproduced-bug exception or points at it` | 7 pass, 0 fail |
+| (b) | One report-template line (`skills/qa-task/SKILL.md:1633`) reverted to "advisory unless the doc opted in via `code_review_blocking: true`" | the `advisory unless` assertion (T273-CR-6), named in cycle 1 (control) and cycle 2 (qa-fix proof) | 7 pass, 0 fail |
+| (c) | `skills/review-code/SKILL.md:319`: the "a bug QA reproduces by execution gates at any reviewer confidence" clause removed | `every restatement of the gating rule carries the reproduced-bug exception or points at it` | 7 pass, 0 fail |
+
+**Runtime (SC-4).** Median of five runs of the guard test at head `085c54e6a` (source files identical to `144f2a1dd`, the last code commit): 0.448 s (0.412, 0.428, 0.448, 0.511, 0.530). Machine load average at the time, 1/5/15 min: 0.98 / 2.56 / 5.54 (`uptime`, read before each run, identical). Bound: under 2 s. Command: wall clock around `node --test` via `process.hrtime`.
+
+**Carried items from task 273 gate 6 (SC-8).** Task 273's `recommendations.future` carries three entries. All three are done in this task:
+
+| Task 273 gate-6 entry | Done by | Evidence |
+| --- | --- | --- |
+| T273-CR-5 (reword "it will not gate") | `shared/resources/code-review-prompt.md:96` now reads "it will not gate on the reviewer claim alone" | mutation (a) above; gate.3 PASS |
+| T273-CR-6 (four report-template lines) | `skills/qa-task/SKILL.md:1633` and `:1953`, `skills/qa-story/SKILL.md:1867` and `:2495` | mutation (b) above; T273-CR-6 assertion checks all four |
+| Guard test so a restated rule cannot drift | `evals/shared/tests/gating-rule-restatements.test.mjs` (7 tests, floor 24, 29 measured) | gate.3 PASS 95/100; mutations (a), (b), (c) |
