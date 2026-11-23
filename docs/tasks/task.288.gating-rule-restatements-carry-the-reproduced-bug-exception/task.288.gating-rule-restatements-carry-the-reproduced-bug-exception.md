@@ -5,18 +5,20 @@ type: task
 description: "Reword the two LOW residues task 273 left (T273-CR-5, T273-CR-6) and add a guard test so a restatement of the code-review gating rule cannot drop the reproduced-bug (5d) exception again."
 tags: [qa, code-review, guard-test]
 category: testing
-status: ready-for-review
+status: accepted
 priority: Low
 created: 2026-11-09
 updated: 2026-11-23
 assignee:
 estimated_effort_hours: 4
 github_issue: 862
+pr_number: 934
+completed_date: 2026-11-23
 ---
 
 # Technical Task: Gating-rule restatements carry the reproduced-bug exception
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.288.review.1.gating-rule-restatements.md` implemented 2026-11-23
 **GitHub Issue**: [#862](https://github.com/Gamaroff/agent-skills/issues/862)
 
@@ -26,7 +28,7 @@ github_issue: 862
 
 Task 273 added an exception to the code-review gating rule: a `category: bug` finding that QA reproduces by execution gates at any reviewer confidence (step 5d). The rule is restated in prose in many files, and the QA loop needed five cycles to find the restatements that omitted the exception, one per cycle. Two LOW residues were left open when it was accepted. This task rewords them, fixes the other restatement that still omits the exception, and adds a test that reads the sources, so the next restatement that omits it turns a test red instead of costing a QA cycle.
 
-**Scope**: five lines of prose in four files (the carried items T273-CR-5 and T273-CR-6, plus the two restatements the probe in § 3 found), and one new test under `evals/shared/tests/`.
+**Scope**: five lines of prose in four files (the carried items T273-CR-5 and T273-CR-6, plus the two restatements the probe in § 3 found), and one new test under `evals/shared/tests/`. **As delivered** the guard test's population probe found nine more restatement sentences, so the prose edits span seven files (`qa-task`, `qa-story`, `review-code`, `code-review-prompt.md`, `develop-pipeline-step-5-6-qa-loop.md`, `pr-conformance-prompt.md`, `qa-runnable-prose-detection.md`) plus `qa-docs-only-review-prompt.md` from QA cycle 2. The widening is the guard doing its job (the population it enumerates is the task's own subject), not new behaviour; recorded in Change Log row 1.2.
 
 **Key deliverables**:
 
@@ -269,12 +271,36 @@ A false positive is fixed by an exemption with a reason, not by deleting the tes
 ### Key Findings
 Both cycle-2 findings are closed. Two low cleanups on the guard test (C3-1, C3-2) are advisory.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.288.qa.3.gating-rule-restatements.md`
+**Gate File**: `task.288.gate.3.gating-rule-restatements.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 8 of 8 met (the mutation proofs, timing and carried task 273 entries are recorded in the Closing Record of `task.288.qa.3`)
+✅ **PR Review:** PR #934, Step 5c review CONCERNS with two documentation findings, both fixed
+✅ **Documentation:** skill and shared-resource prose updated, bundled copies clean, CHANGELOG cites `(task 288)`
+✅ **Security Review:** PASS, no boundary deliverable
+⚠️ **Compliance Review:** not applicable
+✅ **CI:** SUCCESS on the acceptance decision head
+
+**Task marked as ACCEPTED on:** 2026-11-23
+
+**Detailed Verification Log:** See `task.288.dod.1.gating-rule-restatements-carry-the-reproduced-bug-exception.md` for complete verification evidence and timestamps.
+
+---
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
-
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-09 | 1.0     | Initial draft | create-task |
 | 2026-11-23 | 1.1     | Review passed (8/10): re-measured drifted anchors (CR-5 `:92`→`:96`; template lines `:1622/:1936/:2479`→`:1633/:1953/:2495`; `qa-task:1050` dropped, the phrase lives at `qa-runnable-prose-detection.md:683`), required a case-insensitive grep for the four template lines, added two unqualified "will not gate" sites to Phase 2, and tied the exemption criterion to its test | review-task |
 | 2026-11-23 |         | Status → ready-for-development | review-task |
@@ -284,7 +310,7 @@ Both cycle-2 findings are closed. Two low cleanups on the guard test (C3-1, C3-2
 | 2026-11-23 |         | QA gate CONCERNS (90/100) — 2 findings (T288-C2-1, T288-C2-2) | qa-task |
 | 2026-11-23 |         | QA findings fixed — T288-C2-1 and T288-C2-2 closed (docs-only prompt reworded, false exemption removed, T273-CR-6 assertion checks every "advisory unless" sentence), 1 iteration | qa-fix |
 | 2026-11-23 |         | QA gate PASS (95/100) — 0 blocking findings, 2 advisory | qa-task |
-
+| 2026-11-23 | 1.3 | DoD passed — accepted (PR #934) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
