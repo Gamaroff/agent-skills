@@ -320,7 +320,9 @@ takes several arguments or flags"** for a shell script: that is the `shell-argv:
 task.147 and task.170 outcome it exists to end. **Nor is "it is prose,
 not a script"** for a guard shipped as a fenced bash block in a step doc: that is the `fence:`
 form's case, and the hand-written wrapper under `.claude/state/` it replaces is the task.159 and
-task.167 outcome it exists to end. **Nor is "it takes a
+task.167 outcome it exists to end. **Nor is "it is a lint rule"**: that is the `eslint:` form's case
+(`--entry 'eslint:<a file the rule applies to>#<rule-id>' --cases-file <cases.json>`, each input being
+source text). **Nor is "it takes a
 second argument"** for a JS export whose extra argument is plain data: that is `--args-json`'s case,
 and recording it unverifiable is the task.124 outcome (`lintReport`, overruled by hand) it exists to
 end.

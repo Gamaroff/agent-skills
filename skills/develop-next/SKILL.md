@@ -667,9 +667,10 @@ without its extension (`docs/task-registry-tick-<id>` for the registry arm):
      --branch docs/<roadmap>-tick-<id> --title "docs(roadmap): tick <id>") || exit 1
    ```
 3. **Merge it through Step 3's merge gate**, which the script applies and refuses on: the quality gate's
-   exit status, the pinned head, green CI on that head, and the PR's state after the merge. It waits for
-   CI, so run it **backgrounded** (`run_in_background`) and read its exit status on the notification:
+   exit status, the pinned head, green CI on that head, and the PR's state after the merge. Read its
+   exit status on the completion notification (the pipeline lock is gone by Step 4, so no wait is marked):
    ```bash
+   # RUN BACKGROUNDED (run_in_background): it waits for CI.
    bash .agents/skills/develop-next/references/tick-pr.sh merge --base <baseBranch> \
      --branch docs/<roadmap>-tick-<id> --pr "$TICK_PR" --quality-gate-exit "$GATE_EXIT" --strategy <mergeStrategy>
    ```

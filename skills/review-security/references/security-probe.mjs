@@ -36,6 +36,10 @@
  *                        block under that heading of a MARKDOWN STEP DOC, read
  *                        on every run and run as a script per case under bash
  *                        and (when present) zsh. See "The fence entry form".
+ *                        or `eslint:relative/file.ts#rule-id` — a LINT RULE: each
+ *                        case's input is linted as that file by the repository's
+ *                        own ESLint and configuration. Needs --cases-file: the
+ *                        corpus is not source text. See "The eslint entry form".
  *   --slot <token>       the fence: form's placeholder — the literal text in the
  *                        block that each case's input replaces. Required with
  *                        fence:, refused (exit 2, `bad-slot`) with every other form
@@ -125,6 +129,17 @@
  * (before 22.15.0) `typescript-hook-unavailable`, each by name, with the fix in
  * the detail — never a raw import error and never an override. The `cli:` form
  * has no TypeScript interpreter in this release.
+ *
+ * THE ESLINT ENTRY FORM (task.319). A control delivered as a lint rule has no
+ * export to call that says what the repository enforces: the rule, its options
+ * and its severity are the configuration's. `--entry eslint:<path>#<rule-id>`
+ * runs the repository's own ESLint (its Node API, through ESLINT_RUNNER) on each
+ * case's input, linted AS `<path>` so that file's configuration applies, and
+ * reads one thing: whether `<rule-id>` is among the reported messages —
+ * `rejected` when it is, `accepted` when it is not. A disable directive in the
+ * input suppresses the report, as it would in the repository, so that case reads
+ * `accepted`. Nothing is written to the repository and `<path>` is not read by
+ * the rule: its content is replaced by the input.
  *
  * THE SHELL ENTRY FORM (task.128). A boundary delivered as a bash script has no
  * export to import, and until this form existed the engine could only decline
@@ -481,6 +496,84 @@ emit(await run());
 process.exitCode = 0;
 `;
 
+// The eslint: form's child (task.319). A fixed string like RUNNER, for the same
+// reason: the paths, the rule id and the case's input all arrive as JSON on
+// stdin. The input is TEXT handed to ESLint, never evaluated here.
+//
+// A run that could not have reached the rule is not an answer, so each such
+// state has its own stage and the case is declined: the file is ignored, the
+// rule is in no configuration that applies to the file (a misspelt id reads the
+// same as an absent control, so it is never scored), or the input does not
+// parse, which stops every rule before it looks. A rule the configuration names
+// at "off" IS scored: nothing reports, which is the finding.
+const ESLINT_RUNNER = `
+import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
+
+const MARK = "__PROBE_RESULT__";
+const emit = (o) => process.stdout.write("\\n" + MARK + JSON.stringify(o) + MARK + "\\n");
+
+async function run() {
+  const spec = JSON.parse(readFileSync(0, "utf8"));
+  let eslint;
+  try {
+    const mod = await import(pathToFileURL(spec.eslintMain).href);
+    const api = mod.ESLint ? mod : mod.default;
+    // loadESLint (8.57 and later) picks the flat or the eslintrc class as the
+    // repository's own command line would.
+    const Class =
+      typeof api.loadESLint === "function"
+        ? await api.loadESLint({ cwd: spec.cwd })
+        : api.ESLint;
+    eslint = new Class({ cwd: spec.cwd, fix: false, cache: false });
+    if (await eslint.isPathIgnored(spec.filePath)) {
+      return {
+        stage: "eslint",
+        error: "the repository's configuration does not lint " + spec.filePath,
+      };
+    }
+    const config = await eslint.calculateConfigForFile(spec.filePath);
+    const rules = (config && config.rules) || {};
+    if (!Object.prototype.hasOwnProperty.call(rules, spec.rule)) {
+      return {
+        stage: "eslint",
+        error:
+          "no configuration that applies to " +
+          spec.filePath +
+          " names the rule " +
+          spec.rule +
+          " — check the id and the file",
+      };
+    }
+  } catch (e) {
+    return { stage: "eslint", error: String(e && e.message) };
+  }
+  try {
+    const [result] = await eslint.lintText(spec.input, {
+      filePath: spec.filePath,
+    });
+    if (!result) return { stage: "eslint", error: "ESLint returned no result" };
+    const fatal = result.messages.find((m) => m.fatal);
+    if (fatal) {
+      return { stage: "eslint", error: "the input does not parse: " + fatal.message };
+    }
+    const hit = result.messages.find((m) => m.ruleId === spec.rule);
+    return hit
+      ? {
+          stage: "call",
+          outcome: "rejected",
+          threw: "reported at severity " + hit.severity + ", line " + hit.line,
+        }
+      : { stage: "call", outcome: "accepted" };
+  } catch (e) {
+    return { stage: "eslint", error: String(e && e.message) };
+  }
+}
+
+emit(await run());
+process.exitCode = 0;
+`;
+
 const MARK = "__PROBE_RESULT__";
 
 function extractResult(stdout) {
@@ -610,13 +703,16 @@ export function describeBadCase(bad) {
  * `kind: "cli"`; its arguments come from `--argv`, never from the entry. The `fence:<doc.md>#<heading>` form
  * (task.180) splits on the FIRST `#` — a heading may contain one, a path may
  * not — requires a `.md` path, takes the same containment, and returns
- * `kind: "fence"` with the heading.
+ * `kind: "fence"` with the heading. The `eslint:<path>#<rule-id>` form
+ * (task.319) takes the same containment for the file whose configuration
+ * applies and returns `kind: "eslint"` with the rule id.
  *
  * @returns {{ok: true, kind: "js", entryPath: string, exportName: string}
  *          |{ok: true, kind: "shell", entryPath: string}
  *          |{ok: true, kind: "shell-fn", entryPath: string, fnName: string}
  *          |{ok: true, kind: "cli", entryPath: string}
  *          |{ok: true, kind: "fence", entryPath: string, heading: string}
+ *          |{ok: true, kind: "eslint", entryPath: string, ruleId: string}
  *          |{ok: false, reason: string, detail: string}}
  */
 export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
@@ -643,11 +739,26 @@ export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
   const isCli = entry.startsWith(CLI_PREFIX);
   // Disjoint from the other three: no prefix shares `fence:`'s first byte.
   const isFence = entry.startsWith(FENCE_PREFIX);
+  const isEslint = entry.startsWith(ESLINT_PREFIX);
   let rawPath;
   let exportName = null;
   let fnName = null;
   let heading = null;
-  if (isFence) {
+  let ruleId = null;
+  if (isEslint) {
+    // The LAST `#`: a path may hold one, a rule id may not.
+    const body = entry.slice(ESLINT_PREFIX.length);
+    const hash = body.lastIndexOf("#");
+    rawPath = body.slice(0, Math.max(hash, 0));
+    ruleId = body.slice(hash + 1);
+    if (hash <= 0 || !ESLINT_RULE_ID.test(ruleId)) {
+      return {
+        ok: false,
+        reason: "bad-entry",
+        detail: `entry must be "eslint:path#rule-id", got "${entry}"`,
+      };
+    }
+  } else if (isFence) {
     const body = entry.slice(FENCE_PREFIX.length);
     const hash = body.indexOf("#");
     if (hash <= 0 || body.slice(hash + 1).trim() === "") {
@@ -748,6 +859,7 @@ export function resolveEntry(entry, repoRoot = defaultRepoRoot()) {
     };
   }
   if (isFence) return { ok: true, kind: "fence", entryPath, heading };
+  if (isEslint) return { ok: true, kind: "eslint", entryPath, ruleId };
   if (isCli) return { ok: true, kind: "cli", entryPath };
   if (isShellArgv) return { ok: true, kind: "shell-argv", entryPath };
   if (isShellFn) return { ok: true, kind: "shell-fn", entryPath, fnName };
@@ -766,6 +878,13 @@ export const SHELL_FN_PREFIX = "shell-fn:";
 export const CLI_PREFIX = "cli:";
 /** The entry-spec prefix that selects the fenced-block form (task.180). */
 export const FENCE_PREFIX = "fence:";
+/** The entry-spec prefix that selects the lint-rule form (task.319). */
+export const ESLINT_PREFIX = "eslint:";
+/** A rule id as ESLint spells one: `no-eval`, `plugin/rule`, `@scope/plugin/rule`. */
+const ESLINT_RULE_ID = /^@?[A-Za-z0-9][A-Za-z0-9_./-]*$/;
+/** A file ESLint reads its configuration from; the nearest one above the file sets its cwd. */
+const ESLINT_CONFIG_FILE =
+  /^(?:eslint\.config\.(?:js|mjs|cjs|ts|mts|cts)|\.eslintrc(?:\.(?:js|cjs|json|ya?ml))?)$/;
 /**
  * The slots a `--argv` template may carry. A slot is a WHOLE element: an
  * element that merely contains one (`--env={input}`) is refused, so the case's
@@ -854,6 +973,46 @@ export function checkTypeScriptRuntime(
       detail: `no \`typescript\` package resolves from ${dirname(entryPath)} (repo root ${repoRoot}) — install the repository's dependencies there and re-run; the probe borrows the repository's own compiler, so no override is needed`,
     };
   }
+}
+/**
+ * Where the eslint: form's ESLint and its cwd come from (task.319): the first `eslint` package
+ * between the linted file's directory and the repo root — never one above the root, as for
+ * TypeScript above — and the nearest directory holding an ESLint configuration file, which is where
+ * the repository's own command runs.
+ *
+ * @returns {{ok: true, main: string, cwd: string}|{ok: false, reason: string, detail: string}}
+ */
+export function checkEslintRuntime(repoRoot, filePath) {
+  const root = resolve(repoRoot);
+  let main = null;
+  let cwd = null;
+  for (let dir = dirname(filePath); isWithin(root, dir); dir = dirname(dir)) {
+    try {
+      if (
+        main === null &&
+        existsSync(join(dir, "node_modules", "eslint", "package.json"))
+      ) {
+        main = createRequire(join(dir, "noop.js")).resolve("eslint");
+      }
+      if (
+        cwd === null &&
+        readdirSync(dir).some((f) => ESLINT_CONFIG_FILE.test(f))
+      ) {
+        cwd = dir;
+      }
+    } catch {
+      // an unreadable directory or a broken package: keep walking
+    }
+    if (dirname(dir) === dir) break;
+  }
+  if (main === null) {
+    return {
+      ok: false,
+      reason: "eslint-unavailable",
+      detail: `no \`eslint\` package resolves from ${dirname(filePath)} (repo root ${repoRoot}) — install the repository's dependencies there and re-run; the probe borrows the repository's own ESLint`,
+    };
+  }
+  return { ok: true, main, cwd: cwd ?? root };
 }
 /**
  * How a `.py` entry is run: `python3 -E -s -B -c PYTHON_BOOTSTRAP <entry>
@@ -1796,6 +1955,7 @@ export function runProbeSpec({
   const isShellForm = resolved.kind === "shell" || resolved.kind === "shell-fn";
   const isCliForm = resolved.kind === "cli";
   const isFenceForm = resolved.kind === "fence";
+  const isEslintForm = resolved.kind === "eslint";
   // `shell-argv:` (task.181): a bash script called with the --argv template. It
   // takes cli:'s argv contract and the shell forms' PATH handling (`gh`).
   const isShellArgvForm = resolved.kind === "shell-argv";
@@ -1845,10 +2005,10 @@ export function runProbeSpec({
   // an argv element, so args there would be recorded without being used —
   // declined, not ignored, like --fake-gh on the JS form.
   if (args !== undefined && args !== null) {
-    if (isShellForm || isCliForm || isFenceForm || isShellArgvForm) {
+    if (resolved.kind !== "js") {
       return decline(
         "bad-args",
-        "--args-json applies to the JS entry form (path#export) only — the shell, cli:, shell-argv: and fence: forms take their input from the case",
+        "--args-json applies to the JS entry form (path#export) only — the shell, cli:, shell-argv:, fence: and eslint: forms take their input from the case",
       );
     }
     if (!Array.isArray(args)) {
@@ -1868,8 +2028,8 @@ export function runProbeSpec({
       `${resolved.entryPath} is not a ${CLI_EXTENSIONS.join(" / ")} script — the cli: form runs .mjs / .js with node and .py with python3`,
     );
   }
-  if (isShellForm || isCliForm || isFenceForm || isShellArgvForm) {
-    // The script must be a readable regular file BEFORE anything is compared.
+  if (resolved.kind !== "js") {
+    // The script (for eslint:, the file whose configuration applies) must be a readable regular file BEFORE anything is compared.
     // Without this a missing path made every run exit 127, every case mismatch
     // `expected`, and the verdict read `absent` with executed = cases × shells —
     // "could not look" scored as "the control is absent", with a count behind
@@ -1883,9 +2043,19 @@ export function runProbeSpec({
     } catch (e) {
       return decline(
         "entry-not-probeable",
-        `script is not a readable regular file: ${e.message}`,
+        `${isEslintForm ? "linted file" : "script"} is not a readable regular file: ${e.message}`,
       );
     }
+  }
+  // The eslint: form's ESLint (task.319), checked once in the parent and declined by name.
+  let eslintRuntime = null;
+  if (isEslintForm) {
+    eslintRuntime = checkEslintRuntime(
+      realpathSafe(resolve(repoRoot)),
+      resolved.entryPath,
+    );
+    if (!eslintRuntime.ok)
+      return decline(eslintRuntime.reason, eslintRuntime.detail);
   }
   // The TypeScript module entry (task.314). A `.ts`/`.mts`/`.cts`/`.tsx` entry is
   // loaded through the bundled hook and the target repository's own compiler.
@@ -2339,14 +2509,19 @@ export function runProbeSpec({
       // The argv is a fixed list: the hook path is a constant beside this file
       // and the compiler path was resolved in the parent. Neither comes from a
       // case or a plan (task.314).
+      //
+      // The eslint: child (task.319) runs in the directory the repository's own
+      // ESLint runs in, because a configuration resolves its paths against it.
+      // Nothing is written there: the case is text, linted as the named file.
+      const childCwd = isEslintForm ? eslintRuntime.cwd : workDir;
       const leash = leashed(
         process.execPath,
         tsCompiler === null
-          ? ["--input-type=module", "-e", RUNNER]
+          ? ["--input-type=module", "-e", isEslintForm ? ESLINT_RUNNER : RUNNER]
           : ["--import", TS_HOOK_PATH, "--input-type=module", "-e", RUNNER],
         {
           env: sandboxEnv({
-            cwd: workDir,
+            cwd: childCwd,
             bindings:
               tsCompiler === null
                 ? {}
@@ -2357,19 +2532,29 @@ export function runProbeSpec({
                     PROBE_TS_ROOT: tsRoot,
                   },
           }),
-          cwd: workDir,
+          cwd: childCwd,
         },
       );
       const child = spawnSync(leash.command, leash.args, {
-        input: JSON.stringify({
-          entryPath: resolved.entryPath,
-          exportName: resolved.exportName,
-          input: c.input,
-          // null when --args-json was not given; the runner's own
-          // Array.isArray default is the one place the fallback lives.
-          extraArgs: base.args,
-        }),
-        cwd: workDir,
+        input: JSON.stringify(
+          isEslintForm
+            ? {
+                eslintMain: eslintRuntime.main,
+                cwd: eslintRuntime.cwd,
+                filePath: resolved.entryPath,
+                rule: resolved.ruleId,
+                input: c.input,
+              }
+            : {
+                entryPath: resolved.entryPath,
+                exportName: resolved.exportName,
+                input: c.input,
+                // null when --args-json was not given; the runner's own
+                // Array.isArray default is the one place the fallback lives.
+                extraArgs: base.args,
+              },
+        ),
+        cwd: childCwd,
         env: leash.env,
         encoding: "utf8",
         timeout: perCaseTimeout,
@@ -4387,11 +4572,15 @@ export const OBSERVATION_LIMITS = Object.freeze({
  * The limit ids that bound an entry's result, in `OBSERVATION_LIMITS` order.
  * Decided by the entry form alone: every form carries `effects-after-accept`,
  * and the `fence:` form, whose block runs as source with the input substituted
- * in, also carries `outside-sandbox-write` (TASK-180-016).
+ * in, also carries `outside-sandbox-write` (TASK-180-016). So does `eslint:`,
+ * whose child runs in the repository and not in the sandbox (task.319).
  */
 export function observationLimitsFor(entry) {
   const ids = ["effects-after-accept"];
-  if (typeof entry === "string" && entry.startsWith("fence:")) {
+  if (
+    typeof entry === "string" &&
+    (entry.startsWith(FENCE_PREFIX) || entry.startsWith(ESLINT_PREFIX))
+  ) {
     ids.push("outside-sandbox-write");
   }
   return ids;
@@ -5120,6 +5309,7 @@ export function main(argv = process.argv.slice(2)) {
       isCliEntry ||
       isFenceEntry ||
       isShellArgvEntry ||
+      opts.entry.startsWith(ESLINT_PREFIX) ||
       opts.entry.startsWith(SHELL_PREFIX) ||
       opts.entry.startsWith(SHELL_FN_PREFIX)
     ) {

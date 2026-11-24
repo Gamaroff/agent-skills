@@ -460,6 +460,7 @@ test("readConfig: no file or no block gives the defaults", () => {
       checkCommand: "",
       checkTimeoutSeconds: eng.DEFAULT_CHECK_TIMEOUT_SECONDS,
       settleSeconds: eng.DEFAULT_SETTLE_SECONDS,
+      skipMarker: "",
     });
     writeFileSync(
       join(dir, "skills-config.yaml"),
@@ -483,6 +484,7 @@ test("readConfig: a block list, enabled and checkCommand are read", () => {
       checkCommand: "npm run ci:fast",
       checkTimeoutSeconds: eng.DEFAULT_CHECK_TIMEOUT_SECONDS,
       settleSeconds: eng.DEFAULT_SETTLE_SECONDS,
+      skipMarker: "",
     });
   } finally {
     cleanup(dir);

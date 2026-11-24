@@ -156,8 +156,8 @@ clean result:
    sourced library, `cli:` with an `--argv` template for a Node or Python CLI whose decision sits behind
    its flags, `shell-argv:` with an `--argv` template (and `--fixture-setup` when it needs a
    repository) for a shell script that takes several arguments or flags, and `fence:` with
-   `--slot` for a fenced bash block in a step doc — never recorded `unverifiable` for being
-   bash, for taking several flags or for being prose; only a target no form reaches (stdin,
+   `--slot` for a fenced bash block in a step doc, and `eslint:` with `--cases-file` for a lint rule —
+   never recorded `unverifiable` for being bash, for taking several flags or for being prose; only a target no form reaches (stdin,
    network) is declined, with the reason named.
 
 ## Out of scope in v1
