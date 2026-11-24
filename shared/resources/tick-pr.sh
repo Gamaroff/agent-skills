@@ -177,7 +177,7 @@ case "$CMD" in
         OUT=$(mktemp) || halt "mktemp failed"
         CODE=$(jq -n --arg t "$TITLE" --arg d "$BODY" --arg s "$TICK_BRANCH" --arg b "$BASE" \
             '{title:$t,description:$d,source:{branch:{name:$s}},destination:{branch:{name:$b}},close_source_branch:true}' \
-          | curl -s -o "$OUT" -w '%{http_code}' -X POST -H "Content-Type: application/json" "${BB_CURL_AUTH[@]}" \
+          | curl -s --max-time 30 -o "$OUT" -w '%{http_code}' -X POST -H "Content-Type: application/json" "${BB_CURL_AUTH[@]}" \
               --data-binary @- "${PR_READ_BB_API}/repositories/${PR_READ_REPO}/pullrequests")
         rm -f "$OUT"
         [ "$CODE" = 201 ] || halt "opening the tick PR answered HTTP ${CODE:-000}"
@@ -198,7 +198,8 @@ case "$CMD" in
       rebase) BB_STRATEGY=fast_forward ;;
       *) usage "--strategy is merge, squash or rebase" ;;
     esac
-    [ -n "$GATE" ] || usage "merge needs --quality-gate"
+    # A gate of blank lines and comments runs nothing and exits 0, so it is no gate.
+    printf '%s\n' "$GATE" | grep -qE '^[[:space:]]*[^#[:space:]]' || usage "merge needs a command in --quality-gate"
     # A wait that is not a number, or none, ended the poll at once, and its NONE merged (T319-CR-303).
     case "$MAX_WAIT" in '' | 0* | *[!0-9]* | ???????*) usage "--max-wait is a positive number of seconds" ;; esac
     case "$FLOOR" in '' | 0?* | *[!0-9]* | ??????*) usage "--checks is a number of checks" ;; esac
@@ -241,11 +242,11 @@ case "$CMD" in
       command -v jq >/dev/null 2>&1 || halt "jq not on PATH"
       jq -n --arg m "Merge PR #$PR: $TICK_BRANCH" --arg s "$BB_STRATEGY" \
           '{type:"pullrequest",message:$m,merge_strategy:$s,close_source_branch:true}' \
-        | curl -s -o /dev/null -X POST -H "Content-Type: application/json" "${BB_CURL_AUTH[@]}" --data-binary @- \
+        | curl -s --max-time 120 -o /dev/null -X POST -H "Content-Type: application/json" "${BB_CURL_AUTH[@]}" --data-binary @- \
             "${PR_READ_BB_API}/repositories/${PR_READ_REPO}/pullrequests/${PR}/merge"
       MERGE_EXIT=$?
       PR_BODY=$(mktemp) || halt "mktemp failed"
-      curl -s -o "$PR_BODY" "${BB_CURL_AUTH[@]}" "${PR_READ_BB_API}/repositories/${PR_READ_REPO}/pullrequests/${PR}"
+      curl -s --max-time 30 -o "$PR_BODY" "${BB_CURL_AUTH[@]}" "${PR_READ_BB_API}/repositories/${PR_READ_REPO}/pullrequests/${PR}"
       # python3, not jq: a PR body carries raw control characters, which jq rejects (pr-read.sh).
       STATE_NOW=$(python3 -c 'import json,sys;print(json.loads(open(sys.argv[1],encoding="utf-8",errors="replace").read(),strict=False).get("state",""))' "$PR_BODY" 2>/dev/null)
       rm -f "$PR_BODY"

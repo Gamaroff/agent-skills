@@ -1109,6 +1109,18 @@ function main(argv) {
           opts.json,
           `--rerun-at-head is a run that did not answer (${rerun.reason}): ${opts.rerunAtHead}`,
         );
+      // `ran` names at least one criterion per run, and the other two answers have no run (T319-CR-411).
+      const named = rerun.runs.filter(
+        (r) => r && Array.isArray(r.criteria) && r.criteria.length > 0,
+      ).length;
+      if (
+        named !== rerun.runs.length ||
+        (rerun.reason === "ran") !== rerun.runs.length > 0
+      )
+        return usage(
+          opts.json,
+          `--rerun-at-head says ${rerun.reason} and holds ${rerun.runs.length} run(s), ${named} naming a criterion: ${opts.rerunAtHead}`,
+        );
       if (rerun.document !== path.basename(opts.doc))
         return usage(
           opts.json,

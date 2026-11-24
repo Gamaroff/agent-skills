@@ -21,27 +21,35 @@
  * whole is refused, never read as shorter or absent: every row of the `finalise` block is accounted for,
  * and an entry the YAML subset would change (a `#`, a partial quote, a block scalar) is refused by name.
  *
- * "AT THE HEAD" IS CHECKED before each command and after the last. An uncommitted path — staged,
- * unstaged or untracked — is refused (`dirty-tree`) unless it is documentation by ci.docsOnly.patterns:
- * /finalise's own records are uncommitted at this point by design, and they are documentation. A run
- * over edited code would be reported as the head's. A command that writes code, or a head that moves
- * while they run, refuses too and leaves no run.json. The uncommitted documentation is listed in the
- * record, because a command that reads documentation read that. The rule and its code are the docs-only
- * check's own (dirtyNonDocsPaths), less `.claude/state/`, the pipelines' own state, which a consumer need
- * not ignore, less this engine's own output, and less the work item's own DoD records beside it
- * (`<id>.dod.*`, listed with the documentation: a project whose patterns are Markdown only would refuse
- * its own ac.json on a resume). A file marked skip-worktree or assume-unchanged is compared as well,
- * because `git status` does not look at it. A path git ignores is not compared: it is not the head's.
+ * "AT THE HEAD" IS CHECKED before each command and after the last, by READING: every file of the head's
+ * tree is hashed in the working tree and compared with the head's own entry, and so is every index entry.
+ * Git's answers about what changed are not asked, because the index and the configuration can tell git not
+ * to look (skip-worktree, assume-unchanged, submodule.<name>.ignore, core.fileMode, an fsmonitor hook:
+ * T319-CR-401 to 403). A path that differs, is missing, is in the index only or is untracked is refused
+ * (`dirty-tree`) unless it is documentation by ci.docsOnly.patterns: /finalise's own records are
+ * uncommitted at this point by design, and they are documentation. A command that writes code, or a head
+ * that moves while they run, refuses too and leaves no run.json. The uncommitted documentation is listed
+ * in the record, because a command that reads documentation read that. Two more are let through: an
+ * untracked file under `.claude/state/`, the pipelines' own state, this engine's output included, which a
+ * consumer need not ignore; and the work item's own DoD records beside it, by the names /finalise writes
+ * (listed with the documentation: a project whose patterns are Markdown only would refuse its own ac.json
+ * on a resume). So a sparse checkout that leaves code out is refused: its working tree is not the head. A
+ * submodule that was never checked out is an empty directory, and is let through.
+ *
+ * WHAT THAT DOES NOT SEE. A path git ignores, by any of its ignore files. A content filter or line-ending
+ * rule is applied as git applies it, so a file that differs only by one is the head's. Nothing is watched
+ * between two checks.
  *
  * THE RUN IS DATA, NEVER A VERDICT. A command's non-zero exit does not change this engine's: the
  * criterion says what the command must do, and the AC agent grades the saved run against it.
  *
  * WHAT BOUNDS IT. --timeout-seconds is the budget of the WHOLE run, not of each command: a command that
- * reaches it is killed, and one that would start after it is recorded as not started. A stream past
- * --max-output-bytes stops its command (`stopped_for_size`) and is cut there; the size is looked at every
- * 200 ms, so a fast command can end over it by itself, with a status and its output cut all the same
- * (`output_capped` covers both). A kill reaches the command's process group; a descendant in a session of
- * its own (`setsid`, a daemon) is outside it and outlives the bound.
+ * reaches it is killed, and one that would start after it is recorded as not started. The engine copies a
+ * command's output itself and keeps at most --max-output-bytes of each stream: one that passes it is
+ * stopped (`stopped_for_size`) unless it had already ended by itself (`output_capped` covers both).
+ * Nothing it started can grow the saved output afterwards. A kill reaches the command's process group: a
+ * descendant that left it (`setsid`, a daemon, and coreutils' `timeout`, which makes a group of its own)
+ * is not killed, and runs on after the bound without a place to write.
  *
  * Usage:
  *   finalise-rerun-at-head.js --doc <path> --out-dir <dir> [--workspace-root <dir>]
@@ -63,8 +71,8 @@
  *   usage           2  bad arguments, or a configuration that cannot be read as a list of commands
  */
 
+const crypto = require("node:crypto");
 const fs = require("node:fs");
-const os = require("node:os");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const { parseYamlSubset } = require("./yaml-subset.js");
@@ -74,7 +82,6 @@ const {
   assertBlockRows,
   assertMapping,
   configTextAtCommit,
-  dirtyNonDocsPaths,
   isDocsPath,
   killProcessGroup,
   parseConfig,
@@ -90,6 +97,7 @@ const OWN_FILE = /^(\d+\.(stdout|stderr)|run\.(json|md))$/;
 const EXCERPT_LINES = 20;
 const EXCERPT_CHARS = 4000;
 const EXCERPT_BYTES = 64 * 1024;
+const DRAIN_MS = 1000; // how long a stream held open by a descendant is read after the command ended
 const USAGE =
   "usage: finalise-rerun-at-head.js --doc <path> --out-dir <dir> [--workspace-root <dir>] [--timeout-seconds <n>] [--max-output-bytes <n>] [--json]";
 
@@ -97,6 +105,26 @@ const USAGE =
 const FINALISE_KEYS = ["deferralApprover", "rerunAtHead"];
 
 const normKey = (k) => String(k).toLowerCase().replace(/[-_]/g, "");
+
+/**
+ * How many rows of the file spell the list's key, at any indent, in any block, its letters escaped or not.
+ * The YAML subset keeps an escape as text, so a list under `"fin\x61lise"` was read as no list at all, and
+ * beside a plain block as a second copy nobody counted (T319-CR-406).
+ */
+function listKeyRows(text) {
+  const plain = text.replace(
+    /\\(?:x([0-9a-fA-F]{2})|u([0-9a-fA-F]{4})|U([0-9a-fA-F]{8}))/g,
+    (_, x, u, U) =>
+      String.fromCodePoint(Math.min(parseInt(x ?? u ?? U, 16), 0xfffd)),
+  );
+  return plain
+    .split(/\r?\n/)
+    .filter((l) =>
+      /^\s*(?:[-?:]\s+)*[{\s]*["']?rerun[-_]?at[-_]?head["']?\s*(?::|$)/i.test(
+        l,
+      ),
+    ).length;
+}
 
 /** The entries of finalise.rerunAtHead as written, one per row, dash removed. */
 function rawEntries(text) {
@@ -169,6 +197,11 @@ function parseRerunList(rawText) {
         );
     }
   assertBlockRows(text, parsed, "finalise");
+  const read = block && block.rerunAtHead !== undefined ? 1 : 0;
+  if (listKeyRows(text) !== read)
+    throw new UsageError(
+      `rerunAtHead is written ${listKeyRows(text)} time(s) and read ${read}: write it once, under a plain "finalise:" key`,
+    );
   if (block === undefined) return [];
   if (block === null || typeof block !== "object" || Array.isArray(block))
     throw new UsageError(
@@ -222,6 +255,48 @@ function namedCommands(list, criteria) {
     .filter((r) => r.criteria.length > 0);
 }
 
+/**
+ * Copy a command's output into `files` ([stdout, stderr]), at most `maxBytes` of each. The command gets
+ * pipes and never the files, so nothing it leaves running can write to them (T319-CR-405).
+ */
+function copyOutput(child, files, maxBytes) {
+  const streams = [child.stdout, child.stderr].filter(Boolean);
+  const fds = files.map((f) => fs.openSync(f, "w"));
+  const state = { capped: false, stopped: false, failed: null };
+  const ended = streams.map(
+    (s, i) =>
+      new Promise((resolve) => {
+        let room = maxBytes;
+        s.on("close", resolve);
+        s.on("error", resolve);
+        s.on("data", (chunk) => {
+          try {
+            if (room > 0) fs.writeSync(fds[i], chunk.subarray(0, room));
+          } catch (e) {
+            state.failed = state.failed || e;
+          }
+          room -= chunk.length;
+          if (room >= 0 || state.capped) return;
+          state.capped = true;
+          state.stopped = child.exitCode === null && child.signalCode === null;
+          killProcessGroup(child.pid);
+        });
+      }),
+  );
+  state.drain = async () => {
+    let timer;
+    const late = new Promise((resolve) => {
+      timer = setTimeout(resolve, DRAIN_MS);
+    });
+    await Promise.race([Promise.all(ended), late]);
+    clearTimeout(timer);
+    for (const s of streams) s.destroy();
+    for (const fd of fds) fs.closeSync(fd);
+    if (state.failed) throw state.failed;
+  };
+  return state;
+}
+
 async function runOne(
   { command, criteria },
   n,
@@ -229,33 +304,25 @@ async function runOne(
 ) {
   const stdout = path.join(outDir, `${n}.stdout`);
   const stderr = path.join(outDir, `${n}.stderr`);
-  const out = fs.openSync(stdout, "w");
-  const err = fs.openSync(stderr, "w");
+  for (const f of [stdout, stderr]) fs.writeFileSync(f, "");
   const left = deadline - Date.now();
-  const tooBig = () =>
-    [out, err].some((fd) => fs.fstatSync(fd).size > maxBytes);
   let r = null;
-  let capped = false;
-  try {
-    if (left > 0) {
-      // spawnCheck owns the command's process group: a timeout, a stop, or a signal to this engine, ends
-      // what the command started and not only its shell.
-      r = await spawnCheck("sh", ["-c", command], {
-        cwd: root,
-        stdio: ["ignore", out, err],
-        timeout: left,
-        stopWhen: () => (tooBig() ? "output over the bound" : ""),
-      });
-      killProcessGroup(r.pid);
-    }
-    capped = tooBig();
-  } finally {
-    fs.closeSync(out);
-    fs.closeSync(err);
+  let copy = null;
+  if (left > 0) {
+    // spawnCheck owns the command's process group: a timeout, or a signal to this engine, ends what the
+    // command started and not only its shell.
+    r = await spawnCheck("sh", ["-c", command], {
+      cwd: root,
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: left,
+      onSpawn: (child) => {
+        copy = copyOutput(child, [stdout, stderr], maxBytes);
+      },
+    });
+    killProcessGroup(r.pid);
+    if (copy) await copy.drain();
   }
-  // Whatever ended the command: a fast one can pass the bound between two looks (T319-CR-209).
-  for (const f of [stdout, stderr])
-    if (fs.statSync(f).size > maxBytes) fs.truncateSync(f, maxBytes);
+  const stopped = Boolean(copy && copy.stopped && r.signal);
   return {
     command,
     criteria,
@@ -265,8 +332,8 @@ async function runOne(
       r === null || r.error || typeof r.status !== "number" ? null : r.status,
     timed_out: Boolean(r && r.error && r.error.code === "ETIMEDOUT"),
     not_started: r === null,
-    stopped_for_size: Boolean(r && r.error && r.error.code === "ESTOPPED"),
-    output_capped: capped,
+    stopped_for_size: stopped,
+    output_capped: Boolean(copy && copy.capped),
     stdout,
     stderr,
   };
@@ -365,62 +432,170 @@ function parseArgs(argv) {
   return o;
 }
 
-/**
- * The files `git status` was told not to look at (skip-worktree, assume-unchanged) whose content is not
- * the head's. Compared through a throwaway index read from the head, which carries no such flag. A
- * skip-worktree file that is missing is a sparse checkout, not an edit.
- */
-function hiddenEdits(top, head) {
-  const exec = (args, env = process.env) =>
-    execFileSync("git", ["-c", "core.fsmonitor=false", ...args], {
-      cwd: top,
-      env,
-      encoding: "utf8",
-      maxBuffer: 512 * 1024 * 1024,
-      stdio: ["ignore", "pipe", "pipe"],
-    });
-  const flagged = new Map();
-  for (const row of exec(["ls-files", "-v", "-z"]).split("\0")) {
-    const tag = row[0];
-    if (tag && (/[a-z]/.test(tag) || tag === "S"))
-      flagged.set(row.slice(2), tag);
-  }
-  if (flagged.size === 0) return [];
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rerun-at-head-index-"));
+/** git in `cwd`, with no object read through a replacement. */
+function gitIn(cwd, args, input) {
+  return execFileSync("git", args, {
+    cwd,
+    env: { ...process.env, GIT_NO_REPLACE_OBJECTS: "1" },
+    input,
+    encoding: "utf8",
+    maxBuffer: 512 * 1024 * 1024,
+    stdio: ["pipe", "pipe", "pipe"],
+  });
+}
+const gitRows = (cwd, ...args) => gitIn(cwd, args).split("\0").filter(Boolean);
+const gitLine = (cwd, ...args) => gitIn(cwd, args).replace(/\r?\n$/, "");
+
+/** Does this checkout's filesystem keep a mode? Asked as `git init` asks it: a file, chmod, look. */
+function keepsModes(gitDir, io = fs) {
+  if (process.platform === "win32") return false;
+  const probe = path.join(gitDir, `rerun-at-head-mode.${process.pid}`);
+  const executable = (mode) => {
+    io.chmodSync(probe, mode);
+    return (io.statSync(probe).mode & 0o100) !== 0;
+  };
   try {
-    const env = { ...process.env, GIT_INDEX_FILE: path.join(dir, "index") };
-    exec(["read-tree", "--no-sparse-checkout", head], env);
-    return exec(["diff", "--name-only", "--no-renames", "-z"], env)
-      .split("\0")
-      .filter((f) => flagged.has(f))
-      .filter((f) => {
-        if (!/s/i.test(flagged.get(f))) return true;
-        try {
-          fs.lstatSync(path.join(top, f));
-          return true;
-        } catch {
-          return false;
-        }
-      });
+    io.writeFileSync(probe, "");
+    return !executable(0o644) && executable(0o755);
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    io.rmSync(probe, { force: true });
   }
 }
+
+/** The object id of a symbolic link's text, in the repository's own hash (an id's length says which). */
+function linkOid(file, length) {
+  const text = fs.readlinkSync(file, { encoding: "buffer" });
+  return crypto
+    .createHash(length === 64 ? "sha256" : "sha1")
+    .update(`blob ${text.length}\0`)
+    .update(text)
+    .digest("hex");
+}
+
+/** A path as `git hash-object --stdin-paths` reads one per line. */
+const asLine = (f) =>
+  /^"|[\r\n]/.test(f)
+    ? `"${f.replace(/[\\"]/g, "\\$&").replace(/\n/g, "\\n")}"`
+    : f;
+
+/**
+ * Every path of the checkout at `dir` that is not `commit`'s, as [{ file, known }] (`known`: the commit has
+ * the path). Read from the commit's tree: the index and the configuration are never asked what changed.
+ * The index itself is compared too, because a command can read it (`git ls-files`).
+ */
+function differing(dir, commit, prefix = "") {
+  const at = (f) => path.join(dir, f);
+  const lstat = (f) => {
+    try {
+      return fs.lstatSync(at(f));
+    } catch {
+      return null;
+    }
+  };
+  const tree = new Map();
+  for (const row of gitRows(
+    dir,
+    "ls-tree",
+    "-r",
+    "-z",
+    "--full-tree",
+    commit,
+  )) {
+    const [, mode, oid, file] = /^(\d+) \S+ ([0-9a-f]+)\t([^]*)$/.exec(row);
+    tree.set(file, { mode, oid });
+  }
+  const bad = new Set(
+    gitRows(dir, "ls-files", "-z", "--others", "--exclude-standard"),
+  );
+  const index = new Set();
+  for (const row of gitRows(dir, "ls-files", "-z", "--stage")) {
+    const [, mode, oid, stage, file] = /^(\d+) ([0-9a-f]+) (\d)\t([^]*)$/.exec(
+      row,
+    );
+    const want = tree.get(file);
+    index.add(file);
+    if (!want || stage !== "0" || want.mode !== mode || want.oid !== oid)
+      bad.add(file);
+  }
+  // a parent that is a link to a directory is not the head's directory, whatever it holds
+  const parents = new Map([[".", true]]);
+  const inPlace = (d) => {
+    if (!parents.has(d)) {
+      const s = lstat(d);
+      parents.set(
+        d,
+        Boolean(s && s.isDirectory()) && inPlace(path.posix.dirname(d)),
+      );
+    }
+    return parents.get(d);
+  };
+  const files = [];
+  const chmodded = [];
+  const inside = [];
+  for (const [f, { mode, oid }] of tree) {
+    const s = inPlace(path.posix.dirname(f)) ? lstat(f) : null;
+    if (!index.has(f) || s === null) bad.add(f);
+    else if (mode === "160000") {
+      if (!s.isDirectory()) bad.add(f);
+      else if (fs.readdirSync(at(f)).length > 0) {
+        // in a directory that is no repository, this is the outer one's HEAD, which no entry can name
+        if (gitLine(at(f), "rev-parse", "HEAD") === oid)
+          inside.push(...differing(at(f), oid, `${prefix}${f}/`));
+        else bad.add(f);
+      }
+    } else if (mode === "120000") {
+      if (!s.isSymbolicLink() || linkOid(at(f), oid.length) !== oid) bad.add(f);
+    } else if (!s.isFile()) bad.add(f);
+    else {
+      files.push(f);
+      if (((s.mode & 0o100) !== 0) !== (mode === "100755")) chmodded.push(f);
+    }
+  }
+  if (
+    chmodded.length > 0 &&
+    keepsModes(gitLine(dir, "rev-parse", "--absolute-git-dir"))
+  )
+    for (const f of chmodded) bad.add(f);
+  // As git would store it, or byte for byte: with core.autocrlf, a file committed with CRLF is only the
+  // second.
+  let left = files;
+  for (const flags of [[], ["--no-filters"]]) {
+    if (left.length === 0) break;
+    const ids = gitIn(
+      dir,
+      ["hash-object", ...flags, "--stdin-paths"],
+      `${left.map(asLine).join("\n")}\n`,
+    ).split("\n");
+    left = left.filter((f, i) => ids[i] !== tree.get(f).oid);
+  }
+  for (const f of left) bad.add(f);
+  return [
+    ...inside,
+    ...[...bad].sort().map((f) => ({ file: prefix + f, known: tree.has(f) })),
+  ];
+}
+
+/** What /finalise writes beside the work item, after `<id>.dod.<N>.`. */
+const DOD_RECORD =
+  /^(?:[^/]+\.md|ac\.json|security\.(?:(?:plan|run)\.json|cases(?:\.\d+)?\.json|run\.json\.d\/[^/]+))$/;
 
 /** Is this path (from the repository's root) a DoD record of the work item `doc`, beside it? */
 function isOwnDodRecord(file, top, doc) {
   const { id } = docId.parse(path.basename(doc));
   if (!id) return false;
-  let dir;
   try {
-    dir = path.relative(top, fs.realpathSync(path.dirname(doc)));
+    const dir = path.relative(top, fs.realpathSync(path.dirname(doc)));
+    const start = `${dir === "" ? "" : `${dir}/`}${id}.dod.`;
+    if (!file.startsWith(start)) return false;
+    const m = /^\d+\.(.*)$/.exec(file.slice(start.length));
+    return (
+      m !== null &&
+      DOD_RECORD.test(m[1]) &&
+      fs.lstatSync(path.join(top, file)).isFile()
+    );
   } catch {
     return false;
   }
-  return (
-    path.dirname(file) === (dir || ".") &&
-    path.basename(file).startsWith(`${id}.dod.`)
-  );
 }
 
 /**
@@ -439,37 +614,32 @@ function compareWithHead({ git, root, head, patterns, outDir, doc }) {
       why: `HEAD moved from ${head.slice(0, 12)} to ${now.slice(0, 12)}`,
       docs: [],
     };
-  const code = dirtyNonDocsPaths(execFileSync, root, patterns);
-  const all = dirtyNonDocsPaths(execFileSync, root, []);
-  if (code === null || all === null)
-    return {
-      why: "git status could not be read, so the working tree cannot be shown to be the head",
-      docs: [],
-    };
   const top = fs.realpathSync(git("rev-parse", "--show-toplevel"));
   const outPrefix = `${path.relative(top, fs.existsSync(outDir) ? fs.realpathSync(outDir) : outDir)}/`;
-  const own = (f) =>
-    f.startsWith(PIPELINE_STATE_DIR) ||
-    (f.startsWith(outPrefix) && OWN_FILE.test(f.slice(outPrefix.length)));
-  const dod = (f) => isOwnDodRecord(f, top, doc);
-  const dirty = code.filter((f) => !own(f) && !dod(f));
-  let hidden;
+  let found;
   try {
-    hidden = hiddenEdits(top, head);
-  } catch {
+    found = differing(top, head);
+  } catch (e) {
     return {
-      why: "the files git status is told to skip could not be compared with the head",
+      why: `the working tree could not be compared with the head (${e.message.split("\n")[0]})`,
       docs: [],
     };
   }
-  const hiddenCode = hidden.filter((f) => !isDocsPath(f, patterns));
-  const bad = [...dirty, ...hiddenCode];
+  const own = ({ file, known }) =>
+    !known &&
+    (file.startsWith(PIPELINE_STATE_DIR) ||
+      (file.startsWith(outPrefix) &&
+        OWN_FILE.test(file.slice(outPrefix.length))));
+  const rest = found.filter((d) => !own(d)).map((d) => d.file);
+  const bad = rest.filter(
+    (f) => !isDocsPath(f, patterns) && !isOwnDodRecord(f, top, doc),
+  );
   return {
     why:
       bad.length > 0
         ? `the working tree is not the head: ${bad.slice(0, 5).join(", ")}`
         : "",
-    docs: [...all, ...hidden].filter((f) => !own(f) && !bad.includes(f)),
+    docs: rest.filter((f) => !bad.includes(f)),
   };
 }
 
@@ -610,6 +780,7 @@ if (require.main === module) main(process.argv.slice(2));
 
 module.exports = {
   codeSpans,
+  keepsModes,
   namedCommands,
   parseRerunList,
   markdown,

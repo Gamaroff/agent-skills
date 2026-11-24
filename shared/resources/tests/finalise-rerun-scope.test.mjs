@@ -445,6 +445,11 @@ test("scope: --rerun-at-head re-judges what this run's record lists, however the
       rec({ reason: "scan-broken", runs: [] }),
       rec({ reason: undefined, runs: [] }),
       rec({ runs: null }),
+      rec({ runs: [] }),
+      rec({ runs: [{ command: "x" }] }),
+      rec({ runs: [{ command: "x", criteria: [] }] }),
+      rec({ reason: "none-named" }),
+      rec({ reason: "not-configured" }),
       [],
     ])
       assert.equal(scopeWith(bad).code, 2, JSON.stringify(bad));

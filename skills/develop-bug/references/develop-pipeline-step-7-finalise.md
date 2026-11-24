@@ -27,31 +27,20 @@ If you find yourself reaching for `Write` to author a DoD file, STOP and invoke 
 ## Invoke /finalise
 
 **First push what the run held.** `/finalise` takes CI reading 1 on the PR head while recording
-`HEAD`, so a commit still local would be accepted on a reading of another commit. Two states change it:
+`HEAD`, so a commit still local would be accepted on a reading of another commit:
 
 ```bash
-REMOTE_REF="refs/remotes/origin/$(git branch --show-current)"
-REMOTE_HEAD=$(git rev-parse --verify --quiet "$REMOTE_REF^{commit}")
-HELD=$(git rev-list --count "$REMOTE_REF..HEAD" 2>/dev/null || echo 0)
-if [ "$HELD" -eq 0 ]; then
-  echo "finalise-entry: nothing held"
-elif [ "$REMOTE_HEAD" = "$(cat .claude/state/finalise-ci-head-2.txt 2>/dev/null)" ]; then
-  echo "finalise-entry: resume — the PR head is the acceptance head and its CI is being read; $HELD commit(s) stay local"
-elif ! git diff --cached --quiet; then
-  echo "finalise-entry: commit-staged"
-else
-  bash .agents/skills/{develop-story|develop-task}/references/push-policy.sh --mark --site finalise-entry
-  if [ "$(bash .agents/skills/{develop-story|develop-task}/references/push-policy.sh --site finalise-entry)" != defer ]; then
-    git push origin HEAD
-  fi
-fi
+bash .agents/skills/{develop-story|develop-task}/references/push-held.sh --site finalise-entry
 ```
 
 | It prints | Do this |
 | :-- | :-- |
-| `nothing held`, or the push | Go on. What 5c staged stays staged for 6a |
+| `nothing held` or `pushed` | Go on. What 5c staged stays staged for 6a |
 | `commit-staged` | A commit is held and 5c's set is staged: the held report links to it, so neither goes out without the other. Commit the staged set and nothing else through `/commit-changes` (`docs(...): review evidence, ahead of finalise`), then run the block again |
-| `resume …` | Go on. A push here would move the PR head off the commit reading 2 is waiting for. Step 8's push carries the held commits |
+| `not pushed …` (exit 1) | HALT with the line. `HEAD` is not on the PR, so there is no reading to take |
+
+A resume during the 6c wait takes this block too. It moves the PR head off the commit the old reading
+waited for, and `/finalise` runs whole again: both of its readings are then of the new head.
 
 **Which push carries a pause commit made at step 7**: this block's, when the pause came before 6a and
 the step is run again; `/finalise` 6a's, when the session carried on in place; Step 8's, when it came

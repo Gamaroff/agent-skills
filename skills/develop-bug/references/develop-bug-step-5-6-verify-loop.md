@@ -197,7 +197,6 @@ Exit the loop and proceed to Step 7.
 3. **Check for actual changes**: run `git diff --stat HEAD`. If qa-fix made **no code edits**, do NOT increment the counter — log in Issues Log, push what the loop held (a HALT always pushes), and **HALT**:
 
    ```bash
-   bash .agents/skills/develop-bug/references/push-policy.sh --mark --site qa-halt
    if [ "$(bash .agents/skills/develop-bug/references/push-policy.sh --site qa-halt)" != defer ]; then
      git push origin HEAD
    fi

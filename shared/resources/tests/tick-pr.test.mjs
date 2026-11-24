@@ -283,6 +283,30 @@ test("a PR with no checks merges on the quality gate alone", (t) => {
   assert.equal(r.out, "merged", r.err);
 });
 
+test("a quality gate that holds no command is refused before the PR is read (T319-CR-506)", (t) => {
+  const f = opened(t);
+  for (const gate of ["", "  ", "\n\t\n", "# npm test", "  # a\n\n# b\n"]) {
+    const r = f.merge(gate);
+    assert.equal(r.code, 2, JSON.stringify(gate));
+    assert.ok(!existsSync(f.st("merged")));
+  }
+  assert.equal(f.merge("# the suite\ntrue").out, "merged");
+});
+
+test("every Bitbucket request on the tick's path has a time limit (T319-CR-504)", () => {
+  const calls = ["tick-pr.sh", "pr-read.sh", "finalise-ci-poll.sh"].flatMap(
+    (f) =>
+      readFileSync(resolve(HERE, "..", f), "utf8")
+        .split("\n")
+        .filter(
+          (line) => /(?:^|[\s(|])curl\s/.test(line) && !/^\s*#/.test(line),
+        )
+        .map((line) => `${f}: ${line.trim()}`),
+  );
+  assert.equal(calls.length, 6);
+  for (const call of calls) assert.match(call, /curl -s --max-time \d+ /, call);
+});
+
 test("no checks is an answer only after the whole wait and under no floor; a wait that is not a number is a usage error (T319-CR-303)", (t) => {
   const f = opened(t);
   writeFileSync(f.st("rollup"), "NONE\n");
@@ -553,6 +577,16 @@ test("ticked-unpushed: a local base holding the tick commit goes back to origin'
   const landed = l.start();
   assert.equal(landed.out, "landed", landed.err);
   assert.equal(landed.err, "");
+  // its branch is gone, so a second start would begin a second tick: develop-next runs none (T319-CR-509)
+  assert.equal(git(l.wt, "branch", "--list", TICK), "");
+  const row = readFileSync(
+    resolve(HERE, "../../../skills/develop-next/SKILL.md"),
+    "utf8",
+  )
+    .split("\n")
+    .filter((x) => x.includes("`ticked-unpushed` → push it"));
+  assert.equal(row.length, 1);
+  assert.match(row[0], /On `landed` [^.]*: run no second `start`\)/);
   assert.equal(git(l.wt, "symbolic-ref", "--short", "HEAD"), "develop");
   assert.equal(
     git(l.wt, "rev-parse", "develop"),

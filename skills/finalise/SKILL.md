@@ -610,7 +610,7 @@ jq -r '"re-run at head: \(.reason)\(if .message then " — " + .message else "" 
 | :-- | :-- |
 | `ran` | Append `run.md` from the out directory to the running summary under `## Step 1` **now** (agent 1 cites its lines; replace an earlier block on a re-run), and pass the absolute path of `run.json` as `<RERUN_AT_HEAD>`. The append is the one exception to "Do NOT write incrementally". A command that failed is data for the grading, never a HALT here. |
 | `none-named`, `not-configured` | Pass `none`. |
-| `dirty-tree` | **HALT.** Uncommitted code, a listed command that wrote code, or a head that moved means a run would not be the head's; the message names which and when. Commit or discard it and re-run. |
+| `dirty-tree` | **HALT.** Uncommitted code, a file the checkout leaves out (a sparse checkout), a listed command that wrote code, or a head that moved means a run would not be the head's; the message names which and when. Commit or discard it and re-run. |
 | `scan-broken`, `usage` | **HALT**: the document, or the `finalise.rerunAtHead` list, cannot be read. |
 | `failed` | **HALT**: the engine itself failed; the message says where. |
 
@@ -2180,12 +2180,13 @@ standalone.
      git commit -m "${COMMIT_MSG}${REG_SUFFIX}${CARRY_SUFFIX}"
      COMMIT_EXIT=$?
      [ "$COMMIT_EXIT" -eq 0 ] || { echo "HALT: acceptance commit rejected (exit $COMMIT_EXIT) — see output above"; exit 1; }
+     # May amend the subject (ci.skipMarker, off by default), so it is asked only of the commit just
+     # made, before anything has recorded its hash. CI_HEAD_2 is read after the push.
+     bash .agents/skills/finalise/references/push-policy.sh --mark --site finalise-accept
    fi
 
    # The push policy's `finalise-accept` site (task.319): 6b and 6c read the remote, so it answers
-   # `push`; a `defer` here means the site table is wrong. `--mark` first, because it may amend the
-   # subject (ci.skipMarker, off by default), and CI_HEAD_2 is read after the push.
-   bash .agents/skills/finalise/references/push-policy.sh --mark --site finalise-accept
+   # `push`; a `defer` here means the site table is wrong.
    [ "$(bash .agents/skills/finalise/references/push-policy.sh --site finalise-accept)" != defer ] \
      || { echo "HALT: push-policy.sh deferred the acceptance push, which 6b and 6c read"; exit 1; }
    git push origin "$BRANCH"

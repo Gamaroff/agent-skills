@@ -439,13 +439,15 @@ function topLevelKey(line) {
  * reads, and it holds nothing but mappings and lists of scalars, whose rows count exactly. Rows of
  * other sections are other skills' business, in whatever shape the YAML subset supports (a list of
  * maps, for one), and an engine that refused the file for them would lose the rule for a valid
- * configuration.
+ * configuration. A row at column 0 that is no key row (a list row, or one with no colon) ends nothing: the
+ * parse stops there, and the rows after it are still this block's, unaccounted for (T319-CR-406).
  */
 function ciBlockRows(text, key = "ci") {
   let n = 0;
   let inBlock = false;
   for (const l of significantLines(text)) {
-    if (/^\S/.test(l)) inBlock = topLevelKey(l) === key;
+    if (/^\S/.test(l) && !/^-(\s|$)/.test(l) && /:(\s|$)/.test(l))
+      inBlock = topLevelKey(l) === key;
     if (inBlock) n++;
   }
   return n;
@@ -908,7 +910,7 @@ async function bitbucketRollup(
     cwd,
     env,
     fetchImpl,
-    destination = "",
+    destination,
     settleSeconds = 0,
     now = Date.now(),
   },
@@ -938,12 +940,11 @@ async function bitbucketRollup(
     }
     if (url) return "UNKNOWN"; // more pages than we read: do not decide on a partial list
     // An ancestor is read by the rule its PR's head is read by: a green for another destination is not
-    // this PR's green, and a red for another destination is not its red (T319-CR-306).
+    // this PR's green, and a red for another destination is not its red (T319-CR-306). Its age is read
+    // off the same statuses (T319-CR-409).
     return settle(
-      destination
-        ? bitbucketPrRollup(values, destination)
-        : reduceBitbucketStatuses(values),
-      values.map((v) => v.updated_on),
+      bitbucketPrRollup(values, destination),
+      bitbucketPrStatuses(values, destination).map((v) => v.updated_on),
       settleSeconds,
       now,
     );
@@ -1040,8 +1041,6 @@ function killProcessGroup(pid) {
   }
 }
 
-const STOP_POLL_MS = 200;
-
 /** Signals a caller sends to stop the engine (`timeout`, Ctrl-C, a closed terminal). */
 const FORWARDED_SIGNALS = ["SIGTERM", "SIGINT", "SIGHUP"];
 
@@ -1050,16 +1049,16 @@ const FORWARDED_SIGNALS = ["SIGTERM", "SIGINT", "SIGHUP"];
  * short of SIGKILL. Resolves with the `spawnSync`-shaped `{ pid, status, signal, error }` the caller
  * reads, so an injected synchronous `spawn` in a test is a drop-in.
  *
- * `stopWhen`, when given, is asked while the check runs; a non-empty answer kills the group and is the
- * error's message (code ESTOPPED). What a kill cannot reach: a descendant that started its OWN session
- * (`setsid`, a daemon) is in another process group, so it outlives a timeout, a stop and a signal.
+ * `onSpawn`, when given, gets the child, to read its pipes. What a kill cannot reach: a descendant that
+ * left the process group (`setsid`, a daemon, and coreutils' `timeout`, which makes a group of its own)
+ * outlives a timeout and a signal.
  *
  * Why not `spawnSync` (obs #94): it blocks the event loop, so a SIGTERM to the engine (e.g. from
  * `timeout 120 node ci-tree-equivalence.js …`) ran no handler — node died at once and the detached
  * group, an `npm run ci:fast` in practice, ran on beside the real gate. Here a forwarded signal
  * kills the group, then re-raises itself so the engine's own exit still says it was signalled.
  */
-function spawnCheck(file, args, { timeout, stopWhen, ...opts } = {}) {
+function spawnCheck(file, args, { timeout, onSpawn, ...opts } = {}) {
   return new Promise((resolve) => {
     let child;
     try {
@@ -1069,14 +1068,12 @@ function spawnCheck(file, args, { timeout, stopWhen, ...opts } = {}) {
       return;
     }
     const pid = child.pid;
+    if (onSpawn) onSpawn(child);
     let timedOut = false;
-    let stopped = "";
     let timer = null;
-    let poll = null;
     const handlers = new Map();
     const release = () => {
       if (timer) clearTimeout(timer);
-      if (poll) clearInterval(poll);
       for (const [sig, fn] of handlers) process.removeListener(sig, fn);
       handlers.clear();
     };
@@ -1095,12 +1092,6 @@ function spawnCheck(file, args, { timeout, stopWhen, ...opts } = {}) {
         killProcessGroup(pid);
       }, timeout);
     }
-    if (stopWhen) {
-      poll = setInterval(() => {
-        stopped = stopped || stopWhen() || "";
-        if (stopped) killProcessGroup(pid);
-      }, STOP_POLL_MS);
-    }
     child.on("error", (error) => {
       release();
       resolve({ pid, status: null, signal: null, error });
@@ -1111,9 +1102,7 @@ function spawnCheck(file, args, { timeout, stopWhen, ...opts } = {}) {
         ? Object.assign(new Error("checkCommand timed out"), {
             code: "ETIMEDOUT",
           })
-        : stopped
-          ? Object.assign(new Error(stopped), { code: "ESTOPPED" })
-          : undefined;
+        : undefined;
       resolve({ pid, status, signal, error });
     });
   });
@@ -1197,14 +1186,14 @@ async function run({
     }
     const platform = args.platform || detectPlatform(exec, root, env);
     const settleOpts = { settleSeconds: cfg.settleSeconds, now: now() };
-    // Asked once, and only when an ancestor is read. A PR whose destination cannot be read leaves every
-    // ancestor UNKNOWN: unfiltered, another destination's green would be this PR's.
+    // Asked once, and only when an ancestor is read. A destination that was neither given nor can be read
+    // from a PR leaves every ancestor UNKNOWN: unfiltered, another destination's green would be this PR's
+    // (T319-CR-407).
     const bb = { exec, cwd: root, env, fetchImpl };
     let destination = null;
     const destinationOf = () =>
       (destination ??= Promise.resolve(
-        args.destination ||
-          (args.pr === undefined ? "" : bitbucketDestination(bb, args.pr)),
+        args.destination || bitbucketDestination(bb, args.pr),
       ));
     const rollupOf = async (sha) => {
       if (platform !== "bitbucket")
@@ -1529,15 +1518,13 @@ module.exports = {
   readConfig,
   readConfigAtCommit,
   configTextAtCommit,
-  // The bounded runner, the working-tree check and the block reader's refusals, for
-  // finalise-rerun-at-head.js (task.319).
+  // The bounded runner and the block reader's refusals, for finalise-rerun-at-head.js (task.319).
   UsageError,
   assertMapping,
   assertBlockRows,
   topLevelKey,
   spawnCheck,
   killProcessGroup,
-  dirtyNonDocsPaths,
   settle,
   DEFAULT_CHECK_TIMEOUT_SECONDS,
   DEFAULT_SETTLE_SECONDS,

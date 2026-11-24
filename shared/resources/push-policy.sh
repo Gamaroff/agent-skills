@@ -167,7 +167,13 @@ if [ "$MARK" = yes ]; then
   case "$SUBJECT" in *"$MARKER"*) unmarked "the subject already carries the marker" ;; esac
   # tree-equivalent: a green first-parent ancestor, and every path since it is documentation (and
   # ci.docsOnly.checkCommand passed, when one is configured). Exit 0 means that and nothing else.
-  command node "$ENGINE" --head-rollup NONE --head HEAD >/dev/null 2>&1 \
+  # On Bitbucket the engine judges statuses for the PR's own destination, so it is told which PR.
+  PR_URL=$(command node -e '
+    const lock = JSON.parse(require("fs").readFileSync(".claude/state/develop-pipeline.lock", "utf8"));
+    if (lock.branch === process.argv[1]) process.stdout.write(String(lock.pr_url || ""));' "$BRANCH" 2>/dev/null)
+  ASK=(--head-rollup NONE --head HEAD)
+  case "${PR_URL##*/}" in '' | *[!0-9]*) ;; *) ASK+=(--pr "${PR_URL##*/}") ;; esac
+  command node "$ENGINE" "${ASK[@]}" >/dev/null 2>&1 \
     || unmarked "ci-tree-equivalence did not answer tree-equivalent"
   # `--only` with no paths amends the message alone: what 5c staged for /finalise stays staged.
   BODY=$(git log -1 --format=%b)

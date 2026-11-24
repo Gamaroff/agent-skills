@@ -332,14 +332,10 @@ If a situation arises that is not in the shared defaults table and the stakes ar
 - **The implementation report is the primary recovery tool.** Always include its path in halt messages.
 - **Push what the run held, then snapshot and remove the lock file, before every terminal HALT.** After committing the report (per the rule above), push the record commits the run was holding (a person reads the PR next), copy the active lock to a halt snapshot and then remove the active lock + transient logs:
 
-  Run **this one block** — once a PR is open it pushes what is held, whichever step halts; then it writes the snapshot, removes the lock and the transient test logs, and is idempotent. Run it **before** the HALT message, never after (a HALT that only printed its message left the lock in place with no snapshot on three runs, obs #49). `--step` defaults to the lock's `current_step`; a non-zero exit means nothing was halted:
+  Run **this one block** — once a PR is open it pushes what is held, whichever step halts (repeat a `halt: kept local` or `halt: not pushed` line in the HALT message); then it writes the snapshot, removes the lock and the transient test logs, and is idempotent. Run it **before** the HALT message, never after (a HALT that only printed its message left the lock in place with no snapshot on three runs, obs #49). `--step` defaults to the lock's `current_step`; a non-zero exit means nothing was halted:
 
   ```bash
-  LOCK=.claude/state/develop-pipeline.lock
-  if [ -n "$(jq -r '.pr_url // empty' "$LOCK" 2>/dev/null)" ] && [ "$(jq -r .branch "$LOCK")" = "$(git branch --show-current)" ] &&
-    [ "$(bash .agents/skills/develop-story/references/push-policy.sh --site halt)" != defer ]; then
-    git push origin HEAD || echo "⚠️ the held commits were not pushed; the HALT goes on"
-  fi
+  bash .agents/skills/develop-story/references/push-held.sh --site halt
   bash .agents/skills/develop-story/references/advance-pipeline-lock.sh --halt --reason "{halt_reason}" --step {halt_step} {story-directory}
   ```
 

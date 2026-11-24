@@ -7,12 +7,16 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import {
+  chmodSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
+  renameSync,
   rmSync,
+  statSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { createRequire } from "node:module";
@@ -507,13 +511,9 @@ test("an edit git status is told not to see is seen: skip-worktree and assume-un
     assert.equal(r.rec.reason, "dirty-tree", flag);
     assert.match(r.rec.message, /count\.txt/);
     assert.equal(r.rec.runs.length, 0);
-    // a sparse checkout leaves the file out; an assume-unchanged file that is gone was deleted
+    // a file that is gone is not the head's, whatever git was told (T319-CR-402)
     rmSync(join(dir, "count.txt"));
-    assert.equal(
-      run().rec.reason,
-      flag === "--skip-worktree" ? "ran" : "dirty-tree",
-      flag,
-    );
+    assert.equal(run().rec.reason, "dirty-tree", flag);
   }
   // hidden documentation is listed, as visible documentation is
   const { dir, run } = fixture(t, {
@@ -540,6 +540,385 @@ test("a command that ends by itself over the bound keeps its status and has its 
       readFileSync(join(out, "run.md"), "utf8"),
       /\*\*exit 0, its output cut at the bound\*\*/,
     );
+});
+
+/** A repository with one of everything the comparison reads, and a checked-out submodule at lib/. */
+function everything(t, { config = "" } = {}) {
+  const f = fixture(t, {
+    config: `${LIST("cat lib/count.txt")}${config}`,
+    criteria: ["`cat lib/count.txt` prints 3 broken"],
+  });
+  const sub = mkdtempSync(join(tmpdir(), "rerun-at-head-sub-"));
+  t.after(() => rmSync(sub, { recursive: true, force: true, maxRetries: 5 }));
+  git(sub, "init", "-q", "-b", "main", ".");
+  writeFileSync(join(sub, "count.txt"), "3 broken\n");
+  git(sub, "add", "-A");
+  git(sub, "commit", "-q", "-m", "sub");
+  const { dir } = f;
+  git(
+    dir,
+    "-c",
+    "protocol.file.allow=always",
+    "submodule",
+    "add",
+    "-q",
+    sub,
+    "lib",
+  );
+  mkdirSync(join(dir, "src"));
+  writeFileSync(join(dir, "src/a.js"), "1\n");
+  writeFileSync(join(dir, "run.sh"), "#!/bin/sh\n");
+  chmodSync(join(dir, "run.sh"), 0o755);
+  symlinkSync("src/a.js", join(dir, "link"));
+  symlinkSync("nowhere", join(dir, "dangling"));
+  for (const odd of ['"q".js', "a\nb.js", "sp ace.js", "é.js", "back\\.js"])
+    writeFileSync(join(dir, odd), `${odd}\n`);
+  writeFileSync(join(dir, "eol.txt"), "x\r\ny\r\n");
+  writeFileSync(join(dir, "up.flt"), "stored\n");
+  writeFileSync(
+    join(dir, ".gitattributes"),
+    "eol.txt text eol=crlf\n*.flt filter=up\n",
+  );
+  git(dir, "config", "filter.up.clean", "tr A-Z a-z");
+  writeFileSync(join(dir, "up.flt"), "STORED\n");
+  git(dir, "add", "-A");
+  git(dir, "commit", "-q", "-m", "everything");
+  return { ...f, sub };
+}
+
+test("a checkout of the head answers ran: links, modes, filters, line endings, odd names, submodules (T319-CR-410)", (t) => {
+  const { dir, run } = everything(t);
+  const clean = run();
+  assert.equal(clean.rec.reason, "ran", clean.rec.message);
+  assert.deepEqual(clean.rec.uncommitted_docs, []);
+  assert.equal(readFileSync(clean.rec.runs[0].stdout, "utf8"), "3 broken\n");
+  // told not to look, at files that are the head's, with settings that make a bare diff disagree
+  for (const f of ["eol.txt", "up.flt", "link", "run.sh", '"q".js'])
+    git(dir, "update-index", "--skip-worktree", "--", f);
+  for (const [k, v] of [
+    ["diff.autoRefreshIndex", "false"],
+    ["diff.ignoreSubmodules", "all"],
+    ["core.safecrlf", "true"],
+  ])
+    git(dir, "config", k, v);
+  assert.equal(run().rec.reason, "ran");
+  // a submodule that is not checked out is not an edit; a file put where it would be is
+  git(dir, "submodule", "deinit", "-q", "-f", "lib");
+  assert.equal(run().rec.reason, "ran");
+  writeFileSync(join(dir, "lib/count.txt"), "0 broken\n");
+  assert.equal(run().rec.reason, "dirty-tree");
+
+  // a file committed with CRLF, under core.autocrlf: git reads it as unchanged, and it is
+  const crlf = fixture(t, {
+    config: LIST("echo a"),
+    criteria: ["`echo a` passes"],
+  });
+  writeFileSync(join(crlf.dir, "w.txt"), "a\r\n");
+  git(crlf.dir, "add", "-A");
+  git(crlf.dir, "commit", "-q", "-m", "crlf");
+  git(crlf.dir, "config", "core.autocrlf", "true");
+  assert.equal(crlf.run().rec.reason, "ran");
+});
+
+test("no setting, flag or index state makes an edited tree answer ran (T319-CR-401, CR-402, CR-403)", (t) => {
+  const edit =
+    (f, text = "0 broken\n") =>
+    (d) =>
+      writeFileSync(join(d, f), text);
+  const submodule =
+    (...a) =>
+    (d) =>
+      git(join(d, "lib"), ...a);
+  const set = (k, v) => (d) => git(d, "config", k, v);
+  const hook = (d) => {
+    const file = join(d, ".git/fsmonitor");
+    writeFileSync(file, "#!/bin/sh\nprintf 'token\\0'\n");
+    chmodSync(file, 0o755);
+    git(d, "config", "core.fsmonitor", file);
+    git(d, "status");
+    git(d, "status");
+  };
+  // [what, the edit, what hides it, the path the refusal names]
+  const cases = [
+    [
+      "a submodule's skip-worktree",
+      submodule("update-index", "--skip-worktree", "count.txt"),
+      edit("lib/count.txt"),
+      "lib/count.txt",
+    ],
+    [
+      "submodule.lib.ignore=all",
+      set("submodule.lib.ignore", "all"),
+      edit("lib/count.txt"),
+      "lib/count.txt",
+    ],
+    [
+      "submodule.lib.ignore=dirty",
+      set("submodule.lib.ignore", "dirty"),
+      edit("lib/new.js"),
+      "lib/new.js",
+    ],
+    [
+      "a submodule at another commit",
+      set("submodule.lib.ignore", "all"),
+      submodule("commit", "-q", "--allow-empty", "-m", "moved"),
+      "lib",
+    ],
+    [
+      "core.fileMode=false",
+      set("core.fileMode", "false"),
+      (d) => chmodSync(join(d, "src/a.js"), 0o755),
+      "src/a.js",
+    ],
+    [
+      "core.fileMode=false, the bit dropped",
+      set("core.fileMode", "false"),
+      (d) => chmodSync(join(d, "run.sh"), 0o644),
+      "run.sh",
+    ],
+    ["an fsmonitor that reports nothing", hook, edit("src/a.js"), "src/a.js"],
+    [
+      "a deleted skip-worktree file",
+      (d) => git(d, "update-index", "--skip-worktree", "src/a.js"),
+      (d) => rmSync(join(d, "src/a.js")),
+      "src/a.js",
+    ],
+    [
+      "a sparse checkout",
+      () => {},
+      (d) =>
+        git(
+          d,
+          "sparse-checkout",
+          "set",
+          "--no-cone",
+          "/docs/",
+          "/skills-config.yaml",
+          "/lib/",
+        ),
+      ".gitignore",
+    ],
+    [
+      "an intent-to-add file",
+      edit("new.js"),
+      (d) => git(d, "add", "-N", "new.js"),
+      "new.js",
+    ],
+    [
+      "a file only the index lost",
+      (d) => writeFileSync(join(d, ".git/info/exclude"), "src\n"),
+      (d) => git(d, "rm", "-q", "--cached", "src/a.js"),
+      "src/a.js",
+    ],
+    [
+      "an edit only the index holds",
+      (d) => {
+        edit("src/a.js")(d);
+        git(d, "add", "src/a.js");
+      },
+      edit("src/a.js", "1\n"),
+      "src/a.js",
+    ],
+    [
+      "a link to another file",
+      () => {},
+      (d) => {
+        rmSync(join(d, "link"));
+        symlinkSync("run.sh", join(d, "link"));
+      },
+      "link",
+    ],
+    [
+      "a link turned into what it named",
+      () => {},
+      (d) => {
+        rmSync(join(d, "link"));
+        writeFileSync(join(d, "link"), "1\n");
+      },
+      "link",
+    ],
+    [
+      "a directory turned into a link to its copy",
+      (d) => writeFileSync(join(d, ".git/info/exclude"), "src\ncopy\n"),
+      (d) => {
+        renameSync(join(d, "src"), join(d, "copy"));
+        symlinkSync("copy", join(d, "src"));
+      },
+      "src/a.js",
+    ],
+    [
+      "a replaced commit",
+      edit("src/a.js"),
+      (d) => {
+        const head = git(d, "rev-parse", "HEAD");
+        git(d, "commit", "-q", "-a", "-m", "edited");
+        const edited = git(d, "rev-parse", "HEAD");
+        git(d, "reset", "-q", "--hard", head);
+        git(d, "replace", head, edited);
+        edit("src/a.js")(d);
+        git(d, "add", "src/a.js");
+      },
+      "src/a.js",
+    ],
+  ];
+  const control = everything(t);
+  edit("src/a.js")(control.dir);
+  assert.equal(control.run().rec.reason, "dirty-tree", "control");
+  for (const [what, first, then, file] of cases) {
+    const { dir, run } = everything(t);
+    first(dir);
+    then(dir);
+    const r = run();
+    assert.equal(r.rec.reason, "dirty-tree", what);
+    assert.equal(r.rec.runs.length, 0, what);
+    const named = r.rec.message.replace(/^.*not the head: /, "").split(", ");
+    assert.ok(named.includes(file), `${what}: ${r.rec.message}`);
+  }
+});
+
+test("a mode is compared where the filesystem keeps one (T319-CR-403)", (t) => {
+  const dir = mkdtempSync(join(tmpdir(), "rerun-at-head-mode-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  assert.equal(eng.keepsModes(dir), true);
+  assert.deepEqual(readdirSync(dir), [], "the probe is removed");
+  for (const mode of [0o777, 0o644]) {
+    const io = {
+      writeFileSync: () => {},
+      chmodSync: () => {},
+      rmSync: () => {},
+      statSync: () => ({ mode }),
+    };
+    assert.equal(eng.keepsModes(dir, io), false, `every file reads ${mode}`);
+  }
+});
+
+test("what a command leaves running cannot grow the saved output, or hold the engine (T319-CR-404, CR-405)", (t) => {
+  const leave = (body) => {
+    const f = fixture(t, {
+      config: LIST("node leave.js"),
+      criteria: ["`node leave.js` ends"],
+    });
+    const pid = join(f.dir, "..", `${f.dir.split("/").pop()}.pid`);
+    t.after(() => {
+      try {
+        process.kill(Number(readFileSync(pid, "utf8")), "SIGKILL");
+      } catch {
+        /* it ended by itself */
+      }
+      rmSync(pid, { force: true });
+    });
+    writeFileSync(
+      join(f.dir, "leave.js"),
+      `const c = require("child_process").spawn("sh", ["-c", ${JSON.stringify(body)}], { detached: true, stdio: ["ignore", "inherit", "inherit"] });
+require("fs").writeFileSync(${JSON.stringify(pid)}, String(c.pid));
+console.log("started");
+c.unref();
+`,
+    );
+    git(f.dir, "add", "-A");
+    git(f.dir, "commit", "-q", "-m", "leave");
+    return { ...f, pid };
+  };
+  // it writes for ever: the bound holds at the return, and afterwards
+  const loud = leave("while :; do printf %01000d 0; done");
+  const [one] = loud.run("--max-output-bytes", "5000").rec.runs;
+  assert.equal(one.output_capped, true);
+  assert.equal(statSync(one.stdout).size, 5000);
+  spawnSync("sleep", ["1"]);
+  assert.equal(statSync(one.stdout).size, 5000);
+  // it writes nothing and keeps the pipe: the engine returns with what the command printed
+  const quiet = leave("exec sleep 600");
+  const [two] = quiet.run().rec.runs;
+  assert.doesNotThrow(
+    () => process.kill(Number(readFileSync(quiet.pid, "utf8")), 0),
+    "it is still running, so the engine did not wait for it",
+  );
+  assert.equal(two.exit_code, 0);
+  assert.equal(readFileSync(two.stdout, "utf8"), "started\n");
+});
+
+test("a list the parse ends early, or under a key spelt with an escape, is refused (T319-CR-406)", () => {
+  const list = "  rerunAtHead:\n    - echo a\n";
+  for (const [what, config] of [
+    ["a list row at column 0", `finalise:\n${list}- echo b\n`],
+    ["a word at column 0", `finalise:\n${list}foo\n    - echo b\n`],
+    ["an escaped block key alone", `"fin\\x61lise":\n${list}`],
+    [
+      "an escaped block key beside a plain one",
+      `${LIST("echo a")}"fin\\u0061lise":\n${list}`,
+    ],
+    ["a long escape", `"fin\\U00000061lise":\n${list}`],
+    [
+      "both keys escaped",
+      '"fin\\x61lise":\n  "rerun\\x41tHead":\n    - echo a\n',
+    ],
+    [
+      "an explicit key",
+      `tracker: github\n? finalise\n: rerunAtHead:\n    - echo a\n`,
+    ],
+    ["a tagged key", `!!str finalise:\n${list}`],
+    ["another block's", `notes:\n${list}`],
+  ])
+    assert.throws(
+      () => eng.parseRerunList(config),
+      (e) => e.constructor.name === "UsageError",
+      what,
+    );
+  // other blocks keep their shapes, at column 0 included
+  for (const config of [
+    "workflows:\n- name: x\n- y\n",
+    `workflows:\n- name: x\n${LIST("echo a")}my key: 1\n`,
+    '"acc\\x65ss":\n  tracker: full\n',
+  ])
+    assert.doesNotThrow(() => eng.parseRerunList(config), config);
+});
+
+test("only a file /finalise writes is a DoD record: code named like one is code (T319-CR-408)", (t) => {
+  const at = dirname(DOC);
+  const { dir, run } = fixture(t, {
+    config: `${LIST("echo a")}ci:\n  docsOnly:\n    patterns:\n      - "**/*.md"\n`,
+    criteria: ["`echo a` passes"],
+  });
+  const put = (name) => {
+    mkdirSync(dirname(join(dir, at, name)), { recursive: true });
+    writeFileSync(join(dir, at, name), "{}\n");
+  };
+  for (const name of [
+    "task.9.dod.1.ac.json",
+    "task.9.dod.2.security.plan.json",
+    "task.9.dod.2.security.cases.json",
+    "task.9.dod.2.security.cases.3.json",
+    "task.9.dod.2.security.run.json",
+    "task.9.dod.2.security.run.json.d/1.stdout",
+  ])
+    put(name);
+  assert.equal(run().rec.reason, "ran");
+  for (const name of [
+    "task.9.dod.1.check.js",
+    "task.9.dod.x.ac.json",
+    "task.9.dod.1.ac.json.js",
+    "task.9.dod.1.security.run.json.d/deep/1.js",
+  ]) {
+    put(name);
+    assert.equal(run().rec.reason, "dirty-tree", name);
+    rmSync(join(dir, at, name));
+  }
+  symlinkSync("../../../count.txt", join(dir, at, "task.9.dod.3.ac.json"));
+  assert.equal(run().rec.reason, "dirty-tree", "a link");
+});
+
+test("a tracked file under the pipeline's state directory is the head's, and its edit is not let through", (t) => {
+  const { dir, run } = fixture(t, {
+    config: LIST("echo a"),
+    criteria: ["`echo a` passes"],
+  });
+  mkdirSync(join(dir, ".claude/state"), { recursive: true });
+  writeFileSync(join(dir, ".claude/state/tool.js"), "1\n");
+  git(dir, "add", "-f", ".claude/state/tool.js");
+  git(dir, "commit", "-q", "-m", "tracked");
+  assert.equal(run().rec.reason, "ran");
+  writeFileSync(join(dir, ".claude/state/tool.js"), "2\n");
+  assert.equal(run().rec.reason, "dirty-tree");
 });
 
 test("a document without criteria, or missing, is scan-broken", (t) => {

@@ -10,8 +10,9 @@ All notable changes to this project will be documented in this file. Format foll
   New `shared/resources/push-policy.sh` answers `push` or `defer` at every push a pipeline makes; its
   table names the step that reads the remote for each one. **Default behaviour changes:** a PreCompact
   pause no longer pushes, and a QA cycle whose commits hold only records waits for the next push. The
-  end of a run and every HALT still push. `pipeline.pushRecordCommits: eager` restores the old
-  behaviour. A scan test fails on a push in the pipeline docs or skills that does not ask the helper.
+  end of a run and any terminal HALT once a PR is open still push what is held (`push-held.sh`).
+  `pipeline.pushRecordCommits: eager` restores the old behaviour. A scan test fails on a push in the
+  pipeline docs or skills that does not ask the helper.
 
 ### Added
 
