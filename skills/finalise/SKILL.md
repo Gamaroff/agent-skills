@@ -2140,6 +2140,12 @@ standalone.
      [ "$COMMIT_EXIT" -eq 0 ] || { echo "HALT: acceptance commit rejected (exit $COMMIT_EXIT) — see output above"; exit 1; }
    fi
 
+   # The push policy's `finalise-accept` site (task.319): 6b and 6c read the remote, so it answers
+   # `push`; a `defer` here means the site table is wrong. `--mark` first, because it may amend the
+   # subject (ci.skipMarker, off by default), and CI_HEAD_2 is read after the push.
+   bash .agents/skills/finalise/references/push-policy.sh --mark --site finalise-accept
+   [ "$(bash .agents/skills/finalise/references/push-policy.sh --site finalise-accept)" != defer ] \
+     || { echo "HALT: push-policy.sh deferred the acceptance push, which 6b and 6c read"; exit 1; }
    git push origin "$BRANCH"
    PUSH_EXIT=$?
    [ "$PUSH_EXIT" -eq 0 ] || { echo "HALT: acceptance push rejected (exit $PUSH_EXIT)"; exit 1; }
@@ -3486,8 +3492,14 @@ node references/finalise-fix-and-recheck.mjs \
 
 `--git-base` derives `commits` from `git rev-list --count <base>..HEAD` and `touched` from
 `git diff --name-only <base>..HEAD` and **refuses** a record that disagrees with either — two
-commits, a file the record did not name, a ref git cannot answer. Exit 0 → `git push origin HEAD`;
-exit 1 → Step 8, with the commit left local. To drop it, run `git reset --soft "$CI_HEAD_1"` and then
+commits, a file the record did not name, a ref git cannot answer. Exit 0 → push (the site's answer is
+always `push`: step 3 below reads the fix head on the remote):
+
+```bash
+[ "$(bash .agents/skills/finalise/references/push-policy.sh --site finalise-fix)" = defer ] || git push origin HEAD
+```
+
+Exit 1 → Step 8, with the commit left local. To drop it, run `git reset --soft "$CI_HEAD_1"` and then
 `git restore --source="$CI_HEAD_1" --staged --worktree -- <touched>`. Never use `--hard`: it would also
 destroy the 5c review report and any doc-only fixes staged for 6a to carry, which no commit holds
 (task.173 QA-2, CR-3). One exception: a `touched` path that is also a 5c-carried doc fix (listed in

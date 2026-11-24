@@ -48,6 +48,7 @@ batch runs never diverge), plus one batch-only key. Every key has a default:
 | `developNext.baseBranch`         | `develop`                                        | Steps 0, 2, 3     |
 | `developNext.qualityGateCommand` | `npm run ci`                                     | Step 3 merge gate |
 | `developNext.mergeStrategy`      | `merge` (one of `merge` / `squash` / `rebase`)   | Step 3            |
+| `developNext.tickVia`            | `push` (or `pr`)                                 | Step 3            |
 | `developBatch.maxParallel`       | `4`                                              | Step 2            |
 | `developBatch.requireTouches`    | `false`                                          | Step 1            |
 | `developBatch.resources`         | *(unset — one implicit resource)*                | Step 2            |
@@ -643,7 +644,11 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
    `develop-next` Step 4 does — `--batch` selects from the roadmap only today, so every batch
    item is `roadmap`-sourced — recorded as `source` on each `batch[]` item at selection, which is
    what a resume into this lane reads — but the arm is named so a registry-aware batch cannot fall
-   into the roadmap arm by default:
+   into the roadmap arm by default. **`developNext.tickVia: pr`** changes how the tick reaches the base
+   exactly as `develop-next` Step 4 § "How the tick is pushed" says, with the scripts under
+   `.agents/skills/develop-batch/references/` (`references/tick-pr.sh`): `start` before the edit, `open`
+   in place of the push, then `merge` with the quality gate's exit status, **before the next item's
+   rebase**. A refused merge halts the item with `merged: true, ticked: false`:
    - **`source: roadmap`** — tick the item `[x]` and rewrite its row in the roadmap's
      accepted-row convention (copy an existing ✅ row's format; if none exists yet, use
      `✅ **accepted + merged** ([PR #N](url), QA PASS S/100)`); add a Change Log row (next
@@ -653,7 +658,7 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
      ```bash
      git add <roadmapPath>
      git commit -m "docs(roadmap): tick <id> [x] — <short summary>"
-     git push origin <baseBranch>
+     [ "$(bash .agents/skills/develop-batch/references/push-policy.sh --site tick)" = defer ] || git push origin <baseBranch>
      ```
    - **`source: task-registry`** — no roadmap row, no roadmap Change Log row; Status is
      already `accepted` (finalise wrote it via `registry-tick.js`). Record the merge with
@@ -666,7 +671,8 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
      `develop-next` does. `annotated` → commit `docs(registry): record <id> — PR #<n> merged`
      (what is staged) and push; `already` → `git diff --cached --quiet HEAD -- docs/tasks/task-registry.md`
      first and commit when the index differs (a crash between the write and its commit leaves the
-     row edited; the resume path skips the dirty-tree check), then `git push origin <baseBranch>` once, regardless (a crash
+     row edited; the resume path skips the dirty-tree check), then the tick push
+     (`push-policy.sh --site tick`, then `git push origin <baseBranch>`) once, regardless (a crash
      between commit and push leaves the record local-only; the push is idempotent), then
      `ticked: true`; every other exit-0 reason (`no-row`, `row-malformed`,
      `no-registry`, `no-cell`, `not-accepted`, `not-a-task`, `engine-unavailable`) → log, no commit.

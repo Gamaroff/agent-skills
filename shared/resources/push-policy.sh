@@ -41,6 +41,8 @@
 # `defer`: the pause commit is read from the same checkout, and the pushes it would make are the cost
 # this script exists to remove.
 #
+# The engine beside it (spelled out so the bundler ships it): shared/resources/ci-tree-equivalence.js
+#
 # The skip marker fails the other way: anything not proven leaves the commit `unmarked`.
 set -u
 

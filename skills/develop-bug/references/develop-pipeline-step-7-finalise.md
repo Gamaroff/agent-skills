@@ -70,10 +70,13 @@ Suggested commit message: `docs(story.{P}.{E}.{S}): implementation report — fi
 
 Suggested commit message: `docs(task.{id}): implementation report — finalise gaps identified`
 
-Then push:
+Then push. A HALT is an end of the run, so this always pushes, deferred record commits included:
 
 ```bash
-git push origin HEAD
+bash .agents/skills/{develop-story|develop-task|develop-bug}/references/push-policy.sh --mark --site finalise-gaps
+if [ "$(bash .agents/skills/{develop-story|develop-task|develop-bug}/references/push-policy.sh --site finalise-gaps)" != defer ]; then
+  git push origin HEAD
+fi
 ```
 
 Then HALT:

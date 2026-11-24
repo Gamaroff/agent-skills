@@ -1173,11 +1173,21 @@ three together:
 | `…qa.{N}.{name}.md` (written by 5a)         | this cycle's `fix(...)` commit           |
 | `…implementation.{name}.md`                 | **deferred to Step 8** (`docs(...)`)     |
 
-**There is exactly one `git push origin HEAD` per cycle** — at step 3 below on a cycle that enters 5b
-from 5a, or **before 5c** on a cycle whose gate reached 5c from 5a (path 1 above — §5c routes 1, 2, 2b and 3), never both. Do not create a separate
-`docs(...): QA cycle {N} gate + report` commit, and do not push twice in a cycle. The rule is about
-the **push**, not the commit: a review-driven cycle legitimately makes two commits (the pre-5c
-gate+report, then 5b's `fix(...)`), and still pushes once.
+**At most one push per cycle, and `push-policy.sh` decides it** (task.319; the script's site table is
+the contract, and this table is how the loop's four push points name themselves to it):
+
+| Push point | Site | Answer (batched, the default) |
+| --- | --- | --- |
+| Step 3 below, a cycle that entered 5b from 5a | `qa-cycle` | `push` when the unpushed commits change code; `defer` when they are records only |
+| Before 5c, a cycle whose gate reached 5c from 5a (§5c routes 1, 2, 2b and 3) | `qa-pre-5c` | `push`: 5c reads the trail on the remote |
+| Step 3 below, a cycle that entered 5b from a 5c verdict | `qa-review-fix` | `defer`: the cycle's push was spent before 5c |
+| The no-code-change HALT (step 0 below) | `qa-halt` | `push`: the end of the run |
+
+The escalation is a HALT too (`qa-escalation`). Log each `defer` in the Decisions Log. Never push both
+at step 3 and before 5c in one cycle, and do not create a separate
+`docs(...): QA cycle {N} gate + report` commit. The rule is about the **push**, not the commit: a
+review-driven cycle legitimately makes two commits (the pre-5c gate+report, then 5b's `fix(...)`), and
+still pushes at most once.
 
 Left unstated, the gate and report fall into `/commit-changes`' default sweep and an orchestrator
 invents a second commit for them and pushes it separately — observed seven times on one PR. The
@@ -1215,7 +1225,16 @@ working tree, where a branch switch loses it and no reader of the PR ever sees i
 
 1. **Any gate that reaches 5c from 5a — §5c routes 1, 2, 2b and 3** — the cycle reaches 5c without entering
    5b, so no `fix(...)` commit exists. Commit the gate `.yml` and QA report `.md` **before invoking
-   `/review-pr` at 5c**, and push once. This is the single stated commit point for this path.
+   `/review-pr` at 5c**, and push once:
+
+   ```bash
+   bash .agents/skills/{develop-story|develop-task}/references/push-policy.sh --mark --site qa-pre-5c
+   if [ "$(bash .agents/skills/{develop-story|develop-task}/references/push-policy.sh --site qa-pre-5c)" != defer ]; then
+     git push origin HEAD
+   fi
+   ```
+
+   This is the single stated commit point for this path.
    Committing here rather than at the Step 7 transition is load-bearing twice over: 5c reads the
    artifact trail **off the branch**, so an uncommitted gate is invisible to the very review that
    audits it; and if 5c returns `REQUEST CHANGES`, the Step 7 transition never happens on this
@@ -1228,7 +1247,8 @@ working tree, where a branch switch loses it and no reader of the PR ever sees i
    > in-flight CI run. **Cycle N's push is spent here.** On the review-driven re-entry, 5b commits
    > **without pushing**; the push happens once, on the next transition that leaves 5b.
 2. **The no-code-change HALT** (step 0 below) — HALTs before any commit. Commit the gate `.yml` and
-   QA report `.md` before halting, same message shape, and push once.
+   QA report `.md` before halting, same message shape, and push once (the same block with
+   `push-policy.sh --site qa-halt`, which always answers `push`).
 
 Those two, plus the convergence-stall and loop-limit escalations, are the **only** places a standalone `docs(...)`
 commit for the gate and QA report is correct — each because there is no `fix(...)` commit in that
@@ -1427,20 +1447,25 @@ After fixes are applied:
 
 2. Run `git log --oneline -1` to capture the fix commit hash.
 
-3. Push to the remote branch so the PR reflects the latest changes — **once per cycle**:
+3. Push to the remote branch when the push policy says so — **at most once per cycle**:
 
-   > **Skip this push when the cycle entered 5b from a 5c `REQUEST CHANGES` verdict.** Cycle N's
+   > **A cycle that entered 5b from a 5c `REQUEST CHANGES` verdict uses `--site qa-review-fix`**, which
+   > answers `defer`. Cycle N's
    > push was already spent on the pre-5c commit (path 1). The `fix(...)` commit rides to the remote
    > on the **next** push — the one taken by whichever cycle exits next, either at this step or
    > before that cycle's 5c. A second push here is the one this section exists to prevent: it
    > cancels the cycle's own in-flight CI run.
    >
-   > **Consequence for step 5's PR-state poll**, which runs after this step: on the skipped-push
-   > path the local branch is ahead of the remote, so poll the PR's *state* (open / merged / closed)
-   > as usual and do **not** treat an unchanged head SHA as a failure.
+   > **Consequence for step 5's PR-state poll**, which runs after this step: on a deferred push
+   > the local branch is ahead of the remote, so poll the PR's *state* (open / merged / closed)
+   > as usual and do **not** treat an unchanged head SHA as a failure. The next 5a's CI read
+   > (`qa-ci-read.sh`) answers `HEAD_MISMATCH` there, which decides nothing.
 
    ```bash
-   git push origin HEAD
+   # From a 5c verdict, the same three lines with --site qa-review-fix (push-policy.sh --site qa-review-fix).
+   if [ "$(bash .agents/skills/{develop-story|develop-task}/references/push-policy.sh --site qa-cycle)" != defer ]; then
+     git push origin HEAD
+   fi
    ```
 
 4. Log what was fixed in the QA Cycle entry:
@@ -2189,10 +2214,13 @@ Suggested commit message: `docs(story.{P}.{E}.{S}): implementation report — qa
 
 Suggested commit message: `docs(task.{id}): implementation report — qa loop escalation`
 
-Then push:
+Then push. A HALT always pushes, deferred record commits included:
 
 ```bash
-git push origin HEAD
+bash .agents/skills/{develop-story|develop-task}/references/push-policy.sh --mark --site qa-escalation
+if [ "$(bash .agents/skills/{develop-story|develop-task}/references/push-policy.sh --site qa-escalation)" != defer ]; then
+  git push origin HEAD
+fi
 ```
 
 #### develop-story HALT message

@@ -705,6 +705,12 @@ run_precompact_in_repo() { # $1 = dir, $2 = report body file, $3 = optional sibl
   ( cd "$dir" && git init -q && git config user.email t@t && git config user.name t && git config commit.gpgsign false ) >/dev/null 2>&1
   local rp="${HOOK_TEST_REPORT_PATH:-report.md}" # the report's repo-relative path
   cp "$2" "$dir/$rp"
+  # `eager` is the pushing mode these scenarios were written against (task.319); HOOK_TEST_PUSH=batched
+  # leaves the key out, which is the default.
+  if [ "${HOOK_TEST_PUSH:-eager}" = eager ]; then
+    printf 'pipeline:\n  pushRecordCommits: eager\n' > "$dir/skills-config.yaml"
+    ( cd "$dir" && git add -- skills-config.yaml ) >/dev/null 2>&1
+  fi
   ( cd "$dir" && git add -- "$rp" && git commit -qm init ) >/dev/null 2>&1
   if [ -n "${HOOK_TEST_REMOTE:-}" ]; then # a bare origin the branch tracks, so a push is observable
     git init -q --bare "$dir.origin.git" >/dev/null 2>&1
@@ -825,12 +831,31 @@ elif ! grep -qF 'NOT pushed' <<<"$OUT" || ! grep -qF "Step 8" <<<"$OUT" || ! gre
 else
   pass "step 8: pause committed locally, NOT pushed, even with every link carried; signal and stderr name step 8"
 fi
+# 17j (task.319): by default (batched) a pause at any step is committed and never pushed, and the entry
+# says so. 17g below is the control: the same report under `eager` is pushed, so the hold is the mode
+# and not a broken remote. Mutation: make the hook ignore push-policy.sh and 17j fails.
+S17J="$TMPDIR_TEST/s17j"
+for STEP_J in 2 5; do
+  DIR_J="$S17J-$STEP_J"
+  OUT=$(HOOK_TEST_PUSH=batched HOOK_TEST_REMOTE=1 HOOK_TEST_STEP=$STEP_J run_precompact_in_repo "$DIR_J" "$SELF_LINKED")
+  J_LOCAL=$(cd "$DIR_J" && git rev-parse HEAD); J_REMOTE=$(origin_tip "$DIR_J")
+  if [ "$(cd "$DIR_J" && git rev-list --count HEAD)" != "2" ]; then
+    fail "batched, step $STEP_J: the pause is still committed locally" "stderr=$(head -3 "$DIR_J/stderr.log")"
+  elif [ -z "$J_REMOTE" ] || [ "$J_LOCAL" = "$J_REMOTE" ]; then
+    fail "batched, step $STEP_J: the remote does not move" "local=$J_LOCAL origin=${J_REMOTE:-none}"
+  elif ! grep -qF 'NOT pushed' <<<"$OUT" || ! grep -qF 'batched' "$DIR_J/stderr.log" \
+       || ! grep -qF '**Pushed:** no' "$DIR_J/report.md"; then
+    fail "batched, step $STEP_J: signal, stderr and the report entry say it was not pushed" "entry=$(grep -F 'Pushed:' "$DIR_J/report.md") stderr=$(head -3 "$DIR_J/stderr.log")"
+  else
+    pass "batched, step $STEP_J: pause committed locally, remote unmoved; signal, stderr and report entry say so"
+  fi
+done
 S17G="$TMPDIR_TEST/s17g"
 OUT=$(HOOK_TEST_REMOTE=1 HOOK_TEST_STEP=5 run_precompact_in_repo "$S17G" "$SELF_LINKED")
 if [ "$(cd "$S17G" && git rev-list --count HEAD)" = "2" ] \
    && [ "$(cd "$S17G" && git rev-parse HEAD)" = "$(origin_tip "$S17G")" ] \
-   && ! grep -qF 'NOT pushed' <<<"$OUT"; then
-  pass "control: the same report at step 5 (the QA loop) is committed AND pushed"
+   && ! grep -qF 'NOT pushed' <<<"$OUT" && ! grep -qF '**Pushed:** no' "$S17G/report.md"; then
+  pass "control: the same report at step 5 (the QA loop) under eager is committed AND pushed"
 else
   fail "control: step 5 → pushed" "commits=$(cd "$S17G" && git rev-list --count HEAD) local=$(cd "$S17G" && git rev-parse HEAD) origin=$(origin_tip "$S17G") stderr=$(head -3 "$S17G/stderr.log")"
 fi

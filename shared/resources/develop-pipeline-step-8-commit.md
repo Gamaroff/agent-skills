@@ -106,10 +106,22 @@ After `/commit-changes` completes, run `git log --oneline -1` to capture the fin
 
 ## Final Push
 
-Push the final commit so the PR reflects the completed implementation report and DoD summary:
+Push the final commit so the PR reflects the completed implementation report and DoD summary. This is
+the run's end-of-run flush: every record-only commit an earlier site deferred goes out with it, and it
+comes **before** `verify-push-state.sh` in the checklist below, which fails on a commit that is not on
+the remote:
+
 ```bash
-git push origin HEAD
+# --mark appends ci.skipMarker to a record-only head's subject (off unless the key is set), which
+# amends the unpushed commit. Anything but `defer` pushes, so a missing script still pushes.
+bash .agents/skills/{develop-story|develop-task|develop-bug}/references/push-policy.sh --mark --site step8
+if [ "$(bash .agents/skills/{develop-story|develop-task|develop-bug}/references/push-policy.sh --site step8)" != defer ]; then
+  git push origin HEAD
+fi
 ```
+
+When the mark line prints `marked`, the commit's hash changed: read it again with `git log --oneline -1`
+for the Phase 2 completion output.
 
 The Pipeline Progress row for Step 8 was already set before the commit (§ Final Implementation Report Update); there is nothing to update here.
 

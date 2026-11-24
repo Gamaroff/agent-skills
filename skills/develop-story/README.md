@@ -20,7 +20,7 @@ Story branches are cut from **`develop`** and PR back to `develop` — short-liv
 | Surface                  | Operations                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | **Filesystem**           | story file (read/append `[x]`), epic file, implementation report (`story.{P}.{E}.{S}.implementation.{N}.*.md`), review report, plan file, gate file (`.yml`), QA report, DoD summary, lock file `.claude/state/develop-pipeline.lock`, subagent summaries `<story-dir>/.summaries/step-*.json`, traceability matrix `<story-dir>/.summaries/qa-traceability-matrix.md`, test-output logs `.claude/state/test-output-{ITER}-*.log` |
-| **Git**                  | story branch create (from `develop`, or the opted-in epic integration branch), stash/pop, commits via `/commit-changes` only, `git push origin HEAD` after every QA cycle + final, mtime + `git log -1` audits                                                                                                                                                                                                                                                                |
+| **Git**                  | story branch create (from `develop`, or the opted-in epic integration branch), stash/pop, commits via `/commit-changes` only, `git push origin HEAD` when `push-policy.sh` answers `push` (code, a remote reader, or the end of the run), mtime + `git log -1` audits                                                                                                                                                                                                                                                                |
 | **GitHub**               | `gh issue comment/close/view`, `gh pr view/comment`, board moves via `gh-stage.js --stage <moment>` (columns resolved from `tracker-workflow.yaml`; Priority auto-set inline), PR creation via `/create-pr` targeting `develop`                                                                                                                                                                                                                                                   |
 | **Jira**                 | `tracker-comment.js`, status moves via `jira-stage.js --stage <moment>` (columns resolved from `tracker-workflow.yaml`). Atlassian MCP (`getTransitionsForJiraIssue`, `transitionJiraIssue`, `getJiraIssue`) is the **fallback only**, used when the CLI reports `no-credentials`                                                                                                                                                                                                                                                                                                        |
 | **Subagents (Explore)**  | resolver, tracker state poller, lite-mode + always-load detector, pipeline-resume stale-context detector, pre-develop surface map, initial loop audit, per-iteration loop audit, test-failure triage, **QA traceability mapper** (story-only), post-fix tracker state poller                                                                                                                                                         |
@@ -344,7 +344,7 @@ sequenceDiagram
                 H->>+CC: /commit-changes<br/>"fix(story.{P}.{E}.{S}): qa-fix cycle {N} — {summary}"
                 CC->>FS: stage + commit
                 CC-->>-H: commit hash
-                H->>GH: git push origin HEAD
+                H->>GH: push-policy.sh --site qa-cycle → git push origin HEAD (code) or defer (records only)
                 H->>FS: append "**Commit**: {hash}" to QA Cycle entry
                 H->>+PG: tracker state poller<br/>PR_NUMBER={PR} ISSUE_KEY=""
                 PG->>GH: gh pr view --json state
@@ -367,7 +367,7 @@ sequenceDiagram
         H->>FS: write escalation entry<br/>(per-cycle summaries, root cause, next steps)
         H->>+CC: docs(story.{P}.{E}.{S}): implementation report — qa loop escalation
         CC-->>-H: hash
-        H->>GH: git push origin HEAD
+        H->>GH: push-policy.sh --site qa-escalation → git push origin HEAD (a HALT always pushes)
         H->>H: HALT — QA loop limit reached
         note right of H: resume offers "Resume the QA loop with {k} more cycles"<br/>(grant-qa-cycles.sh writes extra_cycles_granted, qa_max_cycles, convergence_from_cycle, qa_phase)
     end
@@ -399,7 +399,7 @@ sequenceDiagram
         Hook-->>CC: additionalContext = ""<br/>(noop)
     else lock present
         Hook->>Rep: append "Pipeline Paused — {ts}" entry
-        Hook->>GH: git add report && git commit && git push
+        Hook->>FS: git add report && git commit (pushed only under pushRecordCommits: eager)
         Hook->>GH: gh pr comment {pr_url} (best-effort)
         Hook->>GH: tracker-comment.js {tracker_issue} (GitHub or Jira, deferred under restricted access.tracker)
         Hook->>Lock: rm -f

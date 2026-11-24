@@ -289,7 +289,13 @@ Exit the loop and proceed to Step 7.
    ```bash
    git reset HEAD -- '**/*.implementation.*.md' 2>/dev/null || true
    ```
-   Invoke `/commit-changes` with `exclude={bug-prefix}.implementation.*.md,{bug-prefix}.*.implementation.*.md` (both report shapes — TASK-125-BUG-17) and message `fix({bug-prefix}): fix cycle {N} — {brief summary}`. Then `git push origin HEAD`. Record the commit hash in the Verify Cycle entry.
+   Invoke `/commit-changes` with `exclude={bug-prefix}.implementation.*.md,{bug-prefix}.*.implementation.*.md` (both report shapes — TASK-125-BUG-17) and message `fix({bug-prefix}): fix cycle {N} — {brief summary}`. Record the commit hash in the Verify Cycle entry. Then push, as the push policy answers (source: `references/push-policy.sh`; a record-only fix waits for the next push, Step 7's acceptance push at the latest):
+
+   ```bash
+   if [ "$(bash .agents/skills/develop-bug/references/push-policy.sh --site qa-cycle)" != defer ]; then
+     git push origin HEAD
+   fi
+   ```
 
 5. Increment the counter and return to **5a**. No budget test here: it was made at 5a, before this 5b was entered, so a verify always follows.
 

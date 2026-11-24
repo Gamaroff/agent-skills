@@ -10,7 +10,15 @@
 # Writes ONE line to RESULT_FILE when it concludes: "<STATE> <HEAD> <CHECKS> <WAITED>s TREE_EQ=<sha12 or empty>".
 # <STATE> is the rollup token, or UNDECIDED when MAX_WAIT ran out on a SUCCESS that never qualified.
 # ENGINE is the path of ci-tree-equivalence.js; absent means the docs-only rule is off for this poll.
-# GitHub only: every read below is `gh`. Bitbucket forms are noted beside each read.
+# Runs on GitHub and Bitbucket (task.319): resolve-platform.sh beside this file names the forge, and when
+# it is missing or rejects the configuration the forge is GitHub, as before. The Bitbucket arm is below
+# the GitHub reads; both write the same line with the same tokens.
+#
+# Siblings the Bitbucket arm runs (spelled out so the bundler ships them):
+#   shared/resources/resolve-platform.sh      (which forge)
+#   shared/resources/pr-read.sh               (the PR's head and destination)
+#   shared/resources/bitbucket-auth.sh        (the credential)
+#   shared/resources/ci-tree-equivalence.js   (--reduce-bitbucket: the rollup token)
 if [ "$#" -lt 4 ] || [ -z "${1:-}" ] || [ -z "${2:-}" ] || [ -z "${3:-}" ] || [ -z "${4:-}" ]; then
   echo "usage: finalise-ci-poll.sh <PR_NUMBER> <EXPECTED_HEAD> <MAX_WAIT_SECONDS> <RESULT_FILE> [EXPECTED_CHECKS] [ENGINE]" >&2
   exit 2
@@ -23,7 +31,6 @@ TREE_EQ=""; TE_LATCHED=0
 command -v jq >/dev/null 2>&1 || { [ -z "$ENGINE" ] || echo "ci-tree-equivalence off: jq not found" >&2; ENGINE=""; }
 # The Step 6 rollup query, the same jq program as reading 1 (finalise/SKILL.md Step 6, CI_ROLLUP).
 # A test holds the two equal: ci-tree-equivalence.test.mjs › "the 6c poll's rollup() is Step 6's query".
-# Bitbucket: the head commit's pipeline statuses.
 rollup() {
   # shellcheck disable=SC2016  # $st is a jq variable, not a shell one: single quotes are intended
   gh pr view "$PR_NUMBER" --json statusCheckRollup \
@@ -42,16 +49,50 @@ rollup() {
           else "SUCCESS" end' 2>/dev/null || echo "UNKNOWN"
 }
 # The head CI was actually sampled on — read from the PR, never echoed back from the argument.
-# Bitbucket: the PR's .source.commit.hash. "unknown" on failure makes the later-turn head check
-# HALT rather than pass.
+# "unknown" on failure makes the later-turn head check HALT rather than pass.
 sampled_head() { gh pr view "$PR_NUMBER" --json headRefOid -q .headRefOid 2>/dev/null || echo unknown; }
 # How many checks the rollup is green OVER. A push registers its fast lanes first; a rollup
 # sampled in that window is SUCCESS across three checks while the slow lanes have not yet
 # appeared (obs #87). Distinct checks, the same query as CI_CHECKS_1 (obs #3).
-# Bitbucket: the pipeline count for the head commit.
 checks() { gh pr view "$PR_NUMBER" --json statusCheckRollup -q '[.statusCheckRollup[] | (.name // .context // "")] | unique | length' 2>/dev/null || echo 0; }
+sample() { STATE=$(rollup); CHECKS=$(checks); }
+
+# ── Bitbucket ────────────────────────────────────────────────────────────────
+# One sample = the PR (its head and destination), then that head's commit statuses, reduced by
+# ci-tree-equivalence.js: no status is parsed here. A pull-request pipeline reports under the key
+# `prs:<pattern>:<destination>`, and one commit can carry a key per destination (a branch with a PR
+# into develop and another into main), so only the keys of THIS PR's destination count. Any read that
+# fails is UNKNOWN, which is never green.
+SELF_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+POLL_VCS=$( . "$SELF_DIR/resolve-platform.sh" >/dev/null 2>&1 && printf '%s' "$VCS") || POLL_VCS=github
+if [ "$POLL_VCS" = bitbucket ]; then
+  # shellcheck source=/dev/null
+  . "$SELF_DIR/pr-read.sh" || { echo "finalise-ci-poll: pr-read.sh is missing beside this file" >&2; exit 2; }
+  BB_HEAD=unknown
+  sampled_head() { printf '%s\n' "$BB_HEAD"; }
+  sample() {
+    STATE=UNKNOWN; CHECKS=0; BB_HEAD=unknown
+    local body code reduced
+    pr_read --pr "$PR_NUMBER" || { echo "finalise-ci-poll: $PR_READ_ERROR" >&2; return 0; }
+    BB_HEAD=$PR_READ_HEAD
+    body=$(mktemp) || return 0
+    code=$(curl -s -o "$body" -w '%{http_code}' "${BB_CURL_AUTH[@]}" \
+      "${PR_READ_BB_API}/repositories/${PR_READ_REPO}/commit/${PR_READ_HEAD}/statuses?pagelen=100" 2>/dev/null)
+    if [ "$code" = 200 ]; then
+      reduced=$(command node "$SELF_DIR/ci-tree-equivalence.js" --reduce-bitbucket --destination "$PR_READ_BASE" < "$body" 2>/dev/null)
+      case "$reduced" in
+        *' '[0-9]*) STATE=${reduced%% *}; CHECKS=${reduced##* } ;;
+      esac
+    else
+      echo "finalise-ci-poll: the commit statuses answered HTTP ${code:-000}" >&2
+    fi
+    rm -f "$body"
+  }
+fi
+
 WAITED=0; PREV_CHECKS=-1
-STATE=$(rollup); CHECKS=$(checks)
+sample
 # A terminal state is accepted only when ALL of:
 #   (1) WAITED > 0 — the pre-loop sample can still be the PREVIOUS head's rollup, which a
 #       fresh push has not yet replaced (obs #108: a stale SUCCESS accepted at 0s);
@@ -94,7 +135,7 @@ decided() {
 DECIDED=0
 while [ "$WAITED" -lt "$MAX_WAIT" ]; do
   decided && { DECIDED=1; break; }
-  sleep 30; WAITED=$((WAITED + 30)); PREV_CHECKS=$CHECKS; STATE=$(rollup); CHECKS=$(checks)
+  sleep 30; WAITED=$((WAITED + 30)); PREV_CHECKS=$CHECKS; sample
 done
 # MAX_WAIT ran out. The last sample was taken after the loop's last decided(), so judge it once.
 # Only a SUCCESS is re-judged: decided() on a PENDING/NONE head asks the engine, and FAILURE is

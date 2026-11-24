@@ -15,6 +15,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
@@ -454,14 +455,30 @@ test("marker: never on a commit with code, off when the key is unset, and never 
   );
   assert.equal(subject(wt), "docs");
 
-  // code whose net effect is nil: the delta to the green ancestor is empty, the head commit is code
+  // unpushed code that some other run called green: the head is documentation over a green ancestor,
+  // and the push still carries code to the remote for the first time
+  const u = fixture(t, { config: MARKED_CONFIG });
+  const gu = commit(u.wt, "src.js", "code");
+  commit(u.wt, "docs/a.md", "docs");
+  const un = policy(u.wt, ["--mark", "--site", "step8"], {
+    env: withGreen(u.dir, gu),
+  });
+  assert.equal(un.out, "unmarked");
+  assert.match(un.err, /the unpushed commits change code/);
+
+  // code whose net effect is nil: the delta to the green ancestor is documentation, the head is code
   const r = fixture(t, { config: MARKED_CONFIG });
   const g2 = commit(r.wt, "src.js", "code");
   git(r.wt, "push", "-q", "origin", "HEAD");
+  commit(r.wt, "docs/a.md", "docs");
   commit(r.wt, "src.js", "code again");
   git(r.wt, "checkout", "-q", g2, "--", "src.js");
   git(r.wt, "commit", "-q", "-m", "put it back");
-  assert.equal(mark(r.wt, withGreen(r.dir, g2)), "unmarked");
+  const nil = policy(r.wt, ["--mark", "--site", "step8"], {
+    env: withGreen(r.dir, g2),
+  });
+  assert.equal(nil.out, "unmarked");
+  assert.match(nil.err, /the head commit changes code/);
 
   const off = fixture(t);
   const g3 = commit(off.wt, "src.js", "code");
@@ -488,54 +505,99 @@ test("marker: a head already on the remote is never amended", (t) => {
 
 // ── the scan: no push site decides on its own ───────────────────────────────
 
-const SCANNED = [
-  "shared/resources/develop-pipeline-on-precompact.sh",
-  "shared/resources/develop-pipeline-pause.md",
-  "shared/resources/develop-pipeline-hooks.md",
-  "shared/resources/develop-pipeline-step-5-6-qa-loop.md",
-  "shared/resources/develop-pipeline-step-7-finalise.md",
-  "shared/resources/develop-pipeline-step-8-commit.md",
-  "shared/resources/tick-pr.sh",
-  "skills/develop-task/SKILL.md",
-  "skills/develop-story/SKILL.md",
-  "skills/develop-bug/SKILL.md",
-  "skills/develop-next/SKILL.md",
-  "skills/develop-batch/SKILL.md",
-  "skills/finalise/SKILL.md",
-];
+/**
+ * The population is found, not listed: every authored file under shared/resources and skills/, so a new
+ * push site in a new file is read too. Generated copies, tests and fixtures are not authored sources.
+ */
+function authoredFiles() {
+  const out = [];
+  const isText = (f) => /\.(md|sh|js|mjs|json|py)$/.test(f);
+  const walk = (rel) => {
+    for (const e of readdirSync(join(ROOT, rel), { withFileTypes: true })) {
+      const p = `${rel}/${e.name}`;
+      if (e.isDirectory()) {
+        if (["tests", "node_modules", "references"].includes(e.name)) continue;
+        walk(p);
+      } else if (isText(e.name) && !/\.test\./.test(e.name)) out.push(p);
+    }
+  };
+  walk("shared/resources");
+  walk("skills");
+  // The one skill whose own step documents live in references/ (they carry no shared source).
+  const bugRefs = "skills/develop-bug/references";
+  for (const f of readdirSync(join(ROOT, bugRefs)))
+    if (/^develop-bug-/.test(f)) out.push(`${bugRefs}/${f}`);
+  return out.sort();
+}
+
+const DELETE = {
+  match: /git push (--quiet )?origin --delete/,
+  reason: "a remote-branch delete starts no CI run on a PR head",
+};
+const FIRST = "creates the branch on the remote; it has no PR and no CI yet";
+const PRINTED = "an instruction printed for a person to run";
+const NAMES = "text or a matcher that names the command and never runs it";
 
 /** A push that asks nobody, by file and by what it is. Every row needs its reason. */
 const EXEMPT = [
   {
     file: "skills/develop-bug/SKILL.md",
     match: /`git push -u origin HEAD`\. Step 1 deferred it/,
-    reason:
-      "the branch's first push: the comment names it, so it must exist first",
+    reason: FIRST,
+  },
+  { file: "skills/develop-next/SKILL.md", ...DELETE },
+  { file: "skills/develop-batch/SKILL.md", ...DELETE },
+  { file: "shared/resources/tick-pr.sh", ...DELETE },
+  {
+    file: "shared/resources/develop-pipeline-on-precompact.sh",
+    match: /echo "- \*\*Pushed:\*\* no/,
+    reason: PRINTED,
   },
   {
-    file: "skills/develop-next/SKILL.md",
-    match: /git push origin --delete/,
-    reason: "a remote-branch delete starts no CI run on a PR head",
+    file: "shared/resources/review-pipeline-step-0a-branch-setup.md",
+    match: /git push -u origin "\$\{EPIC_BRANCH\}"/,
+    reason: FIRST,
+  },
+  { file: "skills/create-branch/SKILL.md", match: /-u origin/, reason: FIRST },
+  {
+    file: "skills/create-parallel-stories/SKILL.md",
+    match: /-u origin/,
+    reason: FIRST,
   },
   {
-    file: "skills/develop-batch/SKILL.md",
-    match: /git push origin --delete/,
-    reason: "a remote-branch delete starts no CI run on a PR head",
+    file: "skills/create-pr/SKILL.md",
+    match: /git push -u origin|Verify `git push` exited/,
+    reason: "the push that opens the PR",
   },
-  {
-    file: "shared/resources/tick-pr.sh",
-    match: /git push --quiet -u origin "\$TICK_BRANCH"/,
-    reason: "the tick branch's only push, and it opens the tick PR",
-  },
+  ...["skills/develop-task/README.md", "skills/develop-story/README.md"].map(
+    (file) => ({
+      file,
+      match: /`git push origin HEAD` when `push-policy\.sh` answers `push`/,
+      reason: "the summary row; it states the policy",
+    }),
+  ),
+  { file: "skills/qa-fix/SKILL.md", match: /echo "\d\./, reason: PRINTED },
+  { file: "skills/qa-story/SKILL.md", match: /echo "\d\./, reason: PRINTED },
+  ...[
+    "shared/resources/defer-mutation.js",
+    "shared/resources/handover-verify.js",
+    "shared/resources/push-policy.sh",
+    "shared/resources/qa-execute-snippets.mjs",
+    "shared/resources/qa-runnable-prose-detection.md",
+    "shared/resources/tracker-access-record.md",
+    "shared/resources/tracker-issue-cli.md",
+    "skills/loop-supervisor/assets/supervisor-settings.json",
+    "skills/session-handoff/SKILL.md",
+  ].map((file) => ({ file, match: /git push/, reason: NAMES })),
 ];
 
-/** Lines with a `git push` that no push-policy call within the window above (or on the line) guards. */
+/** Lines with a `git push` that no push-policy call just above (or on, or under) the line guards. */
 function unguardedPushes(text, siteIds) {
   const lines = text.split("\n");
   const bad = [];
   lines.forEach((line, i) => {
     if (!/git push\b/.test(line)) return;
-    const window = lines.slice(Math.max(0, i - 8), i + 2).join("\n");
+    const window = lines.slice(Math.max(0, i - 3), i + 2).join("\n");
     const ids = [
       ...window.matchAll(/push-policy\.sh"?\s+--site\s+([a-z0-9-]+)/g),
     ].map((m) => m[1]);
@@ -558,7 +620,16 @@ test("scan: every git push in a pipeline document or pipeline skill asks push-po
   const used = new Set();
   const found = [];
   let guarded = 0;
-  for (const file of SCANNED) {
+  const files = authoredFiles();
+  for (const must of [
+    "shared/resources/develop-pipeline-step-5-6-qa-loop.md",
+    "skills/finalise/SKILL.md",
+    "skills/develop-next/SKILL.md",
+    "skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md",
+  ])
+    assert.ok(files.includes(must), `${must} is in the scanned population`);
+  for (const file of files) {
+    if (file === "shared/resources/push-policy.sh") continue; // the table itself
     const text = readFileSync(join(ROOT, file), "utf8");
     for (const m of text.matchAll(
       /push-policy\.sh"?\s+--site\s+([a-z0-9-]+)/g,
@@ -590,6 +661,14 @@ test("scan: the detector flags an unlisted push and an unknown site (non-vacuity
   assert.equal(
     unguardedPushes(
       'if [ "$(bash push-policy.sh --site nowhere)" = push ]; then\n  git push origin HEAD\nfi\n',
+      ids,
+    ).length,
+    1,
+  );
+  // a guard further up the document is not this push's guard
+  assert.equal(
+    unguardedPushes(
+      "bash push-policy.sh --site qa-cycle\n\n\n\n\ngit push origin HEAD\n",
       ids,
     ).length,
     1,
