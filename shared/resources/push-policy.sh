@@ -109,7 +109,7 @@ answer() { # token, reason
   exit 0
 }
 
-# The ref the next `git push <remote> HEAD` moves. Not `@{upstream}`: a branch cut from develop may
+# The ref the next `git push <remote> HEAD` moves. Not the configured upstream: a branch cut from develop may
 # track origin/develop, and a push still goes to the branch's own name.
 BRANCH=$(git symbolic-ref --short -q HEAD 2>/dev/null)
 REMOTE_REF=""

@@ -51,7 +51,7 @@ The two pipelines are the same shape. Read `story.{P}.{E}.{S}` and `task.{N}` as
 | 2 | `review-story` / `review-task` | **Review report** `*.review.{n}.{name}.md` | Yes — with Step 4's commit |
 | 3 | `develop` | Source changes, tests, and transient **test logs** `.claude/state/test-output-{ITER}-*.log` | Source yes, logs no |
 | 4 | `create-pr` | **Pull request** against the Q2 base | n/a (remote) |
-| 5 | `qa-story` / `qa-task` | **QA report** `*.qa.{n}.{name}.md` **and gate file** `*.gate.{n}.{name}.yml` — one pair per cycle | Yes — one commit + push per cycle |
+| 5 | `qa-story` / `qa-task` | **QA report** `*.qa.{n}.{name}.md` **and gate file** `*.gate.{n}.{name}.yml` — one pair per cycle | Yes — one commit per cycle; pushed when `push-policy.sh` says so ([rule](./configuration.md#when-the-pipelines-push)) |
 | 5c | `review-pr` | **PR review report** `*.pr-review.{n}.{name}.md` — the exit gate of the Steps 5–6 loop; also invocable standalone | Yes — carried by `/finalise`'s 6a acceptance commit |
 | 6 | `qa-fix` | Fix commits pushed to the branch (no new document) | Yes — immediately |
 | 7 | `finalise` | **DoD summary** `*.dod.{n}.{name}.md`, a PR comment, a tracker-issue comment, a board move, and `status: accepted` on the work item (plus `sprint-review-summary.md`, and for a task the registry tick) | Yes — `/finalise` 6a commits and pushes them, then takes a second CI reading |

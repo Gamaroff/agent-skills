@@ -104,6 +104,10 @@ develop: # optional — develop-story / develop-task / develop-bug pipelines
 
 finalise: # optional — /finalise
   deferralApprover: Pat Owner # optional — the repository owner(s), ONE comma-separated line; absent ⇒ no deferral is ever accepted
+  # Optional BLOCK list — commands /finalise runs again at the head when a criterion names one of them,
+  # word for word, as a code span. Absent ⇒ nothing is re-run (task.319).
+  rerunAtHead:
+    - npm run docs:check
 
 qa: # optional — the QA loop's diminishing-returns exit
   # Which paths count as TEST MACHINERY rather than product. Glob strings, each
@@ -136,6 +140,12 @@ ci: # optional — the docs-only rule at the pipeline's CI waits (task.172)
     checkCommand: ""
     checkTimeoutSeconds: 1500 # the check is killed after this long and the finding is check-failed
     settleSeconds: 300 # an ancestor whose newest check is younger than this is still PENDING (0 turns it off)
+  # Optional text a pipeline appends to the subject of a head that holds only records, so the platform
+  # starts no CI for it ("[skip ci]"). Leave it empty when a merge check needs a status on the head.
+  skipMarker: ""
+
+pipeline: # optional — when the develop pipelines push (task.319)
+  pushRecordCommits: batched # batched | eager; eager pushes after every commit, as before task.319
 
 changelog: # optional — /finalise's CHANGELOG checks (task.241)
   # OFF BY DEFAULT: unset, /finalise never reads CHANGELOG.md (unless the work item's
@@ -158,6 +168,7 @@ developNext: # optional — develop-next roadmap orchestrator
   baseBranch: develop
   qualityGateCommand: npm run ci # merge gate run on every branch before gh pr merge
   mergeStrategy: merge # merge | squash | rebase
+  tickVia: push # push | pr — pr ticks through a docs PR, for a base branch that refuses direct pushes
 
 qaNext: # optional — qa-next UAT loop orchestrator
   registryPath: docs/qa/uat-registry.md # one row per user function; uat-surfaces.json beside it
@@ -298,11 +309,15 @@ gate, and strategy — single-item and batch runs never diverge) and adds
 | `ci.docsOnly.checkCommand`                       | shell command                   | unset                                            | A local check run from the repo root once a head is found docs-only over a green ancestor. Non-zero exits make the finding `check-failed` and the site waits as before. Unset, the rule applies on the patterns alone. **Set it to reproduce every check that a workflow path-filtered to your docs patterns would have run**: a green ancestor that never touched those paths never ran that workflow. |
 | `ci.docsOnly.checkTimeoutSeconds`                 | positive integer (seconds)      | `1500`                                           | How long `checkCommand` may run before it is killed and the finding is `check-failed`. The `/finalise` 6c poll runs the check inside its decision loop, so an unbounded check would stall the poll past its own wait bound without writing a result. The default matches `FINALISE_CI_MAX_WAIT`. |
 | `ci.docsOnly.settleSeconds`                      | non-negative integer (seconds)  | `300`                                            | How old an ancestor's newest completed check or status must be before its green counts. A push registers its fast lanes first, so a green read in the first minutes can be a partial rollup (obs #87 guards the head with a check-count floor; an ancestor has none). An ancestor with no timestamps cannot be shown to have settled and is `PENDING`. `0` turns the guard off. |
+| `ci.skipMarker`                                  | one printable line              | `""` (off)                                       | Text a pipeline appends to the subject of a commit it is about to push when that push changes no code over a green, settled ancestor. Never applied to a commit with code, to a commit already pushed, or when anything is unproven. **Leave it empty when a merge check needs a status on the head.** See [When the pipelines push](#when-the-pipelines-push). |
+| `pipeline.pushRecordCommits`                     | `batched` \| `eager`            | `batched`                                        | Whether commits that hold only records wait for the next push that needs to happen. `eager` pushes after every commit, the behaviour before task 319. Read at the `HEAD` commit. See [When the pipelines push](#when-the-pipelines-push). |
+| `finalise.rerunAtHead`                           | block list of shell commands    | absent — nothing is re-run                       | Commands `/finalise` Step 3a runs at the head before it grades a criterion that names one, as a code span equal to the entry. Output and exit code go to the DoD. Read at the `HEAD` commit, never the working tree; a working tree with uncommitted code refuses. A criterion naming an unlisted command keeps its own rule. Near-miss spellings of the key are a usage error. |
 | `changelog.enforce`                              | boolean                         | `false` (unset)                                  | Turns on `/finalise`'s two CHANGELOG checks: the docs subagent's "CHANGELOG.md updated" judgement and Step 7 action 6d, which HALTs `no-changelog-entry` when `## [Unreleased]` does not cite `(task N)`. **Unset, `/finalise` never reads `CHANGELOG.md`** — the subagent reports `NOT_APPLICABLE` ("changelog checks not enabled"), 6d prints `6d: changelog checks not enabled`, and no other DoD agent checks it; the one exception is a work item whose own acceptance criteria name the changelog. A config the reader cannot follow (YAML outside its subset on a host without PyYAML) reads as off with a warning naming why. The citation convention is this repository's own ([releases.md](../contributing/releases.md)), so a consumer whose changelog is generated, or cites Jira keys or PR numbers, must not opt in. On is a YAML true in any spelling both config readers return (`true`, `yes`, `on`, any case); any other value that is not a false spelling is off with a warning naming it. Write `true`, directly under `changelog:`. One resolver answers it, `changelog-enforce.sh`, read by both checks (task.241); a resolver that is missing or cannot load its reader is a broken install, and `/finalise` HALTs `changelog-unknown` rather than reading it as off |
 | `developNext.roadmapPath`                        | path                            | `docs/development/project-completion-roadmap.md` | Completion roadmap parsed by `develop-next`'s deterministic selector (`select-next.mjs`).                                                                                                                                                                                                                                                                                                                                                                                                 |
 | `developNext.baseBranch`                         | branch name                     | `develop`                                        | Branch `develop-next` syncs before selection, merges completed epics into, and commits roadmap ticks to.                                                                                                                                                                                                                                                                                                                                                                                  |
 | `developNext.qualityGateCommand`                 | shell command                   | `npm run ci`                                     | Local merge gate `develop-next` and `develop-batch` run on every branch before merging (the whole gate for projects without PR CI). **Expected to be the project's full CI-equivalent** — everything the CI job runs, in one command — so that a local green predicts a CI green. Defaulted to `npm test` until 2026-09-01, which was quietly weaker than the CI it was meant to predict; an explicit value here still wins. |
 | `developNext.mergeStrategy`                      | `merge` \| `squash` \| `rebase` | `merge`                                          | Strategy passed to `gh pr merge`.                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `developNext.tickVia`                            | `push` \| `pr`                  | `push`                                           | How `develop-next` and `develop-batch` land the tick commit. `push` commits on `baseBranch` and pushes it. `pr` commits on `docs/<roadmap>-tick-<id>`, opens a PR and merges it through Step 3's merge gate (quality gate, pinned head, green CI, PR state). |
 | `qaNext.registryPath`                            | path                            | `docs/qa/uat-registry.md`                        | The owner's UAT registry — one row per **user function**, authored by hand, grouped by surface; each row names the stories that built it. `uat-surfaces.json` (surfaces, epic → surface map, `storyNa`, `uatSpecPattern`) is read from the same directory. |
 | `qaNext.baseUrl` / `qaNext.apiUrl` / `qaNext.healthPath` / `qaNext.apiHealthPath` | URL / URL / path / path | (none) / (none) / `/` / `/health`          | The environment `/qa-next` exercises. `baseUrl` is required for a run; `apiUrl` enables HTTP probes; preflight `curl`s `baseUrl + healthPath` and, when `apiUrl` is set, `apiUrl + apiHealthPath` — never the bare API origin, whose root is a 404 on most frameworks — and stops with `env-unreachable` on failure. |
 | `qaNext.envLabel`                                | string                          | `local`                                          | Names the environment in run files: `runs/<id>/<date>-<envLabel>.md` — one directory per function. |
@@ -453,6 +468,31 @@ Things worth knowing:
 - **`checkCommand` runs in the foreground** of `/finalise` reading 1 and of the `/develop-next` and `/develop-batch` merge arms, so keep it, or `checkTimeoutSeconds`, under the host's tool timeout (600 s); a longer check is killed and the finding is `check-failed`, which waits for CI as before. This repository sets 570. The `/finalise` 6c poll also needs `jq`: without it the rule is off for that poll. The check runs as the leader of its own process group and the whole group is killed when it finishes or times out, so a check that starts children leaves none behind. The group is killed when the check ends or times out, not when the engine itself is interrupted or killed from outside: the check runs in its own session, so an interrupt or a host timeout that reaches the engine alone leaves the check running. It is **not run over uncommitted code** (the finding is `unverifiable`, which a poll re-asks): `checkCommand` runs in the working tree and would judge the uncommitted edits, not the commit. Uncommitted documentation is allowed, because `/finalise` reading 1 normally runs with its own DoD summary and report uncommitted; that is a stated residual, since an uncommitted edit to a document the check reads could still colour a green. Patterns are matched by a matcher whose cost is the number of pattern tokens times the path length, whatever the pattern, and a changed path with a `.`, `..` or empty segment is never documentation.
 - **A rebased `/develop-batch` head with code does not qualify.** Its diff to any green ancestor
   includes the item's own changes, so it waits as before.
+
+## When the pipelines push
+
+Every push to a branch with an open PR starts the project's CI. The develop pipelines commit after
+almost every step, and many of those commits hold only records. One script,
+[`push-policy.sh`](../../shared/resources/push-policy.sh), answers `push` or `defer` at every push a
+pipeline makes; its site table names, for each push, the step that reads the remote and so needs it.
+A deferred commit is not lost: it goes out with the next push, and the end of a run (Step 8, or a HALT)
+always pushes.
+
+- **`pipeline.pushRecordCommits: batched`** (the default) changes what a running pipeline shows: a
+  PreCompact pause commits its record and leaves the remote unmoved, a QA cycle pushes once when its
+  commits hold code, and a cycle whose commits are only records waits. `eager` restores a push after
+  every commit.
+- **What a deferred commit changes for a reader.** Until the next push the PR does not show it, and
+  `qa-ci-read.sh` reports `HEAD_MISMATCH` (advisory). Nothing that decides an outcome reads the remote
+  before the push that its row in the table requires.
+- **`ci.skipMarker`** is off by default. With `[skip ci]`, or the text your platform reads, the pipeline
+  amends the subject of the commit it is about to push, and only when every path not yet on the remote
+  is documentation by `ci.docsOnly.patterns` and an earlier commit of the branch has a green, settled
+  run. **Leave it empty when a merge check needs a status on the head:** the platform reports none for a
+  skipped run. `/finalise` and the merge gates then read the head through
+  [the docs-only rule](#the-docs-only-ci-rule).
+- **When it cannot decide** (no `node`, a malformed configuration, no remote branch to compare with) it
+  answers `push`, with the reason on stderr. The pause site answers `defer` instead.
 
 ## Stakeholder sign-off
 

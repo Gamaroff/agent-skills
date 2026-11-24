@@ -4,7 +4,32 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Changed
+
+- **The develop pipelines push when a run can answer something, not after every commit (task 319).**
+  New `shared/resources/push-policy.sh` answers `push` or `defer` at every push a pipeline makes; its
+  table names the step that reads the remote for each one. **Default behaviour changes:** a PreCompact
+  pause no longer pushes, and a QA cycle whose commits hold only records waits for the next push. The
+  end of a run and every HALT still push. `pipeline.pushRecordCommits: eager` restores the old
+  behaviour. A scan test fails on a push in the pipeline docs or skills that does not ask the helper.
+
 ### Added
+
+- **`ci.skipMarker` (task 319), off by default.** The pipelines append it to a commit they are about to
+  push when that push changes no code over a green, settled ancestor, and never otherwise. Leave it
+  empty when a merge check needs a status on the head.
+- **`finalise.rerunAtHead` (task 319).** `/finalise` Step 3a runs a listed command again at the head
+  before it grades a criterion that names it as a code span, and records output and exit code in the
+  DoD. A prior PASS on such a criterion is never carried over. Engine:
+  `shared/resources/finalise-rerun-at-head.js`.
+- **The security probe reaches a lint rule (task 319).** `--entry eslint:<path>#<rule-id>` lints each
+  case as that file with the repository's own ESLint and configuration; a reported rule is `rejected`.
+  Such a control was declined `entry-not-probeable` before.
+- **`/finalise`'s CI reading 2 poll reads Bitbucket (task 319).** `finalise-ci-poll.sh` takes the
+  destination's status key (`prs:**:<destination>`) and writes the same result line as on GitHub.
+- **`developNext.tickVia: pr` (task 319).** `develop-next` and `develop-batch` can land the tick through
+  a docs PR and the merge gate, for a base branch that refuses direct pushes. Default `push`. New
+  `shared/resources/tick-pr.sh`.
 
 - **`review-task` check 32: an allow-list that replaces a deny-list covers the whole set (task 312).**
   The review now asks that the table list every member of the set it gates, or state the count and
