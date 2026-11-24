@@ -1,0 +1,27 @@
+{
+  "sink": "template-render",
+  "entry": "shared/resources/finalise-rerun-at-head.js#parseRerunList",
+  "name": "finalise.rerunAtHead list",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 38,
+  "passed": 38,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "observation_limits": [
+    "effects-after-accept"
+  ],
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "fixture_copy": null,
+  "ran_at": "2026-11-24T21:44:37.251Z"
+}
