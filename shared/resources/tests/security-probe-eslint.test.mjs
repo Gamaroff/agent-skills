@@ -228,6 +228,52 @@ test("a malformed entry, an escape from the root and a missing file are each dec
   ]);
 });
 
+test("the route /finalise takes: a plan entry runs, records, and renders in the security_review block", (t) => {
+  const dir = repo(t);
+  const work = join(dir, "docs");
+  mkdirSync(work);
+  const plan = join(work, "plan.json");
+  const record = join(work, "task.9.dod.1.security.run.json");
+  const entry = "eslint:pkg/src/a.js#no-eval";
+  writeFileSync(
+    plan,
+    JSON.stringify([
+      {
+        argv: ["--sink", "shell-exec", "--entry", entry, "--name", "no-eval"],
+        cases: CASES,
+      },
+    ]),
+  );
+  const run = spawnSync(
+    process.execPath,
+    [
+      resolve(HERE, "..", "security-probe-plan.mjs"),
+      "--plan",
+      plan,
+      "--record",
+      record,
+      "--cases-base",
+      join(work, "task.9.dod.1.security.cases"),
+      "--repo-root",
+      dir,
+      "--json",
+    ],
+    { encoding: "utf8", timeout: BUDGET.timeoutMs * 4 },
+  );
+  const out = JSON.parse(run.stdout);
+  assert.equal(out.reason, "ran", run.stdout);
+  assert.equal(out.probes_executed, 3);
+  assert.deepEqual(out.refusals, []);
+  assert.deepEqual(out.probes, []);
+  assert.equal(out.observation_limits.length, 2);
+  const block = spawnSync(process.execPath, [ENGINE, "--emit-block", record], {
+    encoding: "utf8",
+    timeout: BUDGET.timeoutMs,
+  }).stdout;
+  assert.match(block, /probes_executed: 3/);
+  assert.ok(block.includes(entry), block);
+});
+
 test("the options of other forms are refused, through the API and through the CLI", (t) => {
   const dir = repo(t);
   const entry = "eslint:pkg/src/a.js#no-eval";

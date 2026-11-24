@@ -715,7 +715,9 @@ takes it.
   outcome is one reading: `<rule-id>` among the reported messages is `rejected`,
   absent from them is `accepted`, and any other rule's report is ignored. A
   `warn` counts as reported; a disable directive in the input suppresses the
-  report and reads `accepted`, which is what it does in the repository. State the
+  report and reads `accepted`, which is what it does under the configuration
+  alone. **Flags of the repository's lint script are not reproduced**
+  (`--no-inline-config`, `--config`, `--rule`): a stated limit. State the
   cases with `--cases-file`: the stock corpora are not source text. The package
   is the nearest `node_modules/eslint` between the file and the repo root, never
   one above it, and the child runs in the directory of the nearest ESLint

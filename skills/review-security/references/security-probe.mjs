@@ -137,8 +137,9 @@
  * case's input, linted AS `<path>` so that file's configuration applies, and
  * reads one thing: whether `<rule-id>` is among the reported messages —
  * `rejected` when it is, `accepted` when it is not. A disable directive in the
- * input suppresses the report, as it would in the repository, so that case reads
- * `accepted`. Nothing is written to the repository and `<path>` is not read by
+ * input suppresses the report, as it would under the configuration alone, so that
+ * case reads `accepted`; flags of the repository's lint script
+ * (`--no-inline-config`, `--config`, `--rule`) are not reproduced. Nothing is written to the repository and `<path>` is not read by
  * the rule: its content is replaced by the input.
  *
  * THE SHELL ENTRY FORM (task.128). A boundary delivered as a bash script has no

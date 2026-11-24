@@ -22,7 +22,8 @@
  * "AT THE HEAD" IS CHECKED. An uncommitted path — staged, unstaged or untracked — is refused
  * (`dirty-tree`) unless it is documentation by ci.docsOnly.patterns: /finalise's own records are
  * uncommitted at this point by design, and they are documentation. A run over edited code would be
- * reported as the head's. The rule and its code are the docs-only check's own (dirtyNonDocsPaths).
+ * reported as the head's. The rule and its code are the docs-only check's own (dirtyNonDocsPaths),
+ * less `.claude/state/`, the pipelines' own state, which a consumer need not ignore.
  *
  * THE RUN IS DATA, NEVER A VERDICT. A command's non-zero exit does not change this engine's: the
  * criterion says what the command must do, and the AC agent grades the saved run against it.
@@ -58,6 +59,7 @@ const {
 } = require("./ci-tree-equivalence.js");
 
 const DEFAULT_TIMEOUT_SECONDS = 1500;
+const PIPELINE_STATE_DIR = ".claude/state/";
 const EXCERPT_LINES = 20;
 const EXCERPT_CHARS = 4000;
 const USAGE =
@@ -280,11 +282,15 @@ async function run(argv) {
     if (named.length === 0)
       return { reason: "none-named", exitCode: 0, ...base };
 
-    const dirty = dirtyNonDocsPaths(
+    const found = dirtyNonDocsPaths(
       execFileSync,
       root,
       parseConfig(text).patterns,
     );
+    // The pipelines keep their own state here, this engine's output included, and a consumer need
+    // not ignore it.
+    const dirty =
+      found && found.filter((f) => !f.startsWith(PIPELINE_STATE_DIR));
     if (dirty === null || dirty.length > 0)
       return {
         reason: "dirty-tree",

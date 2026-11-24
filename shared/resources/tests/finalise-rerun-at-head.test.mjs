@@ -201,6 +201,22 @@ test("a working tree that is not the head refuses: staged, unstaged or untracked
   assert.equal(run().rec.reason, "ran");
 });
 
+test("the pipeline's own state directory is not code, ignored by git or not; a file beside it is", (t) => {
+  const { dir, run } = fixture(t, {
+    config: LIST("echo a"),
+    criteria: ["`echo a` passes"],
+  });
+  writeFileSync(join(dir, ".gitignore"), "");
+  git(dir, "commit", "-q", "-am", "nothing is ignored");
+  // the caller's redirect target and the pipeline lock, untracked
+  mkdirSync(join(dir, ".claude", "state"), { recursive: true });
+  writeFileSync(join(dir, ".claude", "state", "develop-pipeline.lock"), "{}");
+  assert.equal(run().rec.reason, "ran");
+  assert.equal(run().rec.reason, "ran");
+  writeFileSync(join(dir, ".claude", "hook.sh"), "x\n");
+  assert.equal(run().rec.reason, "dirty-tree");
+});
+
 test("a command that outlives its bound is killed with what it started, and has no status", (t) => {
   const { dir, run } = fixture(t, {
     config: LIST("sh -c '(sleep 3; touch late) & sleep 30'"),
