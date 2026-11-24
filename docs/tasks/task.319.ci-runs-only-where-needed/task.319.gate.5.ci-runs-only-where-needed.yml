@@ -1,0 +1,138 @@
+schema: 2
+task: 'task.319.ci-runs-only-where-needed'
+task_title: 'Pipelines spend a CI run only where a run can answer something'
+gate: CONCERNS
+status_reason: 'All 12 findings of cycle 4 are fixed and the suites and CI are green. The re-review of the files changed since gate 4 found no high defect; four medium and six low defects stand, each reproduced by QA with a control.'
+reviewer: 'QA Engineer'
+head: '8bf94fef4c3554af9d1cc16fb0935e91c2d90728'
+updated: '2026-11-24T17:21:56Z'
+
+top_issues:
+  - id: 'T319-CR-801'
+    severity: medium
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'Untracked files come from git ls-files, which core.ignorecase can blind: an untracked src/A.js beside a tracked src/a.js answers ran (origin: code-review, reproduced by QA; control with the setting false answers dirty-tree).'
+    suggested_action: 'Run the listing with core.ignorecase pinned to false, and add the case to the settings table test.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-802'
+    severity: medium
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'output_overwritten is one flag for both streams and is set when a stream is re-opened while still empty, so a command with whole stdout that uses > /dev/stderr cannot pass a criterion on what it prints (origin: code-review, reproduced by QA: both lines saved whole, flag true; control with >&2 false).'
+    suggested_action: 'Record the flag per stream, grade on the stream the criterion states, and tell a cut before any output from a cut after it.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-803'
+    severity: low
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'The block-start pattern is wider than the one Markdown uses: an unindented criterion line that starts with #936, an inline tag, a lone | row or a three-backtick span hides a listed command (origin: code-review, reproduced by QA: none-named; control without the # scan-broken).'
+    suggested_action: 'Require what CommonMark requires to interrupt a paragraph.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-804'
+    severity: low
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'The command list is read without GIT_NO_REPLACE_OBJECTS, so a replacement ref on the configuration blob supplies a list the HEAD commit does not hold (origin: code-review, reproduced by QA: not-configured becomes ran).'
+    suggested_action: 'Read the head and the configuration with the environment the tree comparison uses.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-805'
+    severity: low
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'A criteria section with no checkbox or numbered criterion answers scan-broken, which Step 3a halts on, while the record preflight answers empty for the same document (origin: code-review at medium confidence, reproduced by QA; control with a checkbox ran).'
+    suggested_action: 'Refuse that state only when a listed command stands in the section as a code span; otherwise none-named.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-901'
+    severity: medium
+    file: 'shared/resources/push-held.sh'
+    finding: 'The time limit kills git push and not its process tree, so a slow pre-push hook outlives the answer and can run twice at once (origin: code-review, reproduced by QA: a 6 s hook wrote its file after the script had returned under a 2 s bound; control with a fast hook pushed).'
+    suggested_action: 'Run the bounded command in its own process group, signal the group, and test that the hook is gone on return.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-902'
+    severity: medium
+    file: 'shared/resources/tick-pr.sh'
+    finding: 'A tick that landed by squash is read as not landed when the base later changed an adjacent row of the same file, because a merge-tree conflict and an absent tick give one answer (origin: code-review, reproduced by QA: start answered resume; control with a far row landed).'
+    suggested_action: 'Tell a conflict from absent and decide a conflict from the rows the tick added or from a merged PR with that head.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-904'
+    severity: low
+    file: 'shared/resources/push-held.sh'
+    finding: 'When mktemp fails, the remote is read through /dev/null and an existing branch is reported as deleted (origin: code-review, reproduced by QA with TMPDIR=/nonexistent; control nothing held).'
+    suggested_action: 'Refuse with its own reason when there is no scratch file.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-905'
+    severity: low
+    file: 'shared/resources/push-held.sh'
+    finding: 'A remote branch ahead of HEAD gets two answers: a failed push before a fetch, nothing held after one, although the PR head is not HEAD (origin: code-review, reproduced by QA in both states).'
+    suggested_action: 'Fetch the object when absent and answer equal, held, and ahead or diverged separately.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-906'
+    severity: low
+    file: 'shared/resources/push-held.sh'
+    finding: 'A push that ran out of time is stated as not pushed without asking the remote, and the server can still complete it (origin: code-review, reproduced by QA with a 5 s pre-receive hook: the remote equalled HEAD 7 s later).'
+    suggested_action: 'On a timeout ask the remote once more, or say the outcome is unknown.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 8879
+  phases_verified: '7/7'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5, 6]
+    phases_with_issues: [2, 4, 5]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 108
+    escaped: 0
+    boundary: true
+    boundary_signals: ["never"]
+    notes: 'parseRerunList engages, 38 of 38; push-policy --site, 48 of 48; push-held --site, 22 of 22. CR-801 and CR-804 need a local git setting or a replacement ref in the runner checkout.'
+  performance:
+    status: PASS
+    notes: 'pushes before (eager): 9; after (batched): 6, re-run at this head.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-901 leaves a hook running past its bound; CR-902 can open a second tick PR; CR-905 and CR-906 state the wrong outcome of a push.'
+  maintainability:
+    status: PASS
+    notes: 'One decision helper, one site table, and one push per HALT.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix the four medium and six low findings'
+      refs: ['shared/resources/finalise-rerun-at-head.js', 'shared/resources/tick-pr.sh', 'shared/resources/push-held.sh']
+  future:
+    - action: 'CR-903 (advisory, a trace of prose, not reproduced by execution): count only executable calls as use of a push site, and give the 5c route its own qa-review-fix block'
+      refs: ['shared/resources/tests/push-policy.test.mjs', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+      remedy: unverified
+    - action: 'Cleanups CR-806, CR-807, CR-808, CR-907 and CR-908'
+      refs: ['shared/resources/ci-tree-equivalence.js', 'shared/resources/finalise-rerun-at-head.js', 'shared/resources/push-held.sh', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md']
+      remedy: unverified
+
+bug_resolution:
+  bugs_fixed: 0
+  bugs_remaining: 0
+  verification_method: 'the cycle 4 reproduction scripts re-run at this head, and the committed tests; no bug report is open'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['the four medium findings fixed or accepted by the owner']
