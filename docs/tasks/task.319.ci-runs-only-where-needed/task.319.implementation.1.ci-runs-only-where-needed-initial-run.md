@@ -34,7 +34,7 @@ Push record-only commits with the next push that needs CI, add an opt-in skip ma
 | -------------------------- | ---------- | ---------------------------------------------------------------------- | ----- | -------------------- | --------------- |
 | 1. create-branch           | ✅ Done    | Branch `feature/task.319.*` exists in git                              | Branch created at `cc8b7afca` | —                    | 2026-11-24T09:44Z |
 | 2. review-task             | ⏭️ Skipped | `task.319.review.{N}.{name}.md` exists (or skip logged)                | Ready for Development + `review.2` exists | —                    | 2026-11-24T09:44Z |
-| 3. develop                 | ⏳ Pending | Task status == `Ready for Review`                                      |       | —                    |                 |
+| 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 7 of 7 phases; `ci:fast` and `eval:all` green on `f87488f55` | —                    | 2026-11-24T10:51Z |
 | 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.319.qa.{N}.*.md`; `task.319.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.319.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
@@ -78,6 +78,13 @@ Push record-only commits with the next push that needs CI, add an opt-in skip ma
 - `tick-pr.sh`: a PR with no checks merges on the quality gate alone, after the full wait.
 - Mutations, each red as required: push-policy (always push: 3 red; batched pause pushes; unreadable pause pushes; step8 not an end: 3; pre-5c weakened: 3; mark without tree-equivalence; mark over a code head; mark over unpushed code; mark of a pushed head; compare with the configured upstream: 7; the scan with the step8 guard removed); hook ignoring the policy (batched step 2 and 5 red); poll (old poll 5/5 red; destination filter dropped 2 red); tick-pr (gate, CI and head checks dropped, each red); rerun (substring, prefix, dirty check off, working-tree configuration, stale record kept, unbounded command, cached output); eslint (any rule counts, always rejected, rule presence, ignored, parse error, package above root, child cwd, rule id), and the re-judge reason.
 - Remote run 1 (on `fe2a844e2`): red with four failures, all from this branch and fixed: two defaults tests that did not expect `skipMarker`, a wait-marking parity test on develop-next's new block, and a source scan that reads `@{upstream}` in a comment.
+- Remote run 2 (on `0d5b5f71a`): one failure, from this branch and fixed: `review-task` check 4 did not name the new re-run criterion kind.
+- Remote run 3 (on `f87488f55`, `CI=true`): `npm run ci:fast` green, 8806 passed, 0 failed, 3 skipped. `validate:all`, `check:generated`, `lint:shell`, `lint:secrets` and `bundle:check` green locally.
+- `rerunAtHead` dirty check: `.claude/state/` is left out, because a consumer need not ignore it. The first version of that test was green without the fix and its commit message said otherwise; the test was corrected, proven red with the filter removed, and the commit amended before any push.
+- Remote `eval:all` (on `f87488f55` plus this report's edits): green.
+- Development completion comment `posted` to GitHub issue #936.
+- Step 4: everything but this report was committed before the step, so its commit carries the report alone and the scope is the work-item directory. The PR body was written in-line from the CHANGELOG entries (summariser not dispatched).
+- Loop audit (inline, not dispatched): 16 of 16 checkboxes in § 6, status `Ready for Review`.
 
 ---
 
