@@ -56,6 +56,9 @@ class ESLint {
     // what ESLint 8 does with a configured rule no plugin defines
     for (const r of Object.keys(this.config))
       if (r.startsWith("ghost/") && on(r)) messages.push({ ruleId: r, severity: 2, line: 1, message: "Definition for rule '" + r + "' not found." });
+    // ESLint 9's and 8's wording (9.39.1, 8.57.1) for an inline configuration the rule cannot take
+    if (text.includes("inline-9")) messages.push({ ruleId: "no-eval", severity: 2, line: 1, message: 'Inline configuration for rule "no-eval" is invalid:\\n\\tExpected severity' });
+    if (text.includes("inline-8")) messages.push({ ruleId: "no-eval", severity: 2, line: 1, message: 'Configuration for rule "no-eval" is invalid:\\n\\tSeverity should be' });
     if (!text.includes("eslint-disable")) {
       if (on("no-eval") && /\\beval\\(/.test(text)) messages.push({ ruleId: "no-eval", severity: on("no-eval"), line: 1 });
       if (on("@acme/lint/no-tabs") && text.includes("\\t")) messages.push({ ruleId: "@acme/lint/no-tabs", severity: 2, line: 1 });
@@ -279,6 +282,71 @@ test("a malformed entry, an escape from the root and a missing file are each dec
     "effects-after-accept",
     "outside-sandbox-write",
   ]);
+});
+
+test("an eslint entry without cases is declined by name, never scored on the corpus: API, CLI and plan (T319-CR-205)", (t) => {
+  const dir = repo(t);
+  const entry = "eslint:pkg/src/a.js#no-eval";
+  const r = runProbeSpec({ sink: "shell-exec", entry, repoRoot: dir });
+  assert.equal(r.verdict, "unverifiable", JSON.stringify(r));
+  assert.equal(r.reason, "bad-cases");
+  assert.equal(r.executed, 0);
+  const argv = ["--sink", "shell-exec", "--entry", entry];
+  const record = join(dir, "run.json");
+  const cli = spawnSync(
+    process.execPath,
+    [ENGINE, ...argv, "--record", record, "--repo-root", dir, "--json"],
+    { encoding: "utf8", timeout: BUDGET.timeoutMs * 4 },
+  );
+  assert.equal(cli.status, 2, cli.stdout);
+  assert.equal(JSON.parse(cli.stdout).reason, "bad-cases");
+  assert.ok(!readdirSync(dir).includes("run.json"), "nothing is recorded");
+  const plan = join(dir, "plan.json");
+  writeFileSync(
+    plan,
+    JSON.stringify([{ argv: [...argv, "--name", "x"], cases: null }]),
+  );
+  const run = spawnSync(
+    process.execPath,
+    [
+      resolve(HERE, "..", "security-probe-plan.mjs"),
+      "--plan",
+      plan,
+      "--record",
+      record,
+      "--cases-base",
+      join(dir, "task.9.dod.1.security.cases"),
+      "--repo-root",
+      dir,
+      "--json",
+    ],
+    { encoding: "utf8", timeout: BUDGET.timeoutMs * 4 },
+  );
+  const out = JSON.parse(run.stdout);
+  assert.equal(out.probes_executed, 0, run.stdout);
+  assert.match(JSON.stringify(out.refusals), /bad-cases/);
+});
+
+test("ESLint's own report of an inline configuration it cannot take is not the rule's: declined alone, scored beside a report (T319-CR-210)", (t) => {
+  const r = probe(repo(t), "eslint:pkg/src/a.js#no-eval", [
+    { id: "nine", direction: "hostile", input: "/* inline-9 */ x(1);\n" },
+    { id: "eight", direction: "hostile", input: "/* inline-8 */ x(1);\n" },
+    { id: "both", direction: "hostile", input: "/* inline-9 */ eval(1);\n" },
+    { id: "plain", direction: "legitimate", input: "x(1);\n" },
+  ]);
+  assert.deepEqual(outcomes(r), {
+    nine: "errored",
+    eight: "errored",
+    both: "rejected",
+    plain: "accepted",
+  });
+  assert.equal(r.executed, 2);
+  assert.deepEqual(
+    r.declined.map((d) => d.id),
+    ["nine", "eight"],
+  );
+  for (const d of r.declined)
+    assert.match(d.detail, /the input configures the rule, and wrongly/);
 });
 
 test("the route /finalise takes: a plan entry runs, records, and renders in the security_review block", (t) => {

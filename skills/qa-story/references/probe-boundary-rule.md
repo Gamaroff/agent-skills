@@ -170,7 +170,7 @@ Declining conditions, each reported with its reason:
 | `bad-entry` | The entry spec is not `path#exportName`. |
 | `outside-repo-root` | The resolved path escapes the containment root. |
 | `unknown-sink` | No corpus for that sink. `corpusFor` throws rather than returning `[]`, deliberately. |
-| `bad-cases` | A supplied case is not an object, its `direction` is not `hostile` or `legitimate`, or its `sink` is set and is not a known sink. A `null` sink counts as absent. The CLI refuses the same input with exit 2. |
+| `bad-cases` | A supplied case is not an object, its `direction` is not `hostile` or `legitimate`, or its `sink` is set and is not a known sink. A `null` sink counts as absent. Also an `eslint:` entry with no supplied cases: the corpus is not source text. The CLI refuses the same input with exit 2. |
 | `entry-not-probeable` | The module would not import, the export is absent, or it is not a function. An **absent** export is a module-private predicate: export it and re-run — never a reason for `boundary: false` (obs #156). For `fence:`: the heading is not in the doc, appears twice, or has no ```` ```bash ```` block under it. |
 | `entry-not-probeable`, the `eslint:` shape | The linted file is missing or ignored, no configuration that applies to it names the rule, or no plugin defines the rule it names (task.319). The detail says which. One input that does not parse is a declined case, not a declined entry. |
 | `eslint-unavailable` | An `eslint:` entry, and no `eslint` package is installed between the linted file's directory and the repo root. Install the repository's dependencies and re-run (task.319). |

@@ -4,7 +4,7 @@
 **Bug ID**: TASK-319-BUG-1
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-11-24
 
@@ -49,3 +49,4 @@ Account for every row of the block, as `ci` and `pipeline` do, and refuse what t
 | Date | Status | Changed By | Notes |
 | --- | --- | --- | --- |
 | 2026-11-24 | Ready for QA | qa-fix | Fixed in QA cycle 1 |
+| 2026-11-24 | Closed | qa-task | Verified by task.319.qa.2.ci-runs-only-where-needed.md |

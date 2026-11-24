@@ -89,6 +89,9 @@ const CRITERION_REASONS = Object.freeze([
   "unchanged",
 ]);
 
+// The answers of finalise-rerun-at-head.js that say what was run: every other one is a refusal.
+const RERUN_ANSWERED = Object.freeze(["ran", "none-named", "not-configured"]);
+
 // The test citation the AC prompt gives a criterion it graded on a re-run command.
 const RE_RERUN_CITATION = /^NOT_APPLICABLE: command re-run at the head\b/;
 
@@ -309,7 +312,7 @@ function fullScope(reason, criteria, head, extra = {}) {
  * The texts of the criteria a finalise-rerun-at-head.js record lists, as readCriteria reads them. Its
  * `criteria[].index` counts readCriteriaEntries from 1, so the line is looked up there and not by this
  * engine's own position, which skips an empty criterion. Throws when the record names a criterion this
- * document does not have: it is another document's.
+ * document does not have, or has in other words: it is another document's, or another state of it.
  */
 function rerunCriterionLines(rerun, docBody) {
   const out = new Set();
@@ -321,6 +324,14 @@ function rerunCriterionLines(rerun, docBody) {
       if (!entry)
         throw new Error(
           `the re-run record names criterion #${c.index}; the document has ${entries.length}`,
+        );
+      const text = [entry.line, ...entry.continuation]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+      if (c.text !== text)
+        throw new Error(
+          `the re-run record's criterion #${c.index} is not the document's; run the re-run block again`,
         );
       out.add(normaliseText(entry.line));
     }
@@ -1073,8 +1084,9 @@ function main(argv) {
         priorText = null;
       }
     }
-    // The record of THIS run and head, or nothing: a record of another head, or one that cannot be
-    // read, would leave out criteria whose command ran, so it is refused rather than ignored.
+    // The record of THIS run, document and head, or nothing: another head's, another document's, one
+    // that cannot be read, or a refused run's (no runs, and not because nothing was named) would leave
+    // out criteria whose command ran or should have, so it is refused rather than ignored.
     let rerun = null;
     if (opts.rerunAtHead && opts.rerunAtHead !== "none") {
       try {
@@ -1091,6 +1103,16 @@ function main(argv) {
         return usage(
           opts.json,
           `--rerun-at-head is not a record of ${head}: ${opts.rerunAtHead}`,
+        );
+      if (!RERUN_ANSWERED.includes(rerun.reason))
+        return usage(
+          opts.json,
+          `--rerun-at-head is a run that did not answer (${rerun.reason}): ${opts.rerunAtHead}`,
+        );
+      if (rerun.document !== path.basename(opts.doc))
+        return usage(
+          opts.json,
+          `--rerun-at-head is a record of ${rerun.document}, not of ${path.basename(opts.doc)}: ${opts.rerunAtHead}`,
         );
     }
     let s;

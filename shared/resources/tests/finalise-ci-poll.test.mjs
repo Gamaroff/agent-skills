@@ -40,6 +40,7 @@ function runPoll(
     floor = "1",
     maxWait = "90",
     movesAfter = 0,
+    engine = false,
   },
 ) {
   const dir = mkdtempSync(join(tmpdir(), "ci-poll-bb-"));
@@ -89,6 +90,9 @@ function runPoll(
 out=""; prev=""; url=""
 for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; url="$a"; done
 echo "$url" >> "${dir}/curl.log"
+limit=""; prev=""
+for a in "$@"; do [ "$prev" = "--max-time" ] && limit="$a"; prev="$a"; done
+case "$limit" in "" | 0 | *[!0-9]*) echo "unbounded $url" >> "${dir}/curl.log" ;; esac
 case "$url" in
   */pullrequests/7)
     if [ ${movesAfter} -gt 0 ] && [ "$(grep -c 'pullrequests/7' "${dir}/curl.log")" -gt ${movesAfter} ]; then
@@ -111,6 +115,13 @@ esac
   );
   for (const f of ["curl", "sleep", "gh"]) chmodSync(join(bin, f), 0o755);
   const result = join(dir, "result.txt");
+  const fakeEngine = join(dir, "engine.js");
+  writeFileSync(
+    fakeEngine,
+    `require("fs").appendFileSync(${JSON.stringify(join(dir, "curl.log"))}, "engine " + process.argv.slice(2).join(" ") + "\\n");
+console.log(JSON.stringify({ reason: "tree-equivalent", greenSha: "${"b".repeat(40)}" }));
+`,
+  );
   const env = {
     ...process.env,
     PATH: `${bin}:${process.env.PATH}`,
@@ -121,7 +132,9 @@ esac
   delete env.TRACKER;
   let r;
   for (let i = 0; i <= BUDGET.retries; i += 1) {
-    r = spawnSync("bash", [POLL, "7", HEAD, maxWait, result, floor], {
+    const args = [POLL, "7", HEAD, maxWait, result, floor];
+    if (engine) args.push(fakeEngine);
+    r = spawnSync("bash", args, {
       cwd: repo,
       env,
       encoding: "utf8",
@@ -255,6 +268,29 @@ test("Bitbucket: the head in the result line is read when the line is written (T
     movesAfter: 2,
   });
   assert.equal(r.line, `SUCCESS ${"c".repeat(12)} 1 30s TREE_EQ=`, r.stderr);
+});
+
+test("Bitbucket: the docs-only rule is asked with the PR's destination, so ancestors are read as the head is (T319-CR-306)", (t) => {
+  const r = runPoll(t, {
+    statuses: [{ values: [status("prs:**:main", "INPROGRESS")] }],
+    destination: "main",
+    engine: true,
+  });
+  assert.equal(
+    r.line,
+    `SUCCESS ${SHORT} 1 30s TREE_EQ=${"b".repeat(12)}`,
+    r.stderr,
+  );
+  assert.match(r.log, /^engine .*--pr 7 --destination main --json$/m);
+});
+
+test("Bitbucket: every request carries a time limit, so a stalled server cannot hold the poll (T319-CR-311)", (t) => {
+  const r = runPoll(t, {
+    statuses: [{ values: [status("prs:**:develop", "SUCCESSFUL")] }],
+  });
+  assert.match(r.log, /pullrequests\/7$/m, "the PR was read");
+  assert.match(r.log, /\/statuses\?/, "the statuses were read");
+  assert.doesNotMatch(r.log, /^unbounded /m);
 });
 
 test("Bitbucket: the check floor holds a partial rollup", (t) => {

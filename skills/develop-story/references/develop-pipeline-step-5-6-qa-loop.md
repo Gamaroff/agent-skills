@@ -1257,8 +1257,9 @@ working tree, where a branch switch loses it and no reader of the PR ever sees i
    fi
    ```
 
-   The mid-loop PR MERGED / CLOSED HALT (step 5 below) runs the same block, after a `defer` at step 3
-   as after a push.
+   The mid-loop PR MERGED / CLOSED HALT (step 5 below) pushes at the same site, after a `defer` at step 3
+   as after a push, and without the `--mark` line: the report has logged that head's hash, and a mark
+   amends it.
 
 Those two, plus the convergence-stall and loop-limit escalations, are the **only** places a standalone `docs(...)`
 commit for the gate and QA report is correct — each because there is no `fix(...)` commit in that
@@ -1494,7 +1495,7 @@ After fixes are applied:
 
    Branch on `result.pr.state`:
    - `"OPEN"` → continue QA loop normally.
-   - `"MERGED"` or `"CLOSED"` → push what the loop held (the path 2 block, `push-policy.sh --site qa-halt`), then HALT: "PR #{PR_NUMBER} was {state} mid-QA loop — pipeline cannot continue. Verify PR state and re-run if needed." Log in Issues Log.
+   - `"MERGED"` or `"CLOSED"` → push what the loop held (the path 2 block **without its `--mark` line**: step 4 has logged the head's hash, and a mark amends it; `push-policy.sh --site qa-halt`), then HALT: "PR #{PR_NUMBER} was {state} mid-QA loop — pipeline cannot continue. Verify PR state and re-run if needed." Log in Issues Log.
    - `null` / missing / empty (poller succeeded but state field absent) → log warning `"⚠️ PR state unknown after qa-fix push — re-polling once"`; re-invoke the poller once. If the second result is still null/missing, log `"⚠️ PR state could not be determined — proceeding optimistically (treating as OPEN)"` in Issues Log and continue. Do **not** HALT on null — flaky `gh pr view` is more common than mid-loop close.
    - `result.errors | length > 0` → log each error in Issues Log; treat `pr.state` per the rules above (the poller may still return a usable state alongside non-fatal errors).
 
@@ -1697,7 +1698,11 @@ acceptance, the commits that can run before 6a are path-limited for the same rea
 commits only its `touched` paths, and the PreCompact pause commit only the report. **A HALT in that
 window is the exception.** The Step 7 DoD-gaps halt, a terminal-HALT report commit, and `/qa-fix` after
 a re-entry at 5a all commit through `/commit-changes`. Each of them carries the staged set and pushes
-it. That is the behaviour before this change: the set is review evidence, and nothing is lost.
+it. That is the behaviour before this change: the set is review evidence, and nothing is lost. **A pause
+in that window is the second.** Its report commit links to the staged review report, so it is held and
+never pushed alone: Step 7's entry commits the staged set behind it and pushes the two together
+(`develop-pipeline-step-7-finalise.md`, its entry block). With nothing held, that entry pushes nothing and the set
+stays staged for 6a.
 
 **A finding is doc-only when the path in its `ref` matches `ci.docsOnly.patterns`** — task.172's
 set, read through its own reader (`readConfig` + `isDocsPath` in `ci-tree-equivalence.js`), so

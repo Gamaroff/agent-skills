@@ -28,24 +28,30 @@
  * while they run, refuses too and leaves no run.json. The uncommitted documentation is listed in the
  * record, because a command that reads documentation read that. The rule and its code are the docs-only
  * check's own (dirtyNonDocsPaths), less `.claude/state/`, the pipelines' own state, which a consumer need
- * not ignore, and less this engine's own output.
+ * not ignore, less this engine's own output, and less the work item's own DoD records beside it
+ * (`<id>.dod.*`, listed with the documentation: a project whose patterns are Markdown only would refuse
+ * its own ac.json on a resume). A file marked skip-worktree or assume-unchanged is compared as well,
+ * because `git status` does not look at it. A path git ignores is not compared: it is not the head's.
  *
  * THE RUN IS DATA, NEVER A VERDICT. A command's non-zero exit does not change this engine's: the
  * criterion says what the command must do, and the AC agent grades the saved run against it.
  *
  * WHAT BOUNDS IT. --timeout-seconds is the budget of the WHOLE run, not of each command: a command that
  * reaches it is killed, and one that would start after it is recorded as not started. A stream past
- * --max-output-bytes stops its command. A kill reaches the command's process group; a descendant in a
- * session of its own (`setsid`, a daemon) is outside it and outlives the bound.
+ * --max-output-bytes stops its command (`stopped_for_size`) and is cut there; the size is looked at every
+ * 200 ms, so a fast command can end over it by itself, with a status and its output cut all the same
+ * (`output_capped` covers both). A kill reaches the command's process group; a descendant in a session of
+ * its own (`setsid`, a daemon) is outside it and outlives the bound.
  *
  * Usage:
  *   finalise-rerun-at-head.js --doc <path> --out-dir <dir> [--workspace-root <dir>]
  *                             [--timeout-seconds <n>] [--max-output-bytes <n>] [--json]
  *
  *   --out-dir is emptied of an earlier run's record first, so a file in it is always this run's.
- *   It writes <n>.stdout, <n>.stderr, run.json: { head, uncommitted_docs, runs: [{ command, criteria,
- *   exit_code, timed_out, not_started, output_capped, stdout, stderr }] }, and run.md, the block for the
- *   DoD running summary.
+ *   It writes <n>.stdout, <n>.stderr, run.json: { document, head, uncommitted_docs, runs: [{ command,
+ *   criteria, exit_code, timed_out, not_started, stopped_for_size, output_capped, stdout, stderr }] }, and
+ *   run.md, the block for the DoD running summary. The --json answer carries `document` too: the work
+ *   item's file name, which finalise-rerun-scope.js holds against its own --doc.
  *
  * reason / exit:
  *   ran             0  at least one command was run
@@ -58,6 +64,7 @@
  */
 
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const { parseYamlSubset } = require("./yaml-subset.js");
@@ -68,10 +75,13 @@ const {
   assertMapping,
   configTextAtCommit,
   dirtyNonDocsPaths,
+  isDocsPath,
   killProcessGroup,
   parseConfig,
   spawnCheck,
+  topLevelKey,
 } = require("./ci-tree-equivalence.js");
+const docId = require("./doc-id.js");
 
 const DEFAULT_TIMEOUT_SECONDS = 1500;
 const DEFAULT_MAX_OUTPUT_BYTES = 16 * 1024 * 1024;
@@ -82,6 +92,9 @@ const EXCERPT_CHARS = 4000;
 const EXCERPT_BYTES = 64 * 1024;
 const USAGE =
   "usage: finalise-rerun-at-head.js --doc <path> --out-dir <dir> [--workspace-root <dir>] [--timeout-seconds <n>] [--max-output-bytes <n>] [--json]";
+
+/** Every key of the `finalise` block (docs/reference/configuration.md). */
+const FINALISE_KEYS = ["deferralApprover", "rerunAtHead"];
 
 const normKey = (k) => String(k).toLowerCase().replace(/[-_]/g, "");
 
@@ -94,7 +107,7 @@ function rawEntries(text) {
     const t = l.trim();
     if (t === "" || t.startsWith("#")) continue;
     if (/^\S/.test(l)) {
-      inFinalise = /^finalise\s*:/.test(l);
+      inFinalise = topLevelKey(l) === "finalise";
       inList = false;
       continue;
     }
@@ -136,18 +149,23 @@ function parseRerunList(rawText) {
   const text = String(rawText).replace(/^﻿/, "");
   const parsed = parseYamlSubset(text) || {};
   assertMapping(text, parsed);
+  // A list under a key nobody reads is a list that is silently not run (T319-CR-208).
   for (const k of Object.keys(parsed)) {
-    if (k !== "finalise" && normKey(k) === "finalise")
+    if (k !== "finalise" && ["finalise", "finalize"].includes(normKey(k)))
       throw new UsageError(
         `${k} looks like finalise; the key is exactly "finalise"`,
+      );
+    if (normKey(k) === "rerunathead")
+      throw new UsageError(
+        `${k} is at the top level; the list goes under "finalise", as finalise.rerunAtHead`,
       );
   }
   const block = parsed.finalise;
   if (block && typeof block === "object" && !Array.isArray(block))
     for (const k of Object.keys(block)) {
-      if (k !== "rerunAtHead" && normKey(k) === "rerunathead")
+      if (!FINALISE_KEYS.includes(k))
         throw new UsageError(
-          `finalise.${k} looks like finalise.rerunAtHead; the key is exactly "rerunAtHead"`,
+          `finalise.${k} is not a key /finalise reads (${FINALISE_KEYS.join(", ")})`,
         );
     }
   assertBlockRows(text, parsed, "finalise");
@@ -235,10 +253,9 @@ async function runOne(
     fs.closeSync(out);
     fs.closeSync(err);
   }
-  const stopped = Boolean(r && r.error && r.error.code === "ESTOPPED");
-  if (stopped)
-    for (const f of [stdout, stderr])
-      if (fs.statSync(f).size > maxBytes) fs.truncateSync(f, maxBytes);
+  // Whatever ended the command: a fast one can pass the bound between two looks (T319-CR-209).
+  for (const f of [stdout, stderr])
+    if (fs.statSync(f).size > maxBytes) fs.truncateSync(f, maxBytes);
   return {
     command,
     criteria,
@@ -248,6 +265,7 @@ async function runOne(
       r === null || r.error || typeof r.status !== "number" ? null : r.status,
     timed_out: Boolean(r && r.error && r.error.code === "ETIMEDOUT"),
     not_started: r === null,
+    stopped_for_size: Boolean(r && r.error && r.error.code === "ESTOPPED"),
     output_capped: capped,
     stdout,
     stderr,
@@ -275,9 +293,9 @@ function excerpt(file) {
 function statusOf(r) {
   if (r.not_started) return "not started: the run's time budget was spent";
   if (r.timed_out) return "timed out";
-  if (r.output_capped && r.exit_code === null)
-    return "stopped: its output passed the bound";
-  return r.exit_code === null ? "did not finish" : `exit ${r.exit_code}`;
+  if (r.stopped_for_size) return "stopped: its output passed the bound";
+  const end = r.exit_code === null ? "did not finish" : `exit ${r.exit_code}`;
+  return r.output_capped ? `${end}, its output cut at the bound` : end;
 }
 
 /** The DoD block: each run, with the tail of what it printed, fenced by more backticks than it holds. */
@@ -348,10 +366,68 @@ function parseArgs(argv) {
 }
 
 /**
+ * The files `git status` was told not to look at (skip-worktree, assume-unchanged) whose content is not
+ * the head's. Compared through a throwaway index read from the head, which carries no such flag. A
+ * skip-worktree file that is missing is a sparse checkout, not an edit.
+ */
+function hiddenEdits(top, head) {
+  const exec = (args, env = process.env) =>
+    execFileSync("git", ["-c", "core.fsmonitor=false", ...args], {
+      cwd: top,
+      env,
+      encoding: "utf8",
+      maxBuffer: 512 * 1024 * 1024,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+  const flagged = new Map();
+  for (const row of exec(["ls-files", "-v", "-z"]).split("\0")) {
+    const tag = row[0];
+    if (tag && (/[a-z]/.test(tag) || tag === "S"))
+      flagged.set(row.slice(2), tag);
+  }
+  if (flagged.size === 0) return [];
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rerun-at-head-index-"));
+  try {
+    const env = { ...process.env, GIT_INDEX_FILE: path.join(dir, "index") };
+    exec(["read-tree", "--no-sparse-checkout", head], env);
+    return exec(["diff", "--name-only", "--no-renames", "-z"], env)
+      .split("\0")
+      .filter((f) => flagged.has(f))
+      .filter((f) => {
+        if (!/s/i.test(flagged.get(f))) return true;
+        try {
+          fs.lstatSync(path.join(top, f));
+          return true;
+        } catch {
+          return false;
+        }
+      });
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/** Is this path (from the repository's root) a DoD record of the work item `doc`, beside it? */
+function isOwnDodRecord(file, top, doc) {
+  const { id } = docId.parse(path.basename(doc));
+  if (!id) return false;
+  let dir;
+  try {
+    dir = path.relative(top, fs.realpathSync(path.dirname(doc)));
+  } catch {
+    return false;
+  }
+  return (
+    path.dirname(file) === (dir || ".") &&
+    path.basename(file).startsWith(`${id}.dod.`)
+  );
+}
+
+/**
  * What the working tree holds that the head does not: { why, docs }. `why` is "" when the tree is the
  * head as far as code goes, else the sentence to refuse with.
  */
-function compareWithHead({ git, root, head, patterns, outDir }) {
+function compareWithHead({ git, root, head, patterns, outDir, doc }) {
   let now;
   try {
     now = git("rev-parse", "--verify", "HEAD^{commit}");
@@ -375,13 +451,25 @@ function compareWithHead({ git, root, head, patterns, outDir }) {
   const own = (f) =>
     f.startsWith(PIPELINE_STATE_DIR) ||
     (f.startsWith(outPrefix) && OWN_FILE.test(f.slice(outPrefix.length)));
-  const dirty = code.filter((f) => !own(f));
+  const dod = (f) => isOwnDodRecord(f, top, doc);
+  const dirty = code.filter((f) => !own(f) && !dod(f));
+  let hidden;
+  try {
+    hidden = hiddenEdits(top, head);
+  } catch {
+    return {
+      why: "the files git status is told to skip could not be compared with the head",
+      docs: [],
+    };
+  }
+  const hiddenCode = hidden.filter((f) => !isDocsPath(f, patterns));
+  const bad = [...dirty, ...hiddenCode];
   return {
     why:
-      dirty.length > 0
-        ? `the working tree is not the head: ${dirty.slice(0, 5).join(", ")}`
+      bad.length > 0
+        ? `the working tree is not the head: ${bad.slice(0, 5).join(", ")}`
         : "",
-    docs: all.filter((f) => !own(f) && !code.includes(f)),
+    docs: [...all, ...hidden].filter((f) => !own(f) && !bad.includes(f)),
   };
 }
 
@@ -404,7 +492,8 @@ async function run(argv) {
         if (OWN_FILE.test(f)) fs.unlinkSync(path.join(outDir, f));
     const text = configTextAtCommit(execFileSync, root, head);
     const list = text === null ? [] : parseRerunList(text);
-    const base = { head, runs: [] };
+    const document = path.basename(o.doc);
+    const base = { document, head, runs: [] };
     if (list.length === 0)
       return { reason: "not-configured", exitCode: 0, ...base };
 
@@ -445,6 +534,7 @@ async function run(argv) {
         head,
         patterns,
         outDir,
+        doc: path.resolve(root, o.doc),
       });
       for (const f of found) docs.add(f);
       return why === ""
@@ -476,6 +566,7 @@ async function run(argv) {
     const result = {
       reason: "ran",
       exitCode: 0,
+      document,
       head,
       uncommitted_docs: [...docs].sort(),
       runs,
@@ -484,7 +575,7 @@ async function run(argv) {
     fs.writeFileSync(path.join(outDir, "run.md"), markdown(result));
     fs.writeFileSync(
       path.join(outDir, "run.json"),
-      `${JSON.stringify({ head, uncommitted_docs, runs }, null, 2)}\n`,
+      `${JSON.stringify({ document, head, uncommitted_docs, runs }, null, 2)}\n`,
     );
     return result;
   } catch (e) {

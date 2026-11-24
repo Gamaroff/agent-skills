@@ -347,11 +347,16 @@ If a situation arises that is not in this table or the shared defaults table and
 - **Commit the report before any halt.** Invoke `/commit-changes` for the report before surfacing any HALT so the audit trail is in git even when the pipeline doesn't complete — and **lint it first** (call site (2) of four): `command node .agents/skills/develop-bug/references/report-lint.js --file "{implementation-report-path}" --json; rc=$?; case $rc in 0) ;; 1) echo "⚠️ report failed lint — HALT commit skipped; repair {implementation-report-path} by hand" ;; 2) echo "⚠️ report-lint usage error (rc 2) — the call site is wrong, not the report; causes: develop-pipeline-step-8-commit.md § report-lint usage error; HALT commit skipped" ;; *) echo "⚠️ report-lint.js not runnable (rc $rc) — HALT commit skipped" ;; esac`. A report that fails the linter is **not committed** by this rule, and the HALT **still proceeds** to the snapshot and lock removal below — the same decision the PreCompact hook makes, because the snapshot and the lock removal are what resume depends on and a lint failure must not strand the lock (task.124 QA cycle 2, CR-5). The corruption stays in the working tree, named, for a human to repair before the next commit. The HALT commit is the one most likely to carry a half-written report, because it is written under the pressure that caused the halt.
 - **Every push asks `push-policy.sh` first.** A commit with code is pushed at once; a record-only commit rides the next push, unless a step that reads the remote runs first or the run ends. The script's site table is the contract; no step decides for itself, and a `defer` is logged in the Decisions Log with the site that deferred. `pipeline.pushRecordCommits: eager` restores a push after every commit. The script: `references/push-policy.sh`.
 - **The implementation report is the primary recovery tool.** Always include its path in halt messages.
-- **Snapshot then remove the lock file before every terminal HALT** (same protocol as develop-task):
+- **Push what the run held, then snapshot and remove the lock file, before every terminal HALT** (same protocol as develop-task):
 
-  Run **one call** — it writes the snapshot, removes the lock and the transient test logs, and is idempotent. Run it **before** the HALT message, never after (a HALT that only printed its message left the lock in place with no snapshot on three runs, obs #49). `--step` defaults to the lock's `current_step`; a non-zero exit means nothing was halted:
+  Run **this one block** — once a PR is open it pushes the record commits the run was holding, whichever step halts; then it writes the snapshot, removes the lock and the transient test logs, and is idempotent. Run it **before** the HALT message, never after (a HALT that only printed its message left the lock in place with no snapshot on three runs, obs #49). `--step` defaults to the lock's `current_step`; a non-zero exit means nothing was halted:
 
   ```bash
+  LOCK=.claude/state/develop-pipeline.lock
+  if [ -n "$(jq -r '.pr_url // empty' "$LOCK" 2>/dev/null)" ] && [ "$(jq -r .branch "$LOCK")" = "$(git branch --show-current)" ] &&
+    [ "$(bash .agents/skills/develop-bug/references/push-policy.sh --site halt)" != defer ]; then
+    git push origin HEAD || echo "⚠️ the held commits were not pushed; the HALT goes on"
+  fi
   bash .agents/skills/develop-bug/references/advance-pipeline-lock.sh --halt --reason "{halt_reason}" --step {halt_step} {bug-directory}
   ```
 

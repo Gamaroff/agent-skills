@@ -119,7 +119,7 @@ pr_read() {
   body=$(mktemp) || { PR_READ_ERROR="mktemp failed"; return 1; }
   if [ -n "$pr" ]; then
     what="PR #${pr} on Bitbucket"
-    http_status=$(curl -s -o "$body" -w '%{http_code}' "${BB_CURL_AUTH[@]}" \
+    http_status=$(curl -s --max-time 30 -o "$body" -w '%{http_code}' "${BB_CURL_AUTH[@]}" \
       "${PR_READ_BB_API}/repositories/${ws}/${repo}/pullrequests/${pr}" 2>/dev/null)
   else
     # symbolic-ref, not `rev-parse --abbrev-ref`: on a detached HEAD that prints the literal
@@ -131,7 +131,7 @@ pr_read() {
       return 1
     fi
     what="the open PR for branch '${branch}' on Bitbucket"
-    http_status=$(curl -s -G -o "$body" -w '%{http_code}' "${BB_CURL_AUTH[@]}" \
+    http_status=$(curl -s --max-time 30 -G -o "$body" -w '%{http_code}' "${BB_CURL_AUTH[@]}" \
       --data-urlencode "q=source.branch.name=\"${branch}\" AND state=\"OPEN\"" \
       "${PR_READ_BB_API}/repositories/${ws}/${repo}/pullrequests" 2>/dev/null)
   fi

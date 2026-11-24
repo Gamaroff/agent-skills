@@ -24,7 +24,7 @@
  *
  * Usage:
  *   ci-tree-equivalence.js --head-rollup PENDING|NONE|... [--head <sha>] [--pr <n>] [--json]
- *                          [--workspace-root <dir>] [--platform github|bitbucket]
+ *                          [--workspace-root <dir>] [--platform github|bitbucket] [--destination <branch>]
  *
  * Exit codes:
  *   0  tree-equivalent
@@ -42,7 +42,9 @@
  *
  * `--json` prints { reason, greenSha, changed, changedCount, checkExit, pr, detail, reads } and nothing
  * else on stdout. `changed` is capped at 200 entries; `changedCount` is the real length.
- * `--pr` is recorded in that payload for the caller's log; no decision reads it.
+ * `--pr` is recorded in that payload for the caller's log. On Bitbucket it also names the pull request
+ * whose destination branch filters the ancestors' statuses, unless `--destination` gives it; a destination
+ * that cannot be read is `unverifiable`. With neither, every status of an ancestor counts.
  * The local check's own output goes to stderr for that reason.
  *
  * Config (skills-config.yaml, every key optional):
@@ -108,7 +110,7 @@ const SKIP_MARKER_MAX = 80;
 
 const USAGE =
   "usage: ci-tree-equivalence.js --head-rollup <PENDING|NONE|...> [--head <sha>] [--pr <n>] " +
-  "[--json] [--workspace-root <dir>] [--platform github|bitbucket]\n" +
+  "[--json] [--workspace-root <dir>] [--platform github|bitbucket] [--destination <branch>]\n" +
   "       ci-tree-equivalence.js --push-policy [--base <rev>] [--head <rev>] [--workspace-root <dir>]\n" +
   "       ci-tree-equivalence.js --reduce-bitbucket --destination <branch>  (statuses JSON on stdin)";
 
@@ -422,6 +424,16 @@ function significantLines(text) {
 }
 
 /**
+ * The key of a row at column 0, in the YAML subset's own key grammar (bare or quoted), or null. A quoted
+ * key counted as no key hid a second copy of a block: the parse keeps the last one, so a list checked in
+ * the first copy ran from the second (T319-CR-201).
+ */
+function topLevelKey(line) {
+  const m = /^(?:"([^"]+)"|'([^']+)'|([\w.-]+))\s*:/.exec(line);
+  return m ? (m[1] ?? m[2] ?? m[3]) : null;
+}
+
+/**
  * How many source rows belong to a top-level `ci:` key: the `ci:` row itself and every row up to the
  * next row at column 0. Read from the text, not from the parse, so a row the parse dropped still
  * counts. Only this block is held to account (CR6-1): it is the only part of the file this engine
@@ -434,10 +446,7 @@ function ciBlockRows(text, key = "ci") {
   let n = 0;
   let inBlock = false;
   for (const l of significantLines(text)) {
-    if (/^\S/.test(l)) {
-      const name = l.match(/^([A-Za-z0-9_-]+)\s*:/);
-      inBlock = Boolean(name) && name[1] === key;
-    }
+    if (/^\S/.test(l)) inBlock = topLevelKey(l) === key;
     if (inBlock) n++;
   }
   return n;
@@ -895,7 +904,15 @@ function githubRollup(
 
 /** Bitbucket: /commit/{sha}/statuses. A 403 or any non-200 is UNKNOWN, never "no CI". */
 async function bitbucketRollup(
-  { exec, cwd, env, fetchImpl, settleSeconds = 0, now = Date.now() },
+  {
+    exec,
+    cwd,
+    env,
+    fetchImpl,
+    destination = "",
+    settleSeconds = 0,
+    now = Date.now(),
+  },
   sha,
 ) {
   try {
@@ -921,14 +938,38 @@ async function bitbucketRollup(
       url = next;
     }
     if (url) return "UNKNOWN"; // more pages than we read: do not decide on a partial list
+    // An ancestor is read by the rule its PR's head is read by: a green for another destination is not
+    // this PR's green, and a red for another destination is not its red (T319-CR-306).
     return settle(
-      reduceBitbucketStatuses(values),
+      destination
+        ? bitbucketPrRollup(values, destination)
+        : reduceBitbucketStatuses(values),
       values.map((v) => v.updated_on),
       settleSeconds,
       now,
     );
   } catch {
     return "UNKNOWN";
+  }
+}
+
+/** The branch a Bitbucket pull request merges into, or null when it cannot be read. */
+async function bitbucketDestination({ exec, cwd, env, fetchImpl }, pr) {
+  try {
+    const auth = bbAuthHeader(env);
+    if (auth.scheme === "none" || !/^\d+$/.test(String(pr))) return null;
+    const { workspace, repo } = bbSlug((cmd, args, opts) =>
+      exec(cmd, args, { ...opts, cwd }),
+    );
+    const res = await (fetchImpl || globalThis.fetch)(
+      `${BB_API}/repositories/${workspace}/${repo}/pullrequests/${pr}`,
+      { headers: { Authorization: auth.header } },
+    );
+    if (!res || res.status !== 200) return null;
+    const name = (await res.json()).destination.branch.name;
+    return typeof name === "string" && name !== "" ? name : null;
+  } catch {
+    return null;
   }
 }
 
@@ -957,6 +998,7 @@ function parseArgs(argv) {
     "--pr",
     "--workspace-root",
     "--platform",
+    "--destination",
   ]);
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
@@ -1156,13 +1198,23 @@ async function run({
     }
     const platform = args.platform || detectPlatform(exec, root, env);
     const settleOpts = { settleSeconds: cfg.settleSeconds, now: now() };
-    const rollupOf = (sha) =>
-      platform === "bitbucket"
-        ? bitbucketRollup(
-            { exec, cwd: root, env, fetchImpl, ...settleOpts },
-            sha,
-          )
-        : githubRollup(exec, root, sha, settleOpts);
+    // Asked once, and only when an ancestor is read. A PR whose destination cannot be read leaves every
+    // ancestor UNKNOWN: unfiltered, another destination's green would be this PR's.
+    const bb = { exec, cwd: root, env, fetchImpl };
+    let destination = null;
+    const destinationOf = () =>
+      (destination ??= Promise.resolve(
+        args.destination ||
+          (args.pr === undefined ? "" : bitbucketDestination(bb, args.pr)),
+      ));
+    const rollupOf = async (sha) => {
+      if (platform !== "bitbucket")
+        return githubRollup(exec, root, sha, settleOpts);
+      const dest = await destinationOf();
+      return dest === null
+        ? "UNKNOWN"
+        : bitbucketRollup({ ...bb, destination: dest, ...settleOpts }, sha);
+    };
 
     if (ancestorShas === null && listError) {
       result = {
@@ -1483,6 +1535,7 @@ module.exports = {
   UsageError,
   assertMapping,
   assertBlockRows,
+  topLevelKey,
   spawnCheck,
   killProcessGroup,
   dirtyNonDocsPaths,

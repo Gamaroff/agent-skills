@@ -1,0 +1,201 @@
+schema: 2
+task: 'task.319.ci-runs-only-where-needed'
+task_title: 'Pipelines spend a CI run only where a run can answer something'
+gate: CONCERNS
+status_reason: 'Both high findings of cycle 1 are closed and the suites are green. The full-diff refute pass found twelve medium and seven low defects, most of them in the repair of the tick path, the re-run record and the HALT pushes.'
+reviewer: 'QA Engineer'
+head: 'f54e31cb4a6d45ae934d8e4e167cf62751d779be'
+updated: '2026-11-24T12:24:48Z'
+
+top_issues:
+  - id: 'T319-CR-201'
+    severity: medium
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'A second finalise block whose key is quoted passes the row accounting: the first block is validated and the second one runs. Reproduced by QA: echo a then a quoted block with echo b#c returns the truncated echo b; controls: the unquoted duplicate and a lone echo b#c are refused.'
+    suggested_action: 'Read a top-level key with the parser''s own key grammar in the row counter and refuse a key that appears twice in any spelling, for every block that shares assertBlockRows.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-202'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'Step 8a compares only the exit code of the re-run on the fix head, so a criterion graded on its output keeps a PASS the new run contradicts.'
+    suggested_action: 'Re-grade every criterion the new record lists by the AC prompt''s rule, or go to Step 8 when the exit code or the output differs.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-203'
+    severity: medium
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'With documentation patterns limited to Markdown, finalise''s own uncommitted DoD records (the ac.json and the security run record) answer dirty-tree at Step 8a or on a resumed Step 3a.'
+    suggested_action: 'Exempt the work item''s own co-located DoD records, scoped to its directory and stem, and list them.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-204'
+    severity: medium
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'An edit to a tracked file marked skip-worktree or assume-unchanged is invisible to git status, so it is run and reported as the head''s.'
+    suggested_action: 'Refuse such a path when its content is not the head''s, or state the limit where the claim is made.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-205'
+    severity: medium
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'An eslint entry without a cases file is scored on the stock corpus, which is not source text: a rule that engages reads absent.'
+    suggested_action: 'Decline an eslint entry with no supplied cases, and exit 2 from the CLI.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-301'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-7-finalise.md'
+    finding: 'The finalise-entry flush pushes a held pause commit whose report links to a file that is staged and not committed (the 5c set), which the pause hook holds back on purpose, and it contradicts the 5c rule that nothing is pushed before finalise.'
+    suggested_action: 'Do not flush a record-only commit while a link target of it is staged and uncommitted, and make the two documents agree.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-302'
+    severity: medium
+    file: 'skills/develop-next/SKILL.md'
+    finding: 'The tick merge block binds the gate command in a double-quoted string, so the outer shell expands $?, $( ) and backticks in it and a red gate can read green.'
+    suggested_action: 'Bind the command without expansion, with a test that has $?, a variable and double quotes in the gate.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-303'
+    severity: medium
+    file: 'shared/resources/tick-pr.sh'
+    finding: 'A CI answer of NONE is accepted whatever the wait and the floor were: a zero or non-numeric --max-wait and a floor above zero both merged.'
+    suggested_action: 'Validate --max-wait and --checks, require the whole wait before NONE, refuse NONE under a floor above zero.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-304'
+    severity: medium
+    file: 'shared/resources/tick-pr.sh'
+    finding: 'A failed fetch of the tick branch is read as no branch: start answers new over a remote tick, and every later push is rejected.'
+    suggested_action: 'Tell absent from unreadable and halt when the look fails.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-305'
+    severity: medium
+    file: 'shared/resources/tick-pr.sh'
+    finding: 'The tree is compared with the head before the quality gate only, so a gate that rewrites a tracked file passes on content the tick head does not hold.'
+    suggested_action: 'Re-check the tree and the branch after the gate.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-306'
+    severity: medium
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'The destination filter reads the head only: an ancestor''s statuses are reduced unfiltered, so a green for another destination answers tree-equivalent.'
+    suggested_action: 'Pass the destination to the engine and reduce ancestors with the same function.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-307'
+    severity: medium
+    file: 'docs/reference/configuration.md'
+    finding: 'A HALT always pushes is still false for four HALTs of the QA loop (waiver, malformed gate, convergence, read-back), and the test names its rows by hand.'
+    suggested_action: 'One flush in the shared terminal-HALT protocol, and a test that enumerates the HALTs.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-206'
+    severity: low
+    file: 'shared/resources/finalise-rerun-scope.js'
+    finding: 'A refused run (dirty-tree or scan-broken, runs empty) is accepted as none-named is.'
+    suggested_action: 'Accept ran, none-named and not-configured only.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-207'
+    severity: low
+    file: 'shared/resources/finalise-rerun-scope.js'
+    finding: 'The record is tied to the document by index range alone, so another document''s record is accepted.'
+    suggested_action: 'Compare the recorded criterion text, or the document.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-208'
+    severity: low
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'finalize, a top-level rerunAtHead and a misspelt key inside finalise read not-configured. The probe found the first two as well.'
+    suggested_action: 'Refuse an unknown key inside finalise, and the two top-level spellings by name.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-209'
+    severity: low
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'A fast command can pass the output bound between two polls: its whole output is kept and output_capped does not tell the two cases apart.'
+    suggested_action: 'Truncate an over-bound stream whatever ended the command, and record the stop separately.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-210'
+    severity: low
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'ESLint''s own invalid inline configuration message is reported under the rule''s id and scored as a rejection.'
+    suggested_action: 'Decline it as the missing definition is declined.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-309'
+    severity: low
+    file: 'shared/resources/tick-pr.sh'
+    finding: 'The ticked-unpushed route leaves the local base holding the tick when origin has advanced.'
+    suggested_action: 'Reset the local base whenever the tick branch contains it, and run start before the re-sync.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-310'
+    severity: low
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'The MERGED or CLOSED HALT marks, and so amends, a commit whose hash the report has just logged.'
+    suggested_action: 'Do not mark there, or re-read the hash after marked.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 8835
+  phases_verified: '7/7'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5, 6]
+    phases_with_issues: [2, 4, 5]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 73
+    escaped: 0
+    boundary: true
+    boundary_signals: ["never"]
+    notes: 'push-policy --site engages, 44 of 44. parseRerunList is present-but-inert, 27 of 29: a top-level rerunAtHead and finalize read as not configured (T319-CR-208). T319-CR-201 is a third form.'
+  performance:
+    status: PASS
+    notes: 'pushes before (eager): 9; after (batched): 6, re-run at this head.'
+  reliability:
+    status: CONCERNS
+    notes: 'The tick path merges on a wait that did not happen (CR-303) and strands on one failed fetch (CR-304); four HALTs do not flush (CR-307).'
+  maintainability:
+    status: PASS
+    notes: 'One decision helper and one site table.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix the medium findings'
+      refs: ['shared/resources/tick-pr.sh', 'shared/resources/finalise-rerun-at-head.js', 'shared/resources/develop-pipeline-step-7-finalise.md']
+  future:
+    - action: 'CR-308 (advisory): a Step 7 resume during the 6c wait flushes the held pause commit and moves the PR head'
+      refs: ['shared/resources/develop-pipeline-step-7-finalise.md']
+      remedy: unverified
+    - action: 'CR-211 and CR-311 (cleanups): the DOD_N guard of the re-run block, and a time limit on the Bitbucket status read'
+      refs: ['skills/finalise/SKILL.md', 'shared/resources/finalise-ci-poll.sh']
+      remedy: unverified
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  verification_method: 'probe cases hostile-same-indent and the marker strategy tests'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['the twelve medium findings fixed']

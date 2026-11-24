@@ -16,15 +16,30 @@ Runs in full in **both lite and standard modes**.
 ### Push what the verify loop held
 
 `/finalise` takes CI reading 1 on the PR head while recording `HEAD`, so a commit still local would be
-accepted on a reading of another commit. The site always answers `push`; with nothing held the push is a
-no-op:
+accepted on a reading of another commit. Two states change it:
 
 ```bash
-bash .agents/skills/develop-bug/references/push-policy.sh --mark --site finalise-entry
-if [ "$(bash .agents/skills/develop-bug/references/push-policy.sh --site finalise-entry)" != defer ]; then
-  git push origin HEAD
+REMOTE_REF="refs/remotes/origin/$(git branch --show-current)"
+REMOTE_HEAD=$(git rev-parse --verify --quiet "$REMOTE_REF^{commit}")
+HELD=$(git rev-list --count "$REMOTE_REF..HEAD" 2>/dev/null || echo 0)
+if [ "$HELD" -eq 0 ]; then
+  echo "finalise-entry: nothing held"
+elif [ "$REMOTE_HEAD" = "$(cat .claude/state/finalise-ci-head-2.txt 2>/dev/null)" ]; then
+  echo "finalise-entry: resume — the PR head is the acceptance head and its CI is being read; $HELD commit(s) stay local"
+elif ! git diff --cached --quiet; then
+  echo "finalise-entry: commit-staged"
+else
+  bash .agents/skills/develop-bug/references/push-policy.sh --mark --site finalise-entry
+  if [ "$(bash .agents/skills/develop-bug/references/push-policy.sh --site finalise-entry)" != defer ]; then
+    git push origin HEAD
+  fi
 fi
 ```
+
+`commit-staged`: a commit is held and something is staged that it may link to. Commit the staged set and
+nothing else through `/commit-changes` (`docs({bug-prefix}): records, ahead of finalise`), then run the
+block again. `resume`: go on; a push would move the PR head off the commit reading 2 is waiting for, and
+Step 8's push carries the held commits. Any other line: go on.
 
 ### DO NOT inline this step
 

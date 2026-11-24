@@ -27,7 +27,8 @@
 #      refuses);
 #   2. the PR's head is the tick branch's head, and its destination is <base>;
 #   3. CI on that head is SUCCESS (a docs-only tail counts, by ci-tree-equivalence.js), or the head has no
-#      checks at all after the whole wait (a project without PR CI: condition 1 is its gate);
+#      checks at all after the whole wait and --checks is 0 (a project without PR CI: condition 1 is its
+#      gate);
 #   4. the merge is judged by the PR's state afterwards, never by the merge command's exit status.
 #
 # Exit 0 on success; 1 when a step was refused or failed, with one `HALT:` line; 2 for a usage error.
@@ -103,32 +104,51 @@ landed() {
   [ "$tree" = "$(git rev-parse "refs/remotes/origin/$BASE^{tree}")" ]
 }
 
+# A local base that holds the tick commit (the `ticked-unpushed` route) fast-forwards neither to an origin
+# that moved on nor to a squash or rebase of the tick. $1 is a ref that holds the tick: when it holds every
+# commit of the local base, the local base goes back to origin's and loses nothing. Whether origin moved
+# since does not matter (T319-CR-309).
+restore_base() {
+  git rev-parse --verify --quiet "refs/heads/$BASE" >/dev/null || return 0
+  ! git merge-base --is-ancestor "refs/heads/$BASE" "refs/remotes/origin/$BASE" || return 0
+  git merge-base --is-ancestor "refs/heads/$BASE" "$1" || return 0
+  if [ "$(git symbolic-ref --short -q HEAD)" = "$BASE" ]; then
+    git checkout --quiet --detach "refs/remotes/origin/$BASE" 2>/dev/null
+  fi
+  git branch --quiet --force --no-track "$BASE" "refs/remotes/origin/$BASE" >&2 \
+    || echo "tick-pr: WARNING: the local $BASE still holds the tick commit" >&2
+}
+
 case "$CMD" in
   start)
     git fetch --quiet origin "$BASE" || halt "git fetch origin $BASE failed"
-    git fetch --quiet origin "+refs/heads/$TICK_BRANCH:refs/remotes/origin/$TICK_BRANCH" 2>/dev/null \
-      || git update-ref -d "refs/remotes/origin/$TICK_BRANCH" 2>/dev/null
-    LANDED=no
+    # No tick branch on the remote, or no answer from it: read as the first, the second starts a new tick
+    # over the one that is there, and every later push of it is rejected (T319-CR-304).
+    git ls-remote --exit-code origin "refs/heads/$TICK_BRANCH" >/dev/null
+    case $? in
+      0)
+        git fetch --quiet origin "+refs/heads/$TICK_BRANCH:refs/remotes/origin/$TICK_BRANCH" \
+          || halt "git fetch origin $TICK_BRANCH failed"
+        ;;
+      2) git update-ref -d "refs/remotes/origin/$TICK_BRANCH" || halt "the stale tracking ref of $TICK_BRANCH could not be removed" ;;
+      *) halt "origin could not be asked for $TICK_BRANCH" ;;
+    esac
+    LANDED=""
     for ref in "refs/heads/$TICK_BRANCH" "refs/remotes/origin/$TICK_BRANCH"; do
       git rev-parse --verify --quiet "$ref^{commit}" >/dev/null || continue
       [ "$(git rev-list --count "refs/remotes/origin/$BASE..$ref")" -gt 0 ] || continue
-      if landed "$ref"; then LANDED=yes; continue; fi
+      if landed "$ref"; then LANDED="$ref"; continue; fi
       if [ "$ref" = "refs/heads/$TICK_BRANCH" ]; then
         git checkout --quiet "$TICK_BRANCH" || halt "cannot check out $TICK_BRANCH"
       else
         git checkout --quiet -B "$TICK_BRANCH" "$ref" || halt "cannot check out $TICK_BRANCH"
       fi
-      # A local base that holds the tick commit (the `ticked-unpushed` route) cannot fast-forward after a
-      # squash or rebase merge. The tick branch holds every commit of it, so it goes back to origin's.
-      if git merge-base --is-ancestor "refs/remotes/origin/$BASE" "refs/heads/$BASE" 2>/dev/null \
-        && git merge-base --is-ancestor "refs/heads/$BASE" "refs/heads/$TICK_BRANCH"; then
-        git branch --quiet --force --no-track "$BASE" "refs/remotes/origin/$BASE" >&2 \
-          || echo "tick-pr: WARNING: the local $BASE still holds the tick commit" >&2
-      fi
+      restore_base "refs/heads/$TICK_BRANCH"
       echo resume
       exit 0
     done
-    if [ "$LANDED" = yes ]; then
+    if [ -n "$LANDED" ]; then
+      restore_base "$LANDED"
       tidy
       echo landed
       exit 0
@@ -179,6 +199,9 @@ case "$CMD" in
       *) usage "--strategy is merge, squash or rebase" ;;
     esac
     [ -n "$GATE" ] || usage "merge needs --quality-gate"
+    # A wait that is not a number, or none, ended the poll at once, and its NONE merged (T319-CR-303).
+    case "$MAX_WAIT" in '' | 0* | *[!0-9]* | ???????*) usage "--max-wait is a positive number of seconds" ;; esac
+    case "$FLOOR" in '' | 0?* | *[!0-9]* | ??????*) usage "--checks is a number of checks" ;; esac
     [ "$(git symbolic-ref --short -q HEAD)" = "$TICK_BRANCH" ] || halt "HEAD is not on $TICK_BRANCH, where the quality gate runs; not merged"
     git diff --quiet HEAD -- || halt "uncommitted changes to tracked files: the quality gate would judge them, not the tick; not merged"
     HEAD_SHA=$(git rev-parse --verify --quiet "refs/heads/$TICK_BRANCH^{commit}") || halt "no local branch $TICK_BRANCH"
@@ -193,15 +216,23 @@ case "$CMD" in
     GATE_EXIT=$?
     [ "$GATE_EXIT" -eq 0 ] || halt "the quality gate failed on $TICK_BRANCH (exit $GATE_EXIT); not merged"
     [ "$(git rev-parse HEAD)" = "$HEAD_SHA" ] || halt "HEAD moved while the quality gate ran; not merged"
+    [ "$(git symbolic-ref --short -q HEAD)" = "$TICK_BRANCH" ] || halt "the quality gate left $TICK_BRANCH; not merged"
+    git diff --quiet HEAD -- || halt "the quality gate changed tracked files, so it passed on content the tick does not hold; not merged"
 
     RESULT=$(mktemp) || halt "mktemp failed"
     bash "$HERE/finalise-ci-poll.sh" "$PR" "$HEAD_SHA" "$MAX_WAIT" "$RESULT" "$FLOOR" "$HERE/ci-tree-equivalence.js" >&2
-    read -r STATE READ_HEAD _ < "$RESULT"
+    read -r STATE READ_HEAD _ WAITED _ < "$RESULT"
     rm -f "$RESULT"
     [ "${READ_HEAD:0:12}" = "${HEAD_SHA:0:12}" ] || halt "CI was sampled on ${READ_HEAD:-nothing}, not the tick head; not merged"
     case "$STATE" in
       SUCCESS) ;;
-      NONE) echo "tick-pr: the tick PR has no checks; the quality gate is the gate" >&2 ;;
+      NONE)
+        [ "$FLOOR" -eq 0 ] || halt "PR #$PR has no checks and --checks asks for $FLOOR; not merged"
+        WAITED=${WAITED%s}
+        case "$WAITED" in '' | *[!0-9]*) WAITED=0 ;; esac
+        [ "$WAITED" -ge "$MAX_WAIT" ] || halt "PR #$PR has no checks after ${WAITED}s, before the whole wait of ${MAX_WAIT}s; not merged"
+        echo "tick-pr: the tick PR has no checks; the quality gate is the gate" >&2
+        ;;
       *) halt "CI on PR #$PR is ${STATE:-unread}; not merged" ;;
     esac
 

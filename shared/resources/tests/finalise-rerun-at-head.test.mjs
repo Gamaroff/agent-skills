@@ -369,6 +369,7 @@ test("a command's output is bounded: it is stopped, has no status, and the excer
   assert.equal(r.rec.reason, "ran", r.err);
   const [one] = r.rec.runs;
   assert.equal(one.output_capped, true);
+  assert.equal(one.stopped_for_size, true);
   assert.equal(one.timed_out, false);
   assert.equal(one.exit_code, null);
   assert.equal(readFileSync(one.stdout).length, 100000);
@@ -413,6 +414,132 @@ test("the time bound is the whole run's: a command past it is recorded as not st
   );
   assert.ok(!existsSync(join(dir, "docs", "started.md")));
   assert.match(readFileSync(join(out, "run.md"), "utf8"), /\*\*not started/);
+});
+
+test("a block whose key is quoted is the same block: a second copy in any spelling is refused, a lone one is read (T319-CR-201)", (t) => {
+  for (const second of ['"finalise"', "'finalise'", "finalise "]) {
+    assert.throws(
+      () =>
+        eng.parseRerunList(
+          `${LIST("echo a")}${second}:\n  rerunAtHead:\n    - echo b#c\n`,
+        ),
+      (e) => e.constructor.name === "UsageError",
+      second,
+    );
+    assert.deepEqual(
+      eng.parseRerunList(`${second}:\n  rerunAtHead:\n    - echo b\n`),
+      ["echo b"],
+      second,
+    );
+    // and an entry inside it is checked as it is inside a bare one
+    assert.throws(
+      () => eng.parseRerunList(`${second}:\n  rerunAtHead:\n    - echo b#c\n`),
+      (e) => /entry 1 \(echo b#c\)/.test(e.message),
+      second,
+    );
+  }
+  const { run } = fixture(t, {
+    config: `${LIST("echo a")}"finalise":\n  rerunAtHead:\n    - echo b\n`,
+    criteria: ["`echo b` passes"],
+  });
+  assert.equal(run().rec.reason, "usage");
+});
+
+test("a list under a key nobody reads is refused by name, not read as absent (T319-CR-208)", () => {
+  for (const [config, why] of [
+    ["finalize:\n  rerunAtHead:\n    - echo a\n", /^finalize looks like/],
+    ["rerunAtHead:\n  - echo a\n", /^rerunAtHead is at the top level/],
+    ["rerun-at-head:\n  - echo a\n", /^rerun-at-head is at the top level/],
+    ["finalise:\n  rerunAtHeads:\n    - echo a\n", /^finalise\.rerunAtHeads /],
+    [
+      "finalise:\n  rerun_at_head:\n    - echo a\n",
+      /^finalise\.rerun_at_head /,
+    ],
+    ["finalise:\n  other: 1\n", /deferralApprover, rerunAtHead/],
+  ])
+    assert.throws(
+      () => eng.parseRerunList(config),
+      (e) => e.constructor.name === "UsageError" && why.test(e.message),
+      config,
+    );
+});
+
+test("the work item's own DoD records are not code, whatever the documentation patterns are; another's are (T319-CR-203)", (t) => {
+  const { dir, run } = fixture(t, {
+    config: `${LIST("echo a")}ci:\n  docsOnly:\n    patterns:\n      - "**/*.md"\n`,
+    criteria: ["`echo a` passes"],
+  });
+  const at = dirname(DOC);
+  writeFileSync(join(dir, at, "task.9.dod.1.ac.json"), "{}\n");
+  writeFileSync(join(dir, at, "task.9.dod.1.security.run.json"), "{}\n");
+  const r = run();
+  assert.equal(r.rec.reason, "ran", r.err);
+  assert.deepEqual(r.rec.uncommitted_docs, [
+    `${at}/task.9.dod.1.ac.json`,
+    `${at}/task.9.dod.1.security.run.json`,
+  ]);
+  for (const other of [
+    `${at}/task.90.dod.1.ac.json`,
+    `${at}/task.9.gate.1.json`,
+    "docs/tasks/task.9.dod.1.ac.json",
+    `${at}/deep/task.9.dod.1.ac.json`,
+  ]) {
+    mkdirSync(dirname(join(dir, other)), { recursive: true });
+    writeFileSync(join(dir, other), "{}\n");
+    const bad = run();
+    assert.equal(bad.rec.reason, "dirty-tree", other);
+    assert.ok(bad.rec.message.includes(other), bad.rec.message);
+    rmSync(join(dir, other));
+  }
+});
+
+test("an edit git status is told not to see is seen: skip-worktree and assume-unchanged (T319-CR-204)", (t) => {
+  for (const flag of ["--skip-worktree", "--assume-unchanged"]) {
+    const { dir, run } = fixture(t, {
+      config: LIST("cat count.txt"),
+      criteria: ["`cat count.txt` prints 3 broken"],
+    });
+    git(dir, "update-index", flag, "count.txt");
+    assert.equal(run().rec.reason, "ran", `${flag}: the head's own content`);
+    writeFileSync(join(dir, "count.txt"), "0 broken\n");
+    assert.equal(git(dir, "status", "--porcelain"), "", `${flag}: hidden`);
+    const r = run();
+    assert.equal(r.rec.reason, "dirty-tree", flag);
+    assert.match(r.rec.message, /count\.txt/);
+    assert.equal(r.rec.runs.length, 0);
+    // a sparse checkout leaves the file out; an assume-unchanged file that is gone was deleted
+    rmSync(join(dir, "count.txt"));
+    assert.equal(
+      run().rec.reason,
+      flag === "--skip-worktree" ? "ran" : "dirty-tree",
+      flag,
+    );
+  }
+  // hidden documentation is listed, as visible documentation is
+  const { dir, run } = fixture(t, {
+    config: LIST("echo a"),
+    criteria: ["`echo a` passes"],
+  });
+  git(dir, "update-index", "--assume-unchanged", DOC);
+  writeFileSync(join(dir, DOC), `${readFileSync(join(dir, DOC), "utf8")}\n`);
+  assert.deepEqual(run().rec.uncommitted_docs, [DOC]);
+});
+
+test("a command that ends by itself over the bound keeps its status and has its output cut (T319-CR-209)", (t) => {
+  const { out, run } = fixture(t, {
+    config: LIST("head -c 300000 /dev/zero"),
+    criteria: ["`head -c 300000 /dev/zero` ends"],
+  });
+  const [r] = run("--max-output-bytes", "1000").rec.runs;
+  assert.equal(r.output_capped, true);
+  assert.equal(readFileSync(r.stdout).length, 1000);
+  // whichever came first, the record says which
+  assert.equal(r.stopped_for_size, r.exit_code === null);
+  if (!r.stopped_for_size)
+    assert.match(
+      readFileSync(join(out, "run.md"), "utf8"),
+      /\*\*exit 0, its output cut at the bound\*\*/,
+    );
 });
 
 test("a document without criteria, or missing, is scan-broken", (t) => {

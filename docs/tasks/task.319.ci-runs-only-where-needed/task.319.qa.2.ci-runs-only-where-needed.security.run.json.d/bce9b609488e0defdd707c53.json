@@ -1,0 +1,33 @@
+{
+  "sink": "filename",
+  "entry": "shell-argv:shared/resources/push-policy.sh",
+  "name": "push-policy --site",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 44,
+  "passed": 44,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "observation_limits": [
+    "effects-after-accept"
+  ],
+  "shells": [
+    "bash",
+    "zsh"
+  ],
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": [
+    "--site",
+    "{input}"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "fixture_copy": null,
+  "ran_at": "2026-11-24T12:10:45.293Z"
+}

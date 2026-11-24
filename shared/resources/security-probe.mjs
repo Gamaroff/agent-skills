@@ -558,11 +558,21 @@ async function run() {
     if (fatal) {
       return { stage: "eslint", error: "the input does not parse: " + fatal.message };
     }
-    const hit = result.messages.find((m) => m.ruleId === spec.rule);
-    // ESLint 8 reports a configured rule that no plugin defines, under the rule's own id, on every
-    // input: the rule never looked at the text.
-    if (hit && /^Definition for rule .* not found\\.?$/.test(String(hit.message))) {
-      return { stage: "eslint", error: "the rule has no definition: " + hit.message };
+    // ESLint reports two things of its own under the rule's id: a configured rule that no plugin defines
+    // (ESLint 8, on every input), and an inline configuration in the input that the rule cannot take. The
+    // rule looked at the text in neither, so only a report beside it counts (T319-CR-210).
+    const own = (m) =>
+      /^Definition for rule .* not found\\.?$/.test(String(m.message)) ||
+      /^(Inline configuration|Configuration) for rule .* is invalid:/.test(String(m.message));
+    const named = result.messages.filter((m) => m.ruleId === spec.rule);
+    const hit = named.find((m) => !own(m));
+    if (!hit && named.length > 0) {
+      return {
+        stage: "eslint",
+        error: (/^Definition/.test(String(named[0].message))
+          ? "the rule has no definition: "
+          : "the input configures the rule, and wrongly: ") + String(named[0].message).split("\\n")[0],
+      };
     }
     return hit
       ? {
@@ -886,6 +896,8 @@ export const CLI_PREFIX = "cli:";
 export const FENCE_PREFIX = "fence:";
 /** The entry-spec prefix that selects the lint-rule form (task.319). */
 export const ESLINT_PREFIX = "eslint:";
+const ESLINT_NEEDS_CASES =
+  "an eslint: entry needs its own cases (--cases-file): the corpus is not source text, so a rule run over it says nothing";
 /** A rule id as ESLint spells one: `no-eval`, `plugin/rule`, `@scope/plugin/rule`. */
 const ESLINT_RULE_ID = /^@?[A-Za-z0-9][A-Za-z0-9_./-]*$/;
 /** A file ESLint reads its configuration from; the nearest one above the file sets its cwd. */
@@ -2056,6 +2068,10 @@ export function runProbeSpec({
   // The eslint: form's ESLint (task.319), checked once in the parent and declined by name.
   let eslintRuntime = null;
   if (isEslintForm) {
+    // The stock corpus is not source text: linted, it reports nothing or does not parse, and a rule that
+    // engages read `absent` (T319-CR-205).
+    if (cases === undefined || cases === null)
+      return decline("bad-cases", ESLINT_NEEDS_CASES);
     eslintRuntime = checkEslintRuntime(
       realpathSafe(resolve(repoRoot)),
       resolved.entryPath,
@@ -5358,6 +5374,8 @@ export function main(argv = process.argv.slice(2)) {
     }
     const bad = validateCases(cases);
     if (bad) return refuse("bad-cases", describeBadCase(bad));
+  } else if (opts.entry.startsWith(ESLINT_PREFIX)) {
+    return refuse("bad-cases", ESLINT_NEEDS_CASES);
   }
 
   // The entry must exist before anything runs or is recorded. A resolveEntry

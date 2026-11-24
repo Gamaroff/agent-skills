@@ -593,6 +593,7 @@ criterion carries it as a code span; every other criterion keeps its own rule. E
 DOC_PATH="{document-path}"
 DOD_N="{Step 0's DOD_N}"
 case "$DOC_PATH$DOD_N" in *'{'*) echo "HALT: DOC_PATH and DOD_N must be substituted into this block (an unsubstituted placeholder found)"; exit 1 ;; esac
+case "$DOD_N" in ''|*[!0-9]*) echo "HALT: DOD_N ('$DOD_N') is not Step 0's run number"; exit 1 ;; esac
 mkdir -p .claude/state
 bash .agents/skills/finalise/references/set-waiting-on.sh "step-7 re-run at head" --kind task --budget-minutes 30
 command node .agents/skills/finalise/references/finalise-rerun-at-head.js \
@@ -3563,8 +3564,11 @@ record, so the record's `totals.executed` is refreshed from the fixed tree — t
 returns a plan and records no command (task.189); for a checklist FAIL it is the check's own
 citation re-read. **And re-run Step 3a's re-run-at-head block on the fix head, whichever section
 failed**, when its first answer was `ran`: that record is one head's, and the fix moved it (task 319).
-Replace its block in the running summary; a command whose exit code is not what its criterion was
-graded on → Step 8. The section is PASS when the reproduction no longer reproduces **and** the record
+Replace its block in the running summary, then **grade every criterion the new record lists again, on
+the new run**, by the AC prompt's re-run criterion rule (`references/finalise-dod-ac-prompt.md` Step 3):
+its exit code **and** the output the criterion states, read from the saved files. A criterion that no
+longer passes → Step 8, whatever its first grade was; the block's answer is anything but `ran` → Step 8.
+Record the verdicts under the block. The section is PASS when the reproduction no longer reproduces **and** the record
 shows the count. The other three sections were evaluated against a tree the fix did not change — the
 `touched` paths are inside the Files Summary, which is what `inside-files-summary` guarantees — and
 that is **stated**, not assumed, in the block below.
@@ -3593,7 +3597,7 @@ provable gap under a rule; it is not a develop loop.
 
 - [ ] Evaluator run three times: first halt on `mutation-proved` only; second exit 0 after the proof (licence to commit); third with `--git-base "$CI_HEAD_1"` exit 0 after the commit (licence to push)
 - [ ] One commit, pushed; `CI reading 1 (fix head)` recorded as SUCCESS
-- [ ] Only the failed section's reproduction re-run, from the record, plus Step 3a's re-run-at-head block when it ran the first time
+- [ ] Only the failed section's reproduction re-run, from the record, plus Step 3a's re-run-at-head block when it ran the first time, with every criterion it lists graded again on the new run
 - [ ] Deviations block appended to the running summary
 - [ ] Step 6 re-entered on the fix head
 

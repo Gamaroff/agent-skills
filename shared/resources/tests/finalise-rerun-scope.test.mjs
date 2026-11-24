@@ -19,7 +19,7 @@ import {
   existsSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { neverRan, spawnBudget } from "../spawn-budget.mjs";
 
@@ -416,24 +416,34 @@ test("scope: --rerun-at-head re-judges what this run's record lists, however the
       ]);
       return { code: r.status, out: JSON.parse(r.stdout) };
     };
+    const text = "SC-2: the engine carries an untouched PASS";
     const rec = (over = {}) => ({
+      reason: "ran",
+      document: basename(DOC),
       head,
-      runs: [{ command: "x", criteria: [{ index: 2, text: "any" }] }],
+      runs: [{ command: "x", criteria: [{ index: 2, text }] }],
       ...over,
     });
     const ok = scopeWith(rec());
     assert.equal(ok.code, 0);
     assert.equal(reasonOf(ok.out, "SC-2"), "rerun-at-head");
     assert.equal(reasonOf(ok.out, "SC-1"), "unchanged");
-    assert.equal(
-      reasonOf(scopeWith(rec({ runs: [] })).out, "SC-2"),
-      "unchanged",
-      "a record that ran nothing changes nothing",
-    );
-    // another head's record, another document's, and one that is not a record
+    for (const reason of ["none-named", "not-configured"])
+      assert.equal(
+        reasonOf(scopeWith(rec({ reason, runs: [] })).out, "SC-2"),
+        "unchanged",
+        "a record that named nothing changes nothing",
+      );
+    // another head's record, another document's, a refused run's, and one that is not a record
     for (const bad of [
       rec({ head: a }),
-      rec({ runs: [{ criteria: [{ index: 40 }] }] }),
+      rec({ runs: [{ criteria: [{ index: 40, text }] }] }),
+      rec({ runs: [{ criteria: [{ index: 2, text: "SC-2: other words" }] }] }),
+      rec({ document: "task.8.other.md" }),
+      rec({ document: undefined, reason: "none-named", runs: [] }),
+      rec({ reason: "dirty-tree", runs: [] }),
+      rec({ reason: "scan-broken", runs: [] }),
+      rec({ reason: undefined, runs: [] }),
       rec({ runs: null }),
       [],
     ])

@@ -25,6 +25,7 @@ if [ "$#" -lt 4 ] || [ -z "${1:-}" ] || [ -z "${2:-}" ] || [ -z "${3:-}" ] || [ 
 fi
 PR_NUMBER=${1}; EXPECTED_HEAD=${2}; MAX_WAIT=${3}; RESULT=${4}; EXPECTED_CHECKS=${5:-0}; ENGINE=${6:-}
 TREE_EQ=""; TE_LATCHED=0
+BB_DESTINATION="" # Bitbucket: the PR's destination, for the ancestors the engine reads (T319-CR-306)
 # The docs-only arm parses the engine's JSON with jq. Without jq nothing could ever be latched and a
 # configured checkCommand would be re-run every 30 s for the whole wait, so the rule is OFF here and the
 # poll waits as before (QA cycle 3, review CR-10).
@@ -79,9 +80,9 @@ if [ "$POLL_VCS" = bitbucket ]; then
     STATE=UNKNOWN; CHECKS=0; BB_HEAD=unknown
     local body code reduced
     pr_read --pr "$PR_NUMBER" || { echo "finalise-ci-poll: $PR_READ_ERROR" >&2; return 0; }
-    BB_HEAD=$PR_READ_HEAD
+    BB_HEAD=$PR_READ_HEAD; BB_DESTINATION=$PR_READ_BASE
     body=$(mktemp) || return 0
-    code=$(curl -s -o "$body" -w '%{http_code}' "${BB_CURL_AUTH[@]}" \
+    code=$(curl -s --max-time 30 -o "$body" -w '%{http_code}' "${BB_CURL_AUTH[@]}" \
       "${PR_READ_BB_API}/repositories/${PR_READ_REPO}/commit/${PR_READ_HEAD}/statuses?pagelen=100" 2>/dev/null)
     if [ "$code" = 200 ]; then
       reduced=$(command node "$SELF_DIR/ci-tree-equivalence.js" --reduce-bitbucket --destination "$PR_READ_BASE" < "$body" 2>/dev/null)
@@ -116,7 +117,8 @@ sample
 tree_equivalent() {
   [ -n "$ENGINE" ] && [ "$TE_LATCHED" -eq 0 ] || return 1
   local out sha
-  if out=$(command node "$ENGINE" --head-rollup "$STATE" --head "$EXPECTED_HEAD" --pr "$PR_NUMBER" --json 2>/dev/null); then
+  if out=$(command node "$ENGINE" --head-rollup "$STATE" --head "$EXPECTED_HEAD" --pr "$PR_NUMBER" \
+    ${BB_DESTINATION:+--destination "$BB_DESTINATION"} --json 2>/dev/null); then
     sha=$(printf '%s' "$out" | jq -r '.greenSha[0:12] // empty')
     [ -n "$sha" ] || return 1
     TREE_EQ=$sha; return 0

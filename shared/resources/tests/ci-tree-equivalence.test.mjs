@@ -1792,6 +1792,78 @@ test("Bitbucket: SUCCESSFUL statuses on the ancestor are tree-equivalent", async
   }
 });
 
+test("Bitbucket: an ancestor is read for the PR's own destination, given or read from the PR (T319-CR-306)", async () => {
+  const { dir, green } = bbRepo();
+  const st = (key, state) => ({ key, state, updated_on: LONG_AGO });
+  const ask = async (extra, values, prAnswer) => {
+    const urls = [];
+    const r = await runEngine(
+      dir,
+      ["--head-rollup", "PENDING", "--json", ...extra],
+      {
+        env: bbEnv,
+        fetchImpl: async (url) => {
+          urls.push(url);
+          return /\/pullrequests\/7$/.test(url)
+            ? prAnswer
+            : resp(200, { values });
+        },
+      },
+    );
+    return { ...JSON.parse(r.stdout), exit: r.exitCode, urls };
+  };
+  const pr = (name) => resp(200, { destination: { branch: { name } } });
+  try {
+    const other = [st("prs:**:main", "SUCCESSFUL"), st("sonar", "SUCCESSFUL")];
+    const own = [
+      st("prs:**:develop", "SUCCESSFUL"),
+      st("prs:**:main", "FAILED"),
+    ];
+    for (const [extra, answer] of [
+      [["--destination", "develop"], undefined],
+      [["--pr", "7"], pr("develop")],
+    ]) {
+      const no = await ask(extra, other, answer);
+      assert.equal(no.exit, 1, `${extra}: a green for another destination`);
+      const yes = await ask(extra, own, answer);
+      assert.equal(yes.exit, 0, `${extra}: ${yes.reason} ${yes.detail}`);
+      assert.equal(yes.greenSha, green);
+      assert.equal(
+        yes.urls.filter((u) => u.includes("/pullrequests/")).length,
+        answer ? 1 : 0,
+        "the PR is read once, and only when the destination was not given",
+      );
+    }
+    // a destination that cannot be read decides nothing
+    for (const bad of [resp(403, {}), resp(200, {}), pr("")]) {
+      const r = await ask(["--pr", "7"], own, bad);
+      assert.equal(r.exit, 1);
+      assert.equal(r.reason, "unverifiable");
+    }
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("a block whose key is quoted twice is refused, for every block that shares the row count (T319-CR-201)", () => {
+  for (const [read, first, second] of [
+    [
+      eng.parseConfig,
+      "ci:\n  docsOnly:\n    enabled: true\n",
+      '"ci":\n  docsOnly:\n    enabled: false\n',
+    ],
+    [
+      eng.parsePipelineConfig,
+      "pipeline:\n  pushRecordCommits: batched\n",
+      "'pipeline':\n  pushRecordCommits: eager\n",
+    ],
+  ]) {
+    assert.doesNotThrow(() => read(second), second);
+    assert.throws(() => read(first + second), /accounts for/, second);
+    assert.throws(() => read(second + first), /accounts for/, second);
+  }
+});
+
 test("Bitbucket: a 403 is unverifiable — never 'no CI'", async () => {
   const { dir } = bbRepo();
   try {

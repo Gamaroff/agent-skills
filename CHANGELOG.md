@@ -27,10 +27,11 @@ All notable changes to this project will be documented in this file. Format foll
   `shared/resources/finalise-rerun-at-head.js`.
 - **The security probe reaches a lint rule (task 319).** `--entry eslint:<path>#<rule-id>` lints each
   case as that file with the repository's own ESLint and configuration; a reported rule is `rejected`.
-  Such a control was declined `entry-not-probeable` before.
+  Such a control was declined `entry-not-probeable` before. It needs its own cases.
 - **`/finalise`'s CI reading 2 poll reads Bitbucket (task 319).** `finalise-ci-poll.sh` takes the
   destination's status key (`prs:**:<destination>`) and every status that is not a pull-request
-  pipeline's, and writes the same result line as on GitHub.
+  pipeline's, and writes the same result line as on GitHub. The docs-only rule reads an ancestor's
+  statuses by the same destination, given or read from the PR.
 - **`developNext.tickVia: pr` (task 319).** `develop-next` and `develop-batch` can land the tick through
   a docs PR and the merge gate, for a base branch that refuses direct pushes. Default `push`. New
   `shared/resources/tick-pr.sh`.

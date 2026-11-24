@@ -18,6 +18,7 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { createRequire } from "node:module";
@@ -349,6 +350,7 @@ test("a remote reader and an end push a record-only commit; a spent push holds c
       "qa-pre-5c",
       "qa-halt",
       "qa-escalation",
+      "halt",
       "finalise-entry",
       "finalise-gaps",
       "finalise-accept",
@@ -824,6 +826,185 @@ test("scan: an instruction to push in a pipeline step document's prose names its
     assert.equal(unguardedProse(`${s}\n`, ids).length, 0, s);
 });
 
+/** The bash fences of a Markdown document, dedented, in order. */
+function bashFences(file) {
+  const out = [];
+  let open = null;
+  for (const line of readFileSync(join(ROOT, file), "utf8").split("\n")) {
+    if (open === null && /^\s*```bash\s*$/.test(line))
+      open = { indent: line.indexOf("`"), body: [] };
+    else if (open !== null && /^\s*```\s*$/.test(line)) {
+      out.push(open.body.join("\n"));
+      open = null;
+    } else if (open !== null) open.body.push(line.slice(open.indent));
+  }
+  return out;
+}
+
+/** `wt` with this checkout's scripts where the block of `skill` looks for them. */
+function installed(wt, skill) {
+  const refs = join(wt, ".agents/skills", skill, "references");
+  mkdirSync(dirname(refs), { recursive: true });
+  symlinkSync(RES, refs);
+  writeFileSync(join(wt, ".git/info/exclude"), ".agents/\n.claude/\n");
+  mkdirSync(join(wt, ".claude/state"), { recursive: true });
+}
+
+const LOCK_FILE = ".claude/state/develop-pipeline.lock";
+function writeLock(wt, over = {}) {
+  mkdirSync(join(wt, "docs/tasks/task.9.x"), { recursive: true });
+  writeFileSync(
+    join(wt, LOCK_FILE),
+    JSON.stringify({
+      skill: "develop-task",
+      current_step: 5,
+      task_or_story_id: "task.9",
+      task_or_story_directory: "docs/tasks/task.9.x",
+      report_path: "docs/tasks/task.9.x/r.md",
+      branch: "feature/x",
+      pr_url: "https://x/pull/1",
+      ...over,
+    }),
+  );
+}
+const runHalt = (wt, text) =>
+  run(
+    "bash",
+    [
+      "-c",
+      text
+        .replace("{halt_reason}", "qa-waiver")
+        .replace("{halt_step}", "5")
+        .replace(/\{[a-z]+-directory\}/, "docs/tasks/task.9.x"),
+    ],
+    { cwd: wt },
+  );
+
+test("every terminal HALT pushes what the run held: each --halt call sits behind the flush, run as written (T319-CR-307)", (t) => {
+  const calls = [];
+  for (const file of authoredFiles().filter((f) => f.endsWith(".md")))
+    for (const block of bashFences(file))
+      if (/advance-pipeline-lock\.sh --halt\b/.test(block))
+        calls.push([file, block]);
+  assert.deepEqual(
+    calls.map(([f]) => f),
+    ["develop-bug", "develop-story", "develop-task"].map(
+      (s) => `skills/${s}/SKILL.md`,
+    ),
+    "the one HALT protocol of each pipeline",
+  );
+  for (const [file, text] of calls) {
+    const skill = file.split("/")[1];
+    const halt = (held, lock) => {
+      const { up, wt } = fixture(t);
+      installed(wt, skill);
+      writeLock(wt, { skill, ...lock });
+      if (held) commit(wt, "docs/gate.md");
+      const r = runHalt(wt, text);
+      assert.equal(r.status, 0, `${file}: ${r.stdout}${r.stderr}`);
+      assert.ok(!existsSync(join(wt, LOCK_FILE)), "halted");
+      return { remote: remoteHead(up), head: git(wt, "rev-parse", "HEAD") };
+    };
+    const held = halt(true, {});
+    assert.equal(held.remote, held.head, `${file}: the held commit is out`);
+    // no PR yet, or another branch: nothing is pushed, and the HALT still happens
+    for (const lock of [{ pr_url: "" }, { branch: "feature/y" }]) {
+      const kept = halt(true, lock);
+      assert.notEqual(kept.remote, kept.head, JSON.stringify(lock));
+    }
+    halt(false, {});
+  }
+});
+
+test("a HALT whose push is refused is still a HALT, and says so (T319-CR-307)", (t) => {
+  const text = bashFences("skills/develop-task/SKILL.md").find((b) =>
+    b.includes("--halt"),
+  );
+  const { up, wt } = fixture(t);
+  installed(wt, "develop-task");
+  writeLock(wt);
+  commit(wt, "docs/gate.md");
+  mkdirSync(join(up, "hooks"), { recursive: true });
+  writeFileSync(join(up, "hooks/pre-receive"), "#!/bin/sh\nexit 1\n");
+  chmodSync(join(up, "hooks/pre-receive"), 0o755);
+  const r = runHalt(wt, text);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /the held commits were not pushed; the HALT goes on/);
+  assert.ok(!existsSync(join(wt, LOCK_FILE)));
+});
+
+test("the entry to /finalise: nothing held leaves 5c's set staged; a held commit goes out with it; the 6c wait is never disturbed (T319-CR-301, CR-308)", (t) => {
+  for (const [file, skill] of [
+    ["shared/resources/develop-pipeline-step-7-finalise.md", "develop-task"],
+    [
+      "skills/develop-bug/references/develop-bug-step-7-close-bug.md",
+      "develop-bug",
+    ],
+  ]) {
+    const script = bashFences(file)
+      .find((b) => b.includes("finalise-entry"))
+      .replaceAll("{develop-story|develop-task}", skill);
+    const state = () => {
+      const { up, wt } = fixture(t);
+      installed(wt, skill);
+      mkdirSync(join(wt, "docs"), { recursive: true });
+      return {
+        wt,
+        entry: () => run("bash", ["-c", script], { cwd: wt }),
+        remote: () => remoteHead(up),
+        head: () => git(wt, "rev-parse", "HEAD"),
+        stage: () => {
+          writeFileSync(join(wt, "docs/review.md"), "review\n");
+          git(wt, "add", "docs/review.md");
+        },
+        // the pause commit: path-limited, and it links to the staged report
+        pause: () => {
+          writeFileSync(join(wt, "docs/report.md"), "[r](review.md)\n");
+          git(wt, "add", "docs/report.md");
+          git(wt, "commit", "-q", "-m", "docs: paused", "--", "docs/report.md");
+        },
+      };
+    };
+    const a = state();
+    a.stage();
+    const before = a.remote();
+    assert.match(a.entry().stdout, /nothing held/, file);
+    assert.equal(a.remote(), before);
+    assert.equal(
+      git(a.wt, "diff", "--cached", "--name-only"),
+      "docs/review.md",
+    );
+
+    const b = state();
+    b.stage();
+    b.pause();
+    const pushed = b.remote();
+    assert.match(b.entry().stdout, /commit-staged/, file);
+    assert.equal(b.remote(), pushed, "the dangling link is not pushed");
+    git(b.wt, "commit", "-q", "-m", "docs: review evidence");
+    b.entry();
+    assert.equal(b.remote(), b.head());
+
+    const c = state();
+    c.pause();
+    c.entry();
+    assert.equal(c.remote(), c.head(), `${file}: held, nothing staged`);
+
+    // a resume of the 6c wait: the remote head is the acceptance head its poll recorded
+    const d = state();
+    const rec = join(d.wt, ".claude/state/finalise-ci-head-2.txt");
+    writeFileSync(rec, `${d.head()}\n`);
+    d.pause();
+    const accepted = d.remote();
+    assert.match(d.entry().stdout, /resume/, file);
+    assert.equal(d.remote(), accepted);
+    // another run's record changes nothing
+    writeFileSync(rec, `${"a".repeat(40)}\n`);
+    d.entry();
+    assert.equal(d.remote(), d.head());
+  }
+});
+
 test("scan: a HALT inside the two fix loops, and the entry to /finalise, each name a push site (T319-CR-102, CR-106)", () => {
   const read = (f) => readFileSync(join(ROOT, f), "utf8");
   const bug = "skills/develop-bug/references/develop-bug-step-";
@@ -855,6 +1036,13 @@ test("scan: a HALT inside the two fix loops, and the entry to /finalise, each na
     assert.ok(a >= 0 && b > a, `${file}: ${from}`);
     assert.match(text.slice(a, b), new RegExp(`--site ${id}\\b`), file);
   }
+  // the MERGED / CLOSED HALT comes after the head's hash was logged, and a mark amends the head (T319-CR-310)
+  const loop = read(`${pipe}5-6-qa-loop.md`);
+  const from = loop.indexOf('- `"MERGED"` or `"CLOSED"` →');
+  assert.match(
+    loop.slice(from, loop.indexOf("HALT:", from)),
+    /\*\*without its `--mark` line\*\*/,
+  );
 });
 
 test("scan: the detector flags an unlisted push and an unknown site (non-vacuity)", () => {

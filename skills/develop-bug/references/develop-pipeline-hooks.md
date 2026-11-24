@@ -113,7 +113,7 @@ The reason is injected as a system reminder in the next assistant turn, forcing 
 | `jq` missing | Degraded mode — refuse to parse, allow stop |
 | `waiting_on` set and `since + budget_minutes` is still in the future | The step is **waiting**, not stalled — it dispatched a background agent or task and yielded the turn to let it run (task.124, obs #89). See "waiting_on" below |
 | `paused` set (the PreCompact hook's mark) | The pause signal asked the agent to halt; blocking would fight it. Lasts only until the session's next lock write (any `advance-pipeline-lock.sh` advance, `set-qa-phase.sh`, `set-waiting-on.sh`), which clears the mark and re-arms the block. Until 2026-11 the hook removed the lock, and the no-lock row gave this pass-through |
-| Orchestrator removes the lock | Legitimate terminal HALT path in SKILL.md (commit report → one `advance-pipeline-lock.sh --halt` call, which writes the snapshot `develop-pipeline.last-halt.json` and then removes the lock) — next stop attempt sails through |
+| Orchestrator removes the lock | Legitimate terminal HALT path in SKILL.md (commit report → push what the run held, once a PR is open → one `advance-pipeline-lock.sh --halt` call, which writes the snapshot `develop-pipeline.last-halt.json` and then removes the lock) — next stop attempt sails through |
 
 **Loop protection in practice**: Claude Code passes `stop_hook_active: true` to the hook on the second consecutive block within a single stop attempt. The hook honours this and exits 0. If the orchestrator genuinely cannot continue, the documented terminal-HALT protocol removes the lock, satisfying the hook permanently.
 

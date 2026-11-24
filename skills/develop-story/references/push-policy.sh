@@ -60,6 +60,7 @@ qa-review-fix	spent	none: the cycle'"'"'s push was used before 5c; the next cycl
 qa-pre-5c	reader	step-5-6 5c asserts the gate and QA report on origin/<branch>, and /review-pr diffs origin/<head>
 qa-halt	end	a person reads the PR after the HALT
 qa-escalation	end	a person reads the PR after the escalation
+halt	end	a person reads the PR after any terminal HALT (the HALT protocol of each develop pipeline)
 finalise-entry	reader	/finalise takes CI reading 1 on the PR head, so a held commit must be on it first
 finalise-gaps	end	a person reads the PR after the DoD-gaps HALT
 finalise-accept	reader	/finalise 6b asserts the artefacts on origin/<branch>; 6c compares the PR head and reads CI on it

@@ -177,7 +177,50 @@ test("Step 3a runs the named commands before it computes the scope, and after th
   assert.ok(at(RERUN) < at(STEP_3A));
 });
 
+test("Step 8a grades the re-run on the fix head again, output as well as exit code, and cut output decides nothing (T319-CR-202, CR-209)", () => {
+  const at = skill.indexOf(
+    "**4. Re-run ONLY the failed section's reproduction.**",
+  );
+  const step = skill.slice(at, skill.indexOf("**5. Append the deviations", at));
+  assert.ok(at > 0 && step.length > 0);
+  const flat = step.replace(/\s+/g, " ");
+  assert.match(
+    flat,
+    /grade every criterion the new record lists again, on the new run/,
+  );
+  assert.match(
+    flat,
+    /its exit code \*\*and\*\* the output the criterion states/,
+  );
+  assert.match(flat, /no longer passes → Step 8/);
+  assert.match(flat, /anything but `ran` → Step 8/);
+  assert.doesNotMatch(flat, /a command whose exit code is not what/);
+  const prompt = readFileSync(
+    path.join(REPO_ROOT, "shared/resources/finalise-dod-ac-prompt.md"),
+    "utf8",
+  );
+  assert.match(
+    prompt,
+    /`FAIL` when it does not, when `exit_code` is `null`, when the criterion states what the command must print and `output_capped` is `true`/,
+  );
+});
+
 for (const shell of SHELLS) {
+  test(`[${shell}] Step 3a's re-run block refuses a DOD_N that is not a number, before anything runs (T319-CR-211)`, () => {
+    const dir = repo();
+    try {
+      for (const dodN of ["", "1; touch owned", "one", "../1"]) {
+        const r = run(shell, dir, substitute(RERUN, { dodN }));
+        assert.equal(r.status, 1, dodN);
+        assert.match(r.stdout, /^HALT: DOD_N \('/, dodN);
+      }
+      assert.ok(!existsSync(path.join(dir, ".claude")), "nothing was started");
+      assert.ok(!existsSync(path.join(dir, "owned")));
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test(`[${shell}] Step 3a end to end: a criterion the re-run lists is re-judged although the last run passed it (T319-CR-5)`, () => {
     const dir = repo({
       [DOC]: doc().replace(

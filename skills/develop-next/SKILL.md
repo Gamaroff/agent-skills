@@ -190,7 +190,7 @@ reads on a resume — the work-item path alone cannot say which arm applies. Thi
      echo "$ROW: $ROW_TICKED"
      ```
 
-     `ticked` → set `ticked: true`. `ticked-unpushed` → push it (Step 4's tick push, `push-policy.sh --site tick` then `git push origin <baseBranch>`, with its non-ff rule; under `tickVia: pr` the base refuses that push, so cut the tick branch from the local base with `git branch -f docs/<roadmap>-tick-<item> <baseBranch>` and go to Step 4, whose `start` answers `resume` and puts the local base back at `origin/<baseBranch>`, the tick branch holding its commit), then set `ticked: true` — never a second tick. `not-ticked` → leave it. `uncommitted` or `unknown` → **HALT** with that line: route nowhere until the operator has committed or discarded the edits, or the look succeeds.
+     `ticked` → set `ticked: true`. `ticked-unpushed` → push it (Step 4's tick push, `push-policy.sh --site tick` then `git push origin <baseBranch>`, with its non-ff rule; under `tickVia: pr` the base refuses that push, so cut the tick branch from the local base with `git branch -f docs/<roadmap>-tick-<item> <baseBranch>` and **run Step 4's `start` block here, before Step 4's re-sync**: it answers `resume` (or `landed`) and puts the local base back at `origin/<baseBranch>`, the tick branch holding its commit. Re-synced first, a local base whose origin has moved on does not fast-forward and Step 4 halts. Then go to Step 4: its re-sync fast-forwards and its own `start` gives the same answer), then set `ticked: true` — never a second tick. `not-ticked` → leave it. `uncommitted` or `unknown` → **HALT** with that line: route nowhere until the operator has committed or discarded the edits, or the look succeeds.
 
    **c. Route on the reconciled flags:**
 
@@ -679,15 +679,19 @@ without its extension (`docs/task-registry-tick-<id>` for the registry arm):
    ```
 3. **Merge it through Step 3's merge gate**, which the script applies and refuses on: the quality gate,
    which it runs itself on the tick branch; the pinned head; green CI on that head; and the PR's state
-   after the merge. Read its exit status on the completion notification (the pipeline lock is gone by
-   Step 4, so no wait is marked):
+   after the merge. **First write the resolved `<qualityGateCommand>`, and nothing else, to
+   `.claude/state/tick-gate.txt` with the Write tool, in a call of its own.** It is read from a file and
+   never typed into the block: between double quotes the block's own shell expands a `$?`, a `$( )` or a
+   backtick in it before the gate runs, and a red gate reads green. Read the block's exit status on the
+   completion notification (the pipeline lock is gone by Step 4, so no wait is marked):
    ```bash
    # RUN BACKGROUNDED (run_in_background): it runs the quality gate and waits for CI.
    # INPUTS, substituted into THIS block: every {…}; TICK_PR is the number 2 printed.
    BASE="{baseBranch}"; TICK_BRANCH="docs/{roadmap}-tick-{id}"; TICK_PR="{tick-pr}"; STRATEGY="{mergeStrategy}"
-   GATE="{qualityGateCommand}"
    case "$BASE$TICK_BRANCH$TICK_PR$STRATEGY" in *'{'*) echo "HALT: the inputs must be substituted into this block"; exit 1 ;; esac
-   case "$GATE" in '{qualityGate'*) echo "HALT: GATE must be substituted into this block"; exit 1 ;; esac
+   GATE=$(cat .claude/state/tick-gate.txt) && [ -n "$GATE" ] \
+     || { echo "HALT: write the quality gate command to .claude/state/tick-gate.txt first"; exit 1; }
+   rm -f .claude/state/tick-gate.txt   # used once: a later tick writes its own
    bash .agents/skills/develop-next/references/tick-pr.sh merge --base "$BASE" --branch "$TICK_BRANCH" \
      --pr "$TICK_PR" --quality-gate "$GATE" --strategy "$STRATEGY"
    ```

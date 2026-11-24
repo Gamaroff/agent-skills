@@ -9,6 +9,7 @@ import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import {
   chmodSync,
+  cpSync,
   existsSync,
   mkdirSync,
   mkdtempSync,
@@ -164,6 +165,7 @@ esac
         ...more,
       ),
     raw: tick,
+    env,
     commit: () => {
       writeFileSync(join(wt, "docs/roadmap.md"), "- [x] 17.4\n");
       git(wt, "commit", "-q", "-am", "docs(roadmap): tick 17.4 [x]");
@@ -281,6 +283,127 @@ test("a PR with no checks merges on the quality gate alone", (t) => {
   assert.equal(r.out, "merged", r.err);
 });
 
+test("no checks is an answer only after the whole wait and under no floor; a wait that is not a number is a usage error (T319-CR-303)", (t) => {
+  const f = opened(t);
+  writeFileSync(f.st("rollup"), "NONE\n");
+  const merge = (...more) =>
+    f.raw(
+      "merge",
+      "--base",
+      "develop",
+      "--branch",
+      TICK,
+      "--pr",
+      "9",
+      "--quality-gate",
+      "true",
+      ...more,
+    );
+  for (const wait of ["0", "soon", "-5", "1.5", "", "060", "60 ", "1234567"])
+    assert.equal(merge("--max-wait", wait).code, 2, `wait '${wait}'`);
+  for (const floor of ["x", "-1", "", "01", "1 "])
+    assert.equal(
+      merge("--max-wait", "60", "--checks", floor).code,
+      2,
+      `floor '${floor}'`,
+    );
+  const floored = merge("--max-wait", "60", "--checks", "2");
+  assert.equal(floored.code, 1, floored.err);
+  assert.match(floored.err, /no checks and --checks asks for 2; not merged/);
+  assert.ok(!existsSync(f.st("merged")));
+  assert.equal(merge("--max-wait", "60", "--checks", "0").out, "merged");
+  // a poll that stopped early says nothing about the checks: a copy of the script beside a short poll
+  const g = opened(t);
+  const lib = join(g.dir, "lib");
+  cpSync(resolve(HERE, ".."), lib, {
+    recursive: true,
+    filter: (p) => !p.includes("/tests"),
+  });
+  for (const [waited, want] of [
+    ["30s", /before the whole wait/],
+    ["soon", /before the whole wait/],
+    ["60s", /^$/],
+  ]) {
+    writeFileSync(
+      join(lib, "finalise-ci-poll.sh"),
+      `printf 'NONE %s 0 ${waited} TREE_EQ=\\n' "$2" > "$4"\n`,
+    );
+    const r = spawnSync(
+      "bash",
+      [
+        join(lib, "tick-pr.sh"),
+        ...["merge", "--base", "develop", "--branch", TICK, "--pr", "9"],
+        ...["--quality-gate", "true", "--max-wait", "60"],
+      ],
+      { cwd: g.wt, env: g.env, encoding: "utf8", timeout: BUDGET.timeoutMs },
+    );
+    assert.equal(r.status, waited === "60s" ? 0 : 1, r.stderr);
+    if (waited !== "60s") assert.match(r.stderr, want);
+  }
+});
+
+test("a gate that rewrites a tracked file, or leaves the tick branch, passed on something else (T319-CR-305)", (t) => {
+  const f = opened(t);
+  for (const [gate, why] of [
+    ["echo formatted >> docs/roadmap.md", /changed tracked files/],
+    ["echo x > new.txt && git add new.txt", /changed tracked files/],
+    ["git checkout -q --detach", /left docs\/roadmap-tick-17\.4/],
+  ]) {
+    const r = f.merge(gate);
+    assert.equal(r.code, 1, gate);
+    assert.match(r.err, why);
+    assert.ok(!existsSync(f.st("merged")), gate);
+    git(f.wt, "checkout", "-q", TICK);
+    git(f.wt, "reset", "-q", "--hard", TICK);
+  }
+  assert.doesNotMatch(f.log(), /statusCheckRollup/);
+  // an untracked file is not the tick's content
+  assert.equal(f.merge("echo log > gate.log").out, "merged");
+});
+
+test("a remote that cannot be asked for the tick branch is a HALT, never `new` (T319-CR-304)", (t) => {
+  const f = fixture(t);
+  f.start();
+  f.commit();
+  f.open();
+  git(f.wt, "checkout", "-q", "develop");
+  git(f.wt, "branch", "-q", "-D", TICK);
+  git(f.wt, "update-ref", "-d", `refs/remotes/origin/${TICK}`);
+  // a git that cannot list the remote: the fetch of the base still works
+  const bin = join(f.dir, "bin");
+  const real = execFileSync("sh", ["-c", "command -v git"], {
+    encoding: "utf8",
+  }).trim();
+  for (const [broken, why] of [
+    ["ls-remote", /origin could not be asked/],
+    ["fetch", /git fetch origin develop failed/],
+  ]) {
+    writeFileSync(
+      join(bin, "git"),
+      `#!/bin/sh\n[ "$1" = ${broken} ] && exit 128\nexec "${real}" "$@"\n`,
+    );
+    chmodSync(join(bin, "git"), 0o755);
+    const r = f.start();
+    assert.equal(r.code, 1, `${broken}: ${r.out}`);
+    assert.match(r.err, why);
+  }
+  // only the tick branch's own fetch fails
+  writeFileSync(
+    join(bin, "git"),
+    `#!/bin/sh\ncase "$*" in "fetch"*"${TICK}"*) exit 128 ;; esac\nexec "${real}" "$@"\n`,
+  );
+  assert.match(f.start().err, /fetch origin docs\/roadmap-tick-17\.4 failed/);
+  rmSync(join(bin, "git"));
+  assert.equal(f.start().out, "resume");
+  // absent on the remote, with a stale tracking ref: gone, and the tick starts over
+  const g = fixture(t);
+  git(g.wt, "update-ref", `refs/remotes/origin/${TICK}`, "HEAD");
+  assert.equal(g.start().out, "new");
+  assert.throws(() =>
+    git(g.wt, "rev-parse", "--verify", `refs/remotes/origin/${TICK}`),
+  );
+});
+
 test("the merge is judged by the PR's state, not by the command's exit status", (t) => {
   const landed = opened(t);
   writeFileSync(landed.st("merge-exit"), "");
@@ -390,6 +513,51 @@ test("ticked-unpushed: a local base holding the tick commit goes back to origin'
     git(f.wt, "rev-parse", "origin/develop"),
   );
   assert.equal(git(f.wt, "rev-parse", TICK), tick, "the commit is not lost");
+  // origin has moved on since: the local base neither fast-forwards nor holds origin's (T319-CR-309)
+  const advance = (x, ...extra) => {
+    const other = join(x.dir, "other");
+    git(x.dir, "clone", "-q", x.up, other);
+    writeFileSync(join(other, "elsewhere.md"), "x\n");
+    git(other, "add", "-A");
+    for (const args of extra) git(other, ...args);
+    git(other, "commit", "-q", "-m", "moved on");
+    git(other, "push", "-q", "origin", "develop");
+  };
+  const h = fixture(t);
+  h.commit();
+  git(h.wt, "branch", "-f", TICK, "develop");
+  advance(h);
+  assert.equal(h.start().out, "resume");
+  assert.equal(
+    git(h.wt, "rev-parse", "develop"),
+    git(h.wt, "rev-parse", "origin/develop"),
+  );
+  git(h.wt, "checkout", "-q", "develop");
+  git(h.wt, "pull", "-q", "--ff-only", "origin", "develop");
+  assert.equal(
+    h.start().out,
+    "resume",
+    "Step 4's own start, after its re-sync",
+  );
+  // the tick landed by squash while the local base held it: start, called from the base, says landed
+  const l = fixture(t);
+  l.commit();
+  git(l.wt, "branch", "-f", TICK, "develop");
+  advance(l, ["rm", "-q", "docs/roadmap.md"]);
+  const other = join(l.dir, "other");
+  mkdirSync(join(other, "docs"), { recursive: true });
+  writeFileSync(join(other, "docs/roadmap.md"), "- [x] 17.4\n");
+  git(other, "add", "-A");
+  git(other, "commit", "-q", "-m", "squashed tick");
+  git(other, "push", "-q", "origin", "develop");
+  const landed = l.start();
+  assert.equal(landed.out, "landed", landed.err);
+  assert.equal(landed.err, "");
+  assert.equal(git(l.wt, "symbolic-ref", "--short", "HEAD"), "develop");
+  assert.equal(
+    git(l.wt, "rev-parse", "develop"),
+    git(l.wt, "rev-parse", "origin/develop"),
+  );
   // control: a local base with a commit of its own is left alone
   const g = fixture(t);
   g.commit();
@@ -439,8 +607,19 @@ test("develop-next's three tick blocks run as written: every input is bound in t
       .replaceAll("{roadmap}", "roadmap")
       .replaceAll("{id}", "17.4")
       .replaceAll("{tick-pr}", "9")
-      .replaceAll("{mergeStrategy}", "squash")
-      .replaceAll("{qualityGateCommand}", "npm run ci -- --x");
+      .replaceAll("{mergeStrategy}", "squash");
+  // the gate command is read from its file, as written: nothing in it is expanded (T319-CR-302)
+  const gate =
+    'npm run "a b"; r=$?; echo "$(date) `id` $HOME"; exit "$r" # {x}';
+  const gateFile = join(dir, ".claude/state/tick-gate.txt");
+  mkdirSync(dirname(gateFile), { recursive: true });
+  const noGate = sh(bind(blocks[2]));
+  assert.equal(noGate.status, 1);
+  assert.match(noGate.stdout, /^HALT: write the quality gate command/);
+  writeFileSync(gateFile, "\n");
+  assert.equal(sh(bind(blocks[2])).status, 1, "an empty gate");
+  writeFileSync(gateFile, `${gate}\n`);
+  assert.ok(!existsSync(join(dir, "ran.log")), "the script was not reached");
   const out = blocks.map((b) => {
     const r = sh(bind(b));
     assert.equal(r.status, 0, r.stderr);
@@ -449,8 +628,9 @@ test("develop-next's three tick blocks run as written: every input is bound in t
   assert.deepEqual(out, [
     `<start><--base><develop><--branch><${TICK}>`,
     `<open><--base><develop><--branch><${TICK}><--title><docs(roadmap): tick 17.4>`,
-    `<merge><--base><develop><--branch><${TICK}><--pr><9><--quality-gate><npm run ci -- --x><--strategy><squash>`,
+    `<merge><--base><develop><--branch><${TICK}><--pr><9><--quality-gate><${gate}><--strategy><squash>`,
   ]);
+  assert.ok(!existsSync(gateFile), "a later tick writes its own");
 });
 
 test("open refuses a branch with no tick commit, and usage errors exit 2", (t) => {
