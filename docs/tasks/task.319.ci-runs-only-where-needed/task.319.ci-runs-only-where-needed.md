@@ -485,6 +485,7 @@ All 12 findings of cycle 4 are fixed. The re-review found no high defect. Four m
 | 2026-11-24 |         | QA gate CONCERNS (80/100) — 12 findings (7 medium, 5 low); bug 3 closed | qa-task |
 | 2026-11-24 |         | QA fixes applied (cycle 4) — all 12 gate findings, and what a review of the fixes themselves reproduced, three low remainders left as stated limits; status → ready-for-review | qa-fix |
 | 2026-11-24 |         | QA gate CONCERNS (80/100) — 10 findings (4 medium, 6 low); all 12 of cycle 4 fixed | qa-task |
+| 2026-11-24 |         | QA fixes applied (cycle 5, the first of 2 granted) — all 10 gate findings, the advisory one and the 5 cleanups, and 7 of the 8 points a review of the fixes reproduced; status → ready-for-review | qa-fix |
 <!-- change-log-end -->
 
 ## Progress Tracking

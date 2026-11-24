@@ -676,6 +676,12 @@ test("no setting, flag or index state makes an edited tree answer ran (T319-CR-4
       (d) => chmodSync(join(d, "run.sh"), 0o644),
       "run.sh",
     ],
+    [
+      "core.ignorecase, a name in another case (T319-CR-801)",
+      set("core.ignorecase", "true"),
+      edit("src/A.js"),
+      "src/A.js",
+    ],
     ["an fsmonitor that reports nothing", hook, edit("src/a.js"), "src/a.js"],
     [
       "a deleted skip-worktree file",
@@ -1052,19 +1058,32 @@ test("a command that writes over its own output is recorded as having done so (T
     };
   };
   const long = "echo ERROR; echo ".concat("y".repeat(200), "; ");
-  for (const script of [
-    "echo ERROR >&2; echo done > /dev/stderr\n",
-    "echo ERROR; echo x | tee /dev/stderr; : > /dev/stdout\n",
-    `${long}echo ok > /dev/stdout; ${long}\n`,
-    "echo ERROR; printf clean | dd of=/dev/stdout conv=notrunc 2>/dev/null\n",
+  for (const [streams, script] of [
+    [["stderr"], "echo ERROR >&2; echo done > /dev/stderr\n"],
+    [
+      ["stdout", "stderr"],
+      "echo ERROR; echo x | tee /dev/stderr; : > /dev/stdout\n",
+    ],
+    [["stdout"], `${long}echo ok > /dev/stdout; ${long}\n`],
+    [
+      ["stdout"],
+      "echo ERROR; printf clean | dd of=/dev/stdout conv=notrunc 2>/dev/null\n",
+    ],
   ]) {
     const r = go(script);
-    assert.equal(r.one.output_overwritten, true, script);
-    assert.match(r.md, /its output not whole/, script);
+    assert.deepEqual(r.one.output_overwritten, streams, script);
+    assert.ok(
+      r.md.includes(`its ${streams.join(" and ")} perhaps not whole`),
+      script,
+    );
   }
+  // the other stream is not doubted for it (T319-CR-802)
+  const whole = go('echo "0 broken"; echo warn > /dev/stderr\n');
+  assert.deepEqual(whole.one.output_overwritten, ["stderr"]);
+  assert.equal(whole.out, "0 broken\n");
   // control: appending to it, and writing to it in the ordinary way, keep every line in order
   const r = go("echo one; echo ERROR >> /dev/stdout; echo two; echo e >&2\n");
-  assert.equal(r.one.output_overwritten, false);
+  assert.deepEqual(r.one.output_overwritten, []);
   assert.equal(r.out, "one\nERROR\ntwo\n");
   assert.doesNotMatch(r.md, /not whole/);
 });
@@ -1087,6 +1106,17 @@ test("a listed command on an unindented line of a criterion is refused, not read
     ["1. the links\n   are clean\n\n   and more:\n`echo a`", 1],
     ["- [ ] the links:\nthat is\n  `echo a`", 1],
     ["- [ ] `echo a` passes, and then\n`echo a` again", 1],
+    // what looks like a block and cannot interrupt a paragraph (T319-CR-803)
+    ["- [ ] fixes issue\n#936 and `echo a` passes", 1],
+    ["- [ ] fixes issue\n####### `echo a`", 1],
+    ["- [ ] fixes issue\n<b>and</b> `echo a`", 1],
+    ["- [ ] fixes issue\n<header-x> `echo a`", 1],
+    ["- [ ] fixes issue\n| and `echo a`", 1],
+    ["- [ ] fixes issue\n``` x ``` and `echo a`", 1],
+    ["- [ ] fixes issue\n===\n`echo a`", 1],
+    ["- [ ] fixes issue\n--\n`echo a`", 1],
+    ["- [ ] fixes issue\n-x `echo a`", 1],
+    ["- [ ] fixes issue\n2.5 `echo a`", 1],
   ]) {
     const r = read(section);
     assert.equal(r.reason, "scan-broken", section);
@@ -1100,10 +1130,90 @@ test("a listed command on an unindented line of a criterion is refused, not read
     "- [ ] `echo a` passes\n- `echo a` is in the list",
     "- [ ] `echo a` passes\n### Notes on `echo a`",
     "- [ ] `echo a` passes\n> `echo a`",
-    "- [ ] `echo a` passes\n| `echo a` | x |",
     "- [ ] `echo a` passes\n---\nNote: `echo a`",
+    "- [ ] `echo a` passes\n* * *\nNote: `echo a`",
+    "- [ ] `echo a` passes\n#\nNote: `echo a`",
+    "- [ ] `echo a` passes\n```sh\n`echo a`\n```",
+    "- [ ] `echo a` passes\n~~~ `x`\n`echo a`\n~~~",
+    "- [ ] `echo a` passes\n<DIV>\n`echo a`\n</DIV>",
+    "- [ ] `echo a` passes\n<!-- `echo a` -->",
+    "- [ ] `echo a` passes\n<pre>`echo a`</pre>",
+    "- [ ] `echo a` passes\n-\nNote: `echo a`",
   ])
     assert.equal(read(section).reason, "ran", section);
+});
+
+test("a section with no criterion the reader can find is refused only when it names a listed command (T319-CR-805)", (t) => {
+  const read = (text) => {
+    const { dir, run } = fixture(t, {
+      config: LIST("echo a"),
+      criteria: ["`echo a` passes"],
+    });
+    writeFileSync(join(dir, DOC), text);
+    return run().rec;
+  };
+  for (const text of [
+    "# T\n\n## Acceptance Criteria\n\n### AC1\n\nGiven x\n\n## Other\n\n`echo a`\n",
+    "# T\n\nno criteria\n",
+    "# T\n\n## Success Criteria\n\necho a, and `echo a b`\n",
+  ])
+    assert.equal(read(text).reason, "none-named", text);
+  for (const text of [
+    "# T\n\n## Acceptance Criteria\n\n### AC1\n\nThen `echo a` passes\n",
+    "# T\n\n## Criteria for success\n\n- [ ] `echo a` passes\n",
+    "# T\n\n## Acceptance Criteria\n\n### AC1\n\nPress the ` key.\n\nThen `echo a` passes\n",
+    "# T\n\n## Acceptance Criteria\n\n### AC1\n\nPress the ` key.\nThen `echo a` passes\n",
+    "# T\n\n## Acceptance Criteria\n\n### AC1\n\nThen `echo\n  a` passes\n",
+  ]) {
+    const r = read(text);
+    assert.equal(r.reason, "scan-broken", text);
+    assert.match(r.message, /names `echo a` and has no criteria/);
+  }
+});
+
+test("what the repository ignores in any case is not compared, and what it does not ignore is (T319-CR-801)", (t) => {
+  for (const [other, reason] of [
+    [null, "ran"],
+    ["other.js", "dirty-tree"],
+  ]) {
+    const { dir, run } = fixture(t, {
+      config: LIST("echo a"),
+      criteria: ["`echo a` passes"],
+    });
+    writeFileSync(join(dir, ".gitignore"), "Build/\n");
+    git(dir, "add", "-A");
+    git(dir, "commit", "-q", "-m", "ignore");
+    git(dir, "config", "core.ignorecase", "true");
+    mkdirSync(join(dir, "build"));
+    writeFileSync(join(dir, "build/o"), "o\n");
+    if (other) writeFileSync(join(dir, other), "x\n");
+    const { rec } = run();
+    assert.equal(rec.reason, reason, rec.message);
+    if (other) assert.match(rec.message, /the head: other\.js$/);
+  }
+});
+
+test("the list is the head's own, whatever a replacement says (T319-CR-804)", (t) => {
+  const { dir, run } = fixture(t, {
+    config: LIST("echo a"),
+    criteria: ["`echo a` passes", "`cat count.txt` passes"],
+  });
+  const other = join(dir, ".claude-other");
+  writeFileSync(other, LIST("cat count.txt"));
+  const blob = git(dir, "hash-object", "-w", other);
+  rmSync(other);
+  git(dir, "replace", git(dir, "rev-parse", "HEAD:skills-config.yaml"), blob);
+  assert.equal(
+    git(dir, "show", "HEAD:skills-config.yaml"),
+    LIST("cat count.txt").trim(),
+    "the replacement is in force",
+  );
+  const { rec } = run();
+  assert.equal(rec.reason, "ran", rec.message);
+  assert.deepEqual(
+    rec.runs.map((r) => r.command),
+    ["echo a"],
+  );
 });
 
 test("CRLF line endings do not hide the criteria (T319-CR-606)", (t) => {
@@ -1161,12 +1271,12 @@ test("a tracked file under the pipeline's state directory is the head's, and its
   assert.equal(run().rec.reason, "dirty-tree");
 });
 
-test("a document without criteria, or missing, is scan-broken", (t) => {
+test("a document that is missing is scan-broken", (t) => {
   const { dir, run } = fixture(t, {
     config: LIST("echo a"),
     criteria: ["`echo a` passes"],
   });
-  writeFileSync(join(dir, DOC), "# T\n\nno criteria\n");
+  rmSync(join(dir, DOC));
   const r = run();
   assert.equal(r.rec.reason, "scan-broken");
   assert.equal(r.code, 1);

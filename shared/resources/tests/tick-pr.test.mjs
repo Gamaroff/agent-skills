@@ -573,6 +573,144 @@ test("start recognises a tick that landed by squash, and leaves the checkout on 
   assert.equal(h.start().out, "resume");
 });
 
+test("a landed tick is recognised when the base changed the row beside it since, and an absent one is not (T319-CR-902)", (t) => {
+  const MAP = "docs/roadmap.md";
+  const OTHER = "docs/log.md";
+  const start = (after, { tick, files = {} } = {}) => {
+    const f = fixture(t);
+    const on = (branch, texts, msg) => {
+      git(f.wt, "checkout", "-q", branch);
+      for (const [file, text] of Object.entries(texts))
+        writeFileSync(join(f.wt, file), text);
+      git(f.wt, "add", "-A");
+      git(f.wt, "commit", "-q", "-m", msg);
+    };
+    on("develop", { [MAP]: "- [ ] 1\n\n- [ ] 2\n- [ ] 3\n", ...files }, "rows");
+    git(f.wt, "push", "-q", "origin", "develop");
+    assert.equal(f.start().out, "new");
+    on(TICK, tick ?? { [MAP]: "- [ ] 1\n\n- [x] 2\n- [ ] 3\n" }, "tick");
+    git(f.wt, "push", "-q", "origin", TICK);
+    for (const [i, texts] of after.entries())
+      on("develop", texts, `later ${i}`);
+    git(f.wt, "push", "-q", "origin", "develop");
+    git(f.wt, "fetch", "-q", "origin");
+    const clean = spawnSync(
+      "git",
+      ["merge-tree", "--write-tree", "origin/develop", TICK],
+      { cwd: f.wt, env: f.env },
+    );
+    assert.equal(clean.status, 1, "a merge would conflict");
+    const r = f.start();
+    assert.equal(r.code, 0, r.err);
+    return r.out;
+  };
+  const landed = { [MAP]: "- [ ] 1\n\n- [x] 2\n- [ ] 3\n" };
+  const beside = { [MAP]: "- [ ] 1\n\n- [x] 2\n- [x] 3\n" };
+  assert.equal(start([landed, beside]), "landed");
+  // the row itself says something else now, or the tick was taken back
+  assert.equal(start([{ [MAP]: "- [ ] 1\n\n- [~] 2\n- [ ] 3\n" }]), "resume");
+  assert.equal(
+    start([landed, beside, { [MAP]: "- [ ] 1\n\n- [~] 2\n" }]),
+    "resume",
+  );
+  // the row it removed is there again beside the one it added
+  assert.equal(
+    start([{ [MAP]: "- [ ] 1\n\n- [x] 2\n- [ ] 2\n- [x] 3\n" }]),
+    "resume",
+  );
+  // half of it: the second file's row is not there
+  const two = {
+    tick: { ...landed, [OTHER]: "old\nticked 2\n" },
+    files: { [OTHER]: "old\n" },
+  };
+  assert.equal(start([beside], two), "resume");
+  assert.equal(
+    start([{ ...beside, [OTHER]: "old\nticked 2\nnewer\n" }], two),
+    "landed",
+  );
+  // a blank row decides nothing, either way
+  assert.equal(
+    start([{ [MAP]: "- [ ] 1\n- [x] 2\n- [x] 3\n" }], {
+      tick: { [MAP]: "- [ ] 1\n\n\n- [x] 2\n- [ ] 3\n" },
+    }),
+    "landed",
+  );
+  assert.equal(
+    start([{ [MAP]: "- [ ] 1 x\n\n\n- [ ] 2\n- [ ] 3\n" }], {
+      tick: { [MAP]: "- [ ] 1\n- [ ] 2\n- [ ] 3\n" },
+    }),
+    "resume",
+  );
+  // nor does one of a file with CRLF
+  assert.equal(
+    start([{ [MAP]: "- [ ] 1\r\n- [x] 2\r\n- [x] 3\r\n" }], {
+      files: { [MAP]: "- [ ] 1\r\n\r\n- [ ] 2\r\n- [ ] 3\r\n" },
+      tick: { [MAP]: "- [ ] 1\r\n\r\n\r\n- [x] 2\r\n- [ ] 3\r\n" },
+    }),
+    "landed",
+  );
+  // a file it added is not read as rows
+  assert.equal(
+    start([{ ...beside, [OTHER]: "ticked 2\n" }], {
+      tick: { ...landed, [OTHER]: "ticked 2\n" },
+    }),
+    "resume",
+  );
+});
+
+test("a read that fails is never a landed tick: the branch with it would be deleted (T319-CR-902)", (t) => {
+  const MAP = "docs/roadmap.md";
+  const at = (wt, branch, text) => {
+    git(wt, "checkout", "-q", branch);
+    writeFileSync(join(wt, MAP), text);
+    git(wt, "commit", "-q", "-am", `${branch}: ${text}`); // not the same commit on both
+  };
+  // every git question `start` asks before and after the merge, with the one of them failing
+  for (const broken of [
+    null,
+    "merge-tree --write-tree",
+    "diff-tree -r --no-renames",
+    "diff-tree -r -z",
+    "show",
+  ]) {
+    const f = fixture(t);
+    git(f.wt, "checkout", "-q", "develop");
+    writeFileSync(join(f.wt, MAP), "- [ ] 1\n- [ ] 2\n- [ ] 3\n");
+    git(f.wt, "add", "-A");
+    git(f.wt, "commit", "-q", "-m", "rows");
+    git(f.wt, "push", "-q", "origin", "develop");
+    assert.equal(f.start().out, "new");
+    at(f.wt, TICK, "- [ ] 1\n- [x] 2\n- [ ] 3\n");
+    git(f.wt, "push", "-q", "origin", TICK);
+    at(f.wt, "develop", "- [ ] 1\n- [x] 2\n- [ ] 3\n");
+    at(f.wt, "develop", "- [ ] 1\n- [x] 2\n- [x] 3\n");
+    git(f.wt, "push", "-q", "origin", "develop");
+    git(f.wt, "fetch", "-q", "origin");
+    const bin = join(dirname(f.wt), "bin"); // first on the script's PATH, and not on this test's
+    const real = spawnSync("sh", ["-c", "command -v git"], {
+      env: f.env,
+      encoding: "utf8",
+    }).stdout.trim();
+    writeFileSync(
+      join(bin, "git"),
+      `#!/bin/sh\ncase "$*" in ${broken ? `"${broken}"*) echo broken >> "${bin}/hit"; exit 128 ;;` : ""} *) exec "${real}" "$@" ;; esac\n`,
+    );
+    chmodSync(join(bin, "git"), 0o755);
+    const r = f.start();
+    if (broken === null) {
+      assert.equal(r.out, "landed", r.err);
+      continue;
+    }
+    assert.ok(existsSync(join(bin, "hit")), `${broken}: it was asked`);
+    assert.notEqual(r.out, "landed", broken);
+    assert.equal(
+      git(f.wt, "rev-parse", "--verify", "-q", TICK).length,
+      40,
+      `${broken}: the branch is there`,
+    );
+  }
+});
+
 test("finish: a row that already reads ticked returns to the base; a commit or an edit is refused (T319-CR-104)", (t) => {
   const f = fixture(t);
   f.start();

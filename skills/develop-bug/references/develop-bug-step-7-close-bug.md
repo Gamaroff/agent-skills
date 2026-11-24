@@ -17,7 +17,7 @@ Runs in full in **both lite and standard modes**.
 
 `/finalise` takes CI reading 1 on the PR head while recording `HEAD`, so a commit still local would be
 accepted on a reading of another commit. Give the call a tool timeout of 600000 ms: the push
-waits up to 540 s for the project's own pre-push hook, and the default tool timeout ends the call before
+waits up to 500 s for the project's own pre-push hook, and the default tool timeout ends the call before
 it answers:
 
 ```bash
@@ -26,7 +26,8 @@ bash .agents/skills/develop-bug/references/push-held.sh --site finalise-entry
 
 `commit-staged`: a commit is held and something is staged that it may link to. Commit the staged set and
 nothing else through `/commit-changes` (`docs({bug-prefix}): records, ahead of finalise`), then run the
-block again. `not pushed` (exit 1): HALT with the line; `HEAD` is not on the PR. No line at all: the call
+block again. `not pushed` (exit 1): HALT with the line; `HEAD` is not known to
+be the PR head (where origin is ahead, pull first; where a push was stopped, ask origin again). No line at all: the call
 was cut off; run it again with that timeout, and HALT when it is cut off again. Any other line: go on.
 
 ### DO NOT inline this step

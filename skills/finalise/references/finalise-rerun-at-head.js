@@ -50,11 +50,12 @@
  * reaches it is killed, and one that would start after it is recorded as not started. A command writes to
  * an unnamed temporary file per stream, and at most --max-output-bytes of each is saved: one that passes
  * the bound is stopped (`stopped_for_size`) unless it had already ended by itself (`output_capped` covers
- * both). Nothing it started can grow the saved output afterwards. A command that writes over what it
- * printed (`> /dev/stderr`, `tee /dev/stderr`) has `output_overwritten`: what is saved is not whole. A kill reaches the command's process
- * group: a descendant that left it (`setsid`, a daemon, and coreutils' `timeout`, which makes a group of
- * its own) is not killed. It runs on after the bound, and what it still writes takes space in the
- * temporary directory until it ends.
+ * both). Nothing it started can grow the saved output afterwards. A stream the
+ * command opened again and emptied (`> /dev/stderr`, `tee /dev/stderr`) is named in `output_overwritten`:
+ * what it printed there before is gone. Whether it had printed anything is not known, so a command whose
+ * first output goes that way is named too. A kill reaches the command's process group: a descendant that
+ * left it (`setsid`, a daemon, and coreutils' `timeout`, which makes a group of its own) is not killed. It
+ * runs on after the bound, and what it still writes takes space in the temporary directory until it ends.
  *
  * Usage:
  *   finalise-rerun-at-head.js --doc <path> --out-dir <dir> [--workspace-root <dir>]
@@ -62,17 +63,17 @@
  *
  *   --out-dir is emptied of an earlier run's record first, so a file in it is always this run's.
  *   It writes <n>.stdout, <n>.stderr, run.json: { document, head, uncommitted_docs, runs: [{ command,
- *   criteria, exit_code, timed_out, not_started, stopped_for_size, output_capped, output_overwritten,
+ *   criteria, exit_code, timed_out, not_started, stopped_for_size, output_capped, output_overwritten: [],
  *   stdout, stderr }] }, and run.md, the block for the DoD running summary. The --json answer carries `document` too: the work
  *   item's file name, which finalise-rerun-scope.js holds against its own --doc.
  *
  * reason / exit:
  *   ran             0  at least one command was run
- *   none-named      0  the list is set and no criterion names an entry of it
+ *   none-named      0  the list is set and no criterion names an entry of it, or there is no criterion
  *   not-configured  0  finalise.rerunAtHead is absent or an empty list
  *   dirty-tree      1  the working tree is not the head, or stopped being it; no record is kept
- *   scan-broken     1  the document or its criteria section could not be read, or a listed command stands on
- *                      an unindented line of a criterion, which the criteria reader does not return
+ *   scan-broken     1  the document could not be read, or a listed command stands in a criteria section of
+ *                      which the reader returns no criterion at all, or on an unindented line of one
  *   failed          1  the engine itself failed (a file it could not write, git); no record is kept
  *   usage           2  bad arguments, or a configuration that cannot be read as a list of commands
  */
@@ -96,6 +97,7 @@ const {
   configTextAtCommit,
   isDocsPath,
   killProcessGroup,
+  normKey,
   parseConfig,
   spawnCheck,
   topLevelKey,
@@ -115,8 +117,6 @@ const USAGE =
 
 /** Every key of the `finalise` block (docs/reference/configuration.md). */
 const FINALISE_KEYS = ["deferralApprover", "rerunAtHead"];
-
-const normKey = (k) => String(k).toLowerCase().replace(/[-_]/g, "");
 
 /**
  * How many rows of the file spell the list's key, at any indent, in any block, its letters escaped or not.
@@ -255,7 +255,7 @@ function codeSpans(text) {
   return out;
 }
 
-/** [{ command, criteria: ["#1 text", …] }] in list order, only for commands a criterion names. */
+/** [{ command, criteria: [{ index, text }] }] in list order, only for commands a criterion names. */
 function namedCommands(list, criteria) {
   return list
     .map((command) => ({
@@ -267,9 +267,28 @@ function namedCommands(list, criteria) {
     .filter((r) => r.criteria.length > 0);
 }
 
-// A line that starts a block of its own, and so does not continue the paragraph above it.
-const RE_BLOCK_START =
-  /^(?:#|>|`{3}|~{3}|[-*+]\s|\d+[.)]\s|<|\||-{3,}\s*$|\*{3,}\s*$|_{3,}\s*$|={3,}\s*$)/;
+// A line that starts a block of its own, and so does not continue the paragraph above it: what CommonMark
+// lets interrupt one, and no more. Wider, it hides a command (T319-CR-803). A table's row is left out: it is
+// one only with a delimiter row under its first, and refusing a command there is loud.
+const HTML_BLOCK =
+  "address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul";
+const RE_BLOCK_START = new RegExp(
+  "^(?:" +
+    [
+      String.raw`#{1,6}(?:\s|$)`,
+      ">",
+      "`{3,}[^`]*$",
+      "~{3}",
+      String.raw`[-*+](?:\s|$)`,
+      String.raw`\d{1,9}[.)](?:\s|$)`,
+      String.raw`([-*_])[ \t]*(?:\1[ \t]*){2,}$`,
+      String.raw`<(?:script|pre|style|textarea)(?:\s|>|$)`,
+      String.raw`<!--|<\?|<![a-z]|<!\[CDATA\[`,
+      String.raw`</?(?:${HTML_BLOCK})(?:\s|/?>|$)`,
+    ].join("|") +
+    ")",
+  "i",
+);
 
 /**
  * The first criterion that names a listed command only by way of a lazy continuation: an unindented line
@@ -333,7 +352,7 @@ async function runOne(
   let r = null;
   let overBound = false; // it passed the bound while it ran, and was killed for it
   let capped = false;
-  let overwritten = false;
+  let overwritten = []; // per stream: output that is whole is not doubted for the other's sake (T319-CR-802)
   if (left > 0) {
     // The command writes to a regular file, and not to a pipe: a program that exits with a pipe still
     // full loses what is in it, and nothing says so (T319-CR-601). The file is outside the working tree
@@ -374,7 +393,7 @@ async function runOne(
       killProcessGroup(r.pid);
       // One reading of the sizes, after the kill: what the record holds and what it says agree.
       const begin = fds.map(starts);
-      overwritten = begin.includes(0);
+      overwritten = ["stdout", "stderr"].filter((_, i) => begin[i] === 0);
       const kept = sizes().map((s, i) => s + mark.length - begin[i]);
       capped = kept.some((s) => s > maxBytes);
       [stdout, stderr].forEach((f, i) =>
@@ -427,8 +446,8 @@ function statusOf(r) {
   if (r.timed_out) end = "timed out";
   if (r.stopped_for_size) end = "stopped: its output passed the bound";
   else if (r.output_capped) end += ", its output cut at the bound";
-  return r.output_overwritten
-    ? `${end}, its output not whole: it overwrote /dev/stdout or /dev/stderr`
+  return r.output_overwritten.length > 0
+    ? `${end}, its ${r.output_overwritten.join(" and ")} perhaps not whole: opened again and emptied`
     : end;
 }
 
@@ -499,11 +518,14 @@ function parseArgs(argv) {
   return o;
 }
 
+/** The environment in which git reads no object through a replacement. */
+const unreplaced = () => ({ ...process.env, GIT_NO_REPLACE_OBJECTS: "1" });
+
 /** git in `cwd`, with no object read through a replacement. Its output is bytes: a path need not be UTF-8. */
 function gitIn(cwd, args, input) {
   return execFileSync("git", args, {
     cwd,
-    env: { ...process.env, GIT_NO_REPLACE_OBJECTS: "1" },
+    env: unreplaced(),
     input,
     maxBuffer: 512 * 1024 * 1024,
     stdio: ["pipe", "pipe", "pipe"],
@@ -518,6 +540,20 @@ const gitLine = (cwd, ...args) =>
     .replace(/\r?\n$/, "");
 const bytes = (f) => Buffer.from(f, "latin1");
 const shown = (f) => bytes(f).toString("utf8");
+
+/** Which of these paths does git ignore? */
+function ignoredOf(dir, files) {
+  if (files.length === 0) return [];
+  try {
+    const input = bytes(`${files.join("\0")}\0`);
+    return gitIn(dir, ["check-ignore", "-z", "--stdin"], input)
+      .toString("latin1")
+      .split("\0");
+  } catch (e) {
+    if (e.status === 1) return []; // none of them
+    throw e;
+  }
+}
 
 /** Does this checkout's filesystem keep a mode? Asked as `git init` asks it: a file, chmod, look. */
 function keepsModes(gitDir, io = fs) {
@@ -579,9 +615,19 @@ function differing(dir, commit, prefix = "") {
     const [, mode, oid, file] = /^(\d+) \S+ ([0-9a-f]+)\t([^]*)$/.exec(row);
     tree.set(file, { mode, oid });
   }
-  const bad = new Set(
-    gitRows(dir, "ls-files", "-z", "--others", "--exclude-standard"),
+  // Under core.ignorecase an untracked A.js beside a tracked a.js is the tracked one (T319-CR-801). What
+  // the repository ignores is still its own configuration's to say, and that covers .gitignore too.
+  const others = gitRows(
+    dir,
+    "-c",
+    "core.ignorecase=false",
+    "ls-files",
+    "-z",
+    "--others",
+    "--exclude-standard",
   );
+  const ignored = new Set(ignoredOf(dir, others));
+  const bad = new Set(others.filter((f) => !ignored.has(f)));
   const links = new Set();
   for (const [f, { mode }] of tree) if (mode === "160000") links.add(f);
   const index = new Set();
@@ -759,7 +805,13 @@ async function run(argv) {
     if (fs.existsSync(outDir))
       for (const f of fs.readdirSync(outDir))
         if (OWN_FILE.test(f)) fs.unlinkSync(path.join(outDir, f));
-    const text = configTextAtCommit(execFileSync, root, head);
+    // Not through a replacement: the list that runs is the one the head holds (T319-CR-804).
+    const text = configTextAtCommit(
+      (cmd, args, opts) =>
+        execFileSync(cmd, args, { ...opts, env: unreplaced() }),
+      root,
+      head,
+    );
     const list = text === null ? [] : parseRerunList(text);
     const document = path.basename(o.doc);
     const base = { document, head, runs: [] };
@@ -778,13 +830,24 @@ async function run(argv) {
       };
     }
     const entries = readCriteriaEntries(body);
-    if (entries === null || entries.length === 0)
+    if (entries === null || entries.length === 0) {
+      // Criteria the reader cannot see, or none at all: only the first can hide a command (T319-CR-805).
+      // By line and by paragraph: a span can stand on two lines, and a stray backtick pairs with no
+      // further than its own.
+      const part = criteriaSection(body) ?? body;
+      const there = [...part.split("\n"), ...part.split(/\n\s*\n/)].flatMap(
+        (block) => codeSpans(block.replace(/\s*\n\s*/g, " ")),
+      );
+      const hidden = list.find((command) => there.includes(command));
+      if (hidden === undefined)
+        return { reason: "none-named", exitCode: 0, ...base };
       return {
         reason: "scan-broken",
         exitCode: 1,
-        message: "the document has no criteria the reader can find",
+        message: `the document names \`${hidden}\` and has no criteria the reader can find`,
         ...base,
       };
+    }
     const texts = entries.map((e) =>
       [e.line, ...e.continuation].filter(Boolean).join(" ").trim(),
     );

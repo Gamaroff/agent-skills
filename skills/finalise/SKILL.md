@@ -611,7 +611,7 @@ jq -r '"re-run at head: \(.reason)\(if .message then " — " + .message else "" 
 | `ran` | Append `run.md` from the out directory to the running summary under `## Step 1` **now** (agent 1 cites its lines; replace an earlier block on a re-run), and pass the absolute path of `run.json` as `<RERUN_AT_HEAD>`. The append is the one exception to "Do NOT write incrementally". A command that failed is data for the grading, never a HALT here. |
 | `none-named`, `not-configured` | Pass `none`. |
 | `dirty-tree` | **HALT.** Uncommitted code, a file the checkout leaves out (a sparse checkout), a listed command that wrote code, or a head that moved means a run would not be the head's; the message names which and when. Commit or discard it and re-run. |
-| `scan-broken`, `usage` | **HALT**: the document, or the `finalise.rerunAtHead` list, cannot be read. |
+| `scan-broken`, `usage` | **HALT**: the document, or the `finalise.rerunAtHead` list, cannot be read, or a listed command stands in a criteria section of which the reader returns no criterion, or on an unindented line of a criterion; the message says which. |
 | `failed` | **HALT**: the engine itself failed; the message says where. |
 
 **Bug mode (`rerun-at-head`):** skip — a bug report has no criteria list.

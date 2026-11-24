@@ -8,7 +8,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn, spawnSync } from "node:child_process";
 import {
   chmodSync,
   copyFileSync,
@@ -786,7 +786,17 @@ const siteIds = () =>
 test("scan: every git push in a pipeline document or pipeline skill asks push-policy, or is exempt by name", () => {
   const ids = siteIds();
   assert.ok(ids.size >= 10, "the site table was read");
-  const used = new Set();
+  const used = new Set(); // a call, and not a comment or a sentence that names one (T319-CR-903)
+  const calls = (text) =>
+    text
+      .split("\n")
+      .filter((l) => !/^\s*#/.test(l))
+      .flatMap((l) => [
+        ...l.matchAll(
+          /\bbash\s+"?[^\s"`]*push-policy\.sh"?\s+--site\s+([a-z0-9-]+)/g,
+        ),
+      ])
+      .map((m) => m[1]);
   const found = [];
   let guarded = 0;
   const files = authoredFiles();
@@ -800,10 +810,10 @@ test("scan: every git push in a pipeline document or pipeline skill asks push-po
   for (const file of files) {
     if (file === "shared/resources/push-policy.sh") continue; // the table itself
     const text = readFileSync(join(ROOT, file), "utf8");
+    for (const id of calls(text)) used.add(id);
     for (const m of text.matchAll(
       /push-policy\.sh"?\s+--site\s+([a-z0-9-]+)/g,
     )) {
-      used.add(m[1]);
       guarded += 1;
       assert.ok(ids.has(m[1]), `${file}: --site ${m[1]} is not in the table`);
     }
@@ -818,6 +828,16 @@ test("scan: every git push in a pipeline document or pipeline skill asks push-po
     [...ids].filter((i) => !used.has(i)),
     [],
     "a site in the table that no document calls",
+  );
+  for (const s of [
+    "# the same with push-policy.sh --site qa-review-fix",
+    "   # bash x/push-policy.sh --site qa-review-fix",
+    "The block (`push-policy.sh --site qa-pre-5c`) is under 5b.",
+  ])
+    assert.deepEqual(calls(s), [], s);
+  assert.deepEqual(
+    calls('if [ "$(bash a/push-policy.sh --site qa-cycle)" != defer ]'),
+    ["qa-cycle"],
   );
 });
 
@@ -991,12 +1011,30 @@ test("a HALT whose push, or whose look at the remote, answers nothing still halt
     [
       "the push",
       ({ up }) => hang(join(up, "hooks/pre-receive")),
-      /^halt: not pushed — the push failed \(no answer in 2 s\)$/m,
+      /^halt: not pushed — the push failed \(no answer in 2 s; origin did not have it when asked again, and may still take it\)$/m,
     ],
     [
       "the pre-push hook",
       ({ wt }) => hang(join(wt, ".git/hooks/pre-push")),
-      /^halt: not pushed — the push failed \(no answer in 2 s\)$/m,
+      /^halt: not pushed — the push failed \(no answer in 2 s; origin did not have it/m,
+    ],
+    // the server took it and went on: what was asked again is what is said (T319-CR-906)
+    [
+      "the push, after the ref moved",
+      ({ up }) => hang(join(up, "hooks/post-receive")),
+      /^halt: pushed$/m,
+    ],
+    [
+      "the push, and then the remote",
+      ({ wt }) => {
+        const slow = hang(join(wt, ".git/slow"));
+        writeFileSync(
+          join(wt, ".git/hooks/pre-push"),
+          `#!/bin/sh\ngit config remote.origin.uploadpack "${slow}"\nexec sleep 25\n`,
+        );
+        chmodSync(join(wt, ".git/hooks/pre-push"), 0o755);
+      },
+      /^halt: not pushed — the push may have failed \(no answer in 2 s; origin could not be asked again\)$/m,
     ],
     [
       "the look",
@@ -1020,6 +1058,181 @@ test("a HALT whose push, or whose look at the remote, answers nothing still halt
     assert.match(r.stdout, want, what);
     assert.ok(!existsSync(join(f.wt, LOCK_FILE)), `${what}: halted`);
   }
+});
+
+/** Is this process still doing anything? (One that ended and nobody collected is not.) */
+function alive(pid) {
+  try {
+    process.kill(pid, 0);
+    if (!existsSync("/proc/self/stat")) return true;
+    const stat = readFileSync(`/proc/${pid}/stat`, "utf8");
+    return stat[stat.lastIndexOf(")") + 2] !== "Z";
+  } catch {
+    return false;
+  }
+}
+const pause = (ms) => new Promise((done) => setTimeout(done, ms));
+async function until(what, yes) {
+  for (let i = 0; i < 200; i += 1) {
+    if (yes()) return;
+    await pause(50);
+  }
+  assert.fail(`never: ${what}`);
+}
+
+test("what push-held stops is the push and its hook, when its time is up and when it is told to end (T319-CR-901)", async (t) => {
+  for (const how of ["its time", "a signal"]) {
+    const { wt, dir } = fixture(t);
+    installed(wt, "develop-task");
+    writeLock(wt);
+    commit(wt, "docs/gate.md");
+    const pidFile = join(dir, "hook.pid");
+    mkdirSync(join(wt, ".git/hooks"), { recursive: true });
+    writeFileSync(
+      join(wt, ".git/hooks/pre-push"),
+      `#!/bin/sh\necho $$ > "${pidFile}.new" && mv "${pidFile}.new" "${pidFile}"\nsleep 25\necho went on\n`,
+    );
+    chmodSync(join(wt, ".git/hooks/pre-push"), 0o755);
+    const child = spawn("bash", [join(RES, "push-held.sh"), "--site", "halt"], {
+      cwd: wt,
+      env: { ...ENV, PUSH_HELD_SECONDS: how === "its time" ? "8" : "20" },
+      stdio: "ignore",
+    });
+    const ended = new Promise((done) => child.on("exit", done));
+    await until("the hook started", () => existsSync(pidFile));
+    const hook = Number(readFileSync(pidFile, "utf8"));
+    t.after(() => {
+      try {
+        process.kill(hook, "SIGKILL");
+      } catch {
+        /* it is gone, as it should be */
+      }
+    });
+    assert.ok(alive(hook), "the hook is running");
+    if (how === "a signal") child.kill("SIGTERM");
+    await ended;
+    await until(`${how}: the hook ended`, () => !alive(hook));
+  }
+});
+
+test("push-held says what is the remote's, whether or not somebody fetched, and never guesses (T319-CR-904, CR-905, CR-907)", (t) => {
+  const held = (site, prepare) => {
+    const f = fixture(t);
+    installed(f.wt, "develop-task");
+    writeLock(f.wt);
+    const env = prepare(f) ?? {};
+    const r = run("bash", [join(RES, "push-held.sh"), "--site", site], {
+      cwd: f.wt,
+      env: { ...ENV, ...env },
+    });
+    return { out: r.stdout.trim(), code: r.status };
+  };
+  const ahead = ({ up, dir }) => {
+    git(dir, "clone", "-q", "-b", "feature/x", up, join(dir, "other"));
+    commit(join(dir, "other"), "docs/theirs.md");
+    git(join(dir, "other"), "push", "-q", "origin", "HEAD");
+  };
+  const fetched = (prepare) => (f) => {
+    prepare(f);
+    git(f.wt, "fetch", "-q", "origin");
+  };
+  const apart = (f) => {
+    commit(f.wt, "docs/mine.md");
+    ahead(f);
+  };
+  for (const [prepare, halt, entry] of [
+    [() => {}, "halt: nothing held", "finalise-entry: nothing held"],
+    [
+      ahead,
+      "halt: nothing held — origin's feature/x is ahead of this checkout",
+      "finalise-entry: not pushed — origin's feature/x is ahead of this checkout: the PR head is not HEAD",
+    ],
+    [
+      apart,
+      "halt: not pushed — origin's feature/x has commits this checkout does not, and the held commits would be rejected",
+      "finalise-entry: not pushed — origin's feature/x has commits this checkout does not, and the held commits would be rejected",
+    ],
+  ])
+    for (const p of [prepare, fetched(prepare)]) {
+      assert.deepEqual(held("halt", p), { out: halt, code: 0 });
+      assert.deepEqual(held("finalise-entry", p), {
+        out: entry,
+        code: entry.includes("not pushed") ? 1 : 0,
+      });
+    }
+
+  const noScratch = ({ dir }) => {
+    mkdirSync(join(dir, "bin"));
+    writeFileSync(join(dir, "bin/mktemp"), "#!/bin/sh\nexit 1\n");
+    chmodSync(join(dir, "bin/mktemp"), 0o755);
+    return { PATH: `${join(dir, "bin")}:${process.env.PATH}` };
+  };
+  assert.deepEqual(held("halt", noScratch), {
+    out: "halt: not pushed — no scratch file could be made",
+    code: 0,
+  });
+  assert.equal(held("finalise-entry", noScratch).code, 1);
+
+  // in a partial clone a question about this repository does not become one for the remote
+  let asked;
+  held("halt", (f) => {
+    ahead(f);
+    git(f.wt, "config", "remote.origin.promisor", "true");
+    git(f.wt, "config", "remote.origin.partialclonefilter", "blob:none");
+    git(f.wt, "config", "extensions.partialClone", "origin");
+    asked = join(f.dir, "asked");
+    const server = join(f.dir, "upload-pack");
+    writeFileSync(
+      server,
+      `#!/bin/sh\necho x >> "${asked}"\n[ $(wc -l < "${asked}") -gt 1 ] && exit 1\nexec git-upload-pack "$@"\n`,
+    );
+    chmodSync(server, 0o755);
+    git(f.wt, "config", "remote.origin.uploadpack", server);
+  });
+  assert.equal(
+    readFileSync(asked, "utf8"),
+    "x\nx\n",
+    "ls-remote, and the one fetch that is bounded by name",
+  );
+
+  // and one that git does not answer is not taken for an answer
+  const real = run("sh", ["-c", "command -v git"]).stdout.trim();
+  for (const [cmd, why] of [
+    ["merge-base", "the history could not be read (no answer in 5 s)"],
+    ["diff", "what is staged could not be read"],
+  ])
+    assert.equal(
+      held("halt", (f) => {
+        commit(f.wt, "docs/mine.md");
+        mkdirSync(join(f.dir, "bin"));
+        writeFileSync(
+          join(f.dir, "bin/git"),
+          `#!/bin/sh\n[ "$1" = ${cmd} ] && exec sleep 25\nexec "${real}" "$@"\n`,
+        );
+        chmodSync(join(f.dir, "bin/git"), 0o755);
+        return { PATH: `${join(f.dir, "bin")}:${process.env.PATH}` };
+      }).out,
+      `halt: not pushed — ${why}`,
+    );
+
+  // the remote moves after it was asked: git's last words are a hint, and the reason is not
+  const raced = held("halt", ({ up, wt, dir }) => {
+    const theirs = commit(wt, "docs/theirs.md");
+    git(wt, "push", "-q", "origin", `${theirs}:refs/heads/theirs`);
+    git(wt, "reset", "-q", "--hard", "HEAD~1");
+    commit(wt, "docs/mine.md");
+    const server = join(dir, "receive-pack");
+    writeFileSync(
+      server,
+      `#!/bin/sh\ngit --git-dir="${up}" update-ref refs/heads/feature/x ${theirs}\nexec git-receive-pack "$@"\n`,
+    );
+    chmodSync(server, 0o755);
+    git(wt, "config", "remote.origin.receivepack", server);
+  });
+  assert.match(
+    raced.out,
+    /^halt: not pushed — the push failed \(exit 1: error: failed to push/,
+  );
 });
 
 test("a HALT never re-creates a deleted branch, never parts a commit from a staged file, and never moves a head CI is being read on (T319-CR-507, CR-508)", (t) => {
@@ -1263,7 +1476,19 @@ test("scan: a HALT has one push, push-held.sh in the HALT block, and the entry t
     const bound = (name) =>
       Number(new RegExp(`${name}[^\\n]*?(\\d+)`).exec(held)[1]);
     const held = read("shared/resources/push-held.sh");
-    const needs = bound("finalise-entry\\) PUSH_SECONDS=") + bound(":-");
+    // the remote is asked before the push, and again after one that was stopped; three local questions
+    const needs =
+      bound("finalise-entry\\) PUSH_SECONDS=") +
+      2 * bound(":-") +
+      3 * bound("LOCAL_SECONDS=");
+    assert.ok(needs <= ms / 1000 - 40, "a margin for a loaded machine");
+    // a HALT fits in the tool's default timeout, which its block does not raise
+    assert.ok(
+      needs -
+        bound("finalise-entry\\) PUSH_SECONDS=") +
+        bound("halt\\) PUSH_SECONDS=") <=
+        110,
+    );
     assert.ok(needs > 120 && ms >= needs * 1000, `${file}: ${ms}, ${needs} s`);
     assert.match(entry, /no line at all/i, file);
   }

@@ -1050,7 +1050,7 @@ const FORWARDED_SIGNALS = ["SIGTERM", "SIGINT", "SIGHUP"];
  * short of SIGKILL. Resolves with the `spawnSync`-shaped `{ pid, status, signal, error }` the caller
  * reads, so an injected synchronous `spawn` in a test is a drop-in.
  *
- * `onSpawn`, when given, gets the child, to read its pipes. What a kill cannot reach: a descendant that
+ * `onSpawn`, when given, gets the child, to stop it on a condition of the caller's. What a kill cannot reach: a descendant that
  * left the process group (`setsid`, a daemon, and coreutils' `timeout`, which makes a group of its own)
  * outlives a timeout and a signal.
  *
@@ -1528,6 +1528,7 @@ module.exports = {
   configTextAtCommit,
   // The bounded runner and the block reader's refusals, for finalise-rerun-at-head.js (task.319).
   UsageError,
+  normKey,
   assertMapping,
   assertBlockRows,
   topLevelKey,

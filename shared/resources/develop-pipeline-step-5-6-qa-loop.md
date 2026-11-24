@@ -1160,7 +1160,7 @@ includes **patch** with a stated reason, and why nothing here constrains the fix
 table — `qa-narrowing-residue.test.mjs`, beside the engine's suite under `tests/` — is the spec this
 section is written from.
 
-#### Where the gate and QA report get committed (one commit, one push, per cycle)
+#### Where the gate and QA report get committed (one commit, at most one push, per cycle)
 
 **This cycle's gate `.yml` and QA report `.md` are evidence for this cycle's fix, and belong in the
 same `fix(...)` commit as the fix.** Only the *implementation report* defers to Step 8. Stage all
@@ -1463,9 +1463,18 @@ After fixes are applied:
    > as usual and do **not** treat an unchanged head SHA as a failure. The next 5a's CI read
    > (`qa-ci-read.sh`) answers `HEAD_MISMATCH` there, which decides nothing.
 
+   A cycle that entered 5b from 5a:
+
    ```bash
-   # From a 5c verdict, the same three lines with --site qa-review-fix (push-policy.sh --site qa-review-fix).
    if [ "$(bash .agents/skills/{develop-story|develop-task}/references/push-policy.sh --site qa-cycle)" != defer ]; then
+     git push origin HEAD
+   fi
+   ```
+
+   A cycle that entered 5b from a 5c verdict:
+
+   ```bash
+   if [ "$(bash .agents/skills/{develop-story|develop-task}/references/push-policy.sh --site qa-review-fix)" != defer ]; then
      git push origin HEAD
    fi
    ```

@@ -28,7 +28,7 @@ If you find yourself reaching for `Write` to author a DoD file, STOP and invoke 
 
 **First push what the run held.** `/finalise` takes CI reading 1 on the PR head while recording
 `HEAD`, so a commit still local would be accepted on a reading of another commit. Give the call a tool
-timeout of 600000 ms: the push waits up to 540 s for the project's own pre-push hook, and the default
+timeout of 600000 ms: the push waits up to 500 s for the project's own pre-push hook, and the default
 tool timeout ends the call before it answers:
 
 ```bash
@@ -39,7 +39,7 @@ bash .agents/skills/{develop-story|develop-task}/references/push-held.sh --site 
 | :-- | :-- |
 | `nothing held` or `pushed` | Go on. What 5c staged stays staged for 6a |
 | `commit-staged` | A commit is held and 5c's set is staged: the held report links to it, so neither goes out without the other. Commit the staged set and nothing else through `/commit-changes` (`docs(...): review evidence, ahead of finalise`), then run the block again |
-| `not pushed …` (exit 1) | HALT with the line. `HEAD` is not on the PR, so there is no reading to take |
+| `not pushed …` (exit 1) | HALT with the line. `HEAD` is not known to be the PR head, so there is no reading to take. Where origin is ahead, pull first; where a push was stopped, ask origin again, because it may still have taken it |
 | no line at all | The call was cut off. Run it again with the timeout above; cut off again, HALT |
 
 A resume during the 6c wait takes this block too. It moves the PR head off the commit the old reading
