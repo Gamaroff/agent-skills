@@ -1080,13 +1080,15 @@ async function until(what, yes) {
   assert.fail(`never: ${what}`);
 }
 
-test("what push-held stops is the push and its hook, when its time is up and when it is told to end (T319-CR-901)", async (t) => {
-  for (const how of ["its time", "a signal"]) {
+test("what push-held stops is the push and its hook, when its time is up, when it is told to end, and when it is killed (T319-CR-901, CR-1101)", async (t) => {
+  for (const how of ["its time", "a signal", "SIGKILL to its group"]) {
     const { wt, dir } = fixture(t);
     installed(wt, "develop-task");
     writeLock(wt);
     commit(wt, "docs/gate.md");
     const pidFile = join(dir, "hook.pid");
+    const scratch = join(dir, "scratch");
+    mkdirSync(scratch);
     mkdirSync(join(wt, ".git/hooks"), { recursive: true });
     writeFileSync(
       join(wt, ".git/hooks/pre-push"),
@@ -1095,8 +1097,13 @@ test("what push-held stops is the push and its hook, when its time is up and whe
     chmodSync(join(wt, ".git/hooks/pre-push"), 0o755);
     const child = spawn("bash", [join(RES, "push-held.sh"), "--site", "halt"], {
       cwd: wt,
-      env: { ...ENV, PUSH_HELD_SECONDS: how === "its time" ? "8" : "20" },
+      env: {
+        ...ENV,
+        PUSH_HELD_SECONDS: how === "its time" ? "8" : "20",
+        TMPDIR: scratch,
+      },
       stdio: "ignore",
+      detached: true, // a group of its own, as a tool call has
     });
     const ended = new Promise((done) => child.on("exit", done));
     await until("the hook started", () => existsSync(pidFile));
@@ -1110,8 +1117,46 @@ test("what push-held stops is the push and its hook, when its time is up and whe
     });
     assert.ok(alive(hook), "the hook is running");
     if (how === "a signal") child.kill("SIGTERM");
+    if (how === "SIGKILL to its group") process.kill(-child.pid, "SIGKILL");
     await ended;
     await until(`${how}: the hook ended`, () => !alive(hook));
+    await until(
+      `${how}: the scratch file was removed`,
+      () => readdirSync(scratch).length === 0,
+    );
+  }
+});
+
+test("push-held leaves no process of its own behind, whichever way it answers (T319-CR-1101)", (t) => {
+  for (const [what, prepare, answer] of [
+    ["pushed", () => {}, /^halt: pushed\n$/],
+    [
+      "rejected",
+      (f) => {
+        const hook = join(f.wt, ".git/hooks/pre-push");
+        mkdirSync(dirname(hook), { recursive: true });
+        writeFileSync(hook, "#!/bin/sh\necho no >&2\nexit 3\n");
+        chmodSync(hook, 0o755);
+      },
+      /^halt: not pushed — the push failed \(exit \d+: .*\n$/,
+    ],
+  ]) {
+    const f = fixture(t);
+    installed(f.wt, "develop-task");
+    writeLock(f.wt);
+    commit(f.wt, "docs/gate.md");
+    prepare(f);
+    // its own path, so that no other run's processes are counted
+    const own = join(
+      f.wt,
+      ".agents/skills/develop-task/references/push-held.sh",
+    );
+    const r = run("bash", [own, "--site", "halt"], { cwd: f.wt });
+    const left = run("ps", ["-A", "-o", "args="]).stdout;
+    assert.match(r.stdout, answer, what);
+    assert.equal(r.stderr, "", what);
+    assert.ok(left.includes("ps -A"), "the processes were listed");
+    assert.ok(!left.includes(own), what);
   }
 });
 
@@ -1175,7 +1220,7 @@ test("push-held says what is the remote's, whether or not somebody fetched, and 
 
   // in a partial clone a question about this repository does not become one for the remote
   let asked;
-  held("halt", (f) => {
+  const unfetched = held("halt", (f) => {
     ahead(f);
     git(f.wt, "config", "remote.origin.promisor", "true");
     git(f.wt, "config", "remote.origin.partialclonefilter", "blob:none");
@@ -1193,6 +1238,11 @@ test("push-held says what is the remote's, whether or not somebody fetched, and 
     readFileSync(asked, "utf8"),
     "x\nx\n",
     "ls-remote, and the one fetch that is bounded by name",
+  );
+  // that fetch failed, and what the branch holds is not told from it (T319-CR-1103)
+  assert.match(
+    unfetched.out,
+    /^halt: not pushed — origin's feature\/x has another commit, which could not be fetched \(exit \d+: /,
   );
 
   // and one that git does not answer is not taken for an answer

@@ -73,7 +73,8 @@
  *   not-configured  0  finalise.rerunAtHead is absent or an empty list
  *   dirty-tree      1  the working tree is not the head, or stopped being it; no record is kept
  *   scan-broken     1  the document could not be read, or a listed command stands in a criteria section of
- *                      which the reader returns no criterion at all, or on an unindented line of one
+ *                      which the reader returns no criterion at all, or on an unindented line of one, or
+ *                      after a backtick that has no partner
  *   failed          1  the engine itself failed (a file it could not write, git); no record is kept
  *   usage           2  bad arguments, or a configuration that cannot be read as a list of commands
  */
@@ -249,10 +250,20 @@ function parseRerunList(rawText) {
 /** The code spans of a criterion, each whole: `x`, ``y``. */
 function codeSpans(text) {
   const out = [];
-  const re = /(?<!`)(`+)(?!`)([\s\S]*?[^`])\1(?!`)/g;
+  const re = /(?<!`)(?<!(?<!\\)(?:\\\\)*\\)(`+)(?!`)([\s\S]*?[^`])\1(?!`)/g;
   let m;
   while ((m = re.exec(text)) !== null) out.push(m[2].trim());
   return out;
+}
+
+/** Does a text show this command anywhere, as a code span of a line or a paragraph or between two backticks?
+ * Wider than `codeSpans`, for a refusal: a span can stand on two lines, and a backtick with no partner takes
+ * one of the command's. */
+function shows(text, command) {
+  if (text.includes(`\`${command}\``)) return true;
+  return [...text.split("\n"), ...text.split(/\n\s*\n/)].some((block) =>
+    codeSpans(block.replace(/\s*\n\s*/g, " ")).includes(command),
+  );
 }
 
 /** [{ command, criteria: [{ index, text }] }] in list order, only for commands a criterion names. */
@@ -540,20 +551,8 @@ const gitLine = (cwd, ...args) =>
     .replace(/\r?\n$/, "");
 const bytes = (f) => Buffer.from(f, "latin1");
 const shown = (f) => bytes(f).toString("utf8");
-
-/** Which of these paths does git ignore? */
-function ignoredOf(dir, files) {
-  if (files.length === 0) return [];
-  try {
-    const input = bytes(`${files.join("\0")}\0`);
-    return gitIn(dir, ["check-ignore", "-z", "--stdin"], input)
-      .toString("latin1")
-      .split("\0");
-  } catch (e) {
-    if (e.status === 1) return []; // none of them
-    throw e;
-  }
-}
+// As git folds a name under core.ignorecase: ASCII only.
+const folded = (f) => f.replace(/[A-Z]/g, (c) => c.toLowerCase());
 
 /** Does this checkout's filesystem keep a mode? Asked as `git init` asks it: a file, chmod, look. */
 function keepsModes(gitDir, io = fs) {
@@ -615,19 +614,24 @@ function differing(dir, commit, prefix = "") {
     const [, mode, oid, file] = /^(\d+) \S+ ([0-9a-f]+)\t([^]*)$/.exec(row);
     tree.set(file, { mode, oid });
   }
-  // Under core.ignorecase an untracked A.js beside a tracked a.js is the tracked one (T319-CR-801). What
-  // the repository ignores is still its own configuration's to say, and that covers .gitignore too.
-  const others = gitRows(
-    dir,
-    "-c",
-    "core.ignorecase=false",
-    "ls-files",
-    "-z",
-    "--others",
-    "--exclude-standard",
-  );
-  const ignored = new Set(ignoredOf(dir, others));
-  const bad = new Set(others.filter((f) => !ignored.has(f)));
+  // What is untracked, and what is ignored, is the repository's own configuration's to say.
+  const listed = ["ls-files", "-z", "--others", "--exclude-standard"];
+  const bad = new Set(gitRows(dir, ...listed));
+  // Except one thing: under core.ignorecase an untracked A.js beside a tracked a.js is the tracked one
+  // (T319-CR-801). It is a file of its own unless the disk folds names too and both name one file
+  // (T319-CR-1002); a second hard link is not one name.
+  const byFold = new Map([...tree.keys()].map((f) => [folded(f), f]));
+  for (const f of gitRows(dir, "-c", "core.ignorecase=false", ...listed)) {
+    if (!byFold.has(folded(f))) continue;
+    const [own, known] = [lstat(f), lstat(byFold.get(folded(f)))];
+    if (
+      !known ||
+      own?.ino !== known.ino ||
+      own.dev !== known.dev ||
+      own.nlink > 1
+    )
+      bad.add(f);
+  }
   const links = new Set();
   for (const [f, { mode }] of tree) if (mode === "160000") links.add(f);
   const index = new Set();
@@ -832,13 +836,15 @@ async function run(argv) {
     const entries = readCriteriaEntries(body);
     if (entries === null || entries.length === 0) {
       // Criteria the reader cannot see, or none at all: only the first can hide a command (T319-CR-805).
-      // By line and by paragraph: a span can stand on two lines, and a stray backtick pairs with no
-      // further than its own.
-      const part = criteriaSection(body) ?? body;
-      const there = [...part.split("\n"), ...part.split(/\n\s*\n/)].flatMap(
-        (block) => codeSpans(block.replace(/\s*\n\s*/g, " ")),
-      );
-      const hidden = list.find((command) => there.includes(command));
+      // Under every heading that speaks of criteria, and in the whole document when nothing stands there
+      // (T319-CR-1003).
+      const under = body
+        .split(/^(?=## )/m)
+        .filter((part) => /^## .*(?:criteri|\bAC[ -]?\d)/i.test(part))
+        .map((part) => part.replace(/^.*/, ""))
+        .join("\n");
+      const where = under.trim() === "" ? body : under;
+      const hidden = list.find((command) => shows(where, command));
       if (hidden === undefined)
         return { reason: "none-named", exitCode: 0, ...base };
       return {
@@ -859,6 +865,20 @@ async function run(argv) {
         message: `criterion #${lazy.index} names \`${lazy.command}\` on an unindented line, which is not read as part of it: indent the line`,
         ...base,
       };
+    // A backtick without a partner takes the one that opens a later span, and the span is gone
+    // (T319-CR-1005).
+    for (const [i, e] of entries.entries()) {
+      const raw = [e.line, ...e.continuation].join("\n");
+      const whole = codeSpans(texts[i]);
+      const lost = list.find((c) => !whole.includes(c) && shows(raw, c));
+      if (lost)
+        return {
+          reason: "scan-broken",
+          exitCode: 1,
+          message: `criterion #${i + 1} names \`${lost}\` after a backtick that has no partner, which hides it: remove that backtick`,
+          ...base,
+        };
+    }
     const named = namedCommands(list, texts);
     if (named.length === 0)
       return { reason: "none-named", exitCode: 0, ...base };

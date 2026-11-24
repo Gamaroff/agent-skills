@@ -50,7 +50,8 @@ LOCAL_SECONDS=5 # for a question about this repository: in a partial clone, git 
 
 OUT=""
 GROUP="" # the bounded command's process group while it runs
-trap '[ -z "$GROUP" ] || kill -9 -- "-$GROUP" 2>/dev/null; [ -z "$OUT" ] || rm -f "$OUT"' EXIT
+WATCHER="" # and its watcher's
+trap '[ -z "$GROUP" ] || kill -9 -- "-$GROUP" 2>/dev/null; [ -z "$WATCHER" ] || kill -9 -- "-$WATCHER" 2>/dev/null; [ -z "$OUT" ] || rm -f "$OUT"' EXIT
 trap 'exit 129' HUP
 trap 'exit 130' INT
 trap 'exit 143' TERM
@@ -64,29 +65,43 @@ refused() {
 # Run a command for at most $1 seconds, with nothing to answer a prompt. 124 when it ran out of time. Its
 # output goes to a file, so a process it leaves behind cannot hold the caller's pipe. It gets a process
 # group of its own (`set -m`), and the group is what is stopped, when the time is up or this script is told
-# to end: a pre-push hook left running runs beside the next push's (T319-CR-901). A descendant that leaves the group
-# (`setsid`, coreutils' `timeout`) is not stopped.
+# to end: a pre-push hook left running runs beside the next push's (T319-CR-901). A second group holds a
+# watcher, which stops the first when this script is gone without a word (SIGKILL, T319-CR-1101). A
+# descendant that leaves the group (`setsid`, coreutils' `timeout`) is not stopped.
 bounded() {
-  local end=$((SECONDS + $1)) pid
+  local end=$((SECONDS + $1)) pid rc=""
   shift
   set -m
   GIT_TERMINAL_PROMPT=0 "$@" < /dev/null > "$OUT" 2>&1 &
   pid=$!
   GROUP=$pid
+  (
+    while kill -0 "$$" && [ "$SECONDS" -le $((end + 5)) ]; do
+      case $(ps -o stat= -p "$$") in Z*) break ;; esac # ended, and nobody collected it
+      sleep 1
+    done
+    kill -9 -- "-$pid"
+    [ "$SECONDS" -gt $((end + 5)) ] || rm -f "$OUT" # the script is gone, and its EXIT trap did not run
+  ) < /dev/null > /dev/null 2>&1 &
+  WATCHER=$!
   set +m
   while kill -0 "$pid" 2>/dev/null; do
     if [ "$SECONDS" -gt "$end" ]; then
       kill -- "-$pid" 2>/dev/null
       sleep 0.2
       kill -9 -- "-$pid" 2>/dev/null
-      wait "$pid" 2>/dev/null
-      GROUP=""
-      return 124
+      rc=124
+      break
     fi
     sleep 0.2
   done
+  wait "$pid" 2>/dev/null
+  rc=${rc:-$?}
   GROUP=""
-  wait "$pid"
+  kill -9 -- "-$WATCHER" 2>/dev/null
+  wait "$WATCHER" 2>/dev/null
+  WATCHER=""
+  return "$rc"
 }
 why() { # exit status, the bound in seconds
   if [ "$1" -eq 124 ]; then echo "no answer in $2 s"; else echo "exit $1: $(grep -v '^hint:' "$OUT" | tail -1)"; fi
@@ -136,8 +151,11 @@ HEAD_SHA=$(git rev-parse HEAD)
 if ! in_history "$REMOTE" HEAD; then
   # The remote has commits this branch does not. Whether this branch has any of its own is asked with the
   # remote's commit here, so that the answer is the same before and after somebody's fetch (T319-CR-905).
-  local_git cat-file -e "$REMOTE^{commit}" \
-    || bounded "$ASK_SECONDS" git fetch --quiet --no-tags origin "refs/heads/$BRANCH"
+  if ! local_git cat-file -e "$REMOTE^{commit}"; then
+    bounded "$ASK_SECONDS" git fetch --quiet --no-tags origin "refs/heads/$BRANCH"
+    rc=$?
+    [ "$rc" -eq 0 ] || refused "origin's $BRANCH has another commit, which could not be fetched ($(why "$rc" "$ASK_SECONDS"))"
+  fi
   if in_history HEAD "$REMOTE"; then
     [ "$SITE" = halt ] && answer "nothing held — origin's $BRANCH is ahead of this checkout"
     refused "origin's $BRANCH is ahead of this checkout: the PR head is not HEAD"

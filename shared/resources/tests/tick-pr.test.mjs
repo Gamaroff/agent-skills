@@ -607,10 +607,19 @@ test("a landed tick is recognised when the base changed the row beside it since,
   const landed = { [MAP]: "- [ ] 1\n\n- [x] 2\n- [ ] 3\n" };
   const beside = { [MAP]: "- [ ] 1\n\n- [x] 2\n- [x] 3\n" };
   assert.equal(start([landed, beside]), "landed");
-  // the row itself says something else now, or the tick was taken back
-  assert.equal(start([{ [MAP]: "- [ ] 1\n\n- [~] 2\n- [ ] 3\n" }]), "resume");
+  // what the base did to the row after it landed is the base's own
   assert.equal(
     start([landed, beside, { [MAP]: "- [ ] 1\n\n- [~] 2\n" }]),
+    "landed",
+  );
+  // the row says something else and never said what the tick did
+  assert.equal(start([{ [MAP]: "- [ ] 1\n\n- [~] 2\n- [ ] 3\n" }]), "resume");
+  // the same words on another item's row (T319-CR-1102)
+  assert.equal(
+    start([{ [MAP]: "A1\nready\nB\naccepted\n" }], {
+      files: { [MAP]: "A\nready\nB\nready\n" },
+      tick: { [MAP]: "A\naccepted\nB\nready\n" },
+    }),
     "resume",
   );
   // the row it removed is there again beside the one it added
@@ -625,37 +634,13 @@ test("a landed tick is recognised when the base changed the row beside it since,
   };
   assert.equal(start([beside], two), "resume");
   assert.equal(
-    start([{ ...beside, [OTHER]: "old\nticked 2\nnewer\n" }], two),
+    start([two.tick, { ...beside, [OTHER]: "old\nticked 2\nnewer\n" }], two),
     "landed",
   );
-  // a blank row decides nothing, either way
-  assert.equal(
-    start([{ [MAP]: "- [ ] 1\n- [x] 2\n- [x] 3\n" }], {
-      tick: { [MAP]: "- [ ] 1\n\n\n- [x] 2\n- [ ] 3\n" },
-    }),
-    "landed",
-  );
-  assert.equal(
-    start([{ [MAP]: "- [ ] 1 x\n\n\n- [ ] 2\n- [ ] 3\n" }], {
-      tick: { [MAP]: "- [ ] 1\n- [ ] 2\n- [ ] 3\n" },
-    }),
-    "resume",
-  );
-  // nor does one of a file with CRLF
-  assert.equal(
-    start([{ [MAP]: "- [ ] 1\r\n- [x] 2\r\n- [x] 3\r\n" }], {
-      files: { [MAP]: "- [ ] 1\r\n\r\n- [ ] 2\r\n- [ ] 3\r\n" },
-      tick: { [MAP]: "- [ ] 1\r\n\r\n\r\n- [x] 2\r\n- [ ] 3\r\n" },
-    }),
-    "landed",
-  );
-  // a file it added is not read as rows
-  assert.equal(
-    start([{ ...beside, [OTHER]: "ticked 2\n" }], {
-      tick: { ...landed, [OTHER]: "ticked 2\n" },
-    }),
-    "resume",
-  );
+  // a file it added
+  const added = { tick: { ...landed, [OTHER]: "ticked 2\n" } };
+  assert.equal(start([added.tick, beside], added), "landed");
+  assert.equal(start([beside], added), "resume");
 });
 
 test("a read that fails is never a landed tick: the branch with it would be deleted (T319-CR-902)", (t) => {
@@ -669,9 +654,9 @@ test("a read that fails is never a landed tick: the branch with it would be dele
   for (const broken of [
     null,
     "merge-tree --write-tree",
-    "diff-tree -r --no-renames",
-    "diff-tree -r -z",
-    "show",
+    "merge-base refs/remotes/origin/develop",
+    "rev-list --first-parent",
+    "rev-parse --verify --quiet ????????????????????????????????????????^{tree}",
   ]) {
     const f = fixture(t);
     git(f.wt, "checkout", "-q", "develop");
@@ -693,7 +678,7 @@ test("a read that fails is never a landed tick: the branch with it would be dele
     }).stdout.trim();
     writeFileSync(
       join(bin, "git"),
-      `#!/bin/sh\ncase "$*" in ${broken ? `"${broken}"*) echo broken >> "${bin}/hit"; exit 128 ;;` : ""} *) exec "${real}" "$@" ;; esac\n`,
+      `#!/bin/sh\ncase "$*" in ${broken ? `${broken.replaceAll(" ", "\\ ")}*) echo broken >> "${bin}/hit"; exit 128 ;;` : ""} *) exec "${real}" "$@" ;; esac\n`,
     );
     chmodSync(join(bin, "git"), 0o755);
     const r = f.start();

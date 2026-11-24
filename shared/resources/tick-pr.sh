@@ -99,45 +99,35 @@ tidy() {
 # True when merging $1 into origin/<base> would change nothing: its content is already there. A squash or
 # rebase merge leaves the branch's own commits off the base, so ancestry cannot say it.
 landed() {
-  local tree
-  tree=$(git merge-tree --write-tree "refs/remotes/origin/$BASE" "$1" 2>/dev/null)
+  local base="refs/remotes/origin/$BASE" from at
+  holds "$base" "$1"
   case $? in
-    0) [ "$tree" = "$(git rev-parse "refs/remotes/origin/$BASE^{tree}")" ] ;;
+    0) return 0 ;;
     # A conflict, which a landed tick gives too once the base changed a row beside its own (T319-CR-902).
-    1) rows_landed "$1" ;;
-    *) return 1 ;; # it could not be asked, which says nothing
+    # Then it is asked of the base as it was at each commit since the branch was cut: the one that landed
+    # the tick holds it, and what the base did to the row afterwards is the base's own. No row is compared
+    # here, so the same words on another row are not the tick (T319-CR-1102).
+    3)
+      from=$(git merge-base "$base" "$1") || return 1
+      # only the commits that changed a file the branch changed
+      for at in $(git diff-tree -r -z --no-renames --name-only "$from" "$1" \
+        | GIT_LITERAL_PATHSPECS=1 xargs -0 git rev-list --first-parent "$from..$base" --); do
+        ! holds "$at" "$1" || return 0
+      done
+      ;;
   esac
+  return 1 # or it could not be asked, which says nothing: `landed` deletes the tick branch
 }
 
-# True when the base holds what the branch $1 did, read row by row: in every file it changed, each row it
-# added is there as often as in the branch's file, and each row it removed no more often. Blank rows are
-# not counted, and a branch that changed nothing but those, or a file by more than its rows, has not landed.
-rows_landed() {
-  local base="refs/remotes/origin/$BASE" from edits f was now got n=0
-  from=$(git merge-base "$base" "$1") || return 1
-  # Only edits of regular files are rows; a file added, deleted or re-moded is not read here. Every read is
-  # checked: one that failed holds no row that says otherwise, and `landed` deletes the tick branch.
-  edits=$(git diff-tree -r --no-renames "$from" "$1") && [ -n "$edits" ] || return 1
-  printf '%s\n' "$edits" | awk '$1 != ":100644" || $2 != "100644" { exit 1 }' || return 1
-  while IFS= read -r -d '' f; do
-    was=$(git show "$from:$f") && now=$(git show "$1:$f") && got=$(git show "$base:$f" 2>/dev/null) || return 1
-    awk '
-      { sub(/\r$/, "") }
-      NF == 0 { next }
-      at == 1 { was[$0]++; seen[$0]; next }
-      at == 2 { now[$0]++; seen[$0]; next }
-      { got[$0]++ }
-      END {
-        for (row in seen) {
-          if (now[row] == was[row]) continue
-          rows++
-          if (now[row] > was[row] ? got[row] < now[row] : got[row] > now[row]) exit 1
-        }
-        exit rows == 0
-      }' at=1 <(printf '%s\n' "$was") at=2 <(printf '%s\n' "$now") at=3 <(printf '%s\n' "$got") || return 1
-    n=$((n + 1))
-  done < <(git diff-tree -r -z --name-only --no-renames "$from" "$1")
-  [ "$n" -eq "$(printf '%s\n' "$edits" | wc -l)" ]
+# Would merging $2 into $1 change nothing? 0 yes, 1 no, 3 a conflict, 2 it could not be asked.
+holds() {
+  local tree own
+  tree=$(git merge-tree --write-tree "$1" "$2" 2>/dev/null)
+  case $? in
+    0) own=$(git rev-parse --verify --quiet "$1^{tree}") && [ "$tree" = "$own" ] ;;
+    1) return 3 ;;
+    *) return 2 ;;
+  esac
 }
 
 # A local base that holds the tick commit (the `ticked-unpushed` route) fast-forwards neither to an origin

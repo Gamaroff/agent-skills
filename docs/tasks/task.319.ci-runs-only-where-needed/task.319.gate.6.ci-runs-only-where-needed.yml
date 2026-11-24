@@ -1,0 +1,121 @@
+schema: 2
+task: 'task.319.ci-runs-only-where-needed'
+task_title: 'Pipelines spend a CI run only where a run can answer something'
+gate: CONCERNS
+status_reason: 'All 10 findings of cycle 5 are fixed for the reported case and the suites and CI are green. The re-review of the files changed since gate 5 found no high defect; four medium and four low defects stand, each reproduced by QA with a control.'
+reviewer: 'QA Engineer'
+head: 'f0e45bb0e1078c667947effeced36d0285f2e345'
+updated: '2026-11-24T19:40:30Z'
+
+top_issues:
+  - id: 'T319-CR-1001'
+    severity: medium
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'Untracked files come only from a listing with core.ignorecase off, so under core.ignorecase=true a negated ignore pattern in another case no longer lists the file: an untracked keep.gen.js that git status shows answers ran (origin: code-review, reproduced by QA; control with the pattern in the same case answers dirty-tree).'
+    suggested_action: 'Take the union of the listing under the repository setting and the case-sensitive one, and add the negated pattern to the settings table test.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-1002'
+    severity: medium
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'platform-variance: on a case-insensitive disk a tracked file whose directory differs only in case on disk is listed as untracked, so a tree git calls clean is refused dirty-tree and nothing can be committed or discarded (origin: code-review, reproduced by QA on a casefold tmpfs; control before the rename answers ran).'
+    suggested_action: 'Drop a path that only the case-sensitive listing has when it is the same file (device and inode) as a tree path equal to it ignoring case.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-1003'
+    severity: low
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'With no criterion read, only the one section the reader chose is searched for a listed command: Success Criteria without a criterion beside a real Acceptance Criteria, or an empty one followed by an H2 AC1, answers none-named (origin: code-review, reproduced by QA; control with an H3 AC1 answers scan-broken).'
+    suggested_action: 'Search the whole document when no criterion is read.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-1004'
+    severity: low
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'check-ignore reads a path that starts with ":/" as another path, so an untracked :/build/o.js is dropped when build/ is ignored (origin: code-review, reproduced by QA; control under c/ answers dirty-tree).'
+    suggested_action: 'Never ask check-ignore about a path that starts with a colon.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-1005'
+    severity: low
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'An unmatched backtick in one paragraph of a criterion pairs with a backtick in the next, so a listed command there is not named and not run (origin: code-review, reproduced by QA: none-named; control without the stray backtick ran). Older than this cycle, new in this pull request.'
+    suggested_action: 'Refuse when a listed command is a code span of a line or a paragraph of a criterion and not of the whole.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-1101'
+    severity: medium
+    file: 'shared/resources/push-held.sh'
+    finding: 'The bounded command has a process group of its own, so a SIGKILL of the caller group leaves git push and its hook running, and step 7 then says to run the push again (origin: code-review at medium confidence, reproduced by QA: hook alive; control with SIGTERM to the script, hook gone).'
+    suggested_action: 'End the group when its starter is gone, and test a SIGKILL beside the signal case.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-1102'
+    severity: medium
+    file: 'shared/resources/tick-pr.sh'
+    finding: 'rows_landed compares row counts without position, so a tick whose changed rows are all generic text reads as landed when the base made the same edit to another item, and the tick branch is deleted (origin: code-review at medium confidence, reproduced by QA with real git; control with unique rows answers resume).'
+    suggested_action: 'On the conflict route, require an added row that is absent from the merge base and stands exactly once in the tick and in the base.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-1103'
+    severity: low
+    file: 'shared/resources/push-held.sh'
+    finding: 'The exit status of the fetch is dropped, so a remote that is ahead and one whose commit could not be fetched give one answer, and it speaks of held commits where there are none (origin: code-review, reproduced by QA; control with a working fetch answers nothing held).'
+    suggested_action: 'Refuse with its own reason when the remote commit is absent and cannot be fetched.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 8886
+  phases_verified: '7/7'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5, 6]
+    phases_with_issues: [2, 4, 5]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 108
+    escaped: 0
+    boundary: true
+    boundary_signals: ["never"]
+    notes: 'parseRerunList engages, 38 of 38; push-policy --site, 48 of 48; push-held --site, 22 of 22. CR-1001 and CR-1004 need an ignore file or a directory name of an unusual form.'
+  performance:
+    status: PASS
+    notes: 'pushes before (eager): 9; after (batched): 6, re-run at this head.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-1101 can leave a hook running after a SIGKILL; CR-1102 can delete a tick branch that has not landed; CR-1002 refuses a clean tree on a case-insensitive disk.'
+  maintainability:
+    status: PASS
+    notes: 'One decision helper, one site table, and one push per HALT.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix the four medium and four low findings'
+      refs: ['shared/resources/finalise-rerun-at-head.js', 'shared/resources/tick-pr.sh', 'shared/resources/push-held.sh']
+  future:
+    - action: 'A scan example for an inline-backticked push-policy call in prose, which the push-site scan would still count as a call (a trace, not executed)'
+      refs: ['shared/resources/tests/push-policy.test.mjs']
+      remedy: unverified
+
+bug_resolution:
+  bugs_fixed: 0
+  bugs_remaining: 0
+  verification_method: 'the cycle 5 reproduction scripts re-run at this head, and the committed tests; no bug report is open'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['the four medium findings fixed or accepted by the owner']

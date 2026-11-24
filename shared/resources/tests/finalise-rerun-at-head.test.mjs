@@ -9,6 +9,7 @@ import { execFileSync, spawnSync } from "node:child_process";
 import {
   chmodSync,
   existsSync,
+  linkSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -1164,10 +1165,30 @@ test("a section with no criterion the reader can find is refused only when it na
     "# T\n\n## Acceptance Criteria\n\n### AC1\n\nPress the ` key.\n\nThen `echo a` passes\n",
     "# T\n\n## Acceptance Criteria\n\n### AC1\n\nPress the ` key.\nThen `echo a` passes\n",
     "# T\n\n## Acceptance Criteria\n\n### AC1\n\nThen `echo\n  a` passes\n",
+    // under the other criteria heading, or past one with nothing under it (T319-CR-1003)
+    "# T\n\n## Success Criteria\n\nSee below.\n\n## Acceptance Criteria\n\n- [ ] `echo a` passes\n",
+    "# T\n\n## Acceptance Criteria\n\n## AC1\n\nThen `echo a` passes\n",
+    "# T\n\n## Acceptance Criteria\n\nBelow.\n\n## AC1\n\nThen `echo a` passes\n",
+    "# T\n\n## Acceptance Criteria\n\n### AC1\n\nPress the ` key, then `echo a` passes\n",
   ]) {
     const r = read(text);
     assert.equal(r.reason, "scan-broken", text);
     assert.match(r.message, /names `echo a` and has no criteria/);
+  }
+  // a backtick with no partner hides a command of a criterion, unless it is escaped (T319-CR-1005)
+  for (const [criterion, reason] of [
+    ["Press the ` key\n\n  Then `echo a` passes", "scan-broken"],
+    ["Press the ` key\n  - then `echo a` passes", "scan-broken"],
+    ["Press the key\n\n  Then `echo a` passes", "ran"],
+    ["Press the ` key, then `echo a` passes", "scan-broken"],
+    ["Press \\` then `echo a` passes", "ran"],
+    ["In C:\\\\`echo a` passes", "ran"],
+    ["``Press the ` key``\n\n  Then `echo a` passes", "ran"],
+  ]) {
+    const r = read(`# T\n\n## Success Criteria\n\n- [ ] ${criterion}\n`);
+    assert.equal(r.reason, reason, criterion);
+    if (reason !== "ran")
+      assert.match(r.message, /#1 names `echo a` after a backtick/);
   }
 });
 
@@ -1190,6 +1211,85 @@ test("what the repository ignores in any case is not compared, and what it does 
     const { rec } = run();
     assert.equal(rec.reason, reason, rec.message);
     if (other) assert.match(rec.message, /the head: other\.js$/);
+  }
+});
+
+test("what git status shows as untracked is never left out by case (T319-CR-1001, CR-1004)", (t) => {
+  for (const [ignore, file] of [
+    ["*.gen.js\n!Keep.gen.js\n", "keep.gen.js"],
+    ["/build/\n", ":/build/o.js"],
+  ]) {
+    const { dir, run } = fixture(t, {
+      config: LIST("echo a"),
+      criteria: ["`echo a` passes"],
+    });
+    writeFileSync(join(dir, ".gitignore"), `.claude/\n${ignore}`);
+    git(dir, "add", "-A");
+    git(dir, "commit", "-q", "-m", "ignore");
+    git(dir, "config", "core.ignorecase", "true");
+    mkdirSync(dirname(join(dir, file)), { recursive: true });
+    writeFileSync(join(dir, file), "x\n");
+    assert.ok(git(dir, "status", "--porcelain", "-uall").includes(file));
+    const { rec } = run();
+    assert.equal(rec.reason, "dirty-tree", file);
+    assert.ok(rec.message.endsWith(`the head: ${file}`), rec.message);
+  }
+});
+
+// What a disk that folds names gives the engine: the case-sensitive listing names a tracked file again, and
+// both names are one file. Here one directory of the second name is a link to the first, and git's listing
+// is added to, because this disk does not fold.
+test("a second spelling of a tracked file is not a file of its own, and a second file is (T319-CR-1002)", (t) => {
+  for (const [what, make, reason] of [
+    ["one file", (d) => symlinkSync("src", join(d, "SRC")), "ran"],
+    [
+      "another file",
+      (d) => {
+        mkdirSync(join(d, "SRC"));
+        writeFileSync(join(d, "SRC/a.js"), "a\n");
+      },
+      "dirty-tree",
+    ],
+    [
+      "a second hard link",
+      (d) => {
+        mkdirSync(join(d, "SRC"));
+        linkSync(join(d, "src/a.js"), join(d, "SRC/a.js"));
+      },
+      "dirty-tree",
+    ],
+  ]) {
+    const { dir, run } = fixture(t, {
+      config: LIST("echo a"),
+      criteria: ["`echo a` passes"],
+    });
+    mkdirSync(join(dir, "src"));
+    writeFileSync(join(dir, "src/a.js"), "a\n");
+    writeFileSync(join(dir, ".gitignore"), ".claude/\n/SRC\n");
+    git(dir, "add", "-A");
+    git(dir, "commit", "-q", "-m", "src");
+    if (existsSync(join(dir, "SRC"))) return; // a disk that folds names cannot hold the other two
+    make(dir);
+    assert.equal(git(dir, "status", "--porcelain"), "", what);
+    const bin = mkdtempSync(join(tmpdir(), "rerun-at-head-bin-"));
+    t.after(() => rmSync(bin, { recursive: true, force: true }));
+    const real = execFileSync("sh", ["-c", "command -v git"], {
+      encoding: "utf8",
+    }).trim();
+    writeFileSync(
+      join(bin, "git"),
+      `#!/bin/sh\n"${real}" "$@" || exit $?\ncase "$*" in *ignorecase=false*--others*) printf 'SRC/a.js\\0' ;; esac\n`,
+    );
+    chmodSync(join(bin, "git"), 0o755);
+    const path = process.env.PATH;
+    ENV.PATH = `${bin}:${path}`;
+    let rec;
+    try {
+      rec = run().rec;
+    } finally {
+      ENV.PATH = path;
+    }
+    assert.equal(rec.reason, reason, `${what}: ${rec.message}`);
   }
 });
 
