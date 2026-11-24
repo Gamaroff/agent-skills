@@ -543,51 +543,8 @@ takes no PR argument, and inside a pipeline the branch rung answers. Record
 `**PR:** #{PR_NUMBER} (source: {PR_SOURCE})` in the running summary's Step 2 block — or
 `**PR:** unresolved (no branch PR, lock, frontmatter or confirmed citation)` when `PR_NUMBER` is empty.
 
-**Then compute the re-run scope** — what agent 1 re-judges, from the newest prior AC record beside
-the document (task 242). Engine source: `references/finalise-rerun-scope.js`.
-
-```bash
-# INPUTS, substituted into THIS block — no block inherits another's variables: STEM and DOD_N
-# exactly as Step 0 bound them. Unbound, the glob below is `.dod.*.ac.json`, no record ever
-# matches, and every re-run reports `no-prior-record` at exit 0 (task.242 QA cycle 1, CR-2).
-STEM="{story.{P}.{E}.{S} | task.{id}}"
-DOD_N="{Step 0's DOD_N}"
-case "$STEM$DOD_N" in *'{'*) echo "HALT: STEM and DOD_N must be substituted into this block (an unsubstituted placeholder found)"; exit 1 ;; esac
-[ -n "$STEM" ] || { echo "HALT: STEM is empty — substitute the work item's filename stem"; exit 1; }
-case "$DOD_N" in ''|*[!0-9]*) echo "HALT: DOD_N ('$DOD_N') is not Step 0's run number"; exit 1 ;; esac
-mkdir -p .claude/state
-# The newest prior run's AC record. Each run writes ${STEM}.dod.{N}.ac.json at Step 3c; the glob
-# never matches a ${STEM}.dod.{N}.security.run.json. Empty on a first run.
-source .agents/skills/finalise/references/newest-numbered.sh || exit 1
-PRIOR_AC_RECORD=$(newest_numbered "{document-directory}" dod -name "${STEM}.dod.*.ac.json")
-RERUN_HEAD=$(git rev-parse HEAD)   # the head this run's agents read; the record stores it
-RERUN_SCOPE_FILE=".claude/state/finalise-rerun-scope-${DOD_N}.json"
-command node .agents/skills/finalise/references/finalise-rerun-scope.js scope \
-  --doc "{document-path}" --head "$RERUN_HEAD" --prior "$PRIOR_AC_RECORD" --json > "$RERUN_SCOPE_FILE"
-case $? in
-  0) jq -r '"re-run scope: \(.mode) (\(.reason)) — \(.rejudge | length) to re-judge, \(.carry | length) carried"' "$RERUN_SCOPE_FILE" ;;
-  *) echo "HALT: finalise-rerun-scope.js scope failed — see $RERUN_SCOPE_FILE"; exit 1 ;;
-esac
-RERUN_SCOPE=$(jq -r '.scope_text' "$RERUN_SCOPE_FILE")   # substituted for <RERUN_SCOPE> in agent 1's prompt
-```
-
-`full` is today's behaviour — judge every criterion — and the engine answers it whenever it has a
-doubt: no prior record (`no-prior-record`), a record it cannot read (`prior-unreadable`), a document
-reopened under Step 2's rule (`reopened`), a prior head that is not an ancestor of `HEAD`
-(`head-not-ancestor`, a rebase or force-push), or no criterion line it can key (`no-criteria`).
-`scoped` re-judges the criteria the prior run failed (`reported-gap`), the ones whose text changed
-(`new-criterion`, `criterion-changed`), every CI-state criterion, deferred or already graded from an
-earlier head's CI (`ci-state`, task 249: its verdict is one head's reading, never carried), every criterion
-graded on a command re-run at an earlier head (`rerun-at-head`, task 319, the same reason), the passes whose cited code, test or member evidence changed
-since the prior head (`evidence-changed`) or resolves to no tracked file (`evidence-unresolved`), and
-carries every other pass (`unchanged`). Without this, each re-run judged every criterion afresh and
-more finely than the last, and found a gap the run before had passed — task.239 needed five runs and a
-hand-set stop rule (obs #121). **To force a full re-judge**, move the newest `${STEM}.dod.*.ac.json`
-aside; the next run reports `no-prior-record`.
-
-**Bug mode (`rerun-scope`):** skip — a bug report has no criteria list to scope; the fix-evidence agent's five checks run in full every time, and no AC record is read or written.
-
-**Then check that every record criterion has a committed place** — before any agent runs (task 259).
+**Then check that every record criterion has a committed place** — before any agent runs (task 259),
+and before the re-run below, because a record it commits moves the head.
 A criterion that asks for a record ("recorded", "logged", "listed in", "documented", or a numeric
 bound graded by a measurement) is graded against **committed** artifacts, and the implementation
 report is committed only at Step 8. On task 257 (2026-11-04) criterion 14's record lived there alone
@@ -627,10 +584,11 @@ check reports and the main context fixes; it never writes a record.
 command listed in `finalise.rerunAtHead` is graded on a run of that command at the head, not on the run
 QA recorded at an earlier one. Only a command that **equals** a listed entry is run, and only when a
 criterion carries it as a code span; every other criterion keeps its own rule. Engine source:
-`references/finalise-rerun-at-head.js`.
+`references/finalise-rerun-at-head.js`. It runs before the scope below, which reads its record.
 
 ```bash
-# RUN BACKGROUNDED (run_in_background): a listed command may be a full suite.
+# RUN BACKGROUNDED (run_in_background): a listed command may be a full suite. The whole run is bounded
+# to 25 minutes (--timeout-seconds 1500, the engine's default), inside the 30-minute wait it marks.
 # INPUTS, substituted into THIS block: {document-path}, and DOD_N as Step 0 bound it.
 DOC_PATH="{document-path}"
 DOD_N="{Step 0's DOD_N}"
@@ -642,7 +600,7 @@ command node .agents/skills/finalise/references/finalise-rerun-at-head.js \
   > ".claude/state/finalise-rerun-at-head-${DOD_N}.json"
 RERUN_EXIT=$?
 bash .agents/skills/finalise/references/set-waiting-on.sh --clear
-jq -r '"re-run at head: \(.reason)\(if .message then " — " + .message else "" end)", (.runs[] | "  \(.command) -> exit \(.exit_code)")' \
+jq -r '"re-run at head: \(.reason)\(if .message then " — " + .message else "" end)", (.runs[] | "  \(.command) -> \(if .not_started then "not started" elif .timed_out then "timed out" elif .exit_code == null then "did not finish" else "exit \(.exit_code)" end)")' \
   ".claude/state/finalise-rerun-at-head-${DOD_N}.json"
 [ "$RERUN_EXIT" -eq 0 ] || { echo "HALT: finalise-rerun-at-head.js (exit $RERUN_EXIT)"; exit 1; }
 ```
@@ -651,10 +609,58 @@ jq -r '"re-run at head: \(.reason)\(if .message then " — " + .message else "" 
 | :-- | :-- |
 | `ran` | Append `run.md` from the out directory to the running summary under `## Step 1` **now** (agent 1 cites its lines; replace an earlier block on a re-run), and pass the absolute path of `run.json` as `<RERUN_AT_HEAD>`. The append is the one exception to "Do NOT write incrementally". A command that failed is data for the grading, never a HALT here. |
 | `none-named`, `not-configured` | Pass `none`. |
-| `dirty-tree` | **HALT.** Uncommitted code means a run would not be the head's; commit or discard it and re-run. |
+| `dirty-tree` | **HALT.** Uncommitted code, a listed command that wrote code, or a head that moved means a run would not be the head's; the message names which and when. Commit or discard it and re-run. |
 | `scan-broken`, `usage` | **HALT**: the document, or the `finalise.rerunAtHead` list, cannot be read. |
+| `failed` | **HALT**: the engine itself failed; the message says where. |
 
 **Bug mode (`rerun-at-head`):** skip — a bug report has no criteria list.
+
+**Then compute the re-run scope** — what agent 1 re-judges, from the newest prior AC record beside
+the document (task 242). Engine source: `references/finalise-rerun-scope.js`.
+
+```bash
+# INPUTS, substituted into THIS block — no block inherits another's variables: STEM and DOD_N
+# exactly as Step 0 bound them. Unbound, the glob below is `.dod.*.ac.json`, no record ever
+# matches, and every re-run reports `no-prior-record` at exit 0 (task.242 QA cycle 1, CR-2).
+STEM="{story.{P}.{E}.{S} | task.{id}}"
+DOD_N="{Step 0's DOD_N}"
+case "$STEM$DOD_N" in *'{'*) echo "HALT: STEM and DOD_N must be substituted into this block (an unsubstituted placeholder found)"; exit 1 ;; esac
+[ -n "$STEM" ] || { echo "HALT: STEM is empty — substitute the work item's filename stem"; exit 1; }
+case "$DOD_N" in ''|*[!0-9]*) echo "HALT: DOD_N ('$DOD_N') is not Step 0's run number"; exit 1 ;; esac
+mkdir -p .claude/state
+# The newest prior run's AC record. Each run writes ${STEM}.dod.{N}.ac.json at Step 3c; the glob
+# never matches a ${STEM}.dod.{N}.security.run.json. Empty on a first run.
+source .agents/skills/finalise/references/newest-numbered.sh || exit 1
+PRIOR_AC_RECORD=$(newest_numbered "{document-directory}" dod -name "${STEM}.dod.*.ac.json")
+RERUN_HEAD=$(git rev-parse HEAD)   # the head this run's agents read; the record stores it
+RERUN_SCOPE_FILE=".claude/state/finalise-rerun-scope-${DOD_N}.json"
+# The previous block's record. A criterion it lists is re-judged on that run; another head's is refused.
+command node .agents/skills/finalise/references/finalise-rerun-scope.js scope \
+  --doc "{document-path}" --head "$RERUN_HEAD" --prior "$PRIOR_AC_RECORD" \
+  --rerun-at-head ".claude/state/finalise-rerun-at-head-${DOD_N}.json" --json > "$RERUN_SCOPE_FILE"
+case $? in
+  0) jq -r '"re-run scope: \(.mode) (\(.reason)) — \(.rejudge | length) to re-judge, \(.carry | length) carried"' "$RERUN_SCOPE_FILE" ;;
+  *) echo "HALT: finalise-rerun-scope.js scope failed — see $RERUN_SCOPE_FILE"; exit 1 ;;
+esac
+RERUN_SCOPE=$(jq -r '.scope_text' "$RERUN_SCOPE_FILE")   # substituted for <RERUN_SCOPE> in agent 1's prompt
+```
+
+`full` is today's behaviour — judge every criterion — and the engine answers it whenever it has a
+doubt: no prior record (`no-prior-record`), a record it cannot read (`prior-unreadable`), a document
+reopened under Step 2's rule (`reopened`), a prior head that is not an ancestor of `HEAD`
+(`head-not-ancestor`, a rebase or force-push), or no criterion line it can key (`no-criteria`).
+`scoped` re-judges the criteria the prior run failed (`reported-gap`), the ones whose text changed
+(`new-criterion`, `criterion-changed`), every CI-state criterion, deferred or already graded from an
+earlier head's CI (`ci-state`, task 249: its verdict is one head's reading, never carried), every criterion
+this run's re-run record lists or the prior run graded on a re-run (`rerun-at-head`, task 319, the same
+reason; judged whole, whatever its prior verdict), the passes whose cited code, test or member evidence changed
+since the prior head (`evidence-changed`) or resolves to no tracked file (`evidence-unresolved`), and
+carries every other pass (`unchanged`). Without this, each re-run judged every criterion afresh and
+more finely than the last, and found a gap the run before had passed — task.239 needed five runs and a
+hand-set stop rule (obs #121). **To force a full re-judge**, move the newest `${STEM}.dod.*.ac.json`
+aside; the next run reports `no-prior-record`.
+
+**Bug mode (`rerun-scope`):** skip — a bug report has no criteria list to scope; the fix-evidence agent's five checks run in full every time, and no AC record is read or written.
 
 #### Step 3b: Dispatch 4 Explore Subagents in Parallel
 
@@ -3555,7 +3561,10 @@ Step 3b.1's block, re-run backgrounded exactly as Step 3b.1 item 2 runs it (the 
 the plan it saved at `.claude/state/probe-plan.json` and into this run's
 record, so the record's `totals.executed` is refreshed from the fixed tree — the security agent
 returns a plan and records no command (task.189); for a checklist FAIL it is the check's own
-citation re-read. The section is PASS when the reproduction no longer reproduces **and** the record
+citation re-read. **And re-run Step 3a's re-run-at-head block on the fix head, whichever section
+failed**, when its first answer was `ran`: that record is one head's, and the fix moved it (task 319).
+Replace its block in the running summary; a command whose exit code is not what its criterion was
+graded on → Step 8. The section is PASS when the reproduction no longer reproduces **and** the record
 shows the count. The other three sections were evaluated against a tree the fix did not change — the
 `touched` paths are inside the Files Summary, which is what `inside-files-summary` guarantees — and
 that is **stated**, not assumed, in the block below.
@@ -3584,7 +3593,7 @@ provable gap under a rule; it is not a develop loop.
 
 - [ ] Evaluator run three times: first halt on `mutation-proved` only; second exit 0 after the proof (licence to commit); third with `--git-base "$CI_HEAD_1"` exit 0 after the commit (licence to push)
 - [ ] One commit, pushed; `CI reading 1 (fix head)` recorded as SUCCESS
-- [ ] Only the failed section's reproduction re-run, from the record
+- [ ] Only the failed section's reproduction re-run, from the record, plus Step 3a's re-run-at-head block when it ran the first time
 - [ ] Deviations block appended to the running summary
 - [ ] Step 6 re-entered on the fix head
 

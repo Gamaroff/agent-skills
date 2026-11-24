@@ -25,6 +25,17 @@ If you find yourself reaching for `Write` to author a DoD file, STOP and invoke 
 
 ## Invoke /finalise
 
+**First push what the QA loop held.** `/finalise` takes CI reading 1 on the PR head while recording
+`HEAD`, so a commit still local would be accepted on a reading of another commit. The site always
+answers `push`; with nothing held the push is a no-op:
+
+```bash
+bash .agents/skills/{develop-story|develop-task}/references/push-policy.sh --mark --site finalise-entry
+if [ "$(bash .agents/skills/{develop-story|develop-task}/references/push-policy.sh --site finalise-entry)" != defer ]; then
+  git push origin HEAD
+fi
+```
+
 #### develop-story
 
 Invoke the `/finalise` skill with the story file path.

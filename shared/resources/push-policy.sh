@@ -7,15 +7,16 @@
 # site in the pipelines asks this script first, and no site decides on its own (task.319).
 #
 # Usage:
-#   push-policy.sh --site <site-id> [--end] [--remote <name>]   prints `push` or `defer`
+#   push-policy.sh --site <site-id> [--remote <name>]           prints `push` or `defer`
 #   push-policy.sh --mark --site <site-id> [--remote <name>]    prints `marked` or `unmarked`
 #   push-policy.sh --list                                       prints the site table (TSV)
 #   push-policy.sh --self-test                                  checks the site table; prints `ok`
 #
 # One token on stdout; the reason is one line on stderr. Exit 0 for every decision, 2 for a usage
-# error. A caller reads the token and pushes only on `push`:
+# error. A caller holds its push on `defer` and on nothing else, so a script that is missing from an
+# install, or refuses its arguments, prints nothing and the caller pushes:
 #
-#   if [ "$(bash references/push-policy.sh --site qa-cycle)" = push ]; then git push origin HEAD; fi
+#   if [ "$(bash references/push-policy.sh --site qa-cycle)" != defer ]; then git push origin HEAD; fi
 #
 # A `defer` loses nothing: `git push origin HEAD` sends every commit the branch is ahead by, so the
 # commit goes out with the next push, and the end of the run (Step 8, a HALT) always pushes.
@@ -34,6 +35,12 @@
 #   pipeline.pushRecordCommits  batched (default) | eager (push at every site, as before task.319)
 #   ci.docsOnly.patterns        what counts as documentation; enabled: false makes every delta code
 #   ci.skipMarker               text `--mark` appends to a record-only head's subject (default: off)
+#   developNext.mergeStrategy   `--mark` answers `unmarked` unless this is stated and is `merge`: under
+#                               a rebase or a fast-forward the marked commit becomes the base branch's
+#                               head, and a squash message lists it, so the marker would skip the base
+#                               run for the whole change
+#   ci.docsOnly.checkCommand    `--mark` answers `unmarked` when one is set: proving the head would run
+#                               that suite, in the foreground, before every push
 #
 # WHEN IT CANNOT DECIDE (no node, no engine beside it, a malformed configuration, no remote branch to
 # compare with) it answers `push`, the behaviour before this script existed: a needless CI run costs
@@ -52,6 +59,7 @@ qa-review-fix	spent	none: the cycle'"'"'s push was used before 5c; the next cycl
 qa-pre-5c	reader	step-5-6 5c asserts the gate and QA report on origin/<branch>, and /review-pr diffs origin/<head>
 qa-halt	end	a person reads the PR after the HALT
 qa-escalation	end	a person reads the PR after the escalation
+finalise-entry	reader	/finalise takes CI reading 1 on the PR head, so a held commit must be on it first
 finalise-gaps	end	a person reads the PR after the DoD-gaps HALT
 finalise-accept	reader	/finalise 6b asserts the artefacts on origin/<branch>; 6c compares the PR head and reads CI on it
 finalise-fix	reader	/finalise re-takes CI reading 1 on the fix head
@@ -64,18 +72,19 @@ ENGINE="$HERE/ci-tree-equivalence.js"
 
 usage() {
   echo "push-policy: $1" >&2
-  echo "usage: push-policy.sh --site <site-id> [--end] [--remote <name>] | --mark --site <site-id> | --list | --self-test" >&2
+  echo "usage: push-policy.sh --site <site-id> [--remote <name>] | --mark --site <site-id> | --list | --self-test" >&2
   exit 2
 }
 
-site_rule() { printf '%s\n' "$SITES" | awk -F '\t' -v s="$1" '$1 == s { print $2 }'; }
+# A field of a site's row. The id reaches awk through the environment: `-v` decodes backslash escapes,
+# so '\160ause' was read as `pause`.
+site_field() { printf '%s\n' "$SITES" | PP_SITE="$1" awk -F '\t' -v n="$2" '$1 "" == ENVIRON["PP_SITE"] "" { print $n }'; }
 
-SITE="" END=no MARK=no REMOTE=origin MODE=decide
+SITE="" MARK=no REMOTE=origin MODE=decide
 while [ $# -gt 0 ]; do
   case "$1" in
     --site)   [ -n "${2:-}" ] || usage "--site needs a value"; SITE="$2"; shift 2 ;;
     --remote) [ -n "${2:-}" ] || usage "--remote needs a value"; REMOTE="$2"; shift 2 ;;
-    --end)    END=yes; shift ;;
     --mark)   MARK=yes; shift ;;
     --list)   MODE=list; shift ;;
     --self-test) MODE=selftest; shift ;;
@@ -100,7 +109,7 @@ if [ "$MODE" = selftest ]; then
 fi
 
 [ -n "$SITE" ] || usage "--site is required"
-RULE=$(site_rule "$SITE")
+RULE=$(site_field "$SITE" 2)
 [ -n "$RULE" ] || usage "unknown site '$SITE' (push-policy.sh --list names them)"
 
 answer() { # token, reason
@@ -145,6 +154,9 @@ if [ "$MARK" = yes ]; then
   read_policy || unmarked "the policy could not be read ($POLICY_WHY)"
   MARKER=$(field skipMarker)
   [ -n "$MARKER" ] || unmarked "ci.skipMarker is not set"
+  [ "$(field mergeStrategy)" = merge ] \
+    || unmarked "developNext.mergeStrategy is not stated as merge, so the marker could reach the base branch's head"
+  [ "$(field checkCommand)" = false ] || unmarked "ci.docsOnly.checkCommand is set, and it would run before every push"
   [ -n "$REMOTE_REF" ] || unmarked "no $REMOTE/${BRANCH:-HEAD} to compare with"
   [ "$(git rev-list --count "$REMOTE_REF..HEAD" 2>/dev/null || echo 0)" -gt 0 ] \
     || unmarked "HEAD is already on the remote"
@@ -169,10 +181,9 @@ $BODY"
   exit 0
 fi
 
-[ "$END" = yes ] && answer push "--end: the last push of the run"
 [ "$RULE" = spent ] && answer defer "this cycle's push was already used; the next push carries the commit"
 [ "$RULE" = end ] && answer push "the last push of the run, or a HALT"
-[ "$RULE" = reader ] && answer push "$(printf '%s\n' "$SITES" | awk -F '\t' -v s="$SITE" '$1 == s { print $3 }')"
+[ "$RULE" = reader ] && answer push "$(site_field "$SITE" 3)"
 
 if ! read_policy; then
   [ "$RULE" = pause ] && answer defer "the policy could not be read ($POLICY_WHY); a pause commit waits"

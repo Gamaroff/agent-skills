@@ -503,7 +503,8 @@ process.exitCode = 0;
 // A run that could not have reached the rule is not an answer, so each such
 // state has its own stage and the case is declined: the file is ignored, the
 // rule is in no configuration that applies to the file (a misspelt id reads the
-// same as an absent control, so it is never scored), or the input does not
+// same as an absent control, so it is never scored), the rule is configured and
+// no plugin defines it (T319-CR-8), or the input does not
 // parse, which stops every rule before it looks. A rule the configuration names
 // at "off" IS scored: nothing reports, which is the finding.
 const ESLINT_RUNNER = `
@@ -558,6 +559,11 @@ async function run() {
       return { stage: "eslint", error: "the input does not parse: " + fatal.message };
     }
     const hit = result.messages.find((m) => m.ruleId === spec.rule);
+    // ESLint 8 reports a configured rule that no plugin defines, under the rule's own id, on every
+    // input: the rule never looked at the text.
+    if (hit && /^Definition for rule .* not found\\.?$/.test(String(hit.message))) {
+      return { stage: "eslint", error: "the rule has no definition: " + hit.message };
+    }
     return hit
       ? {
           stage: "call",

@@ -647,8 +647,9 @@ merge gate (Step 3) and acceptance record (Step 4) verbatim per item:
    into the roadmap arm by default. **`developNext.tickVia: pr`** changes how the tick reaches the base
    exactly as `develop-next` Step 4 § "How the tick is pushed" says, with the scripts under
    `.agents/skills/develop-batch/references/` (`references/tick-pr.sh`): `start` before the edit, `open`
-   in place of the push, then `merge` with the quality gate's exit status, **before the next item's
-   rebase**. A refused merge halts the item with `merged: true, ticked: false`:
+   in place of the push, then `merge`, which runs the quality gate itself, **before the next item's
+   rebase**; `landed`, and `finish` when there is nothing to commit, as that section says. A refused
+   merge halts the item with `merged: true, ticked: false`:
    - **`source: roadmap`** — tick the item `[x]` and rewrite its row in the roadmap's
      accepted-row convention (copy an existing ✅ row's format; if none exists yet, use
      `✅ **accepted + merged** ([PR #N](url), QA PASS S/100)`); add a Change Log row (next

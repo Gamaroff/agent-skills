@@ -190,7 +190,7 @@ reads on a resume — the work-item path alone cannot say which arm applies. Thi
      echo "$ROW: $ROW_TICKED"
      ```
 
-     `ticked` → set `ticked: true`. `ticked-unpushed` → push it (Step 4's tick push, `push-policy.sh --site tick` then `git push origin <baseBranch>`, with its non-ff rule; under `tickVia: pr` the base refuses that push, so cut the tick branch from the local base with `git branch -f docs/<roadmap>-tick-<item> <baseBranch>` and go to Step 4, whose `start` answers `resume`), then set `ticked: true` — never a second tick. `not-ticked` → leave it. `uncommitted` or `unknown` → **HALT** with that line: route nowhere until the operator has committed or discarded the edits, or the look succeeds.
+     `ticked` → set `ticked: true`. `ticked-unpushed` → push it (Step 4's tick push, `push-policy.sh --site tick` then `git push origin <baseBranch>`, with its non-ff rule; under `tickVia: pr` the base refuses that push, so cut the tick branch from the local base with `git branch -f docs/<roadmap>-tick-<item> <baseBranch>` and go to Step 4, whose `start` answers `resume` and puts the local base back at `origin/<baseBranch>`, the tick branch holding its commit), then set `ticked: true` — never a second tick. `not-ticked` → leave it. `uncommitted` or `unknown` → **HALT** with that line: route nowhere until the operator has committed or discarded the edits, or the look succeeds.
 
    **c. Route on the reconciled flags:**
 
@@ -655,29 +655,48 @@ branch is `docs/<roadmap>-tick-<id>`, where `<roadmap>` is the basename of the d
 without its extension (`docs/task-registry-tick-<id>` for the registry arm):
 
 1. **Before the edit**, move to the tick branch. `new` → edit and commit as the arm says. `resume` → an
-   earlier run committed the tick: skip to 2.
+   earlier run committed the tick: skip to 2. `landed` → an earlier run's tick is already on the base:
+   mark `ticked: true` and go to Step 5.
    ```bash
-   bash .agents/skills/develop-next/references/tick-pr.sh start --base <baseBranch> --branch docs/<roadmap>-tick-<id> \
+   # INPUTS, substituted into THIS block: every {…}.
+   BASE="{baseBranch}"; TICK_BRANCH="docs/{roadmap}-tick-{id}"
+   case "$BASE$TICK_BRANCH" in *'{'*) echo "HALT: BASE and TICK_BRANCH must be substituted into this block"; exit 1 ;; esac
+   bash .agents/skills/develop-next/references/tick-pr.sh start --base "$BASE" --branch "$TICK_BRANCH" \
      || { echo "HALT: the tick branch could not be prepared"; exit 1; }
    ```
-2. **In place of the arm's push**, open the PR, then run `<qualityGateCommand>` on the tick branch and
-   keep its exit status:
+   **`new` with nothing to commit.** A resume after the tick's merge commit landed finds the row already
+   as the arm would write it (the roadmap row `[x]` with this PR; the registry arm's `already`, or any of
+   its no-commit reasons). Make no commit and do not run 2 or 3. Return to the base with the same block,
+   `start` replaced by `finish`; it prints `already-recorded`, or refuses when there is a commit or an
+   uncommitted edit after all. Then mark `ticked: true`.
+2. **In place of the arm's push**, open the PR. The line it prints is the PR number 3 takes:
    ```bash
-   TICK_PR=$(bash .agents/skills/develop-next/references/tick-pr.sh open --base <baseBranch> \
-     --branch docs/<roadmap>-tick-<id> --title "docs(roadmap): tick <id>") || exit 1
+   # INPUTS, substituted into THIS block: every {…}.
+   BASE="{baseBranch}"; TICK_BRANCH="docs/{roadmap}-tick-{id}"; TITLE="docs(roadmap): tick {id}"
+   case "$BASE$TICK_BRANCH$TITLE" in *'{'*) echo "HALT: BASE, TICK_BRANCH and TITLE must be substituted into this block"; exit 1 ;; esac
+   bash .agents/skills/develop-next/references/tick-pr.sh open --base "$BASE" --branch "$TICK_BRANCH" --title "$TITLE" \
+     || { echo "HALT: the tick PR could not be opened"; exit 1; }
    ```
-3. **Merge it through Step 3's merge gate**, which the script applies and refuses on: the quality gate's
-   exit status, the pinned head, green CI on that head, and the PR's state after the merge. Read its
-   exit status on the completion notification (the pipeline lock is gone by Step 4, so no wait is marked):
+3. **Merge it through Step 3's merge gate**, which the script applies and refuses on: the quality gate,
+   which it runs itself on the tick branch; the pinned head; green CI on that head; and the PR's state
+   after the merge. Read its exit status on the completion notification (the pipeline lock is gone by
+   Step 4, so no wait is marked):
    ```bash
-   # RUN BACKGROUNDED (run_in_background): it waits for CI.
-   bash .agents/skills/develop-next/references/tick-pr.sh merge --base <baseBranch> \
-     --branch docs/<roadmap>-tick-<id> --pr "$TICK_PR" --quality-gate-exit "$GATE_EXIT" --strategy <mergeStrategy>
+   # RUN BACKGROUNDED (run_in_background): it runs the quality gate and waits for CI.
+   # INPUTS, substituted into THIS block: every {…}; TICK_PR is the number 2 printed.
+   BASE="{baseBranch}"; TICK_BRANCH="docs/{roadmap}-tick-{id}"; TICK_PR="{tick-pr}"; STRATEGY="{mergeStrategy}"
+   GATE="{qualityGateCommand}"
+   case "$BASE$TICK_BRANCH$TICK_PR$STRATEGY" in *'{'*) echo "HALT: the inputs must be substituted into this block"; exit 1 ;; esac
+   case "$GATE" in '{qualityGate'*) echo "HALT: GATE must be substituted into this block"; exit 1 ;; esac
+   bash .agents/skills/develop-next/references/tick-pr.sh merge --base "$BASE" --branch "$TICK_BRANCH" \
+     --pr "$TICK_PR" --quality-gate "$GATE" --strategy "$STRATEGY"
    ```
-   `merged` → mark `ticked: true`. Any other outcome is a **HALT** with its `HALT:` line; the run state
-   keeps `merged: true, ticked: false`, and the next run's `start` answers `resume`.
+   `merged` → mark `ticked: true`, whatever warnings came with it: the tick is on the base branch. Any
+   other outcome is a **HALT** with its `HALT:` line; the run state keeps `merged: true, ticked: false`,
+   and the next run's `start` answers `resume`, or `landed` when the merge went through after all.
 
-The non-ff retry in the arms is for `push` only.
+The non-ff retry in the arms is for `push` only, and so are the arms' unconditional pushes (the registry
+arm's `already`).
 
 ### `item.source` = `roadmap`
 

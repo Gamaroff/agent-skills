@@ -257,6 +257,164 @@ test("a malformed list is a usage error with nothing run, and a stale record nev
   assert.deepEqual(readdirSync(out), ["note.txt"]);
 });
 
+test("a list the reader cannot read whole is refused, never read as shorter or absent (T319-CR-1)", (t) => {
+  const bad = {
+    "a list at the key's own indent": "finalise:\n  rerunAtHead:\n  - echo a\n",
+    "a list at column 0": "finalise:\nrerunAtHead:\n- echo a\n",
+    "finalise as a list": "finalise:\n- echo a\n",
+    "a key with nothing under it": "finalise:\n  rerunAtHead:\n",
+    "a block with nothing under it": "finalise:\n",
+    "a file that is not a mapping": "- finalise\n- echo a\n",
+    "a duplicate block":
+      "finalise:\n  rerunAtHead:\n    - echo a\nfinalise:\n  deferralApprover: Pat\n",
+    "a duplicate key":
+      "finalise:\n  rerunAtHead:\n    - echo a\n  rerunAtHead:\n    - echo b\n",
+    "a row at another indent":
+      "finalise:\n  rerunAtHead:\n    - echo a\n   - echo b\n",
+    "a # inside a word": "finalise:\n  rerunAtHead:\n    - echo a#b\n",
+    "a # inside a partial quote":
+      'finalise:\n  rerunAtHead:\n    - echo "a # b"\n',
+    "a partial quote": 'finalise:\n  rerunAtHead:\n    - "echo" a\n',
+    "an escape": 'finalise:\n  rerunAtHead:\n    - "echo \\"a\\""\n',
+    "a block scalar": "finalise:\n  rerunAtHead:\n    - >-\n      echo a\n",
+    "a flow list": "finalise:\n  rerunAtHead: [echo a]\n",
+    "a flow entry": "finalise:\n  rerunAtHead:\n    - [ echo a ]\n",
+  };
+  for (const [name, config] of Object.entries(bad))
+    assert.throws(
+      () => eng.parseRerunList(config),
+      (e) => e.constructor.name === "UsageError",
+      name,
+    );
+  // the reproduced case, end to end
+  const { run } = fixture(t, {
+    config: bad["a list at the key's own indent"],
+    criteria: ["`echo a` passes"],
+  });
+  const r = run();
+  assert.equal(r.code, 2);
+  assert.equal(r.rec.reason, "usage");
+  assert.match(r.rec.message, /one level deeper/);
+  // and the shapes that are whole stay read
+  for (const [config, want] of [
+    ["", []],
+    ["other: 1\n", []],
+    ["finalise:\n  rerunAtHead: []\n", []],
+    ["finalise:\n  deferralApprover: Pat\n", []],
+    [LIST("echo a  # why"), ["echo a"]],
+    [LIST('"echo a#b"  # why', "'echo # c'"), ["echo a#b", "echo # c"]],
+    [LIST("echo it's"), ["echo it's"]],
+    [`finalise:\r\n  rerunAtHead:\r\n    - echo a\r\n`, ["echo a"]],
+    [`${LIST("echo a")}  deferralApprover: Pat\nci:\n  x: 1\n`, ["echo a"]],
+  ])
+    assert.deepEqual(eng.parseRerunList(config), want, config);
+});
+
+test("a command that writes code, or moves the head, refuses the record; one that writes documentation does not (T319-CR-3)", (t) => {
+  for (const cmd of ["touch new.js", "git commit -q --allow-empty -m moved"]) {
+    // the dirtying command first: the next one must not run on its tree
+    const two = fixture(t, {
+      config: LIST(cmd, "echo second"),
+      criteria: [`\`${cmd}\` and \`echo second\` pass`],
+    });
+    const r = two.run();
+    assert.equal(r.rec.reason, "dirty-tree", cmd);
+    assert.equal(r.code, 1);
+    assert.match(r.rec.message, /before `echo second`/);
+    assert.ok(!existsSync(join(two.out, "2.stdout")), "the second one ran");
+    assert.ok(!existsSync(join(two.out, "run.json")));
+    // alone, it is caught by the check after the last command
+    const one = fixture(t, {
+      config: LIST(cmd),
+      criteria: [`\`${cmd}\` passes`],
+    });
+    const last = one.run();
+    assert.equal(last.rec.reason, "dirty-tree", cmd);
+    assert.match(last.rec.message, /^after /);
+    assert.ok(!existsSync(join(one.out, "run.json")));
+  }
+  const docs = fixture(t, {
+    config: LIST("touch docs/report.md"),
+    criteria: ["`touch docs/report.md` passes"],
+  });
+  assert.equal(docs.run().rec.reason, "ran");
+});
+
+test("the record lists the uncommitted documentation a command could read, and not the engine's own output (T319-CR-4)", (t) => {
+  const { dir, run } = fixture(t, {
+    config: LIST("echo a"),
+    criteria: ["`echo a` passes"],
+  });
+  writeFileSync(join(dir, ".gitignore"), "");
+  git(dir, "commit", "-q", "-am", "nothing is ignored");
+  mkdirSync(join(dir, ".claude", "state"), { recursive: true });
+  writeFileSync(join(dir, ".claude", "state", "comment-body.md"), "x\n");
+  assert.deepEqual(run().rec.uncommitted_docs, []);
+  writeFileSync(join(dir, "docs", "note.md"), "x\n");
+  const r = run("--out-dir", "elsewhere");
+  assert.deepEqual(r.rec.uncommitted_docs, ["docs/note.md"]);
+  assert.match(
+    readFileSync(join(dir, "elsewhere", "run.md"), "utf8"),
+    /Uncommitted documentation the commands could read: `docs\/note\.md`/,
+  );
+});
+
+test("a command's output is bounded: it is stopped, has no status, and the excerpt reads only the tail (T319-CR-6)", (t) => {
+  const { out, run } = fixture(t, {
+    // a shell loop and not `yes`: between two polls it writes megabytes, not a gigabyte
+    config: LIST("sh -c 'while :; do printf %01000d 0; done'"),
+    criteria: ["`sh -c 'while :; do printf %01000d 0; done'` ends"],
+  });
+  const r = run("--max-output-bytes", "100000", "--timeout-seconds", "60");
+  assert.equal(r.rec.reason, "ran", r.err);
+  const [one] = r.rec.runs;
+  assert.equal(one.output_capped, true);
+  assert.equal(one.timed_out, false);
+  assert.equal(one.exit_code, null);
+  assert.equal(readFileSync(one.stdout).length, 100000);
+  const md = readFileSync(join(out, "run.md"), "utf8");
+  assert.match(md, /\*\*stopped: its output passed the bound\*\*/);
+  assert.ok(md.length < 6000);
+  // one that finished by itself keeps its status, whatever it printed
+  const big = fixture(t, {
+    config: LIST("head -c 300000 /dev/zero"),
+    criteria: ["`head -c 300000 /dev/zero` ends"],
+  });
+  const done = big.run("--max-output-bytes", "400000");
+  assert.equal(done.rec.runs[0].exit_code, 0);
+  assert.equal(done.rec.runs[0].output_capped, false);
+});
+
+test("the engine's own failure is `failed`, not a usage error (T319-CR-6)", (t) => {
+  const { dir, run } = fixture(t, {
+    config: LIST("echo a"),
+    criteria: ["`echo a` passes"],
+  });
+  mkdirSync(join(dir, ".claude", "state"), { recursive: true });
+  writeFileSync(join(dir, ".claude", "state", "rerun"), "a file\n");
+  const r = run();
+  assert.equal(r.rec.reason, "failed");
+  assert.equal(r.code, 1);
+});
+
+test("the time bound is the whole run's: a command past it is recorded as not started (T319-CR-10)", (t) => {
+  const { dir, out, run } = fixture(t, {
+    config: LIST("sleep 30", "touch docs/started.md"),
+    criteria: ["`sleep 30` then `touch docs/started.md`"],
+  });
+  const r = run("--timeout-seconds", "1");
+  assert.equal(r.rec.reason, "ran");
+  assert.deepEqual(
+    r.rec.runs.map((x) => [x.timed_out, x.not_started, x.exit_code]),
+    [
+      [true, false, null],
+      [false, true, null],
+    ],
+  );
+  assert.ok(!existsSync(join(dir, "docs", "started.md")));
+  assert.match(readFileSync(join(out, "run.md"), "utf8"), /\*\*not started/);
+});
+
 test("a document without criteria, or missing, is scan-broken", (t) => {
   const { dir, run } = fixture(t, {
     config: LIST("echo a"),

@@ -1,0 +1,176 @@
+schema: 2
+task: 'task.319.ci-runs-only-where-needed'
+task_title: 'Pipelines spend a CI run only where a run can answer something'
+gate: FAIL
+status_reason: 'Every phase is delivered and every test is green, but two high findings stand: a rerunAtHead list at the key''s own indent is read as not configured, and the skip marker can reach the base branch head under a rebase or squash merge. Eleven medium and four low findings are listed.'
+reviewer: 'QA Engineer'
+head: 'a8528bbe9e3db67d6ed13bc3f4353fd910ab492f'
+updated: '2026-11-24T11:00:05Z'
+
+top_issues:
+  - id: 'T319-CR-1'
+    severity: high
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'A rerunAtHead list at the key''s own indent (valid YAML) parses to null and reads not-configured at exit 0, so nothing is re-run; a top-level list, a duplicate finalise block, a mis-indented row and a truncated entry are dropped the same way. Reproduced by QA; control: the deeper-indented list returns its entry.'
+    suggested_action: 'Account for every row of the finalise block as the ci and pipeline blocks do, refuse a present-but-null key and non-mapping content as usage, with a test for the same-indent list.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-101'
+    severity: high
+    file: 'shared/resources/push-policy.sh'
+    finding: 'step8 and finalise-accept mark the last commit of the PR. Under a rebase or fast-forward merge that commit becomes the base branch head, and GitHub''s squash body lists the commit messages, so the marker can skip the base run for the whole code push.'
+    suggested_action: 'Answer unmarked unless the merge strategy is stated to be a merge commit, and state the constraint in the configuration reference.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-2'
+    severity: medium
+    file: 'shared/resources/finalise-rerun-scope.js'
+    finding: 'Only a prior PASS is excluded from carrying. A prior FAIL re-run criterion goes to the member merge, which can overturn a command that fails at the head.'
+    suggested_action: 'Re-judge every re-run criterion whole, whatever its prior status.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-3'
+    severity: medium
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'The tree is compared with the head once, before the loop. A listed command that writes a code path, or a head that moves, leaves later commands running on another tree while the record names the first head.'
+    suggested_action: 'Re-check the head and the tree before each command and after the last, and refuse when either moved.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-6'
+    severity: medium
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'A command''s output is captured with no size bound, and the excerpt reads the whole file; a very large file throws and the engine reports usage with no runs, although the commands ran.'
+    suggested_action: 'Bound the captured bytes, read only the tail for the excerpt, and give an internal failure its own reason.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-102'
+    severity: medium
+    file: 'shared/resources/push-policy.sh'
+    finding: 'The table omits /finalise CI reading 1 as a remote reader: a commit held when /finalise starts leaves HEAD ahead of the PR head, and the reading is recorded for a commit that was never pushed.'
+    suggested_action: 'Add a reader site that flushes held commits before /finalise in every pipeline.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-103'
+    severity: medium
+    file: 'skills/develop-next/SKILL.md'
+    finding: 'The tickVia pr merge block reads TICK_PR and GATE_EXIT, which no line of the block binds, so run as written it exits 2.'
+    suggested_action: 'Substitute placeholders, and let tick-pr.sh run the quality gate itself.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-104'
+    severity: medium
+    file: 'skills/develop-next/SKILL.md'
+    finding: 'Under tickVia pr, a resume after the tick merged has nothing to commit and tick-pr.sh open halts on every run; after a squash or rebase merge start answers resume for a tick that already landed.'
+    suggested_action: 'Define the no-commit case, and have start recognise a tick that already landed.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-105'
+    severity: medium
+    file: 'shared/resources/tick-pr.sh'
+    finding: 'A tidying failure after the PR merged halts with exit 1, so the run keeps ticked false. The ticked-unpushed route hits it under squash or rebase because the local base still holds the tick commit.'
+    suggested_action: 'Print merged with a warning once the PR state is MERGED.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-106'
+    severity: medium
+    file: 'docs/reference/configuration.md'
+    finding: 'The reference says a HALT always pushes. The develop-bug no-code-change HALT and the mid-loop PR MERGED/CLOSED HALT have no push site and can follow a deferred commit.'
+    suggested_action: 'Give every HALT that can follow a deferred commit a push site.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-107'
+    severity: medium
+    file: 'shared/resources/tests/push-policy.test.mjs'
+    finding: 'The scan finds only the literal git push; two develop-bug HALTs push in prose and ask no site.'
+    suggested_action: 'Give them push blocks and widen the scan to an imperative push in the pipeline step documents.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-110'
+    severity: medium
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'Once any prs: key exists every other status is dropped, so a FAILED external check beside a green pipeline reads SUCCESS. Origin: code-review (medium confidence), reproduced by QA; control: no FAILED status reads SUCCESS.'
+    suggested_action: 'Drop only the prs: keys of other destinations.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-111'
+    severity: medium
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'NONE means both no statuses and statuses for another destination only, and tick-pr.sh merges on either. Origin: code-review (medium confidence), reproduced by QA; control: an empty list is NONE.'
+    suggested_action: 'Return PENDING when statuses exist but none is for the destination.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-QA-1'
+    severity: low
+    file: 'shared/resources/push-policy.sh'
+    finding: 'awk -v decodes backslash escapes, so --site ''\160ause'' is accepted as pause. Reproduced by the probe (bash and zsh); control: an unlisted id exits 2.'
+    suggested_action: 'Pass the id through the environment.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-7'
+    severity: low
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'A descendant in its own session outlives the timeout; the comment states the bound without that limit.'
+    suggested_action: 'State the limit where the bound is claimed.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-8'
+    severity: low
+    file: 'shared/resources/security-probe.mjs'
+    finding: 'Under ESLint 8 a rule with no definition reports under its own id on every input, so each case is scored rejected instead of declined.'
+    suggested_action: 'Decline the missing-definition message.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-10'
+    severity: low
+    file: 'skills/finalise/SKILL.md'
+    finding: 'The wait budget is 30 minutes while each command has its own 25-minute bound.'
+    suggested_action: 'Bound the whole run to the marked budget.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 60
+
+evidence:
+  tests_reviewed: 238
+  phases_verified: '7/7'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5, 6]
+    phases_with_issues: [2, 3, 4, 5]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 36
+    escaped: 0
+    boundary: true
+    boundary_signals: ["never"]
+    notes: 'Two boundaries probed: push-policy --site (present-but-inert: one escape case accepted, T319-QA-1) and parseRerunList (engages on the ten cases given; T319-CR-1 is a legitimate form it drops).'
+  performance:
+    status: PASS
+    notes: 'pushes before (eager): 9; after (batched): 6, re-run at this head.'
+  reliability:
+    status: CONCERNS
+    notes: 'Held commits can be stranded at two HALTs (CR-106, CR-107); the tickVia pr path does not run as written (CR-103, CR-104, CR-105).'
+  maintainability:
+    status: PASS
+    notes: 'One decision helper and one site table; the scan test holds the population, short of prose pushes (CR-107).'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix the two high and the medium findings'
+      refs: ['shared/resources/finalise-rerun-at-head.js', 'shared/resources/push-policy.sh', 'shared/resources/tick-pr.sh']
+  future: []
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T319-CR-1 and T319-CR-101 fixed']

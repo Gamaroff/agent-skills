@@ -13,6 +13,19 @@ Runs in full in **both lite and standard modes**.
 
 ## Part A — Finalise (DoD)
 
+### Push what the verify loop held
+
+`/finalise` takes CI reading 1 on the PR head while recording `HEAD`, so a commit still local would be
+accepted on a reading of another commit. The site always answers `push`; with nothing held the push is a
+no-op:
+
+```bash
+bash .agents/skills/develop-bug/references/push-policy.sh --mark --site finalise-entry
+if [ "$(bash .agents/skills/develop-bug/references/push-policy.sh --site finalise-entry)" != defer ]; then
+  git push origin HEAD
+fi
+```
+
 ### DO NOT inline this step
 
 Invoke the `/finalise` skill via the Skill tool **in bug mode** against the **bug file**:
@@ -27,7 +40,15 @@ Do NOT write a DoD file directly or set any accepted/closed status without runni
 
 After finalise returns, read its output:
 - DoD satisfied → continue to Part B.
-- DoD gaps found → do **not** advance the lock (it stays at 7, where `/finalise` held it — task 222); log each gap in the Issues Log, commit the report via `/commit-changes` (`docs({bug-prefix}): implementation report — finalise gaps identified`), push, and **HALT**:
+- DoD gaps found → do **not** advance the lock (it stays at 7, where `/finalise` held it — task 222); log each gap in the Issues Log, commit the report via `/commit-changes` (`docs({bug-prefix}): implementation report — finalise gaps identified`), push it (a HALT always pushes, held commits included), and **HALT**:
+
+  ```bash
+  bash .agents/skills/develop-bug/references/push-policy.sh --mark --site finalise-gaps
+  if [ "$(bash .agents/skills/develop-bug/references/push-policy.sh --site finalise-gaps)" != defer ]; then
+    git push origin HEAD
+  fi
+  ```
+
   ```
   ⚠️ Finalise identified Definition of Done gaps.
   Address the gaps in {report path} before re-running /develop-bug.

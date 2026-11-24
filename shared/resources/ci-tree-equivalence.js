@@ -463,6 +463,46 @@ function consumedRows(v) {
 }
 
 /**
+ * Refuse a file with content that does not parse to a mapping: a configuration the engine cannot read is
+ * not an absent one (a top-level list, a line with no colon, or the one-line link text a symlinked file
+ * reads as). Only a file with no significant line at all is "not configured" (CR4-2).
+ */
+function assertMapping(text, parsed) {
+  if (
+    significantLines(text).length > 0 &&
+    (parsed === null ||
+      typeof parsed !== "object" ||
+      Array.isArray(parsed) ||
+      Object.keys(parsed).length === 0)
+  ) {
+    throw new UsageError(
+      `${CONFIG_BASENAME} has content but it does not parse to a mapping (a top-level list, a line without a colon, or the link text of a symlink); the rule will not guess what it meant`,
+    );
+  }
+}
+
+/**
+ * Refuse a top-level block when the parse does not account for EVERY row of it. The subset ends a block
+ * at a dedent without an error, skips a row it cannot read, and collapses a duplicate key into one, so a
+ * row can vanish from the result with nothing said: an opt-out indented one level too deep or too shallow
+ * was ignored one spelling at a time across five QA cycles (CR5-2), and a list at its key's own indent
+ * read as an absent key (task.319, T319-CR-1). One check for the whole class, over one block only:
+ * counted over the whole file it refused a valid configuration that holds a list of maps elsewhere, and
+ * one miscount there offset a dropped row here (CR6-1, CR6-2).
+ */
+function assertBlockRows(text, parsed, key) {
+  const rows = ciBlockRows(text, key);
+  const consumed = Object.prototype.hasOwnProperty.call(parsed, key)
+    ? 1 + consumedRows(parsed[key])
+    : 0;
+  if (consumed !== rows) {
+    throw new UsageError(
+      `${CONFIG_BASENAME} has ${rows} row(s) under ${key} but the parse accounts for ${consumed}: a row is mis-indented, duplicated or in a form the YAML subset does not read (a list goes one level deeper than its key); the rule will not guess which`,
+    );
+  }
+}
+
+/**
  * The ONE place that defines what the configuration may contain. Everything it does not recognise
  * is refused, because each silent fall back to the defaults across QA cycles 1 to 3 was a rule
  * applied to files its owner did not choose: a misspelt key, a `ci:` written as a flow mapping (the
@@ -474,40 +514,11 @@ function parseConfig(rawText) {
   // row, so `ci:` at column 0 after a BOM'd first key was never read (CR5-1).
   const text = String(rawText).replace(/^\uFEFF/, "");
   const parsed = parseYamlSubset(text) || {};
-  // Text with content that does not parse to a mapping is a configuration the engine cannot read,
-  // not an absent one: a top-level list, a line with no colon, or the one-line link text a symlinked
-  // file reads as. Only a file with no significant line at all is "not configured" (CR4-2).
-  const rows = significantLines(text);
-  if (
-    rows.length > 0 &&
-    (parsed === null ||
-      typeof parsed !== "object" ||
-      Array.isArray(parsed) ||
-      Object.keys(parsed).length === 0)
-  ) {
-    throw new UsageError(
-      `${CONFIG_BASENAME} has content but it does not parse to a mapping (a top-level list, a line without a colon, or the link text of a symlink); the rule will not guess what it meant`,
-    );
-  }
+  assertMapping(text, parsed);
   // The specific diagnostics (a block scalar, an unknown key) are produced first so they name the
   // cause; the completeness check below is the net under all of them.
   const cfg = interpretConfig(parsed);
-  // The parse must account for EVERY row of the `ci` block, or the file is refused. The subset ends a
-  // block at a dedent without an error, and a duplicate key collapses into one, so a row can vanish
-  // from the result with nothing said: an opt-out indented one level too deep or too shallow was
-  // ignored one spelling at a time across five QA cycles (CR5-2). This is the one check for that
-  // whole class, and it covers the `ci` block only: counted over the whole file it refused a valid
-  // configuration that holds a list of maps elsewhere, and one miscount there offset a dropped row
-  // here (CR6-1, CR6-2).
-  const ciRows = ciBlockRows(text);
-  const consumed = Object.prototype.hasOwnProperty.call(parsed, "ci")
-    ? 1 + consumedRows(parsed.ci)
-    : 0;
-  if (consumed !== ciRows) {
-    throw new UsageError(
-      `${CONFIG_BASENAME} has ${ciRows} row(s) under ci but the parse accounts for ${consumed}: a row is mis-indented, duplicated or in a form the YAML subset does not read; the rule will not guess which`,
-    );
-  }
+  assertBlockRows(text, parsed, "ci");
   return cfg;
 }
 
@@ -554,16 +565,8 @@ function parsePipelineConfig(rawText) {
     }
   }
   const block = parsed.pipeline;
-  const rows = ciBlockRows(text, "pipeline");
-  const consumed = Object.prototype.hasOwnProperty.call(parsed, "pipeline")
-    ? 1 + consumedRows(block)
-    : 0;
   if (block === undefined || block === null) {
-    if (rows > 1) {
-      throw new UsageError(
-        `${CONFIG_BASENAME} has ${rows} row(s) under pipeline that the parse does not account for`,
-      );
-    }
+    assertBlockRows(text, parsed, "pipeline");
     return cfg;
   }
   if (typeof block !== "object" || Array.isArray(block)) {
@@ -577,11 +580,7 @@ function parsePipelineConfig(rawText) {
       `pipeline has unknown key(s): ${unknown.join(", ")} (known: ${PIPELINE_KEYS.join(", ")})`,
     );
   }
-  if (consumed !== rows) {
-    throw new UsageError(
-      `${CONFIG_BASENAME} has ${rows} row(s) under pipeline but the parse accounts for ${consumed}: a row is mis-indented, duplicated or in a form the YAML subset does not read`,
-    );
-  }
+  assertBlockRows(text, parsed, "pipeline");
   if ("pushRecordCommits" in block) {
     if (!PUSH_RECORD_COMMITS.includes(block.pushRecordCommits)) {
       throw new UsageError(
@@ -591,6 +590,26 @@ function parsePipelineConfig(rawText) {
     cfg.pushRecordCommits = block.pushRecordCommits;
   }
   return cfg;
+}
+
+/**
+ * `developNext.mergeStrategy` as the project WROTE it, or null (task.319, T319-CR-101). The default is
+ * not filled in: push-policy.sh marks a commit only on a stated `merge`, because under any other strategy
+ * the marked commit, or its subject, becomes the base branch's head. A block the parse does not account
+ * for states nothing.
+ */
+function statedMergeStrategy(rawText) {
+  const text = String(rawText).replace(/^﻿/, "");
+  const parsed = parseYamlSubset(text) || {};
+  const block = parsed.developNext;
+  if (!block || typeof block !== "object" || Array.isArray(block)) return null;
+  try {
+    assertBlockRows(text, parsed, "developNext");
+  } catch {
+    return null;
+  }
+  const v = block.mergeStrategy;
+  return typeof v === "string" && v !== "" ? v : null;
 }
 
 /** Interpret a parsed top-level mapping as the ci.docsOnly configuration. */
@@ -979,6 +998,8 @@ function killProcessGroup(pid) {
   }
 }
 
+const STOP_POLL_MS = 200;
+
 /** Signals a caller sends to stop the engine (`timeout`, Ctrl-C, a closed terminal). */
 const FORWARDED_SIGNALS = ["SIGTERM", "SIGINT", "SIGHUP"];
 
@@ -987,12 +1008,16 @@ const FORWARDED_SIGNALS = ["SIGTERM", "SIGINT", "SIGHUP"];
  * short of SIGKILL. Resolves with the `spawnSync`-shaped `{ pid, status, signal, error }` the caller
  * reads, so an injected synchronous `spawn` in a test is a drop-in.
  *
+ * `stopWhen`, when given, is asked while the check runs; a non-empty answer kills the group and is the
+ * error's message (code ESTOPPED). What a kill cannot reach: a descendant that started its OWN session
+ * (`setsid`, a daemon) is in another process group, so it outlives a timeout, a stop and a signal.
+ *
  * Why not `spawnSync` (obs #94): it blocks the event loop, so a SIGTERM to the engine (e.g. from
  * `timeout 120 node ci-tree-equivalence.js …`) ran no handler — node died at once and the detached
  * group, an `npm run ci:fast` in practice, ran on beside the real gate. Here a forwarded signal
  * kills the group, then re-raises itself so the engine's own exit still says it was signalled.
  */
-function spawnCheck(file, args, { timeout, ...opts } = {}) {
+function spawnCheck(file, args, { timeout, stopWhen, ...opts } = {}) {
   return new Promise((resolve) => {
     let child;
     try {
@@ -1003,10 +1028,13 @@ function spawnCheck(file, args, { timeout, ...opts } = {}) {
     }
     const pid = child.pid;
     let timedOut = false;
+    let stopped = "";
     let timer = null;
+    let poll = null;
     const handlers = new Map();
     const release = () => {
       if (timer) clearTimeout(timer);
+      if (poll) clearInterval(poll);
       for (const [sig, fn] of handlers) process.removeListener(sig, fn);
       handlers.clear();
     };
@@ -1025,6 +1053,12 @@ function spawnCheck(file, args, { timeout, ...opts } = {}) {
         killProcessGroup(pid);
       }, timeout);
     }
+    if (stopWhen) {
+      poll = setInterval(() => {
+        stopped = stopped || stopWhen() || "";
+        if (stopped) killProcessGroup(pid);
+      }, STOP_POLL_MS);
+    }
     child.on("error", (error) => {
       release();
       resolve({ pid, status: null, signal: null, error });
@@ -1035,7 +1069,9 @@ function spawnCheck(file, args, { timeout, ...opts } = {}) {
         ? Object.assign(new Error("checkCommand timed out"), {
             code: "ETIMEDOUT",
           })
-        : undefined;
+        : stopped
+          ? Object.assign(new Error(stopped), { code: "ESTOPPED" })
+          : undefined;
       resolve({ pid, status, signal, error });
     });
   });
@@ -1320,6 +1356,8 @@ function runPushPolicy({
       `${JSON.stringify({
         pushRecordCommits: pipe.pushRecordCommits,
         skipMarker: ci.skipMarker,
+        mergeStrategy: text === null ? null : statedMergeStrategy(text),
+        checkCommand: ci.checkCommand !== "",
         docsOnly,
         headDocsOnly,
         files,
@@ -1339,16 +1377,31 @@ function runPushPolicy({
  * Bitbucket build statuses for a PR, by destination (task.319). A commit carries one status per
  * pipeline definition that ran on it; a PR pipeline's key is `prs:<pattern>:<destination>`, so a
  * commit on a PR into develop that also runs a branch pipeline, or sits in a second PR into main,
- * has statuses that say nothing about this PR. When any status carries a `prs:` key only those for
- * `destination` count, and none for it is NONE (undecided, never green). When none carries one the
- * repository does not use these keys and every status counts, as before.
+ * has statuses that say nothing about this PR. So a `prs:` key of ANOTHER destination is dropped, and
+ * nothing else is: an external check, or a pipeline that uses no such key, reports on the commit itself
+ * and its failure is this PR's failure (T319-CR-110).
  */
 function bitbucketPrStatuses(values, destination) {
   const all = Array.isArray(values) ? values : [];
   const keyOf = (v) => String((v && v.key) || "");
-  const keyed = all.filter((v) => keyOf(v).startsWith("prs:"));
-  if (keyed.length === 0) return all;
-  return keyed.filter((v) => keyOf(v).endsWith(`:${destination}`));
+  return all.filter(
+    (v) => !keyOf(v).startsWith("prs:") || keyOf(v).endsWith(`:${destination}`),
+  );
+}
+
+/**
+ * The PR's rollup. NONE means the commit has no status at all. When `prs:` keys exist and none is for
+ * this destination, the repository runs PR pipelines and this one has not registered yet: a green from
+ * anything else is PENDING, never SUCCESS and never "no checks" (T319-CR-111). A failure is a failure.
+ */
+function bitbucketPrRollup(values, destination) {
+  const all = Array.isArray(values) ? values : [];
+  const mine = bitbucketPrStatuses(all, destination);
+  const prs = (list) =>
+    list.some((v) => String((v && v.key) || "").startsWith("prs:"));
+  const rollup = reduceBitbucketStatuses(mine);
+  if (prs(all) && !prs(mine) && rollup !== "FAILURE") return "PENDING";
+  return rollup;
 }
 
 /** `--reduce-bitbucket`: the statuses response on stdin, `<STATE> <count>` on stdout. */
@@ -1379,7 +1432,7 @@ function runReduceBitbucket({
   }
   const mine = bitbucketPrStatuses(body.values, destination);
   const keys = new Set(mine.map((v) => String((v && (v.key || v.name)) || "")));
-  stdout.write(`${reduceBitbucketStatuses(mine)} ${keys.size}\n`);
+  stdout.write(`${bitbucketPrRollup(body.values, destination)} ${keys.size}\n`);
   return 0;
 }
 
@@ -1415,6 +1468,7 @@ module.exports = {
   reduceChecks,
   reduceBitbucketStatuses,
   bitbucketPrStatuses,
+  bitbucketPrRollup,
   runPushPolicy,
   runReduceBitbucket,
   parsePipelineConfig,
@@ -1423,7 +1477,11 @@ module.exports = {
   readConfig,
   readConfigAtCommit,
   configTextAtCommit,
-  // The bounded runner and the working-tree check, for finalise-rerun-at-head.js (task.319).
+  // The bounded runner, the working-tree check and the block reader's refusals, for
+  // finalise-rerun-at-head.js (task.319).
+  UsageError,
+  assertMapping,
+  assertBlockRows,
   spawnCheck,
   killProcessGroup,
   dirtyNonDocsPaths,

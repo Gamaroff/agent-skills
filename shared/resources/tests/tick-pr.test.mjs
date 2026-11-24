@@ -101,8 +101,12 @@ for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; [ "$a" = POST ] && post=yes; [
 # like the real one: a status code is printed only when -w asks for it
 [ "$w" = yes ] || exec 1>/dev/null
 echo "curl $post $url" >> "${st("log")}"
+# move-after-statuses: the reads after the first statuses are the poll's second sample, its result line and
+# the one before the merge; the head moves at the last
 pr() { state=OPEN; [ -f "${st("merged")}" ] && state=MERGED
-  printf '{"id":9,"state":"%s","source":{"commit":{"hash":"%s"},"branch":{"name":"${TICK}"}},"destination":{"branch":{"name":"develop"}}}' "$state" "$(git -C "${up}" rev-parse --short=12 refs/heads/${TICK})"; }
+  hash="$(git -C "${up}" rev-parse --short=12 refs/heads/${TICK})"
+  if [ -f "${st("move-after-statuses")}" ] && [ "$(sed -n '/statuses/,$p' "${st("log")}" | grep -c 'pullrequests/9$')" -ge 3 ]; then hash=bbbbbbbbbbbb; fi
+  printf '{"id":9,"state":"%s","source":{"commit":{"hash":"%s"},"branch":{"name":"${TICK}"}},"destination":{"branch":{"name":"develop"}}}' "$state" "$hash"; }
 case "$post $url" in
   "yes "*/merge) cat > "${st("merge.json")}"; [ -f "${st("merge-refused")}" ] || { git -C "${up}" update-ref refs/heads/develop refs/heads/${TICK}; touch "${st("merged")}"; }; printf 200 ;;
   "yes "*/pullrequests) cat > "${st("create.json")}"; touch "${st("pr")}"; printf 201 ;;
@@ -146,6 +150,7 @@ esac
     wt,
     st,
     start: () => tick("start", ...at),
+    finish: () => tick("finish", ...at),
     open: () => tick("open", ...at, "--title", "docs(roadmap): tick 17.4"),
     merge: (gate, ...more) =>
       tick(
@@ -155,7 +160,7 @@ esac
         "9",
         "--max-wait",
         "60",
-        ...(gate === undefined ? [] : ["--quality-gate-exit", gate]),
+        ...(gate === undefined ? [] : ["--quality-gate", gate]),
         ...more,
       ),
     raw: tick,
@@ -182,7 +187,7 @@ for (const forge of ["github", "bitbucket"]) {
     const f = opened(t, { forge });
     const before = f.base();
     assert.notEqual(before, git(f.up, "rev-parse", `refs/heads/${TICK}`));
-    const r = f.merge("0", "--strategy", "squash");
+    const r = f.merge("true", "--strategy", "squash");
     assert.equal(r.out, "merged", r.err);
     assert.notEqual(f.base(), before);
     assert.equal(git(f.wt, "symbolic-ref", "--short", "HEAD"), "develop");
@@ -207,7 +212,7 @@ for (const forge of ["github", "bitbucket"]) {
         f.st(forge === "github" ? "rollup" : "bbstate"),
         forge === "github" ? `${s}\n` : s,
       );
-      const r = f.merge("0");
+      const r = f.merge("true");
       assert.equal(r.code, 1, `${s}: ${r.err}`);
       assert.match(r.err, /HALT: .*not merged/);
       assert.equal(f.base(), before, s);
@@ -216,20 +221,41 @@ for (const forge of ["github", "bitbucket"]) {
   });
 }
 
-test("the quality gate's exit status is required: absent or non-zero refuses before any CI read", (t) => {
+test("the quality gate is run here, on the tick's own tree: absent or red refuses before any CI read (T319-CR-112)", (t) => {
   const f = opened(t);
-  for (const gate of [undefined, "1", ""]) {
+  for (const gate of [undefined, "exit 3", "", "no-such-command-x"]) {
     const r = f.merge(gate);
     assert.notEqual(r.code, 0);
     assert.ok(!existsSync(f.st("merged")), String(gate));
   }
+  assert.match(f.merge("exit 3").err, /quality gate failed .*exit 3/);
+  // off the tick branch, or over uncommitted edits, the gate would judge another tree
+  git(f.wt, "checkout", "-q", "develop");
+  assert.match(f.merge("true").err, /HEAD is not on/);
+  git(f.wt, "checkout", "-q", TICK);
+  writeFileSync(join(f.wt, "docs/roadmap.md"), "- [x] edited\n");
+  assert.match(f.merge("true").err, /uncommitted changes/);
+  git(f.wt, "checkout", "-q", "--", "docs/roadmap.md");
+  // a gate that moves the head judged something else
+  const moved = f.merge("git commit -q --allow-empty -m x");
+  assert.match(moved.err, /HEAD moved/);
+  git(f.wt, "reset", "-q", "--hard", "HEAD~1");
   assert.doesNotMatch(f.log(), /statusCheckRollup/);
+  assert.ok(!existsSync(f.st("merged")));
+  const ran = f.st("gate-ran");
+  const r = f.merge(`cat docs/roadmap.md > "${ran}"; echo gate output`);
+  assert.equal(
+    r.out,
+    "merged",
+    "the gate's own output never reaches the answer",
+  );
+  assert.match(readFileSync(ran, "utf8"), /\[x\]/);
 });
 
 test("a head that moved since the tick, and another destination, are refused", (t) => {
   const f = opened(t);
   writeFileSync(f.st("head"), `${"b".repeat(40)}\n`);
-  const r = f.merge("0");
+  const r = f.merge("true");
   assert.equal(r.code, 1);
   assert.match(r.err, /is not the tick head/);
   const g = opened(t);
@@ -241,8 +267,8 @@ test("a head that moved since the tick, and another destination, are refused", (
     TICK,
     "--pr",
     "9",
-    "--quality-gate-exit",
-    "0",
+    "--quality-gate",
+    "true",
   );
   assert.equal(other.code, 1);
   assert.match(other.err, /targets develop, not main/);
@@ -251,17 +277,17 @@ test("a head that moved since the tick, and another destination, are refused", (
 test("a PR with no checks merges on the quality gate alone", (t) => {
   const f = opened(t);
   writeFileSync(f.st("rollup"), "NONE\n");
-  const r = f.merge("0");
+  const r = f.merge("true");
   assert.equal(r.out, "merged", r.err);
 });
 
 test("the merge is judged by the PR's state, not by the command's exit status", (t) => {
   const landed = opened(t);
   writeFileSync(landed.st("merge-exit"), "");
-  assert.equal(landed.merge("0").out, "merged");
+  assert.equal(landed.merge("true").out, "merged");
   const refused = opened(t);
   writeFileSync(refused.st("merge-refused"), "");
-  const r = refused.merge("0");
+  const r = refused.merge("true");
   assert.equal(r.code, 1);
   assert.match(r.err, /'OPEN' after the merge call/);
 });
@@ -278,6 +304,153 @@ test("resume: an interrupted tick is found again, locally or only on the remote,
   assert.equal(f.start().out, "resume", "only the remote has it");
   assert.equal(f.open().out, "9");
   assert.equal((f.log().match(/gh pr create/g) ?? []).length, 1);
+});
+
+test("bitbucket: the head is read again just before the merge call (T319-CR-109)", (t) => {
+  const f = opened(t, { forge: "bitbucket" });
+  // the PR's head moves once the poll has answered: the statuses are read, then the branch moves
+  const r = f.merge(`touch "${f.st("move-after-statuses")}"`);
+  assert.equal(r.code, 1, r.err);
+  assert.match(r.err, /is not the tick head/);
+  assert.ok(!existsSync(f.st("merged")));
+});
+
+/** The forge squashes the tick: the base gets its content in one commit of its own. */
+function squashOnForge(f) {
+  const tree = git(f.up, "rev-parse", `refs/heads/${TICK}^{tree}`);
+  const c = git(
+    f.wt,
+    "commit-tree",
+    tree,
+    "-p",
+    f.base(),
+    "-m",
+    "squashed tick",
+  );
+  git(f.wt, "push", "-q", "origin", `${c}:refs/heads/develop`);
+}
+
+test("start recognises a tick that landed by squash, and leaves the checkout on the updated base (T319-CR-104)", (t) => {
+  const f = opened(t);
+  squashOnForge(f);
+  git(f.wt, "checkout", "-q", "develop");
+  const r = f.start();
+  assert.equal(r.out, "landed", r.err);
+  assert.equal(git(f.wt, "symbolic-ref", "--short", "HEAD"), "develop");
+  assert.equal(git(f.wt, "rev-parse", "HEAD"), f.base());
+  // and when the base moved on in another row since
+  const g = opened(t);
+  squashOnForge(g);
+  git(g.wt, "fetch", "-q", "origin", "develop");
+  git(g.wt, "checkout", "-q", "-B", "develop", "origin/develop");
+  writeFileSync(join(g.wt, "docs/other.md"), "later\n");
+  git(g.wt, "add", "-A");
+  git(g.wt, "commit", "-q", "-m", "later");
+  git(g.wt, "push", "-q", "origin", "develop");
+  assert.equal(g.start().out, "landed");
+  // control: a tick that has not landed is resumed
+  const h = opened(t);
+  git(h.wt, "checkout", "-q", "develop");
+  assert.equal(h.start().out, "resume");
+});
+
+test("finish: a row that already reads ticked returns to the base; a commit or an edit is refused (T319-CR-104)", (t) => {
+  const f = fixture(t);
+  f.start();
+  writeFileSync(join(f.wt, "docs/roadmap.md"), "- [x] 17.4\n");
+  assert.match(f.finish().err, /uncommitted edit/);
+  git(f.wt, "commit", "-q", "-am", "tick");
+  assert.match(f.finish().err, /holds a commit/);
+  git(f.wt, "reset", "-q", "--hard", "origin/develop");
+  const r = f.finish();
+  assert.equal(r.out, "already-recorded", r.err);
+  assert.equal(git(f.wt, "symbolic-ref", "--short", "HEAD"), "develop");
+});
+
+test("once the PR is merged the answer is merged: tidying that fails is a warning (T319-CR-105)", (t) => {
+  const f = opened(t);
+  // the local base diverged, so it cannot fast-forward
+  git(f.wt, "checkout", "-q", "develop");
+  git(f.wt, "commit", "-q", "--allow-empty", "-m", "local only");
+  git(f.wt, "checkout", "-q", TICK);
+  const r = f.merge("true");
+  assert.equal(r.code, 0, r.err);
+  assert.equal(r.out, "merged");
+  assert.match(r.err, /WARNING: the checkout could not be moved/);
+});
+
+test("ticked-unpushed: a local base holding the tick commit goes back to origin's, so a squash merge can fast-forward it (T319-CR-105)", (t) => {
+  const f = fixture(t);
+  f.commit(); // on develop, the push refused
+  const tick = git(f.wt, "rev-parse", "HEAD");
+  git(f.wt, "branch", "-f", TICK, "develop");
+  assert.equal(f.start().out, "resume");
+  assert.equal(
+    git(f.wt, "rev-parse", "develop"),
+    git(f.wt, "rev-parse", "origin/develop"),
+  );
+  assert.equal(git(f.wt, "rev-parse", TICK), tick, "the commit is not lost");
+  // control: a local base with a commit of its own is left alone
+  const g = fixture(t);
+  g.commit();
+  git(g.wt, "branch", "-f", TICK, "develop");
+  git(g.wt, "commit", "-q", "--allow-empty", "-m", "own");
+  const own = git(g.wt, "rev-parse", "develop");
+  assert.equal(g.start().out, "resume");
+  assert.equal(git(g.wt, "rev-parse", "develop"), own);
+});
+
+test("develop-next's three tick blocks run as written: every input is bound in the block, and an unsubstituted one HALTs (T319-CR-103)", (t) => {
+  const skill = readFileSync(
+    resolve(HERE, "..", "..", "..", "skills/develop-next/SKILL.md"),
+    "utf8",
+  );
+  const from = skill.indexOf(
+    "### How the tick is pushed: `developNext.tickVia`",
+  );
+  const section = skill.slice(from, skill.indexOf("\n### ", from + 10));
+  const blocks = [...section.matchAll(/^ *```bash\n([\s\S]*?)^ *```$/gm)]
+    .map((m) => m[1])
+    .filter((b) => b.includes("tick-pr.sh "));
+  assert.equal(blocks.length, 3);
+  const dir = mkdtempSync(join(tmpdir(), "tick-blocks-"));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const refs = join(dir, ".agents/skills/develop-next/references");
+  mkdirSync(refs, { recursive: true });
+  writeFileSync(
+    join(refs, "tick-pr.sh"),
+    'printf "<%s>" "$@"; echo; echo ran >> ran.log\n',
+  );
+  const sh = (block) =>
+    spawnSync("bash", ["-u", "-c", block], {
+      cwd: dir,
+      encoding: "utf8",
+      timeout: BUDGET.timeoutMs,
+    });
+  for (const b of blocks) {
+    const r = sh(b);
+    assert.equal(r.status, 1, b);
+    assert.match(r.stdout, /^HALT: /);
+  }
+  assert.ok(!existsSync(join(dir, "ran.log")), "the script was not reached");
+  const bind = (b) =>
+    b
+      .replaceAll("{baseBranch}", "develop")
+      .replaceAll("{roadmap}", "roadmap")
+      .replaceAll("{id}", "17.4")
+      .replaceAll("{tick-pr}", "9")
+      .replaceAll("{mergeStrategy}", "squash")
+      .replaceAll("{qualityGateCommand}", "npm run ci -- --x");
+  const out = blocks.map((b) => {
+    const r = sh(bind(b));
+    assert.equal(r.status, 0, r.stderr);
+    return r.stdout.trim();
+  });
+  assert.deepEqual(out, [
+    `<start><--base><develop><--branch><${TICK}>`,
+    `<open><--base><develop><--branch><${TICK}><--title><docs(roadmap): tick 17.4>`,
+    `<merge><--base><develop><--branch><${TICK}><--pr><9><--quality-gate><npm run ci -- --x><--strategy><squash>`,
+  ]);
 });
 
 test("open refuses a branch with no tick commit, and usage errors exit 2", (t) => {

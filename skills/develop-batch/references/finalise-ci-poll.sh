@@ -57,6 +57,9 @@ sampled_head() { gh pr view "$PR_NUMBER" --json headRefOid -q .headRefOid 2>/dev
 # appeared (obs #87). Distinct checks, the same query as CI_CHECKS_1 (obs #3).
 checks() { gh pr view "$PR_NUMBER" --json statusCheckRollup -q '[.statusCheckRollup[] | (.name // .context // "")] | unique | length' 2>/dev/null || echo 0; }
 sample() { STATE=$(rollup); CHECKS=$(checks); }
+# The head the result line carries: read when the line is written, so a push during the last sample or
+# the tree-equivalence check shows.
+final_head() { sampled_head; }
 
 # ── Bitbucket ────────────────────────────────────────────────────────────────
 # One sample = the PR (its head and destination), then that head's commit statuses, reduced by
@@ -72,6 +75,7 @@ if [ "$POLL_VCS" = bitbucket ]; then
   . "$SELF_DIR/pr-read.sh" || { echo "finalise-ci-poll: pr-read.sh is missing beside this file" >&2; exit 2; }
   BB_HEAD=unknown
   sampled_head() { printf '%s\n' "$BB_HEAD"; }
+  final_head() { if pr_read --pr "$PR_NUMBER"; then printf '%s\n' "$PR_READ_HEAD"; else echo unknown; fi; }
   sample() {
     STATE=UNKNOWN; CHECKS=0; BB_HEAD=unknown
     local body code reduced
@@ -157,4 +161,4 @@ if [ "$DECIDED" -eq 0 ] && [ "$STATE" = SUCCESS ]; then
     fi
   fi
 fi
-printf '%s %s %s %ss TREE_EQ=%s\n' "$STATE" "$(sampled_head)" "$CHECKS" "$WAITED" "$TREE_EQ" > "$RESULT"
+printf '%s %s %s %ss TREE_EQ=%s\n' "$STATE" "$(final_head)" "$CHECKS" "$WAITED" "$TREE_EQ" > "$RESULT"

@@ -59,6 +59,7 @@ function fenceContaining(needle) {
   return hits[0];
 }
 const STEP_3A = fenceContaining("finalise-rerun-scope.js scope");
+const RERUN = fenceContaining("finalise-rerun-at-head.js \\"); // Step 3a's re-run at the head (task 319)
 const STEP_3C = fenceContaining("finalise-rerun-scope.js merge");
 
 const DOC_DIR = "docs/tasks/task.9.demo";
@@ -106,11 +107,12 @@ function doc(extra = "") {
   ].join("\n");
 }
 
-function repo() {
+function repo(extra = {}) {
   const dir = mkdtempSync(path.join(tmpdir(), "finalise-3a3c-"));
   git(dir, "init", "-q", "-b", "main");
   for (const [p, body] of Object.entries({
     [DOC]: doc(),
+    ...extra,
     "src/a.js": "a\n",
     "tests/a.test.mjs": "ta\n",
     "README.md": "r\n",
@@ -157,11 +159,70 @@ const AGENT_ALL_PASS = [
   "",
 ].join("\n");
 
+/** Step 3a's two blocks, in the document's order: the second reads the first's record. */
+function step3a(shell, dir, dodN) {
+  const r = run(shell, dir, substitute(RERUN, { dodN }));
+  if (r.status !== 0) return r;
+  const s = run(shell, dir, substitute(STEP_3A, { dodN }));
+  return { ...s, stdout: r.stdout + s.stdout, stderr: r.stderr + s.stderr };
+}
+
+test("Step 3a runs the named commands before it computes the scope, and after the record preflight that can commit", () => {
+  const at = (s) => {
+    const i = skill.indexOf(s);
+    assert.ok(i > 0, s);
+    return i;
+  };
+  assert.ok(at("finalise-record-preflight.js check") < at(RERUN));
+  assert.ok(at(RERUN) < at(STEP_3A));
+});
+
 for (const shell of SHELLS) {
+  test(`[${shell}] Step 3a end to end: a criterion the re-run lists is re-judged although the last run passed it (T319-CR-5)`, () => {
+    const dir = repo({
+      [DOC]: doc().replace(
+        "SC-2: the second criterion",
+        "SC-2: `sh check.sh` passes",
+      ),
+      "skills-config.yaml":
+        'finalise:\n  rerunAtHead:\n    - "sh check.sh"\nci:\n  docsOnly:\n    patterns:\n      - "**/*.md"\n',
+      "check.sh": "exit 0\n",
+    });
+    try {
+      const a1 = step3a(shell, dir, 1);
+      assert.equal(a1.status, 0, a1.stdout + a1.stderr);
+      assert.match(a1.stdout, /re-run at head: ran/);
+      assert.match(a1.stdout, /sh check\.sh -> exit 0/);
+      writeFileSync(
+        path.join(dir, ".claude/state/finalise-ac-result-1.yaml"),
+        AGENT_ALL_PASS, // the citation says nothing of a re-run
+      );
+      const c1 = run(shell, dir, substitute(STEP_3C, { dodN: 1 }));
+      assert.equal(c1.status, 0, c1.stdout + c1.stderr);
+      writeFileSync(path.join(dir, "README.md"), "r2\n");
+      git(dir, "add", "-A");
+      git(dir, "commit", "-q", "-m", "B");
+      const a2 = step3a(shell, dir, 2);
+      assert.equal(a2.status, 0, a2.stdout + a2.stderr);
+      assert.match(
+        a2.stdout,
+        /re-run scope: scoped \(prior-record\) — 1 to re-judge, 2 carried/,
+      );
+      // uncommitted code stops the block, before anything is graded
+      writeFileSync(path.join(dir, "src/a.js"), "edited\n");
+      const dirty = step3a(shell, dir, 3);
+      assert.equal(dirty.status, 1, dirty.stdout);
+      assert.match(dirty.stdout, /re-run at head: dirty-tree/);
+      assert.match(dirty.stdout, /HALT: finalise-rerun-at-head\.js/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test(`[${shell}] Steps 3a + 3c as substituted: a first run is full and writes ${"${STEM}"}.dod.1.ac.json; the next run finds it and is scoped`, () => {
     const dir = repo();
     try {
-      const a1 = run(shell, dir, substitute(STEP_3A, { dodN: 1 }));
+      const a1 = step3a(shell, dir, 1);
       assert.equal(a1.status, 0, a1.stdout + a1.stderr);
       assert.match(a1.stdout, /re-run scope: full \(no-prior-record\)/);
 
@@ -180,7 +241,7 @@ for (const shell of SHELLS) {
       git(dir, "add", "-A");
       git(dir, "commit", "-q", "-m", "B");
 
-      const a2 = run(shell, dir, substitute(STEP_3A, { dodN: 2 }));
+      const a2 = step3a(shell, dir, 2);
       assert.equal(a2.status, 0, a2.stdout + a2.stderr);
       assert.match(
         a2.stdout,
@@ -202,6 +263,9 @@ for (const shell of SHELLS) {
           /HALT: STEM and DOD_N must be substituted into this block/,
         );
       }
+      const un = run(shell, dir, RERUN);
+      assert.equal(un.status, 1, un.stdout + un.stderr);
+      assert.match(un.stdout, /HALT: DOC_PATH and DOD_N must be substituted/);
       // Bound but not a run number: still refused, never passed to the engine.
       const bad = run(shell, dir, substitute(STEP_3C, { dodN: "" }));
       assert.equal(bad.status, 1, bad.stdout + bad.stderr);

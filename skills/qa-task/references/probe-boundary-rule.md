@@ -172,7 +172,7 @@ Declining conditions, each reported with its reason:
 | `unknown-sink` | No corpus for that sink. `corpusFor` throws rather than returning `[]`, deliberately. |
 | `bad-cases` | A supplied case is not an object, its `direction` is not `hostile` or `legitimate`, or its `sink` is set and is not a known sink. A `null` sink counts as absent. The CLI refuses the same input with exit 2. |
 | `entry-not-probeable` | The module would not import, the export is absent, or it is not a function. An **absent** export is a module-private predicate: export it and re-run — never a reason for `boundary: false` (obs #156). For `fence:`: the heading is not in the doc, appears twice, or has no ```` ```bash ```` block under it. |
-| `entry-not-probeable`, the `eslint:` shape | The linted file is missing or ignored, or no configuration that applies to it names the rule (task.319). The detail says which. One input that does not parse is a declined case, not a declined entry. |
+| `entry-not-probeable`, the `eslint:` shape | The linted file is missing or ignored, no configuration that applies to it names the rule, or no plugin defines the rule it names (task.319). The detail says which. One input that does not parse is a declined case, not a declined entry. |
 | `eslint-unavailable` | An `eslint:` entry, and no `eslint` package is installed between the linted file's directory and the repo root. Install the repository's dependencies and re-run (task.319). |
 | `entry-not-probeable`, the uniform-failure shape | Every case failed before reaching the control (task 256). At least one hostile and one legitimate case ran, every hostile case read `accepted`, every legitimate case read `rejected`, and within each shell they share one non-zero exit (not 126 or 127) and one non-empty stderr, after removing the sandbox path, `fixture-XXXXXX` and `fence-N.sh`. The usual cause is a wrong entry form: a multi-flag script under `shell:`, which passes the fixture as one positional argument. Use `shell-argv:` with an `--argv` template. A run that reached `gh` stays `needs-fake-gh`. **Four shapes stay scored, and these are limits, not guarantees:** a usage error quoting the input, a corpus with hostile cases only, exit 126 or 127, and a failure with no stderr. |
 | `typescript-unavailable` | A `.ts`/`.mts`/`.cts`/`.tsx` module entry, and no `typescript` package is installed between the entry's directory and the repo root (one above the root is never borrowed). The detail names the directory and the repo root searched; install the repository's dependencies and re-run. Declined by the parent before any child is spawned, so nothing ran. |
@@ -723,7 +723,12 @@ takes it.
   one above it, and the child runs in the directory of the nearest ESLint
   configuration. A run that never reached the rule is declined, not scored: an
   ignored file, a rule no applicable configuration names (a misspelt id looks
-  the same as an absent control), or an input that does not parse. A rule the
+  the same as an absent control), a configured rule no plugin defines, or an
+  input that does not parse. **The directory is a guess when a repository has
+  more than one configuration between the file and its root**: the nearest one
+  is taken, and an ignore file or a relative pattern of an outer one, which the
+  repository's own command would read from its own directory, is not. Name a
+  file whose nearest configuration is the one the command uses. A rule the
   configuration names at `off` **is** scored, and reads `absent`. The input is
   text handed to ESLint and is never written to the repository; the child runs
   outside the sandbox, so a write its configuration makes is not observed

@@ -114,10 +114,10 @@ function policy(wt, args, { script = SCRIPT, env = ENV } = {}) {
 
 const remoteHead = (up) => git(up, "rev-parse", "refs/heads/feature/x");
 
-/** What a call site does: ask, and push only on `push`. Returns 1 when the remote moved. */
-function site(wt, up, id, extra = []) {
+/** What a call site does: ask, and hold the push on `defer` alone. Returns 1 when the remote moved. */
+function site(wt, up, id, opts) {
   const before = remoteHead(up);
-  if (policy(wt, ["--site", id, ...extra]).out === "push")
+  if (policy(wt, ["--site", id], opts).out !== "defer")
     git(wt, "push", "-q", "origin", "HEAD");
   return remoteHead(up) === before ? 0 : 1;
 }
@@ -314,7 +314,31 @@ test("pause: batched never pushes, even over unpushed code; eager does", (t) => 
   assert.equal(site(e.wt, e.up, "pause"), 1);
 });
 
-test("a remote reader, an end and --end push a record-only commit; a spent push holds code in both modes", (t) => {
+test("a missing script pushes: every call site holds on `defer` and on nothing else (T319-CR-113)", (t) => {
+  const { wt, up, dir } = fixture(t);
+  commit(wt, "docs/a.md");
+  assert.equal(
+    site(wt, up, "qa-cycle", { script: join(dir, "gone.sh") }),
+    1,
+    "a record commit is pushed when nothing can answer",
+  );
+  // the authored blocks, not only this file's helper
+  const held = authoredFiles().flatMap((f) =>
+    readFileSync(join(ROOT, f), "utf8")
+      .split("\n")
+      .filter((l) => /\$\([^)]*push-policy\.sh"? --site/.test(l))
+      .map((l) => [f, l.trim()]),
+  );
+  assert.ok(held.length >= 10, "the call sites were found");
+  assert.deepEqual(
+    held.filter(
+      ([f, l]) => !/= ?defer/.test(l) && !f.endsWith("on-precompact.sh"), // its pause waits on any other answer
+    ),
+    [],
+  );
+});
+
+test("a remote reader and an end push a record-only commit; a spent push holds code in both modes", (t) => {
   for (const config of [
     DOCS_CONFIG,
     `${DOCS_CONFIG}pipeline:\n  pushRecordCommits: eager\n`,
@@ -325,6 +349,7 @@ test("a remote reader, an end and --end push a record-only commit; a spent push 
       "qa-pre-5c",
       "qa-halt",
       "qa-escalation",
+      "finalise-entry",
       "finalise-gaps",
       "finalise-accept",
       "finalise-fix",
@@ -332,7 +357,6 @@ test("a remote reader, an end and --end push a record-only commit; a spent push 
       "tick",
     ])
       assert.equal(policy(wt, ["--site", id]).out, "push", id);
-    assert.equal(policy(wt, ["--site", "qa-cycle", "--end"]).out, "push");
     commit(wt, "src.js");
     assert.equal(policy(wt, ["--site", "qa-review-fix"]).out, "defer");
   }
@@ -377,7 +401,16 @@ test("what cannot be decided pushes, except a pause, which waits", (t) => {
 
 test("usage: an unknown site, a missing site and an unknown flag exit 2 with nothing on stdout", (t) => {
   const { wt } = fixture(t);
-  for (const args of [["--site", "nope"], [], ["--site"], ["--bogus"]]) {
+  for (const args of [
+    ["--site", "nope"],
+    [],
+    ["--site"],
+    ["--bogus"],
+    // T319-QA-1: an escape awk would decode into a listed id, and a string it would compare as a number
+    ["--site", "\\160ause"],
+    ["--site", "qa\\055cycle"],
+    ["--site", "pause\n"],
+  ]) {
     const r = policy(wt, args);
     assert.equal(r.code, 2, args.join(" "));
     assert.equal(r.out, "");
@@ -415,7 +448,8 @@ function withGreen(dir, green) {
   chmodSync(join(bin, "gh"), 0o755);
   return { ...ENV, VCS: "github", PATH: `${bin}:${ENV.PATH}` };
 }
-const MARKED_CONFIG = `${DOCS_CONFIG}  skipMarker: "[skip ci]"\n`;
+const MARKER_ONLY = `${DOCS_CONFIG}  skipMarker: "[skip ci]"\n`;
+const MARKED_CONFIG = `${MARKER_ONLY}developNext:\n  mergeStrategy: merge\n`;
 const subject = (wt) => git(wt, "log", "-1", "--format=%s");
 const mark = (wt, env) =>
   policy(wt, ["--mark", "--site", "step8"], { env }).out;
@@ -491,6 +525,54 @@ test("marker: never on a commit with code, off when the key is unset, and never 
   git(none.wt, "push", "-q", "origin", "HEAD");
   commit(none.wt, "docs/a.md", "docs");
   assert.equal(mark(none.wt, withGreen(none.dir, "0".repeat(40))), "unmarked");
+});
+
+test("marker: only under a stated merge-commit strategy, so it never reaches the base branch's head (T319-CR-101, bug 2)", (t) => {
+  const strategy = (s) => `${MARKER_ONLY}developNext:\n  ${s}\n`;
+  for (const [config, why] of [
+    [MARKER_ONLY, "not stated"],
+    [`${MARKER_ONLY}developNext:\n  baseBranch: develop\n`, "not stated"],
+    [strategy("mergeStrategy: squash"), "squash"],
+    [strategy("mergeStrategy: rebase"), "rebase"],
+    [strategy("mergeStrategy: Merge"), "not the exact word"],
+    [
+      `${MARKER_ONLY}developNext: { mergeStrategy: merge }\n`,
+      "a flow mapping the subset cannot read",
+    ],
+    [
+      strategy("mergeStrategy: merge\n  mergeStrategy: rebase"),
+      "stated twice: the reader would keep one",
+    ],
+  ]) {
+    const f = fixture(t, { config });
+    const green = commit(f.wt, "src.js", "code");
+    git(f.wt, "push", "-q", "origin", "HEAD");
+    commit(f.wt, "docs/a.md", "docs");
+    const r = policy(f.wt, ["--mark", "--site", "step8"], {
+      env: withGreen(f.dir, green),
+    });
+    assert.equal(r.out, "unmarked", why);
+    assert.match(r.err, /mergeStrategy/, why);
+    assert.equal(subject(f.wt), "docs");
+  }
+});
+
+test("marker: never when a checkCommand is configured, and the command is not run (T319-CR-108)", (t) => {
+  const f = fixture(t, {
+    config: MARKED_CONFIG.replace(
+      "  skipMarker",
+      '    checkCommand: "touch ran.txt"\n  skipMarker',
+    ),
+  });
+  const green = commit(f.wt, "src.js", "code");
+  git(f.wt, "push", "-q", "origin", "HEAD");
+  commit(f.wt, "docs/a.md", "docs");
+  const r = policy(f.wt, ["--mark", "--site", "step8"], {
+    env: withGreen(f.dir, green),
+  });
+  assert.equal(r.out, "unmarked");
+  assert.match(r.err, /checkCommand/);
+  assert.equal(existsSync(join(f.wt, "ran.txt")), false);
 });
 
 test("marker: a head already on the remote is never amended", (t) => {
@@ -606,6 +688,55 @@ function unguardedPushes(text, siteIds) {
   return bad;
 }
 
+/**
+ * An instruction to push written as prose: "commit the report, push, then HALT", "Then push.". The words
+ * `git push` are not in it, so the scan above cannot see it, and a HALT that pushes nothing strands what
+ * a `defer` held (T319-CR-107). A site named within the window below guards it.
+ */
+const PROSE_PUSH =
+  /(?:^|[.,;:—→)]\s+|\b(?:and|then)\s+)(?:\*\*)?(?:then\s+)?push(?:\*\*)?(?:[.,:;]| (?:it|once|what|the (?:branch|commit|report))\b|\s*$)/i;
+function unguardedProse(text, siteIds) {
+  const lines = text.split("\n");
+  const bad = [];
+  let fence = false;
+  lines.forEach((line, i) => {
+    if (/^\s*```/.test(line)) fence = !fence;
+    if (fence || !PROSE_PUSH.test(line)) return;
+    const window = lines.slice(i, i + 8).join("\n");
+    const ids = [
+      ...window.matchAll(/push-policy\.sh"?\s+--site\s+([a-z0-9-]+)/g),
+    ].map((m) => m[1]);
+    if (!ids.some((id) => siteIds.has(id))) bad.push([i + 1, line.trim()]);
+  });
+  return bad;
+}
+const PROSE_EXEMPT = [
+  {
+    file: "shared/resources/develop-pipeline-step-4-create-pr.md",
+    match: /implementation report — create-pr failure`\), push, then HALT/,
+    reason: "no PR exists yet, so the push starts no PR run and holds nothing",
+  },
+  {
+    file: "skills/develop-bug/references/develop-bug-step-2-review.md",
+    match: /Step 2b: Open the Tracker Issue": push,/,
+    reason: FIRST,
+  },
+  ...[
+    "shared/resources/develop-pipeline-step-5-6-qa-loop.md",
+    "skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md",
+  ].map((file) => ({
+    file,
+    match:
+      /> not in `npm test`, so a cycle could close green, push, and fail CI/,
+    reason: "what a red cycle would do; not an instruction",
+  })),
+  {
+    file: "shared/resources/develop-pipeline-step-5-6-qa-loop.md",
+    match: /task\.110 ran cycles 12 and 13/,
+    reason: "a past run's cost; not an instruction",
+  },
+];
+
 const siteIds = () =>
   new Set(
     run("bash", [SCRIPT, "--list"], { cwd: ROOT })
@@ -650,6 +781,80 @@ test("scan: every git push in a pipeline document or pipeline skill asks push-po
     [],
     "a site in the table that no document calls",
   );
+});
+
+test("scan: an instruction to push in a pipeline step document's prose names its site (T319-CR-107)", () => {
+  const ids = siteIds();
+  const files = authoredFiles().filter((f) =>
+    /(develop-pipeline-step-|develop-bug-step-)[^/]*\.md$/.test(f),
+  );
+  assert.ok(files.length >= 8, files.join(", "));
+  const found = [];
+  let seen = 0;
+  for (const file of files) {
+    const text = readFileSync(join(ROOT, file), "utf8");
+    seen += text.split("\n").filter((l) => PROSE_PUSH.test(l)).length;
+    for (const [n, line] of unguardedProse(text, ids))
+      if (!PROSE_EXEMPT.some((e) => e.file === file && e.match.test(line)))
+        found.push(`${file}:${n}: ${line}`);
+  }
+  assert.ok(seen >= 8, `the scan read real prose (${seen})`);
+  assert.deepEqual(found, []);
+  for (const e of PROSE_EXEMPT)
+    assert.match(readFileSync(join(ROOT, e.file), "utf8"), e.match, e.reason);
+  // non-vacuity: the sentences the two develop-bug HALTs carried
+  for (const s of [
+    "commit the report via `/commit-changes` (`docs(x): y`), push, and **HALT**:",
+    "commit the report via `/commit-changes` (`docs(x): y`), push, then HALT:",
+    "Then push. A HALT is an end of the run",
+    "Commit the gate, then push once — per path 2 above.",
+  ]) {
+    assert.equal(unguardedProse(`${s}\n`, ids).length, 1, s);
+    assert.equal(
+      unguardedProse(`${s}\n\npush-policy.sh --site qa-halt\n`, ids).length,
+      0,
+      s,
+    );
+  }
+  for (const s of [
+    "Each cycle pushes as above.",
+    "A second push here is the one this section exists to prevent:",
+    "the next push carries the commit",
+  ])
+    assert.equal(unguardedProse(`${s}\n`, ids).length, 0, s);
+});
+
+test("scan: a HALT inside the two fix loops, and the entry to /finalise, each name a push site (T319-CR-102, CR-106)", () => {
+  const read = (f) => readFileSync(join(ROOT, f), "utf8");
+  const bug = "skills/develop-bug/references/develop-bug-step-";
+  const pipe = "shared/resources/develop-pipeline-step-";
+  for (const [file, from, to, id] of [
+    [
+      `${bug}5-6-verify-loop.md`,
+      "3. **Check for actual changes**",
+      "3a.",
+      "qa-halt",
+    ],
+    [
+      `${pipe}5-6-qa-loop.md`,
+      '- `"MERGED"` or `"CLOSED"` →',
+      "HALT:",
+      "qa-halt",
+    ],
+    [`${bug}7-close-bug.md`, "## Part A", "Skill(finalise", "finalise-entry"],
+    [
+      `${pipe}7-finalise.md`,
+      "## Invoke /finalise",
+      "Invoke the `/finalise`",
+      "finalise-entry",
+    ],
+  ]) {
+    const text = read(file);
+    const a = text.indexOf(from);
+    const b = text.indexOf(to, a);
+    assert.ok(a >= 0 && b > a, `${file}: ${from}`);
+    assert.match(text.slice(a, b), new RegExp(`--site ${id}\\b`), file);
+  }
 });
 
 test("scan: the detector flags an unlisted push and an unknown site (non-vacuity)", () => {

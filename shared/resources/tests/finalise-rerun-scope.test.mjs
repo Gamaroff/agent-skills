@@ -373,6 +373,76 @@ test("scope: a PASS graded on a command re-run at the head → rerun-at-head, ne
   }
 });
 
+test("scope: a re-run criterion is judged whole whatever its prior status, so members cannot overturn it (T319-CR-2)", () => {
+  const dir = mkRepo();
+  try {
+    const a = git(dir, "rev-parse", "HEAD");
+    const prior = record(dir, a, {
+      "SC-1": {
+        status: "FAIL",
+        test_citation: "NOT_APPLICABLE: command re-run at the head",
+        members: [{ member: "m1", status: "PASS", citation: "src/a.js:1" }],
+      },
+    });
+    commit(dir, { "README.md": "unrelated\n" });
+    const s = scopeAt(dir, prior);
+    const entry = s.rejudge.find((r) => r.id === "SC-1");
+    assert.equal(entry.reason, "rerun-at-head");
+    assert.equal(entry.carried_members, undefined);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("scope: --rerun-at-head re-judges what this run's record lists, however the prior run graded it (T319-CR-5)", () => {
+  const dir = mkRepo();
+  try {
+    const a = git(dir, "rev-parse", "HEAD");
+    writeFileSync(join(dir, "prior.json"), record(dir, a, {}));
+    const head = commit(dir, { "README.md": "unrelated\n" });
+    const scopeWith = (rec) => {
+      writeFileSync(join(dir, "run.json"), JSON.stringify(rec));
+      const r = cli(dir, [
+        "scope",
+        "--doc",
+        DOC,
+        "--head",
+        head,
+        "--prior",
+        "prior.json",
+        "--rerun-at-head",
+        "run.json",
+        "--json",
+      ]);
+      return { code: r.status, out: JSON.parse(r.stdout) };
+    };
+    const rec = (over = {}) => ({
+      head,
+      runs: [{ command: "x", criteria: [{ index: 2, text: "any" }] }],
+      ...over,
+    });
+    const ok = scopeWith(rec());
+    assert.equal(ok.code, 0);
+    assert.equal(reasonOf(ok.out, "SC-2"), "rerun-at-head");
+    assert.equal(reasonOf(ok.out, "SC-1"), "unchanged");
+    assert.equal(
+      reasonOf(scopeWith(rec({ runs: [] })).out, "SC-2"),
+      "unchanged",
+      "a record that ran nothing changes nothing",
+    );
+    // another head's record, another document's, and one that is not a record
+    for (const bad of [
+      rec({ head: a }),
+      rec({ runs: [{ criteria: [{ index: 40 }] }] }),
+      rec({ runs: null }),
+      [],
+    ])
+      assert.equal(scopeWith(bad).code, 2, JSON.stringify(bad));
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test("scope: a CI-state entry (resolved PASS or still deferred) → ci-state, never carried (task 249)", () => {
   const dir = mkRepo();
   try {

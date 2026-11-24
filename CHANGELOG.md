@@ -16,17 +16,21 @@ All notable changes to this project will be documented in this file. Format foll
 ### Added
 
 - **`ci.skipMarker` (task 319), off by default.** The pipelines append it to a commit they are about to
-  push when that push changes no code over a green, settled ancestor, and never otherwise. Leave it
-  empty when a merge check needs a status on the head.
+  push when that push changes no code over a green, settled ancestor, and never otherwise. It needs
+  `developNext.mergeStrategy: merge` written in the file and no `ci.docsOnly.checkCommand`, so the
+  marker cannot reach the base branch's head. Leave it empty when a merge check needs a status on the
+  head.
 - **`finalise.rerunAtHead` (task 319).** `/finalise` Step 3a runs a listed command again at the head
   before it grades a criterion that names it as a code span, and records output and exit code in the
-  DoD. A prior PASS on such a criterion is never carried over. Engine:
+  DoD. No prior verdict on such a criterion is carried over. A list the configuration reader would drop
+  is a usage error, and a run whose tree or head changed under it is refused. Engine:
   `shared/resources/finalise-rerun-at-head.js`.
 - **The security probe reaches a lint rule (task 319).** `--entry eslint:<path>#<rule-id>` lints each
   case as that file with the repository's own ESLint and configuration; a reported rule is `rejected`.
   Such a control was declined `entry-not-probeable` before.
 - **`/finalise`'s CI reading 2 poll reads Bitbucket (task 319).** `finalise-ci-poll.sh` takes the
-  destination's status key (`prs:**:<destination>`) and writes the same result line as on GitHub.
+  destination's status key (`prs:**:<destination>`) and every status that is not a pull-request
+  pipeline's, and writes the same result line as on GitHub.
 - **`developNext.tickVia: pr` (task 319).** `develop-next` and `develop-batch` can land the tick through
   a docs PR and the merge gate, for a base branch that refuses direct pushes. Default `push`. New
   `shared/resources/tick-pr.sh`.

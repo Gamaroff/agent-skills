@@ -39,6 +39,7 @@ function runPoll(
     head = HEAD,
     floor = "1",
     maxWait = "90",
+    movesAfter = 0,
   },
 ) {
   const dir = mkdtempSync(join(tmpdir(), "ci-poll-bb-"));
@@ -89,7 +90,11 @@ out=""; prev=""; url=""
 for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; url="$a"; done
 echo "$url" >> "${dir}/curl.log"
 case "$url" in
-  */pullrequests/7) cat "${dir}/pr.json" > "$out"; printf '${prCode}' ;;
+  */pullrequests/7)
+    if [ ${movesAfter} -gt 0 ] && [ "$(grep -c 'pullrequests/7' "${dir}/curl.log")" -gt ${movesAfter} ]; then
+      sed 's/${head.slice(0, 12)}/${"c".repeat(12)}/' "${dir}/pr.json" > "$out"
+    else cat "${dir}/pr.json" > "$out"; fi
+    printf '${prCode}' ;;
   */statuses*)
     n=$(grep -c statuses "${dir}/curl.log"); n=$((n - 1))
     while [ "$n" -gt 0 ] && [ ! -f "${dir}/statuses.$n.json" ]; do n=$((n - 1)); done
@@ -154,7 +159,20 @@ test("Bitbucket: the result line carries the rollup of the PR's own destination"
   assert.equal(red.line, `FAILURE ${SHORT} 1 30s TREE_EQ=`, red.stderr);
 });
 
-test("Bitbucket: pending resolves on a later sample, and no status for the destination is NONE", (t) => {
+test("Bitbucket: a status that is not a PR pipeline's counts: an external failure is a failure (T319-CR-110)", (t) => {
+  const values = [
+    status("prs:**:develop", "SUCCESSFUL"),
+    status("prs:**:main", "SUCCESSFUL"),
+    status("sonar", "FAILED"),
+  ];
+  const red = runPoll(t, { statuses: [{ values }] });
+  assert.equal(red.line, `FAILURE ${SHORT} 2 30s TREE_EQ=`, red.stderr);
+  values[2] = status("sonar", "SUCCESSFUL");
+  const green = runPoll(t, { statuses: [{ values }] });
+  assert.equal(green.line, `SUCCESS ${SHORT} 2 30s TREE_EQ=`, green.stderr);
+});
+
+test("Bitbucket: pending resolves on a later sample; statuses for another destination only are PENDING, none at all is NONE", (t) => {
   const late = runPoll(t, {
     statuses: [
       { values: [status("prs:**:develop", "INPROGRESS")] },
@@ -163,10 +181,31 @@ test("Bitbucket: pending resolves on a later sample, and no status for the desti
     ],
   });
   assert.equal(late.line, `SUCCESS ${SHORT} 1 60s TREE_EQ=`, late.stderr);
-  const none = runPoll(t, {
-    statuses: [{ values: [status("prs:**:main", "SUCCESSFUL")] }],
-    maxWait: "60",
+  // this PR's own pipeline has not registered: never green, never "no checks" (T319-CR-111)
+  for (const extra of [[], [status("sonar", "SUCCESSFUL")]]) {
+    const other = runPoll(t, {
+      statuses: [{ values: [status("prs:**:main", "SUCCESSFUL"), ...extra] }],
+      maxWait: "60",
+    });
+    assert.equal(
+      other.line,
+      `PENDING ${SHORT} ${extra.length} 60s TREE_EQ=`,
+      other.stderr,
+    );
+  }
+  // …but a failure already in is a failure
+  const failed = runPoll(t, {
+    statuses: [
+      {
+        values: [
+          status("prs:**:main", "SUCCESSFUL"),
+          status("sonar", "FAILED"),
+        ],
+      },
+    ],
   });
+  assert.equal(failed.line, `FAILURE ${SHORT} 1 30s TREE_EQ=`, failed.stderr);
+  const none = runPoll(t, { statuses: [{ values: [] }], maxWait: "60" });
   assert.equal(none.line, `NONE ${SHORT} 0 60s TREE_EQ=`, none.stderr);
 });
 
@@ -207,6 +246,15 @@ test("Bitbucket: a PR that cannot be read is `unknown`, and a moved head never d
     maxWait: "60",
   });
   assert.equal(moved.line, `UNDECIDED ${"b".repeat(12)} 1 60s TREE_EQ=`);
+});
+
+test("Bitbucket: the head in the result line is read when the line is written (T319-CR-109)", (t) => {
+  // the head moves after the second sample decided
+  const r = runPoll(t, {
+    statuses: [{ values: [status("prs:**:develop", "SUCCESSFUL")] }],
+    movesAfter: 2,
+  });
+  assert.equal(r.line, `SUCCESS ${"c".repeat(12)} 1 30s TREE_EQ=`, r.stderr);
 });
 
 test("Bitbucket: the check floor holds a partial rollup", (t) => {

@@ -9,7 +9,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import {
   mkdirSync,
   mkdtempSync,
@@ -53,6 +53,9 @@ class ESLint {
     if (text.includes("(((")) return [{ filePath, messages: [{ ruleId: null, fatal: true, message: "Parsing error", severity: 2 }] }];
     const messages = [];
     const on = (r) => this.config[r] && this.config[r][0];
+    // what ESLint 8 does with a configured rule no plugin defines
+    for (const r of Object.keys(this.config))
+      if (r.startsWith("ghost/") && on(r)) messages.push({ ruleId: r, severity: 2, line: 1, message: "Definition for rule '" + r + "' not found." });
     if (!text.includes("eslint-disable")) {
       if (on("no-eval") && /\\beval\\(/.test(text)) messages.push({ ruleId: "no-eval", severity: on("no-eval"), line: 1 });
       if (on("@acme/lint/no-tabs") && text.includes("\\t")) messages.push({ ruleId: "@acme/lint/no-tabs", severity: 2, line: 1 });
@@ -127,6 +130,56 @@ test("a rule the configuration turns off is scored absent; one it never names is
   assert.equal(r.reason, "entry-not-probeable");
   assert.equal(r.executed, 0);
   assert.match(r.declined[0].detail, /names the rule no-evil/);
+});
+
+test("a configured rule no plugin defines is declined, not scored as rejecting everything (T319-CR-8)", (t) => {
+  const dir = repo(t, { config: { ...CONFIG, "ghost/rule": [2] } });
+  const r = probe(dir, "eslint:pkg/src/a.js#ghost/rule");
+  assert.equal(r.verdict, "unverifiable", JSON.stringify(r));
+  assert.equal(r.executed, 0);
+  assert.match(r.declined[0].detail, /no definition/);
+  // a rule that is defined keeps its verdict beside one that is not
+  assert.equal(probe(dir, "eslint:pkg/src/a.js#no-eval").verdict, "engages");
+});
+
+test("every document that lists the engine's entry forms names the eslint form (T319-CR-12)", () => {
+  // Found by search, not listed: an authored document that tells an agent how to reach a fence: or
+  // shell-argv: entry lists the forms, and a form it leaves out is a boundary recorded as unreachable.
+  const ROOT = resolve(HERE, "..", "..", "..");
+  const docs = execFileSync(
+    "git",
+    [
+      "grep",
+      "-l",
+      "-e",
+      "shell-argv:",
+      "--",
+      ":(glob)skills/*/SKILL.md",
+      ":(glob)shared/resources/*.md",
+    ],
+    { cwd: ROOT, encoding: "utf8" },
+  )
+    .trim()
+    .split("\n")
+    // a list names them all; review-task quotes two of them as a worked example
+    .filter((f) => {
+      const text = readFileSync(join(ROOT, f), "utf8");
+      return ["fence:", "cli:", "shell-fn:"].every((x) => text.includes(x));
+    });
+  // the floor: the six that list the forms today; a seventh is found by the search and checked too
+  for (const must of [
+    "shared/resources/finalise-dod-security-prompt.md",
+    "shared/resources/probe-boundary-rule.md",
+    "shared/resources/security-review-prompt.md",
+    "skills/qa-story/SKILL.md",
+    "skills/qa-task/SKILL.md",
+    "skills/review-security/SKILL.md",
+  ])
+    assert.ok(docs.includes(must), must);
+  assert.deepEqual(
+    docs.filter((f) => !/eslint:/.test(readFileSync(join(ROOT, f), "utf8"))),
+    [],
+  );
 });
 
 test("a disable directive in the input is what it is in the repository: not reported", (t) => {

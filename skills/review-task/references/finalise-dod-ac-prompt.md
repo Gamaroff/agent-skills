@@ -35,7 +35,7 @@ The caller ran, on the head you are judging, every command the project lists in 
 <RERUN_AT_HEAD>
 ```
 
-When it is a path, read that `run.json` and, for each entry of `runs[]`, the `stdout` and `stderr` files it names. Each entry lists the criteria it answers (`criteria[].index` counts the criteria section from 1) and its `exit_code` (`null` means it did not finish). Step 3's **re-run criterion** says how to grade them. `none` means no listed command is named: every criterion keeps its own rule.
+When it is a path, read that `run.json` and, for each entry of `runs[]`, the `stdout` and `stderr` files it names. Each entry lists the criteria it answers (`criteria[].index` counts the criteria section from 1) and its `exit_code` (`null` means it did not finish: timed out, stopped for its output size, or never started because the run's budget was spent). `uncommitted_docs` lists documentation the commands could read that the head does not hold: name a listed file in the evidence when the command reads it. Step 3's **re-run criterion** says how to grade them. `none` means no listed command is named: every criterion keeps its own rule.
 
 ### Step 1: Read the story/task file
 
