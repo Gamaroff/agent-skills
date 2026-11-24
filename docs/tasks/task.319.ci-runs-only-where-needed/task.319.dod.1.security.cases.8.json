@@ -1,0 +1,74 @@
+[
+  {
+    "id": "legit-eager",
+    "input": "pipeline:\n  pushRecordCommits: eager\n",
+    "direction": "legitimate",
+    "why": "documented value",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:313"
+  },
+  {
+    "id": "legit-batched",
+    "input": "pipeline:\n  pushRecordCommits: batched\n",
+    "direction": "legitimate",
+    "why": "documented value",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:313"
+  },
+  {
+    "id": "legit-absent",
+    "input": "tracker: github\n",
+    "direction": "legitimate",
+    "why": "the default",
+    "correct": "accepted as batched",
+    "spec_ref": "docs/reference/configuration.md:313"
+  },
+  {
+    "id": "hostile-value",
+    "input": "pipeline:\n  pushRecordCommits: always\n",
+    "direction": "hostile",
+    "why": "not batched or eager",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:313"
+  },
+  {
+    "id": "hostile-case",
+    "input": "pipeline:\n  pushRecordCommits: Eager\n",
+    "direction": "hostile",
+    "why": "case variant",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:313"
+  },
+  {
+    "id": "hostile-boolean",
+    "input": "pipeline:\n  pushRecordCommits: true\n",
+    "direction": "hostile",
+    "why": "not a listed value",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:313"
+  },
+  {
+    "id": "hostile-list",
+    "input": "pipeline:\n  pushRecordCommits:\n    - eager\n",
+    "direction": "hostile",
+    "why": "not a listed value",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:313"
+  },
+  {
+    "id": "hostile-unknown-key",
+    "input": "pipeline:\n  pushRecordCommit: eager\n",
+    "direction": "hostile",
+    "why": "unknown key",
+    "correct": "REJECT, as ci does",
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:288"
+  },
+  {
+    "id": "hostile-near-miss",
+    "input": "Pipeline:\n  pushRecordCommits: eager\n",
+    "direction": "hostile",
+    "why": "near-miss block",
+    "correct": "REJECT, as ci does",
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:288"
+  }
+]

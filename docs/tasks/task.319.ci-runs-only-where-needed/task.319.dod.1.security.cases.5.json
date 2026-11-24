@@ -1,0 +1,114 @@
+[
+  {
+    "id": "legit-core-rule",
+    "input": "eslint:src/a.js#no-eval",
+    "direction": "legitimate",
+    "why": "the form",
+    "correct": "accepted",
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:189"
+  },
+  {
+    "id": "legit-scoped-rule",
+    "input": "eslint:src/a.ts#@typescript-eslint/no-explicit-any",
+    "direction": "legitimate",
+    "why": "a scoped plugin's rule",
+    "correct": "accepted",
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:189"
+  },
+  {
+    "id": "legit-hash-in-path",
+    "input": "eslint:src/a#b.js#no-eval",
+    "direction": "legitimate",
+    "why": "a path may hold a #",
+    "correct": "accepted",
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:189"
+  },
+  {
+    "id": "hostile-traversal",
+    "input": "eslint:../outside.js#no-eval",
+    "direction": "hostile",
+    "why": "leaves the root",
+    "correct": "REJECT outside-repo-root",
+    "spec_ref": "shared/resources/probe-boundary-rule.md:170"
+  },
+  {
+    "id": "hostile-inner-traversal",
+    "input": "eslint:src/../../x.js#no-eval",
+    "direction": "hostile",
+    "why": "leaves the root",
+    "correct": "REJECT outside-repo-root",
+    "spec_ref": "shared/resources/probe-boundary-rule.md:170"
+  },
+  {
+    "id": "hostile-absolute",
+    "input": "eslint:/etc/passwd#no-eval",
+    "direction": "hostile",
+    "why": "leaves the root",
+    "correct": "REJECT outside-repo-root",
+    "spec_ref": "shared/resources/probe-boundary-rule.md:170"
+  },
+  {
+    "id": "hostile-no-rule",
+    "input": "eslint:src/a.js",
+    "direction": "hostile",
+    "why": "no rule id",
+    "correct": "REJECT bad-entry",
+    "spec_ref": "shared/resources/probe-boundary-rule.md:169"
+  },
+  {
+    "id": "hostile-empty-rule",
+    "input": "eslint:src/a.js#",
+    "direction": "hostile",
+    "why": "empty rule id",
+    "correct": "REJECT bad-entry",
+    "spec_ref": "shared/resources/probe-boundary-rule.md:169"
+  },
+  {
+    "id": "hostile-no-path",
+    "input": "eslint:#no-eval",
+    "direction": "hostile",
+    "why": "no path",
+    "correct": "REJECT bad-entry",
+    "spec_ref": "shared/resources/probe-boundary-rule.md:169"
+  },
+  {
+    "id": "hostile-bare",
+    "input": "eslint:",
+    "direction": "hostile",
+    "why": "prefix alone",
+    "correct": "REJECT bad-entry",
+    "spec_ref": "shared/resources/probe-boundary-rule.md:169"
+  },
+  {
+    "id": "hostile-rule-space",
+    "input": "eslint:src/a.js#no eval",
+    "direction": "hostile",
+    "why": "not a rule id",
+    "correct": "REJECT bad-entry",
+    "spec_ref": "shared/resources/probe-boundary-rule.md:169"
+  },
+  {
+    "id": "hostile-rule-newline",
+    "input": "eslint:src/a.js#no-eval\n",
+    "direction": "hostile",
+    "why": "trailing newline",
+    "correct": "REJECT bad-entry",
+    "spec_ref": "shared/resources/probe-boundary-rule.md:169"
+  },
+  {
+    "id": "hostile-rule-substitution",
+    "input": "eslint:src/a.js#$(id)",
+    "direction": "hostile",
+    "why": "not a rule id",
+    "correct": "REJECT bad-entry",
+    "spec_ref": "shared/resources/probe-boundary-rule.md:169"
+  },
+  {
+    "id": "hostile-rule-proto",
+    "input": "eslint:src/a.js#__proto__",
+    "direction": "hostile",
+    "why": "not a rule id",
+    "correct": "REJECT bad-entry",
+    "spec_ref": "shared/resources/probe-boundary-rule.md:169"
+  }
+]

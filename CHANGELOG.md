@@ -18,9 +18,10 @@ All notable changes to this project will be documented in this file. Format foll
 
 - **`ci.skipMarker` (task 319), off by default.** The pipelines append it to a commit they are about to
   push when that push changes no code over a green, settled ancestor, and never otherwise. It needs
-  `developNext.mergeStrategy: merge` written in the file and no `ci.docsOnly.checkCommand`, so the
-  marker cannot reach the base branch's head. Leave it empty when a merge check needs a status on the
-  head.
+  `developNext.mergeStrategy: merge` written in the file and no `ci.docsOnly.checkCommand`, so a merge
+  made that way does not put the marker on the base branch's head. Leave it empty when a person can merge
+  with another button or with a message that lists the commits (Bitbucket's default text), or when a
+  merge check needs a status on the head.
 - **`finalise.rerunAtHead` (task 319).** `/finalise` Step 3a runs a listed command again at the head
   before it grades a criterion that names it as a code span, and records output and exit code in the
   DoD. No prior verdict on such a criterion is carried over. A list the configuration reader would drop

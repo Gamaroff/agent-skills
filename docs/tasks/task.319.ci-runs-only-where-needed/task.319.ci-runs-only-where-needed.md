@@ -486,11 +486,34 @@ All 10 findings of PR review 1 are fixed, documents only. No finding is open. Th
 - **T319-CR-1303** (LOW) — carried to gate 7 `recommendations.future` (route 2b, cycle 7): a script stopped past its bound answers that a push failed which reached the server
 - **T319-CR-1304** (LOW) — carried to gate 7 `recommendations.future` (route 2b, cycle 7): a tick started in a subdirectory reads `resume`
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+**QA gate:** PASS (100), `task.319.gate.8.ci-runs-only-where-needed.yml`. **PR review 2:** APPROVE.
+
+### Missing Criteria:
+
+- [ ] Criterion 10: the QA reports do not record a red run for 45 of the new tests (medium). The runs were made on 2026-11-24 and are in the DoD file; they belong in a QA report.
+- [ ] Security: `ci.skipMarker` accepts U+0085, a C1 control, against "one printable line" (low, reproduced by probe).
+- [ ] Documentation: `docs/reference/configuration.md` says a HALT's push is kept local only in two cases and after 60 seconds; `push-held.sh` allows 50 and has more cases (low).
+
+### Next Steps:
+
+- Refuse U+0080 to U+009F in `skipMarkerOf`, with a test that is red without it
+- Correct the sentence
+- The next QA report carries the red-run tables
+
+**Estimated Effort:** Small
+
+**Gap Report Generated:** 2026-11-25
+
+**Detailed Verification Log:** `task.319.dod.1.ci-runs-only-where-needed.md`
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
-| Date       | Version | Description   | Author          |
-| ---------- | ------- | ------------- | --------------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-24 | 1.0     | Initial draft | Lorien Gamaroff |
 | 2026-11-24 |         | GitHub issue created (#936) | Lorien Gamaroff |
 | 2026-11-24 | 1.1     | Review 1 (7/10): widened the `ci` parser for `skipMarker`, completed the push-site list and its search, named `verify-push-state.sh` and finalise's polls as remote readers, scan test for criterion 1, tests to update, `rerunAtHead` contract | review-task |
@@ -512,6 +535,7 @@ All 10 findings of PR review 1 are fixed, documents only. No finding is open. Th
 | 2026-11-24 |         | QA gate PASS (100/100) — 7 findings (7 low); all 8 of cycle 6 fixed for the reported case | qa-task |
 | 2026-11-24 |         | QA fixes applied (cycle 7, 1 more granted) — all 10 findings of PR review 1, documents only; a wider search found 7 more statements of the removed push rule and two reviews of the fixes 12 points, also corrected; status → ready-for-review | qa-fix |
 | 2026-11-25 |         | QA gate PASS (100/100) — no open finding; the 10 findings of PR review 1 are fixed | qa-task |
+| 2026-11-25 |  | DoD incomplete — 3 gaps identified | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking

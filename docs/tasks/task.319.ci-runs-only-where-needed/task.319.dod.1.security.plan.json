@@ -1,0 +1,128 @@
+[
+  {
+    "argv": [
+      "--sink",
+      "shell-exec",
+      "--entry",
+      "shell-argv:shared/resources/push-policy.sh",
+      "--argv",
+      "[\"--site\",\"{input}\"]",
+      "--fixture-setup",
+      "shared/resources/tests/fixtures/security-probe/setup-git-repo.sh",
+      "--name",
+      "push-policy --site"
+    ],
+    "cases_file": "task.319.dod.1.security.cases.1.json",
+    "cases_sha256": "d5b9c64cdf8f91fc40fe73a1481052b9efa604611d22c2156b16d5f5974ad75e"
+  },
+  {
+    "argv": [
+      "--sink",
+      "shell-exec",
+      "--entry",
+      "shell-argv:shared/resources/push-held.sh",
+      "--argv",
+      "[\"--site\",\"{input}\"]",
+      "--name",
+      "push-held --site"
+    ],
+    "cases_file": "task.319.dod.1.security.cases.2.json",
+    "cases_sha256": "5962bad1c7e77b6653504c78c439de296110a104279f53ff717430fbdd48983b"
+  },
+  {
+    "argv": [
+      "--sink",
+      "template-render",
+      "--entry",
+      "shared/resources/finalise-rerun-at-head.js#parseRerunList",
+      "--name",
+      "finalise.rerunAtHead list"
+    ],
+    "cases_file": "task.319.dod.1.security.cases.3.json",
+    "cases_sha256": "7da26ad1ef437605f505b17bbbd236c64b9d24135e132f10e8b798e7b9b9ef6e"
+  },
+  {
+    "argv": [
+      "--sink",
+      "shell-exec",
+      "--entry",
+      "cli:shared/resources/finalise-rerun-at-head.js",
+      "--argv",
+      "[\"--doc\",\"{input}\",\"--out-dir\",\".claude/state/rerun\"]",
+      "--fixture-setup",
+      "shared/resources/tests/fixtures/security-probe/setup-git-repo.sh",
+      "--name",
+      "rerun-at-head listed-command match"
+    ],
+    "cases_file": "task.319.dod.1.security.cases.4.json",
+    "cases_sha256": "6d83136c4e67210073eb5b00c63651fdbcacb440d6d26ef2a268091d1f77cdde"
+  },
+  {
+    "argv": [
+      "--sink",
+      "path",
+      "--entry",
+      "shared/resources/security-probe.mjs#resolveEntry",
+      "--name",
+      "resolveEntry eslint form"
+    ],
+    "cases_file": "task.319.dod.1.security.cases.5.json",
+    "cases_sha256": "6fde78a00df44093a6deddff03dd778b6d1e6fe9fd7d81bbd6b74758630dc393"
+  },
+  {
+    "argv": [
+      "--sink",
+      "shell-exec",
+      "--entry",
+      "cli:shared/resources/security-probe.mjs",
+      "--argv",
+      "[\"--sink\",\"shell-exec\",\"--entry\",\"{input}\",\"--cases-file\",\"cases.json\",\"--repo-root\",\".\"]",
+      "--name",
+      "security-probe eslint entry"
+    ],
+    "cases_file": "task.319.dod.1.security.cases.6.json",
+    "cases_sha256": "f79440468a690879fdcd6eb56275c0590f0787c3587b51f047f3c6dbf8db16bf"
+  },
+  {
+    "argv": [
+      "--sink",
+      "template-render",
+      "--entry",
+      "shared/resources/ci-tree-equivalence.js#parseConfig",
+      "--name",
+      "ci.skipMarker"
+    ],
+    "cases_file": "task.319.dod.1.security.cases.7.json",
+    "cases_sha256": "56ddb26277a88a50ab30043c4e664f69bd34b280fb55337614add4c0505f64d4"
+  },
+  {
+    "argv": [
+      "--sink",
+      "template-render",
+      "--entry",
+      "shared/resources/ci-tree-equivalence.js#parsePipelineConfig",
+      "--name",
+      "pipeline.pushRecordCommits"
+    ],
+    "cases_file": "task.319.dod.1.security.cases.8.json",
+    "cases_sha256": "e6b46d8ca7b3a0fd86148792070a6372681e585720995c59d4689b06cd6ec8c7"
+  },
+  {
+    "argv": [
+      "--sink",
+      "shell-exec",
+      "--entry",
+      "shell-argv:shared/resources/tick-pr.sh",
+      "--argv",
+      "[\"merge\",\"--base\",\"develop\",\"--branch\",\"docs/roadmap-tick-1\",\"--pr\",\"1\",\"--quality-gate\",\"{input}\"]",
+      "--fixture-setup",
+      "shared/resources/tests/fixtures/security-probe/setup-git-repo.sh",
+      "--fake-gh",
+      "tests/fixtures/fake-gh",
+      "--name",
+      "tick-pr merge --quality-gate"
+    ],
+    "cases_file": "task.319.dod.1.security.cases.9.json",
+    "cases_sha256": "af14f7fb4d261b07c8e508b8fd6d3533b5a1b43656a9c51abe11834ed7e22fce"
+  }
+]

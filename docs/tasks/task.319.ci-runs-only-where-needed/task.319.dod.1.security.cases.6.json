@@ -1,0 +1,116 @@
+[
+  {
+    "id": "legit-engages",
+    "input": "eslint:src/a.js#no-eval",
+    "direction": "legitimate",
+    "why": "a rule that reports the hostile case and not the legitimate one",
+    "correct": "scored, engages",
+    "fixture": {
+      "files": {
+        "src/a.js": "export const a = 1;\n",
+        "gen/b.js": "export const b = 1;\n",
+        "eslint.config.js": "// probe\n",
+        "node_modules/eslint/package.json": "{\"name\":\"eslint\",\"main\":\"i.js\"}\n",
+        "node_modules/eslint/i.js": "class ESLint { constructor(o) { this.o = o; } async isPathIgnored(f) { return f.includes('/gen/'); } async calculateConfigForFile() { return { rules: { 'no-eval': [2], 'no-alert': [0] } }; } async lintText(t) { const m = []; if (t.includes('eval(')) m.push({ ruleId: 'no-eval', severity: 2, line: 1, message: 'eval can be harmful.' }); return [{ messages: m }]; } }\nmodule.exports = { ESLint, loadESLint: async () => ESLint };\n",
+        "cases.json": "[{\"id\":\"h\",\"direction\":\"hostile\",\"input\":\"eval(x);\"},{\"id\":\"l\",\"direction\":\"legitimate\",\"input\":\"const a = 1;\"}]\n"
+      }
+    },
+    "expected": {
+      "exit": 0
+    },
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:393"
+  },
+  {
+    "id": "hostile-rule-off",
+    "input": "eslint:src/a.js#no-alert",
+    "direction": "hostile",
+    "why": "a rule turned off filters nothing",
+    "correct": "never engages (absent, exit 1)",
+    "fixture": {
+      "files": {
+        "src/a.js": "export const a = 1;\n",
+        "eslint.config.js": "// probe\n",
+        "node_modules/eslint/package.json": "{\"name\":\"eslint\",\"main\":\"i.js\"}\n",
+        "node_modules/eslint/i.js": "class ESLint { constructor(o) { this.o = o; } async isPathIgnored(f) { return f.includes('/gen/'); } async calculateConfigForFile() { return { rules: { 'no-eval': [2], 'no-alert': [0] } }; } async lintText(t) { const m = []; if (t.includes('eval(')) m.push({ ruleId: 'no-eval', severity: 2, line: 1, message: 'eval can be harmful.' }); return [{ messages: m }]; } }\nmodule.exports = { ESLint, loadESLint: async () => ESLint };\n",
+        "cases.json": "[{\"id\":\"h\",\"direction\":\"hostile\",\"input\":\"eval(x);\"},{\"id\":\"l\",\"direction\":\"legitimate\",\"input\":\"const a = 1;\"}]\n"
+      }
+    },
+    "expected": {
+      "exit": 1
+    },
+    "spec_ref": "shared/resources/probe-boundary-rule.md:122"
+  },
+  {
+    "id": "hostile-unknown-rule",
+    "input": "eslint:src/a.js#no-evil",
+    "direction": "hostile",
+    "why": "a misspelt rule must not read as a control",
+    "correct": "declined, exit 1",
+    "fixture": {
+      "files": {
+        "src/a.js": "export const a = 1;\n",
+        "eslint.config.js": "// probe\n",
+        "node_modules/eslint/package.json": "{\"name\":\"eslint\",\"main\":\"i.js\"}\n",
+        "node_modules/eslint/i.js": "class ESLint { constructor(o) { this.o = o; } async isPathIgnored(f) { return f.includes('/gen/'); } async calculateConfigForFile() { return { rules: { 'no-eval': [2], 'no-alert': [0] } }; } async lintText(t) { const m = []; if (t.includes('eval(')) m.push({ ruleId: 'no-eval', severity: 2, line: 1, message: 'eval can be harmful.' }); return [{ messages: m }]; } }\nmodule.exports = { ESLint, loadESLint: async () => ESLint };\n",
+        "cases.json": "[{\"id\":\"h\",\"direction\":\"hostile\",\"input\":\"eval(x);\"},{\"id\":\"l\",\"direction\":\"legitimate\",\"input\":\"const a = 1;\"}]\n"
+      }
+    },
+    "expected": {
+      "exit": 1
+    },
+    "spec_ref": "shared/resources/probe-boundary-rule.md:174"
+  },
+  {
+    "id": "hostile-ignored-file",
+    "input": "eslint:gen/b.js#no-eval",
+    "direction": "hostile",
+    "why": "an ignored file is not linted",
+    "correct": "declined, exit 1",
+    "fixture": {
+      "files": {
+        "gen/b.js": "export const b = 1;\n",
+        "eslint.config.js": "// probe\n",
+        "node_modules/eslint/package.json": "{\"name\":\"eslint\",\"main\":\"i.js\"}\n",
+        "node_modules/eslint/i.js": "class ESLint { constructor(o) { this.o = o; } async isPathIgnored(f) { return f.includes('/gen/'); } async calculateConfigForFile() { return { rules: { 'no-eval': [2], 'no-alert': [0] } }; } async lintText(t) { const m = []; if (t.includes('eval(')) m.push({ ruleId: 'no-eval', severity: 2, line: 1, message: 'eval can be harmful.' }); return [{ messages: m }]; } }\nmodule.exports = { ESLint, loadESLint: async () => ESLint };\n",
+        "cases.json": "[{\"id\":\"h\",\"direction\":\"hostile\",\"input\":\"eval(x);\"},{\"id\":\"l\",\"direction\":\"legitimate\",\"input\":\"const a = 1;\"}]\n"
+      }
+    },
+    "expected": {
+      "exit": 1
+    },
+    "spec_ref": "shared/resources/probe-boundary-rule.md:174"
+  },
+  {
+    "id": "hostile-no-eslint",
+    "input": "eslint:src/a.js#no-eval",
+    "direction": "hostile",
+    "why": "no eslint installed under the root",
+    "correct": "declined eslint-unavailable, exit 1",
+    "fixture": {
+      "files": {
+        "src/a.js": "export const a = 1;\n",
+        "cases.json": "[{\"id\":\"h\",\"direction\":\"hostile\",\"input\":\"eval(x);\"},{\"id\":\"l\",\"direction\":\"legitimate\",\"input\":\"const a = 1;\"}]\n"
+      }
+    },
+    "expected": {
+      "exit": 1
+    },
+    "spec_ref": "shared/resources/probe-boundary-rule.md:175"
+  },
+  {
+    "id": "hostile-outside-root",
+    "input": "eslint:../x.js#no-eval",
+    "direction": "hostile",
+    "why": "leaves the root",
+    "correct": "declined outside-repo-root, exit 1",
+    "fixture": {
+      "files": {
+        "cases.json": "[{\"id\":\"h\",\"direction\":\"hostile\",\"input\":\"eval(x);\"},{\"id\":\"l\",\"direction\":\"legitimate\",\"input\":\"const a = 1;\"}]\n"
+      }
+    },
+    "expected": {
+      "exit": 1
+    },
+    "spec_ref": "shared/resources/probe-boundary-rule.md:170"
+  }
+]

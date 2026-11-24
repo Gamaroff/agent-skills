@@ -3,7 +3,7 @@
 **Task**: `task.319.ci-runs-only-where-needed.md`
 **Run Number**: 1
 **Started**: 2026-11-24 09:43
-**Status**: Escalated
+**Status**: In Progress
 **Report format**: 2
 
 ---
@@ -36,8 +36,8 @@ Push record-only commits with the next push that needs CI, add an opt-in skip ma
 | 2. review-task             | ⏭️ Skipped | `task.319.review.{N}.{name}.md` exists (or skip logged)                | Ready for Development + `review.2` exists | —                    | 2026-11-24T09:44Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 7 of 7 phases; `ci:fast` and `eval:all` green on `f87488f55` | —                    | 2026-11-24T10:51Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #937: https://github.com/Gamaroff/agent-skills/pull/937 | —                    | 2026-11-24T10:52Z |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.319.qa.{N}.*.md`; `task.319.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | `.summaries/step-5-post-fix-tracker-6.json` |                 |
-| 7. finalise                | ⏳ Pending | `task.319.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.319.qa.{N}.*.md`; `task.319.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 8 cycles; gate 8 PASS; PR review 2 APPROVE | `.summaries/step-5-post-fix-tracker-6.json` | 2026-11-24T22:20Z |
+| 7. finalise                | ⏳ Pending | `task.319.dod.{N}.*.md`; task `status: accepted`                       | Run 1 halted on 3 Definition of Done gaps (`dod.1`) | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -100,6 +100,10 @@ Push record-only commits with the next push that needs CI, add an opt-in skip ma
 - QA Cycle 6: gate 6 CONCERNS (80) over the files changed since gate 5; gate posted to PR #937 and issue #936. The session crashed while a reviewer ran; that one was started again (431 s and 579 s). Every gate finding reproduced with a control. Convergence check (from cycle 6): HIGH 0, not tripped. Loop route: continue (not-a-pass-gate; route 2 declined: product-defect-signal). CI on f0e45bb0e107: green. Budget test: N = 6 < 7, so one more fix.
 - QA Cycle 7: gate 7 PASS (100) over the files changed since gate 6; gate posted to PR #937 and issue #936 (`posted`). Two read-only reviewers (217 s and 1091 s); every finding reproduced with a control. Convergence check (from cycle 6): HIGH 0, 0, not tripped. Loop route: cosmetic-residue, seven lows carried. CI on d5ed9e499923: green. `qa-pre-5c`: push, `35e3a97a8`.
 - QA Cycle 7, 5c: `/review-pr --effort medium --comment --no-code` → CONCERNS, 10 findings, each checked against the head; `OPEN_COVERAGE=7`, so the REQUEST CHANGES arm; N = 7 = the budget → loop escalation, findings unfixed. Review posted to PR #937.
+- QA loop re-entry 2: 1 extra cycle granted by the owner ("grant another cycle"); 0 cycle(s) run outside the loop. Re-entered at 5b (budget 8, convergence counted from cycle 8). GitHub board: changes-requested → stage-disabled.
+- QA Cycle 7, qa-fix: findings read in-line from PR review 1 (`pr-review-current.js`: current); ingester and pre-fix map not dispatched, since the ten anchors were already read. Mutation proofs: none, no behaviour changed. Push: `qa-review-fix` → defer.
+- QA Cycle 8: gate 8 PASS (100), no open entry; route 1. Convergence check (from cycle 8): HIGH 0, not tripped. The reviewers ran on the staged tree before the commit; QA read the answers to the second one in-line. `qa-pre-5c`: push, `4005bbc73`.
+- QA Cycle 8, 5c: `/review-pr --effort medium --comment --no-code` → APPROVE, 1 low finding; `OPEN_COVERAGE=0`. Conformance lens 245 s. The finding is doc-only and fixed in the carry. Review comment on PR #937 updated in place. The loop ends.
 
 ---
 
@@ -166,6 +170,16 @@ The pipeline completed 7 cycles. The final gate read PASS, but Step 5c returned 
 2. Accepting the residual does not help: 5c would run again and find the same open coverage
 
 ---
+
+### Finalise: Definition of Done gaps — 2026-11-25
+
+`/finalise` run 1 did not accept the task. DoD file: `task.319.dod.1.ci-runs-only-where-needed.md`. CI reading 1: SUCCESS @ `4005bbc73`.
+
+- Criterion 10 (medium): the QA reports hold no red-first record for 45 of the new tests. The runs were made during `/finalise` and are in the DoD file; every test was red. They belong in a QA report.
+- Security (low): `ci.skipMarker` accepts U+0085 against "one printable line" (168 candidates executed, 1 reproduced).
+- Docs (low): `docs/reference/configuration.md` states a 60-second bound and two cases for a HALT's push; `push-held.sh` has 50 seconds and more cases.
+
+Fix-and-recheck does not apply (three sections fail). The security fix is a code change, so a resume re-enters QA at 5a (`reenter-qa-after-finalise.sh`), and `/finalise` runs again after it. 5c's carried set is committed with this report: no acceptance commit exists to carry it.
 
 ## QA Iteration History
 
@@ -296,7 +310,27 @@ _Track each QA review/fix cycle._
 **Traceability**: skipped (no Success Criteria table)
 **PR Review**: CONCERNS — task.319.pr-review.1.ci-runs-only-where-needed.md; 10 findings (4 medium, 6 low), 7 of them open coverage
 **Loop exit**: Cosmetic-residue exit taken — PASS gate at cycle 7 with HIGH 0 for cycles 6 and 7; all 7 open findings are LOW and are carried to the gate's recommendations.future by id (T319-CR-1201, T319-CR-1202, T319-CR-1203, T319-CR-1301, T319-CR-1302, T319-CR-1303, T319-CR-1304). This is a CLEAN exit, not a stall: nothing is blocked and nothing is being accepted over; a full qa-fix cycle for cosmetic findings is what this route exists to avoid.
-**Action**: Escalating — loop limit reached
+**Action**: Running qa-fix (cycle 7 of 8) — escalated at the loop limit via the PR review first; 1 cycle granted by the owner
+
+#### qa-fix (5b)
+
+**Fast gate**: attempt 1 green on an earlier state of the fixes; attempt 2 red (two push-site scan tests: two README rows reworded unasked, then restored); attempt 3 green on the tree committed as `5c0de1ea3`, 8889 tests, 8886 passed, 0 failed, 3 skipped
+**Evals**: `eval:all` green on a tree that differs by the two README rows
+**Pre-gate review**: two read-only reviews; 12 points, all fixed before the commit
+**Fixes Applied**: all 10 findings of PR review 1, and 7 more statements of the removed rule; documents and one header comment
+**Commit**: `5c0de1ea3`, not pushed (`qa-review-fix`: defer)
+**Comments**: fix summary on PR #937; tracker comment `qa-fix-7` on #936 (`posted`)
+
+### QA Cycle 8 — 2026-11-25
+**Gate Result**: PASS
+**Issues Found**: 0 — all 10 findings of PR review 1 fixed
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**Traceability**: skipped (no Success Criteria table)
+**PR Review**: APPROVE — task.319.pr-review.2.ci-runs-only-where-needed.md; 1 low finding (a CHANGELOG sentence), fixed here as doc-only
+**Carried to 6a**: docs/tasks/task.319.ci-runs-only-where-needed/task.319.pr-review.2.ci-runs-only-where-needed.md CHANGELOG.md
+**Loop exit**: n/a — this exit not taken (route 1, a clean gate)
+**Action**: Proceeding to 5c (PR conformance review)
 
 ---
 
