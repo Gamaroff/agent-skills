@@ -80,11 +80,15 @@ const CRITERION_REASONS = Object.freeze([
   "new-criterion",
   "criterion-changed",
   "ci-state", // a CI-state criterion: graded from each run's own CI reading, never carried
+  "rerun-at-head", // graded on a command run at one head (finalise-rerun-at-head.js), never carried
   "reported-gap",
   "evidence-changed",
   "evidence-unresolved",
   "unchanged",
 ]);
+
+// The test citation the AC prompt gives a criterion it graded on a re-run command.
+const RE_RERUN_CITATION = /^NOT_APPLICABLE: command re-run at the head\b/;
 
 // ── criteria ────────────────────────────────────────────────────────────────
 
@@ -391,6 +395,15 @@ function scopeOf(input, io) {
     // grades; an unresolved one still reads DEFERRED-CI.
     if (p.status === DEFERRED_CI || p.ci_reading) {
       rejudge.push({ id: c.id, reason: "ci-state" });
+      continue;
+    }
+    // A criterion graded on a command's run is graded on ONE head's run, and its citation is the DoD
+    // file, which the evidence rule below would read as unchanged (task 319).
+    if (
+      p.status === "PASS" &&
+      RE_RERUN_CITATION.test(String(p.test_citation))
+    ) {
+      rejudge.push({ id: c.id, reason: "rerun-at-head" });
       continue;
     }
     if (p.status !== "PASS") {

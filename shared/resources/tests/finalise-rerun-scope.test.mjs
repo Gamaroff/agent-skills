@@ -356,6 +356,23 @@ test("scope: a criterion added → new-criterion; reworded → criterion-changed
   }
 });
 
+test("scope: a PASS graded on a command re-run at the head → rerun-at-head, never carried (task 319)", () => {
+  const dir = mkRepo();
+  try {
+    const a = git(dir, "rev-parse", "HEAD");
+    const prior = record(dir, a, {
+      "SC-1": { test_citation: "NOT_APPLICABLE: command re-run at the head" },
+      "SC-2": { test_citation: "NOT_APPLICABLE: measured criterion" },
+    });
+    commit(dir, { "README.md": "unrelated\n" });
+    const s = scopeAt(dir, prior);
+    assert.equal(reasonOf(s, "SC-1"), "rerun-at-head");
+    assert.equal(reasonOf(s, "SC-2"), "unchanged");
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test("scope: a CI-state entry (resolved PASS or still deferred) → ci-state, never carried (task 249)", () => {
   const dir = mkRepo();
   try {

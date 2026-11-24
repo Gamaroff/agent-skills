@@ -1422,6 +1422,11 @@ module.exports = {
   defaultConfig,
   readConfig,
   readConfigAtCommit,
+  configTextAtCommit,
+  // The bounded runner and the working-tree check, for finalise-rerun-at-head.js (task.319).
+  spawnCheck,
+  killProcessGroup,
+  dirtyNonDocsPaths,
   settle,
   DEFAULT_CHECK_TIMEOUT_SECONDS,
   DEFAULT_SETTLE_SECONDS,

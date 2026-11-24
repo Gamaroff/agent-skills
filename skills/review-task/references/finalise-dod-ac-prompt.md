@@ -1,12 +1,12 @@
 ---
 name: finalise-dod-ac-prompt
-description: Explore subagent prompt for AC traceability, PR status, and documentation check in /finalise DoD parallel dispatch. Substitute <STORY_FILE>, <PR_NUMBER>, <STORY_TYPE>, <DIFF_FILE>, and <RERUN_SCOPE> before dispatching.
+description: Explore subagent prompt for AC traceability, PR status, and documentation check in /finalise DoD parallel dispatch. Substitute <STORY_FILE>, <PR_NUMBER>, <STORY_TYPE>, <DIFF_FILE>, <RERUN_SCOPE>, and <RERUN_AT_HEAD> before dispatching.
 ---
 <!-- AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/finalise-dod-ac-prompt.md. Regenerate via `npm run bundle`. -->
 
 # AC Traceability Check — Explore Subagent Prompt
 
-**Usage**: Dispatch as an Explore subagent from `/finalise` Steps 3–5 parallel dispatch. Substitute `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`, `<DIFF_FILE>`, and `<RERUN_SCOPE>` before sending.
+**Usage**: Dispatch as an Explore subagent from `/finalise` Steps 3–5 parallel dispatch. Substitute `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`, `<DIFF_FILE>`, `<RERUN_SCOPE>`, and `<RERUN_AT_HEAD>` before sending.
 
 ---
 
@@ -26,6 +26,16 @@ The caller computed this run's scope from the previous run's record (`finalise-r
 - **`mode: full`**: judge every criterion, exactly as Step 3 says.
 - **`mode: scoped`**: judge only the criteria under **Re-judge**, by Step 3's rules. For a `reported-gap` entry that lists members, re-check the members it names under `re-check members` and any member whose evidence moved since the prior head; return every member you judged in `members`. A `re-check members` entry you do not return counts as `FAIL`, and so does a re-judged criterion you do not return. When the criterion fails for a reason that is not a member (the execution rule, a test that does not cover it), state that reason in `non_member_fail`: the caller reads that field, never your `note`. A `FAIL` that sets it, or that names no failing member, stands whatever the members say; without it, a `FAIL` whose failing members are all carried or new on unchanged evidence is overturned. An entry that shows `prior non-member FAIL` names the reason the previous run gave: check whether it still holds. Copy each **Carry** criterion through unchanged.
 - **A problem you notice outside your scope** — in a carried criterion, a carried member, or a member no earlier run named whose evidence has not changed — goes in `advisories` with its evidence. It is reported to the reader and does not fail the run. The caller restores every carried verdict whatever you return, so an advisory is the only place such a finding is kept.
+
+### Step 0b: Read the commands re-run at the head
+
+The caller ran, on the head you are judging, every command the project lists in `finalise.rerunAtHead` that a criterion of this document names (finalise-rerun-at-head.js). The record, or `none`:
+
+```
+<RERUN_AT_HEAD>
+```
+
+When it is a path, read that `run.json` and, for each entry of `runs[]`, the `stdout` and `stderr` files it names. Each entry lists the criteria it answers (`criteria[].index` counts the criteria section from 1) and its `exit_code` (`null` means it did not finish). Step 3's **re-run criterion** says how to grade them. `none` means no listed command is named: every criterion keeps its own rule.
 
 ### Step 1: Read the story/task file
 
@@ -57,8 +67,8 @@ For each AC item extracted in Step 1:
 - An AC ticked complete with **no test written at all**. When the assertion was finally written it went **red immediately**, having concealed a live defect for the whole period it was assumed present.
 - A test written and cited, but placed in a **smoke/e2e directory excluded from the per-PR job** — so it would never have guarded the PR it was authored for.
 
-**Five kinds of criterion may carry `test_citation: "NOT_APPLICABLE: …"`, and only these five:**
-(the last of them, a CI-state criterion, is not graded here at all — task 249)
+**Six kinds of criterion may carry `test_citation: "NOT_APPLICABLE: …"`, and only these six:**
+(one of them, a CI-state criterion, is not graded here at all — task 249)
 
 - **"No unit tests applicable."** A task that says so explicitly (cite that line). Mark `PASS` with a note.
 - **A documentation criterion.** Its whole deliverable is what a document says — a CHANGELOG entry cites the work item, a reference doc is updated, a doc agrees with the code — not what code does. Classify by what the criterion *requires*, not how it is worded: if it can be stated as "file F says S", it is a documentation criterion; if meeting it needs code to do something when run, it is not. For a documentation criterion:
@@ -81,7 +91,12 @@ For each AC item extracted in Step 1:
   - `/finalise` Step 6 grades it from CI reading 1 — `SUCCESS` → PASS, `FAILURE` → FAIL, anything else leaves it deferred and the CI decision table decides. Until then it counts as **not met**, so a `DEFERRED-CI` you return can only lower `overall`, never raise it.
   - Only a criterion whose **whole** evidence is CI state takes this path. "The new test passes in CI" is a behaviour criterion: cite the test, and the execution rule covers the lane. "CI is green *and* the docs are updated" is two criteria; judge the doc half by its own path and say so in `note`.
 
-`test_runs_per_pr` is `null` on all five kinds: the execution rule reads a test lane, and none has a test in one. **A behaviour criterion never takes any of these paths**, and a bound a per-PR test could assert is a behaviour criterion. "Hard to test" is not "no unit tests applicable", and describing a behaviour in a document does not make it a documentation criterion. Before this rule existed, every run failed its CHANGELOG criterion for having no test and the orchestrator overrode it by hand; a check that is overridden on every run is not a check.
+- **A re-run criterion.** A criterion that an entry of Step 0b's `runs[]` lists. The run at the head is its evidence for what the command does; a figure recorded from an earlier commit (a QA report's, the gate's) is not, whichever way the two disagree.
+  - Grade what the criterion says of the command against that run: its exit status when the criterion only says it passes or is clean, its output when the criterion states what it must print. Read the saved files, never a summary of them.
+  - `code_citation` is the line of this run's DoD file that records it ("Commands re-run at the head"); `test_citation` is `"NOT_APPLICABLE: command re-run at the head"`, spelled so; `note` states the command, its exit status and the output line that decides it.
+  - `PASS` when the run meets the criterion. `FAIL` when it does not, when `exit_code` is `null`, or when `run.json`'s `head` is not the head under review. A criterion that also asks for something the command does not show is judged on the rest by its own rule, and the weaker verdict stands.
+
+`test_runs_per_pr` is `null` on all six kinds: the execution rule reads a test lane, and none has a test in one. **A behaviour criterion never takes any of these paths**, and a bound a per-PR test could assert is a behaviour criterion. "Hard to test" is not "no unit tests applicable", and describing a behaviour in a document does not make it a documentation criterion. Before this rule existed, every run failed its CHANGELOG criterion for having no test and the orchestrator overrode it by hand; a check that is overridden on every run is not a check.
 
 ### Step 4: Check documentation updates
 
