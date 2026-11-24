@@ -114,8 +114,10 @@ in the reference).
 
 ## Appendix: Phase 0 — who reads the remote after each push site
 
-Read at `0d5b5f71a`. The same table is the input of `push-policy.sh` (`SITES`); a step that starts
-reading the remote head changes its row there.
+Read at `0d5b5f71a`: the Phase 0 snapshot, kept as it was found. `push-policy.sh` started from it and has
+since changed: the HALT sites became one (`halt`) and `finalise-entry` was added. The current table is
+`bash shared/resources/push-policy.sh --list`; a step that starts reading the remote head changes its row
+there.
 
 | Site | Push (file:line) | First remote reader after it (file:line) | Must push before it |
 | --- | --- | --- | --- |

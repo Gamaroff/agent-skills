@@ -489,7 +489,7 @@ harm (a deleted branch, a CI reading in progress) or does not finish in 60 secon
 - **`ci.skipMarker`** is off by default. With `[skip ci]`, or the text your platform reads, the pipeline
   amends the subject of the commit it is about to push, and only when every path not yet on the remote
   is documentation by `ci.docsOnly.patterns` and an earlier commit of the branch has a green, settled
-  run. The head of a HALT is not marked: a person reads that PR next. **Leave it empty when a merge check needs a status on the head:** the platform reports none for a
+  run. A HALT's own push adds no marker: a person reads that PR next. **Leave it empty when a merge check needs a status on the head:** the platform reports none for a
   skipped run. `/finalise` and the merge gates then read the head through
   [the docs-only rule](#the-docs-only-ci-rule). Two settings switch it off, so a marked commit never
   decides the base branch's own run:

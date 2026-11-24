@@ -25,7 +25,7 @@ When compaction fires mid-pipeline:
 
 The agent has no token-count introspection, so the orchestrator cannot detect "compaction is about to fire" from inside its own turn. The only reliable signal is the Claude Code **`PreCompact` hook**, which executes a shell script before the harness summarises the conversation.
 
-The pause flow is therefore: a shell hook (independent execution budget, runs even when the agent is out of room) does the durable work — appends a pause entry to the report, commits and pushes, posts the PR and tracker-issue comments through the comment contract — and then injects a system-reminder back to the agent telling it to halt cleanly.
+The pause flow is therefore: a shell hook (independent execution budget, runs even when the agent is out of room) does the durable work — appends a pause entry to the report, commits it (pushed only under `pipeline.pushRecordCommits: eager`, and not always then), posts the PR and tracker-issue comments through the comment contract — and then injects a system-reminder back to the agent telling it to halt cleanly.
 
 ## Architecture overview
 
@@ -277,7 +277,7 @@ End-to-end test on a real task or story:
 1. Start `/develop-task <path>` on a small task. Confirm `.claude/state/develop-pipeline.lock` appears at end of Step 1.
 2. Mid-pipeline, manually invoke `/compact`. Confirm:
    - Report has a new "Paused — Context Compaction" entry.
-   - `git log -1` shows the pause commit; remote reflects it.
+   - `git log -1` shows the pause commit. Under `batched` (the default) the remote has not moved and the report entry reads `**Pushed:** no`; under `eager` the remote has the commit unless the hook names a hold.
    - PR has a "⏸️ Pipeline paused" comment.
    - GitHub issue (or Jira via MCP after agent processes signal) has matching comment.
    - Agent outputs the pause banner + summary and halts.

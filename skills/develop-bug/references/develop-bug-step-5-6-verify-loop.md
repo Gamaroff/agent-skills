@@ -55,7 +55,7 @@ Run the bug-appropriate verification signals, in order. **All must pass** for a 
 
 > Standard vs lite: in lite mode (`Minor`/`Trivial` + `Low`/`Medium` only — see Phase 0c), run signals 1 + 2 and skip signal 3. `Blocker`/`Critical`/`Major` bugs always run all three.
 
-**No verify cycle waits on CI.** The PR's CI run is not a signal here: each fix cycle pushes, CI runs in the background as information, and a pending, cancelled or environmentally failing run neither blocks nor fails a cycle. **CI green is required exactly once, on the final commit, at `/finalise`** (`/finalise --bug`, Step 7 — CI readings 1 and 2). This is the same rule as the story/task QA loop's §"CI and the QA loop" in `shared/resources/develop-pipeline-step-5-6-qa-loop.md`; this file is skill-native, so it states the rule itself. The reason is cost: on a single shared runner a per-cycle wait turns into hours, and an environmental CI failure then blocks a loop with nothing to fix.
+**No verify cycle waits on CI.** The PR's CI run is not a signal here: each fix cycle pushes unless `push-policy.sh` answers `defer`, CI runs in the background as information, and a pending, cancelled or environmentally failing run neither blocks nor fails a cycle. **CI green is required exactly once, on the final commit, at `/finalise`** (`/finalise --bug`, Step 7 — CI readings 1 and 2). This is the same rule as the story/task QA loop's §"CI and the QA loop" in `shared/resources/develop-pipeline-step-5-6-qa-loop.md`; this file is skill-native, so it states the rule itself. The reason is cost: on a single shared runner a per-cycle wait turns into hours, and an environmental CI failure then blocks a loop with nothing to fix.
 
 Determine the verdict:
 
@@ -287,7 +287,7 @@ Exit the loop and proceed to Step 7.
    > `evals/shared/tests/ci-gate-parity.test.mjs` now asserts all three loop documents carry it, so
    > the next one cannot drift out silently.
 
-4. **Commit + push (exclude the report)** — Step 8 owns the sole report commit:
+4. **Commit, and push unless deferred (exclude the report)** — Step 8 owns the sole report commit:
    ```bash
    git reset HEAD -- '**/*.implementation.*.md' 2>/dev/null || true
    ```

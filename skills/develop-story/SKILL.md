@@ -114,7 +114,7 @@ find {story-directory} -maxdepth 1 -name "story.{P}.{E}.{S}.implementation.*.md"
 
 This complements the post-compaction recovery above. **Pre**-compaction graceful pause requires the `PreCompact` hook to be installed (see Setup section at the top of this file). When the hook fires:
 
-1. The hook itself appends a "Pipeline Paused" entry to the implementation report, commits, pushes, and posts a PR/issue comment — all best-effort, all done before compaction proceeds.
+1. The hook itself appends a "Pipeline Paused" entry to the implementation report, commits it (pushed only under `pipeline.pushRecordCommits: eager`), and posts a PR/issue comment — all best-effort, all done before compaction proceeds.
 2. The hook emits `🛑 PIPELINE-PAUSE-SIGNAL` as `additionalContext` to you, which appears as a `<system-reminder>` in your next turn.
 3. The hook **keeps** the lock file and marks it `paused` (2026-11); the `Stop` hook allows the halt below while the mark is set. A second compaction before any lock write records nothing new.
 
@@ -246,7 +246,7 @@ See `references/develop-pipeline-step-4-create-pr.md` for the full Step 4 protoc
 
 ### Step 5–6: QA Review / Fix Loop
 
-See `references/develop-pipeline-step-5-6-qa-loop.md` for the full Steps 5–6 protocol: QA cycle counter setup, gate file location, QA skill invocation (with lite mode directive), PASS/CONCERNS/FAIL branching, no-code-change HALT, qa-fix invocation, commit/push per cycle, escalation entry, and loop limit HALT message.
+See `references/develop-pipeline-step-5-6-qa-loop.md` for the full Steps 5–6 protocol: QA cycle counter setup, gate file location, QA skill invocation (with lite mode directive), PASS/CONCERNS/FAIL branching, no-code-change HALT, qa-fix invocation, at most one push per cycle (`push-policy.sh` decides it), escalation entry, and loop limit HALT message.
 
 **The loop's exit gate is Step 5c — `/review-pr`, not the QA gate.** A gate that reads `PASS` or
 `WAIVED` hands to 5c, which runs `/review-pr --effort {medium|low} --comment --no-code` over the open PR —

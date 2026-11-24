@@ -8,7 +8,8 @@
 #      mid-flow by the harness (SIGTERM/timeout) leaves recoverable resume state for
 #      the Phase 0b resume detector
 #   1. Appends a "Paused — Context Compaction" entry to the implementation report
-#   2. Commits the report and pushes to remote (best-effort) — the push is held when
+#   2. Commits the report (best-effort). The commit is pushed only under
+#      `pipeline.pushRecordCommits: eager`, and even then held at steps 7 and 8 and when
 #      the report links to a path staged but not in the commit (a 5c carry)
 #   3. Posts a pause comment to the PR (best-effort) — through the access gate
 #      (`tracker_write`), opening with the plain-language lead for the
