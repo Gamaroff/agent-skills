@@ -31,10 +31,12 @@
  * that moves while they run, refuses too and leaves no run.json. The uncommitted documentation is listed
  * in the record, because a command that reads documentation read that. Two more are let through: an
  * untracked file under `.claude/state/`, the pipelines' own state, this engine's output included, which a
- * consumer need not ignore; and the work item's own DoD records beside it, by the names /finalise writes
- * (listed with the documentation: a project whose patterns are Markdown only would refuse its own ac.json
- * on a resume). So a sparse checkout that leaves code out is refused: its working tree is not the head. A
- * submodule that was never checked out is an empty directory, and is let through.
+ * consumer need not ignore; and the work item's own records beside it, by the names the pipeline writes
+ * (its DoD records, and the reports and gates that wait for the acceptance commit; listed with the
+ * documentation, because a project's patterns may leave them out). So a sparse checkout that leaves code
+ * out is refused: its working tree is not the head. A submodule that was never checked out is an empty
+ * directory, and is let through; one at another commit, or with an edit inside it, is refused wherever it
+ * is, because a submodule is never documentation.
  *
  * WHAT THAT DOES NOT SEE. A path git ignores, by any of its ignore files. A content filter or line-ending
  * rule is applied as git applies it, so a file that differs only by one is the head's. Nothing is watched
@@ -44,12 +46,14 @@
  * criterion says what the command must do, and the AC agent grades the saved run against it.
  *
  * WHAT BOUNDS IT. --timeout-seconds is the budget of the WHOLE run, not of each command: a command that
- * reaches it is killed, and one that would start after it is recorded as not started. The engine copies a
- * command's output itself and keeps at most --max-output-bytes of each stream: one that passes it is
- * stopped (`stopped_for_size`) unless it had already ended by itself (`output_capped` covers both).
- * Nothing it started can grow the saved output afterwards. A kill reaches the command's process group: a
- * descendant that left it (`setsid`, a daemon, and coreutils' `timeout`, which makes a group of its own)
- * is not killed, and runs on after the bound without a place to write.
+ * reaches it is killed, and one that would start after it is recorded as not started. A command writes to
+ * an unnamed temporary file per stream, and at most --max-output-bytes of each is saved: one that passes
+ * the bound is stopped (`stopped_for_size`) unless it had already ended by itself (`output_capped` covers
+ * both). Nothing it started can grow the saved output afterwards. A command that writes over what it
+ * printed (`> /dev/stderr`, `tee /dev/stderr`) has `output_overwritten`: what is saved is not whole. A kill reaches the command's process
+ * group: a descendant that left it (`setsid`, a daemon, and coreutils' `timeout`, which makes a group of
+ * its own) is not killed. It runs on after the bound, and what it still writes takes space in the
+ * temporary directory until it ends.
  *
  * Usage:
  *   finalise-rerun-at-head.js --doc <path> --out-dir <dir> [--workspace-root <dir>]
@@ -57,8 +61,8 @@
  *
  *   --out-dir is emptied of an earlier run's record first, so a file in it is always this run's.
  *   It writes <n>.stdout, <n>.stderr, run.json: { document, head, uncommitted_docs, runs: [{ command,
- *   criteria, exit_code, timed_out, not_started, stopped_for_size, output_capped, stdout, stderr }] }, and
- *   run.md, the block for the DoD running summary. The --json answer carries `document` too: the work
+ *   criteria, exit_code, timed_out, not_started, stopped_for_size, output_capped, output_overwritten,
+ *   stdout, stderr }] }, and run.md, the block for the DoD running summary. The --json answer carries `document` too: the work
  *   item's file name, which finalise-rerun-scope.js holds against its own --doc.
  *
  * reason / exit:
@@ -66,17 +70,24 @@
  *   none-named      0  the list is set and no criterion names an entry of it
  *   not-configured  0  finalise.rerunAtHead is absent or an empty list
  *   dirty-tree      1  the working tree is not the head, or stopped being it; no record is kept
- *   scan-broken     1  the document or its criteria section could not be read
+ *   scan-broken     1  the document or its criteria section could not be read, or a listed command stands on
+ *                      an unindented line of a criterion, which the criteria reader does not return
  *   failed          1  the engine itself failed (a file it could not write, git); no record is kept
  *   usage           2  bad arguments, or a configuration that cannot be read as a list of commands
  */
 
 const crypto = require("node:crypto");
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const { parseYamlSubset } = require("./yaml-subset.js");
-const { readCriteriaEntries } = require("./criteria-section.js");
+const {
+  RE_CHECKBOX,
+  RE_NUMBERED,
+  criteriaSection,
+  readCriteriaEntries,
+} = require("./criteria-section.js");
 const {
   UsageError,
   assertBlockRows,
@@ -97,7 +108,7 @@ const OWN_FILE = /^(\d+\.(stdout|stderr)|run\.(json|md))$/;
 const EXCERPT_LINES = 20;
 const EXCERPT_CHARS = 4000;
 const EXCERPT_BYTES = 64 * 1024;
-const DRAIN_MS = 1000; // how long a stream held open by a descendant is read after the command ended
+const WATCH_MS = 20; // how often the size of a running command's output is read
 const USAGE =
   "usage: finalise-rerun-at-head.js --doc <path> --out-dir <dir> [--workspace-root <dir>] [--timeout-seconds <n>] [--max-output-bytes <n>] [--json]";
 
@@ -255,46 +266,58 @@ function namedCommands(list, criteria) {
     .filter((r) => r.criteria.length > 0);
 }
 
+// A line that starts a block of its own, and so does not continue the paragraph above it.
+const RE_BLOCK_START =
+  /^(?:#|>|`{3}|~{3}|[-*+]\s|\d+[.)]\s|<|\||-{3,}\s*$|\*{3,}\s*$|_{3,}\s*$|={3,}\s*$)/;
+
 /**
- * Copy a command's output into `files` ([stdout, stderr]), at most `maxBytes` of each. The command gets
- * pipes and never the files, so nothing it leaves running can write to them (T319-CR-405).
+ * The first criterion that names a listed command only by way of a lazy continuation: an unindented line
+ * directly under it, which Markdown renders as part of it and the criteria reader ends it at. `null` when
+ * there is none. Read past, the command would not be run and nothing would say so (T319-CR-605).
  */
-function copyOutput(child, files, maxBytes) {
-  const streams = [child.stdout, child.stderr].filter(Boolean);
-  const fds = files.map((f) => fs.openSync(f, "w"));
-  const state = { capped: false, stopped: false, failed: null };
-  const ended = streams.map(
-    (s, i) =>
-      new Promise((resolve) => {
-        let room = maxBytes;
-        s.on("close", resolve);
-        s.on("error", resolve);
-        s.on("data", (chunk) => {
-          try {
-            if (room > 0) fs.writeSync(fds[i], chunk.subarray(0, room));
-          } catch (e) {
-            state.failed = state.failed || e;
-          }
-          room -= chunk.length;
-          if (room >= 0 || state.capped) return;
-          state.capped = true;
-          state.stopped = child.exitCode === null && child.signalCode === null;
-          killProcessGroup(child.pid);
-        });
-      }),
-  );
-  state.drain = async () => {
-    let timer;
-    const late = new Promise((resolve) => {
-      timer = setTimeout(resolve, DRAIN_MS);
-    });
-    await Promise.race([Promise.all(ended), late]);
-    clearTimeout(timer);
-    for (const s of streams) s.destroy();
-    for (const fd of fds) fs.closeSync(fd);
-    if (state.failed) throw state.failed;
-  };
-  return state;
+function lazilyNamed(list, body, texts) {
+  let inItem = false; // an indented line belongs to the last criterion
+  let open = false; // and so does an unindented one: no blank line stands between
+  const whole = [];
+  for (const line of criteriaSection(body).split("\n")) {
+    const m = RE_CHECKBOX.exec(line) || RE_NUMBERED.exec(line);
+    if (m) {
+      whole.push(m[1]);
+      inItem = true;
+      open = true;
+    } else if (line.trim() === "") open = false;
+    else if (/^\s/.test(line) ? inItem : open && !RE_BLOCK_START.test(line)) {
+      whole.push(`${whole.pop()} ${line.trim()}`);
+      open = true;
+    } else {
+      inItem = false;
+      open = false;
+    }
+  }
+  const count = (text, command) =>
+    codeSpans(text).filter((s) => s === command).length;
+  for (const [i, text] of whole.entries())
+    for (const command of list)
+      if (count(text, command) > count(texts[i], command))
+        return { index: i + 1, command };
+  return null;
+}
+
+/** Copy `size` bytes of the open file `from`, starting at byte `start`, into `to`. */
+function copyBytes(from, to, start, size) {
+  const buf = Buffer.alloc(64 * 1024);
+  const out = fs.openSync(to, "w");
+  try {
+    for (let done = 0; done < size;) {
+      const want = Math.min(buf.length, size - done);
+      const got = fs.readSync(from, buf, 0, want, start + done);
+      if (got === 0) break;
+      fs.writeSync(out, buf, 0, got);
+      done += got;
+    }
+  } finally {
+    fs.closeSync(out);
+  }
 }
 
 async function runOne(
@@ -307,22 +330,61 @@ async function runOne(
   for (const f of [stdout, stderr]) fs.writeFileSync(f, "");
   const left = deadline - Date.now();
   let r = null;
-  let copy = null;
+  let overBound = false; // it passed the bound while it ran, and was killed for it
+  let capped = false;
+  let overwritten = false;
   if (left > 0) {
-    // spawnCheck owns the command's process group: a timeout, or a signal to this engine, ends what the
-    // command started and not only its shell.
-    r = await spawnCheck("sh", ["-c", command], {
-      cwd: root,
-      stdio: ["ignore", "pipe", "pipe"],
-      timeout: left,
-      onSpawn: (child) => {
-        copy = copyOutput(child, [stdout, stderr], maxBytes);
-      },
+    // The command writes to a regular file, and not to a pipe: a program that exits with a pipe still
+    // full loses what is in it, and nothing says so (T319-CR-601). The file is outside the working tree
+    // and has no name once it is open, so what the command leaves running has no way to the record
+    // (T319-CR-405). A file has a loss of its own: a command that opens /dev/stdout or /dev/stderr again
+    // can cut off what it printed before. So the file starts with a random mark, and is opened for
+    // append: a mark that is gone says the output is not whole.
+    const mark = crypto.randomBytes(32);
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "rerun-at-head-"));
+    const fds = ["out", "err"].map((f) => {
+      const fd = fs.openSync(path.join(dir, f), "ax+");
+      fs.writeSync(fd, mark);
+      return fd;
     });
-    killProcessGroup(r.pid);
-    if (copy) await copy.drain();
+    fs.rmSync(dir, { recursive: true, force: true });
+    const starts = (fd) => {
+      const head = Buffer.alloc(mark.length);
+      fs.readSync(fd, head, 0, head.length, 0);
+      return head.equals(mark) ? mark.length : 0;
+    };
+    const sizes = () => fds.map((fd) => fs.fstatSync(fd).size - mark.length);
+    let watch = null;
+    try {
+      // spawnCheck owns the command's process group: a timeout, or a signal to this engine, ends what
+      // the command started and not only its shell.
+      r = await spawnCheck("sh", ["-c", command], {
+        cwd: root,
+        stdio: ["ignore", ...fds],
+        timeout: left,
+        onSpawn: (child) => {
+          watch = setInterval(() => {
+            if (overBound || !sizes().some((s) => s > maxBytes)) return;
+            overBound = true;
+            killProcessGroup(child.pid);
+          }, WATCH_MS);
+        },
+      });
+      killProcessGroup(r.pid);
+      // One reading of the sizes, after the kill: what the record holds and what it says agree.
+      const begin = fds.map(starts);
+      overwritten = begin.includes(0);
+      const kept = sizes().map((s, i) => s + mark.length - begin[i]);
+      capped = kept.some((s) => s > maxBytes);
+      [stdout, stderr].forEach((f, i) =>
+        copyBytes(fds[i], f, begin[i], Math.min(kept[i], maxBytes)),
+      );
+    } finally {
+      clearInterval(watch);
+      for (const fd of fds) fs.closeSync(fd);
+    }
   }
-  const stopped = Boolean(copy && copy.stopped && r.signal);
+  const stopped = Boolean(overBound && r.signal);
   return {
     command,
     criteria,
@@ -333,7 +395,8 @@ async function runOne(
     timed_out: Boolean(r && r.error && r.error.code === "ETIMEDOUT"),
     not_started: r === null,
     stopped_for_size: stopped,
-    output_capped: Boolean(copy && copy.capped),
+    output_capped: capped,
+    output_overwritten: overwritten,
     stdout,
     stderr,
   };
@@ -359,10 +422,13 @@ function excerpt(file) {
 
 function statusOf(r) {
   if (r.not_started) return "not started: the run's time budget was spent";
-  if (r.timed_out) return "timed out";
-  if (r.stopped_for_size) return "stopped: its output passed the bound";
-  const end = r.exit_code === null ? "did not finish" : `exit ${r.exit_code}`;
-  return r.output_capped ? `${end}, its output cut at the bound` : end;
+  let end = r.exit_code === null ? "did not finish" : `exit ${r.exit_code}`;
+  if (r.timed_out) end = "timed out";
+  if (r.stopped_for_size) end = "stopped: its output passed the bound";
+  else if (r.output_capped) end += ", its output cut at the bound";
+  return r.output_overwritten
+    ? `${end}, its output not whole: it overwrote /dev/stdout or /dev/stderr`
+    : end;
 }
 
 /** The DoD block: each run, with the tail of what it printed, fenced by more backticks than it holds. */
@@ -432,19 +498,25 @@ function parseArgs(argv) {
   return o;
 }
 
-/** git in `cwd`, with no object read through a replacement. */
+/** git in `cwd`, with no object read through a replacement. Its output is bytes: a path need not be UTF-8. */
 function gitIn(cwd, args, input) {
   return execFileSync("git", args, {
     cwd,
     env: { ...process.env, GIT_NO_REPLACE_OBJECTS: "1" },
     input,
-    encoding: "utf8",
     maxBuffer: 512 * 1024 * 1024,
     stdio: ["pipe", "pipe", "pipe"],
   });
 }
-const gitRows = (cwd, ...args) => gitIn(cwd, args).split("\0").filter(Boolean);
-const gitLine = (cwd, ...args) => gitIn(cwd, args).replace(/\r?\n$/, "");
+// One character per byte, so a name survives the trip to a string and back (T319-CR-607).
+const gitRows = (cwd, ...args) =>
+  gitIn(cwd, args).toString("latin1").split("\0").filter(Boolean);
+const gitLine = (cwd, ...args) =>
+  gitIn(cwd, args)
+    .toString("utf8")
+    .replace(/\r?\n$/, "");
+const bytes = (f) => Buffer.from(f, "latin1");
+const shown = (f) => bytes(f).toString("utf8");
 
 /** Does this checkout's filesystem keep a mode? Asked as `git init` asks it: a file, chmod, look. */
 function keepsModes(gitDir, io = fs) {
@@ -479,12 +551,14 @@ const asLine = (f) =>
     : f;
 
 /**
- * Every path of the checkout at `dir` that is not `commit`'s, as [{ file, known }] (`known`: the commit has
- * the path). Read from the commit's tree: the index and the configuration are never asked what changed.
- * The index itself is compared too, because a command can read it (`git ls-files`).
+ * Every path of the checkout at `dir` that is not `commit`'s, as [{ file, known, code }] (`known`: the
+ * commit has the path; `code`: it is a submodule or inside one, which no documentation pattern covers).
+ * Read from the commit's tree: the index and the configuration are never asked what changed. The index
+ * itself is compared too, because a command can read it (`git ls-files`). A path is a byte string in here
+ * (one character per byte), and text in the answer.
  */
 function differing(dir, commit, prefix = "") {
-  const at = (f) => path.join(dir, f);
+  const at = (f) => Buffer.concat([Buffer.from(`${dir}/`), bytes(f)]);
   const lstat = (f) => {
     try {
       return fs.lstatSync(at(f));
@@ -507,6 +581,8 @@ function differing(dir, commit, prefix = "") {
   const bad = new Set(
     gitRows(dir, "ls-files", "-z", "--others", "--exclude-standard"),
   );
+  const links = new Set();
+  for (const [f, { mode }] of tree) if (mode === "160000") links.add(f);
   const index = new Set();
   for (const row of gitRows(dir, "ls-files", "-z", "--stage")) {
     const [, mode, oid, stage, file] = /^(\d+) ([0-9a-f]+) (\d)\t([^]*)$/.exec(
@@ -514,6 +590,7 @@ function differing(dir, commit, prefix = "") {
     );
     const want = tree.get(file);
     index.add(file);
+    if (mode === "160000") links.add(file);
     if (!want || stage !== "0" || want.mode !== mode || want.oid !== oid)
       bad.add(file);
   }
@@ -539,8 +616,10 @@ function differing(dir, commit, prefix = "") {
       if (!s.isDirectory()) bad.add(f);
       else if (fs.readdirSync(at(f)).length > 0) {
         // in a directory that is no repository, this is the outer one's HEAD, which no entry can name
-        if (gitLine(at(f), "rev-parse", "HEAD") === oid)
-          inside.push(...differing(at(f), oid, `${prefix}${f}/`));
+        const sub = `${dir}/${shown(f)}`;
+        if (gitLine(sub, "rev-parse", "HEAD") === oid)
+          for (const d of differing(sub, oid, `${prefix}${shown(f)}/`))
+            inside.push({ ...d, code: true });
         else bad.add(f);
       }
     } else if (mode === "120000") {
@@ -564,33 +643,48 @@ function differing(dir, commit, prefix = "") {
     const ids = gitIn(
       dir,
       ["hash-object", ...flags, "--stdin-paths"],
-      `${left.map(asLine).join("\n")}\n`,
-    ).split("\n");
+      bytes(`${left.map(asLine).join("\n")}\n`),
+    )
+      .toString("latin1")
+      .split("\n");
     left = left.filter((f, i) => ids[i] !== tree.get(f).oid);
   }
   for (const f of left) bad.add(f);
   return [
     ...inside,
-    ...[...bad].sort().map((f) => ({ file: prefix + f, known: tree.has(f) })),
+    ...[...bad].sort().map((f) => ({
+      file: prefix + shown(f),
+      known: tree.has(f),
+      code: links.has(f),
+    })),
   ];
 }
 
-/** What /finalise writes beside the work item, after `<id>.dod.<N>.`. */
-const DOD_RECORD =
-  /^(?:[^/]+\.md|ac\.json|security\.(?:(?:plan|run)\.json|cases(?:\.\d+)?\.json|run\.json\.d\/[^/]+))$/;
+/**
+ * What the pipeline writes beside the work item, after `<id>.`: the DoD and security-probe records, and
+ * the reports, bug reports and gates that can stay uncommitted until the acceptance commit.
+ */
+const OWN_RECORD = new RegExp(
+  "^(?:" +
+    [
+      String.raw`dod\.\d+\.ac\.json`,
+      String.raw`(?:dod|qa)\.\d+\.(?:[^/]+\.)?security\.(?:(?:plan|run)\.json|cases(?:[.-][^/.]+)?\.json|run\.json\.d/[^/]+\.json)`,
+      String.raw`(?:dod|implementation|review|qa|pr-review|bug)\.\d+\.[^/]+\.md`,
+      String.raw`gate\.\d+\.[^/]+\.yml`,
+    ].join("|") +
+    ")$",
+);
 
-/** Is this path (from the repository's root) a DoD record of the work item `doc`, beside it? */
-function isOwnDodRecord(file, top, doc) {
+/** Is this path (from the repository's root) a record of the work item `doc`, beside it? */
+function isOwnRecord(file, top, doc) {
   const { id } = docId.parse(path.basename(doc));
   if (!id) return false;
   try {
     const dir = path.relative(top, fs.realpathSync(path.dirname(doc)));
-    const start = `${dir === "" ? "" : `${dir}/`}${id}.dod.`;
-    if (!file.startsWith(start)) return false;
-    const m = /^\d+\.(.*)$/.exec(file.slice(start.length));
+    const start = `${dir === "" ? "" : `${dir}/`}${id}.`;
     return (
-      m !== null &&
-      DOD_RECORD.test(m[1]) &&
+      file.startsWith(start) &&
+      OWN_RECORD.test(file.slice(start.length)) &&
       fs.lstatSync(path.join(top, file)).isFile()
     );
   } catch {
@@ -630,10 +724,14 @@ function compareWithHead({ git, root, head, patterns, outDir, doc }) {
     (file.startsWith(PIPELINE_STATE_DIR) ||
       (file.startsWith(outPrefix) &&
         OWN_FILE.test(file.slice(outPrefix.length))));
-  const rest = found.filter((d) => !own(d)).map((d) => d.file);
-  const bad = rest.filter(
-    (f) => !isDocsPath(f, patterns) && !isOwnDodRecord(f, top, doc),
-  );
+  const differs = found.filter((d) => !own(d));
+  const rest = differs.map((d) => d.file);
+  const bad = differs
+    .filter(
+      ({ file, code }) =>
+        code || (!isDocsPath(file, patterns) && !isOwnRecord(file, top, doc)),
+    )
+    .map((d) => d.file);
   return {
     why:
       bad.length > 0
@@ -686,12 +784,18 @@ async function run(argv) {
         message: "the document has no criteria the reader can find",
         ...base,
       };
-    const named = namedCommands(
-      list,
-      entries.map((e) =>
-        [e.line, ...e.continuation].filter(Boolean).join(" ").trim(),
-      ),
+    const texts = entries.map((e) =>
+      [e.line, ...e.continuation].filter(Boolean).join(" ").trim(),
     );
+    const lazy = lazilyNamed(list, body, texts);
+    if (lazy)
+      return {
+        reason: "scan-broken",
+        exitCode: 1,
+        message: `criterion #${lazy.index} names \`${lazy.command}\` on an unindented line, which is not read as part of it: indent the line`,
+        ...base,
+      };
+    const named = namedCommands(list, texts);
     if (named.length === 0)
       return { reason: "none-named", exitCode: 0, ...base };
 

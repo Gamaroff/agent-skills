@@ -194,13 +194,7 @@ Exit the loop and proceed to Step 7.
    `qa-cycle-{N}` stage carries — so it states it. Pass the same `{N}` as the `qa-cycle-{N}` that
    triggered this fix; the two comments then read as one round.
 
-3. **Check for actual changes**: run `git diff --stat HEAD`. If qa-fix made **no code edits**, do NOT increment the counter — log in Issues Log, push what the loop held (a HALT always pushes), and **HALT**:
-
-   ```bash
-   if [ "$(bash .agents/skills/develop-bug/references/push-policy.sh --site qa-halt)" != defer ]; then
-     git push origin HEAD
-   fi
-   ```
+3. **Check for actual changes**: run `git diff --stat HEAD`. If qa-fix made **no code edits**, do NOT increment the counter — log in Issues Log, and **HALT** (the terminal HALT block's `push-held.sh --site halt` sends out what the loop held):
 
    "qa-fix could not address the remaining failure. Human review required. See implementation report."
 
@@ -331,14 +325,7 @@ the fix has an unaddressed dependency, or the repro is environment-specific}
 2. {specific action}
 ```
 
-Set the report's Final Status to `Escalated`, leave the bug `reopened` (do NOT close), commit the report via `/commit-changes` (`docs({bug-prefix}): implementation report — fix loop escalation`), push it (a HALT always pushes, held commits included), then HALT:
-
-```bash
-bash .agents/skills/develop-bug/references/push-policy.sh --mark --site qa-escalation
-if [ "$(bash .agents/skills/develop-bug/references/push-policy.sh --site qa-escalation)" != defer ]; then
-  git push origin HEAD
-fi
-```
+Set the report's Final Status to `Escalated`, leave the bug `reopened` (do NOT close), commit the report via `/commit-changes` (`docs({bug-prefix}): implementation report — fix loop escalation`), then HALT (the terminal HALT block's `push-held.sh --site halt` sends it out, held commits included):
 
 ```
 ⚠️ Bug Fix Paused — Fix Loop Limit Reached

@@ -19,7 +19,8 @@
 #   if [ "$(bash references/push-policy.sh --site qa-cycle)" != defer ]; then git push origin HEAD; fi
 #
 # A `defer` loses nothing: `git push origin HEAD` sends every commit the branch is ahead by, so the
-# commit goes out with the next push, and the end of the run (Step 8, a HALT) always pushes.
+# commit goes out with the next push, and the end of the run (Step 8, or a HALT through push-held.sh)
+# pushes.
 #
 # THE SITE TABLE (below) is the input: one row per push site, its rule, and the remote reader that
 # forces the rule. A step that starts reading the remote head changes its row here, in one place.
@@ -57,11 +58,8 @@ SITES='pause	pause	none: the resume reads the local commit (qa-ci-read.sh report
 qa-cycle	delta	none before the next push: 5a reads the local tree; qa-ci-read.sh is advisory
 qa-review-fix	spent	none: the cycle'"'"'s push was used before 5c; the next cycle'"'"'s push carries it
 qa-pre-5c	reader	step-5-6 5c asserts the gate and QA report on origin/<branch>, and /review-pr diffs origin/<head>
-qa-halt	end	a person reads the PR after the HALT
-qa-escalation	end	a person reads the PR after the escalation
-halt	end	a person reads the PR after any terminal HALT (the HALT protocol of each develop pipeline)
+halt	end	a person reads the PR after any terminal HALT (push-held.sh, in the HALT protocol of each develop pipeline)
 finalise-entry	reader	/finalise takes CI reading 1 on the PR head, so a held commit must be on it first
-finalise-gaps	end	a person reads the PR after the DoD-gaps HALT
 finalise-accept	reader	/finalise 6b asserts the artefacts on origin/<branch>; 6c compares the PR head and reads CI on it
 finalise-fix	reader	/finalise re-takes CI reading 1 on the fix head
 step8	end	verify-push-state.sh, the develop-next merge gate and its head check read the remote

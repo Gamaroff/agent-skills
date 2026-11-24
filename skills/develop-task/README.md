@@ -352,7 +352,7 @@ sequenceDiagram
         H->>FS: write escalation entry<br/>(per-cycle summaries, root cause, next steps)
         H->>+CC: docs(task.{id}): implementation report — qa loop escalation
         CC-->>-H: hash
-        H->>GH: push-policy.sh --site qa-escalation → git push origin HEAD (a HALT always pushes)
+        H->>GH: push-held.sh --site halt (the one push of every HALT)
         H->>H: HALT — QA loop limit reached
         note right of H: resume offers "Resume the QA loop with {k} more cycles"<br/>(grant-qa-cycles.sh writes extra_cycles_granted, qa_max_cycles, convergence_from_cycle, qa_phase)
     end

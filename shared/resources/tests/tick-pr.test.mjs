@@ -453,6 +453,78 @@ test("resume: an interrupted tick is found again, locally or only on the remote,
   assert.equal((f.log().match(/gh pr create/g) ?? []).length, 1);
 });
 
+test("resume at the newer of the two tick branches, and at neither when they have parted (T319-CR-702)", (t) => {
+  // the tick branch on the remote, with `more` added to it there
+  const ticked = (more) => {
+    const f = fixture(t);
+    f.start();
+    f.commit();
+    f.open();
+    const local = git(f.wt, "rev-parse", TICK);
+    if (more) {
+      const other = join(f.dir, "other");
+      git(f.dir, "clone", "-q", "-b", TICK, f.up, other);
+      writeFileSync(join(other, "updated.md"), "x\n");
+      git(other, "add", "-A");
+      git(other, "commit", "-q", "-m", "update branch");
+      git(other, "push", "-q", "origin", "HEAD");
+    }
+    return { ...f, local, remote: () => git(f.up, "rev-parse", TICK) };
+  };
+  for (const from of [TICK, "develop"]) {
+    const behind = ticked(true);
+    git(behind.wt, "checkout", "-q", from);
+    assert.equal(behind.start().out, "resume", from);
+    assert.equal(git(behind.wt, "rev-parse", "HEAD"), behind.remote());
+    assert.equal(behind.open().out, "9", "the push is not rejected");
+  }
+  // control: the local branch holds more, and is kept
+  const ahead = ticked(false);
+  git(ahead.wt, "commit", "-q", "--allow-empty", "-m", "more");
+  const kept = git(ahead.wt, "rev-parse", "HEAD");
+  assert.equal(ahead.start().out, "resume");
+  assert.equal(git(ahead.wt, "rev-parse", "HEAD"), kept);
+  // each holds a commit the other does not: neither is dropped
+  const parted = ticked(true);
+  git(parted.wt, "commit", "-q", "--allow-empty", "-m", "own");
+  const own = git(parted.wt, "rev-parse", "HEAD");
+  const r = parted.start();
+  assert.equal(r.code, 1, r.out);
+  assert.match(r.err, /have diverged/);
+  assert.equal(git(parted.wt, "rev-parse", TICK), own);
+});
+
+test("the tick is pushed to its own branch whatever the push and tracking settings are (T319-CR-701)", (t) => {
+  const row = readFileSync(
+    resolve(HERE, "../../../skills/develop-next/SKILL.md"),
+    "utf8",
+  ).match(/cut the tick branch from the local base with `git ([^`]+)`/);
+  assert.ok(row, "develop-next says how the branch is cut");
+  const cut = row[1]
+    .replace("docs/<roadmap>-tick-<item>", TICK)
+    .replace("<baseBranch>", "develop")
+    .split(" ");
+  // as it says, and as an install of an older develop-next does it
+  for (const args of [cut, cut.filter((a) => a !== "--no-track")])
+    for (const setup of ["always", "inherit", "true", "false"]) {
+      const f = fixture(t);
+      git(f.wt, "config", "push.default", "upstream");
+      git(f.wt, "config", "branch.autoSetupMerge", setup);
+      const base = git(f.up, "rev-parse", "develop");
+      f.commit();
+      git(f.wt, ...args);
+      assert.equal(f.start().out, "resume");
+      assert.equal(f.open().out, "9", setup);
+      assert.equal(git(f.up, "rev-parse", "develop"), base, setup);
+      assert.equal(
+        git(f.up, "rev-parse", TICK),
+        git(f.wt, "rev-parse", TICK),
+        setup,
+      );
+    }
+  assert.ok(cut.includes("--no-track"));
+});
+
 test("bitbucket: the head is read again just before the merge call (T319-CR-109)", (t) => {
   const f = opened(t, { forge: "bitbucket" });
   // the PR's head moves once the poll has answered: the statuses are read, then the branch moves

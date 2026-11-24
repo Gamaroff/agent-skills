@@ -1182,9 +1182,9 @@ the contract, and this table is how the loop's push points name themselves to it
 | Step 3 below, a cycle that entered 5b from 5a | `qa-cycle` | `push` when the unpushed commits change code; `defer` when they are records only |
 | Before 5c, a cycle whose gate reached 5c from 5a (§5c routes 1, 2, 2b and 3) | `qa-pre-5c` | `push`: 5c reads the trail on the remote |
 | Step 3 below, a cycle that entered 5b from a 5c verdict | `qa-review-fix` | `defer`: the cycle's push was spent before 5c |
-| The no-code-change HALT (step 0 below) and the PR MERGED / CLOSED HALT (step 5 below) | `qa-halt` | `push`: the end of the run |
+| Any HALT of the loop (no code change, PR MERGED / CLOSED, escalation) | `halt`, through `push-held.sh` in the terminal HALT block | `push`: the end of the run |
 
-The escalation is a HALT too (`qa-escalation`). Log each `defer` in the Decisions Log. Never push both
+Log each `defer` in the Decisions Log. Never push both
 at step 3 and before 5c in one cycle, and do not create a separate
 `docs(...): QA cycle {N} gate + report` commit. The rule is about the **push**, not the commit: a
 review-driven cycle legitimately makes two commits (the pre-5c gate+report, then 5b's `fix(...)`), and
@@ -1248,18 +1248,10 @@ working tree, where a branch switch loses it and no reader of the PR ever sees i
    > in-flight CI run. **Cycle N's push is spent here.** On the review-driven re-entry, 5b commits
    > **without pushing**; the push happens once, on the next transition that leaves 5b.
 2. **The no-code-change HALT** (step 0 below) — HALTs before any commit. Commit the gate `.yml` and
-   QA report `.md` before halting, same message shape, and push once. The site always answers `push`:
-
-   ```bash
-   bash .agents/skills/{develop-story|develop-task}/references/push-policy.sh --mark --site qa-halt
-   if [ "$(bash .agents/skills/{develop-story|develop-task}/references/push-policy.sh --site qa-halt)" != defer ]; then
-     git push origin HEAD
-   fi
-   ```
-
-   The mid-loop PR MERGED / CLOSED HALT (step 5 below) pushes at the same site, after a `defer` at step 3
-   as after a push, and without the `--mark` line: the report has logged that head's hash, and a mark
-   amends it.
+   QA report `.md` before halting, same message shape. The terminal HALT block (the orchestrator's Error
+   Recovery Principles) sends them out: its `push-held.sh --site halt` is the one push of every HALT, this
+   one and the PR MERGED / CLOSED one (step 5 below) included. A second push here would re-create a branch
+   the forge deleted at merge, which that script never does (T319-CR-703).
 
 Those two, plus the convergence-stall and loop-limit escalations, are the **only** places a standalone `docs(...)`
 commit for the gate and QA report is correct — each because there is no `fix(...)` commit in that
@@ -1276,7 +1268,7 @@ After fixes are applied:
      reads is the clean one. If the path was omitted, re-invoke once with it before treating this as
      a HALT, and log the re-invocation.
    - Log in Issues Log: "QA Cycle {N}: qa-fix made no code changes — issues may be unfixable with current approach"
-   - **Commit this cycle's gate `.yml` and QA report `.md` first**, then push once — path 2's block above (`push-policy.sh --site qa-halt`). A HALT is a handover to a person: evidence left uncommitted is not on the PR they will read, and does not survive a branch switch. **Skip this when the cycle reached 5b via a 5c `REQUEST CHANGES` verdict** — it arrived through path 1, which already committed and pushed both files earlier in the same cycle, and repeating it produces an empty commit or a redundant push.
+   - **Commit this cycle's gate `.yml` and QA report `.md` first** — path 2 above; the terminal HALT block sends them out. A HALT is a handover to a person: evidence left uncommitted is not on the PR they will read, and does not survive a branch switch. **Skip this when the cycle reached 5b via a 5c `REQUEST CHANGES` verdict** — it arrived through path 1, which already committed and pushed both files earlier in the same cycle, and repeating it produces an empty commit or a redundant push.
    - HALT with: "qa-fix could not address the remaining issues. Human review required. See implementation report for details."
 
 0-stage. **Stage this cycle's evidence before the gate.** The fast gate's doc-links check reads the
@@ -1495,7 +1487,7 @@ After fixes are applied:
 
    Branch on `result.pr.state`:
    - `"OPEN"` → continue QA loop normally.
-   - `"MERGED"` or `"CLOSED"` → push what the loop held (the path 2 block **without its `--mark` line**: step 4 has logged the head's hash, and a mark amends it; `push-policy.sh --site qa-halt`), then HALT: "PR #{PR_NUMBER} was {state} mid-QA loop — pipeline cannot continue. Verify PR state and re-run if needed." Log in Issues Log.
+   - `"MERGED"` or `"CLOSED"` → HALT (its `push-held.sh --site halt` decides what may still go out): "PR #{PR_NUMBER} was {state} mid-QA loop — pipeline cannot continue. Verify PR state and re-run if needed." Log in Issues Log.
    - `null` / missing / empty (poller succeeded but state field absent) → log warning `"⚠️ PR state unknown after qa-fix push — re-polling once"`; re-invoke the poller once. If the second result is still null/missing, log `"⚠️ PR state could not be determined — proceeding optimistically (treating as OPEN)"` in Issues Log and continue. Do **not** HALT on null — flaky `gh pr view` is more common than mid-loop close.
    - `result.errors | length > 0` → log each error in Issues Log; treat `pr.state` per the rules above (the poller may still return a usable state alongside non-fatal errors).
 
@@ -2229,14 +2221,7 @@ Suggested commit message: `docs(story.{P}.{E}.{S}): implementation report — qa
 
 Suggested commit message: `docs(task.{id}): implementation report — qa loop escalation`
 
-Then push. A HALT always pushes, deferred record commits included:
-
-```bash
-bash .agents/skills/{develop-story|develop-task}/references/push-policy.sh --mark --site qa-escalation
-if [ "$(bash .agents/skills/{develop-story|develop-task}/references/push-policy.sh --site qa-escalation)" != defer ]; then
-  git push origin HEAD
-fi
-```
+The terminal HALT block sends it out, deferred record commits included (`push-held.sh --site halt`).
 
 #### develop-story HALT message
 

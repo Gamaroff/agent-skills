@@ -1850,6 +1850,11 @@ test("Bitbucket: an ancestor is read for the PR's own destination, given or read
     const unnamed = await ask([], own);
     assert.equal(unnamed.exit, 1);
     assert.equal(unnamed.reason, "unverifiable");
+    // and the answer says what was missing, where it was (T319-CR-604)
+    const missing = /destination branch is not known/;
+    assert.match(unnamed.detail, missing);
+    const red = await ask(BB_ASK.slice(3), [st("prs:**:develop", "FAILED")]);
+    assert.doesNotMatch(red.detail, missing);
     // another destination's statuses do not age this one's green (T319-CR-409)
     const fresh = { ...st("prs:**:main", "SUCCESSFUL"), updated_on: undefined };
     const aged = await ask(BB_ASK.slice(3), [own[0], fresh]);

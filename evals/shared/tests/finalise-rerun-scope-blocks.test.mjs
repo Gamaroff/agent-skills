@@ -201,7 +201,7 @@ test("Step 8a grades the re-run on the fix head again, output as well as exit co
   );
   assert.match(
     prompt,
-    /`FAIL` when it does not, when `exit_code` is `null`, when the criterion states what the command must print and `output_capped` is `true`/,
+    /`FAIL` when it does not, when `exit_code` is `null`, when the criterion states what the command must print and `output_capped` or `output_overwritten` is `true`/,
   );
 });
 

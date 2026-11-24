@@ -4,7 +4,7 @@
 **Bug ID**: TASK-319-BUG-3
 **Severity**: HIGH
 **Priority**: P1
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-11-24
 
@@ -53,3 +53,4 @@ Compare the working tree with the head tree itself, submodules included, with ev
 | Date | Status | Changed By | Notes |
 | --- | --- | --- | --- |
 | 2026-11-24 | Ready for QA | qa-fix | Fixed in QA cycle 3 |
+| 2026-11-24 | Closed | qa-task | Verified by task.319.qa.4.ci-runs-only-where-needed.md |

@@ -826,7 +826,7 @@ c.unref();
   assert.equal(statSync(one.stdout).size, 5000);
   spawnSync("sleep", ["1"]);
   assert.equal(statSync(one.stdout).size, 5000);
-  // it writes nothing and keeps the pipe: the engine returns with what the command printed
+  // it writes nothing and keeps the file open: the engine returns with what the command printed
   const quiet = leave("exec sleep 600");
   const [two] = quiet.run().rec.runs;
   assert.doesNotThrow(
@@ -889,7 +889,8 @@ test("only a file /finalise writes is a DoD record: code named like one is code 
     "task.9.dod.2.security.cases.json",
     "task.9.dod.2.security.cases.3.json",
     "task.9.dod.2.security.run.json",
-    "task.9.dod.2.security.run.json.d/1.stdout",
+    // what the security probe writes there: <key>.json, and nothing else
+    "task.9.dod.2.security.run.json.d/bce9b609488e.json",
   ])
     put(name);
   assert.equal(run().rec.reason, "ran");
@@ -905,6 +906,245 @@ test("only a file /finalise writes is a DoD record: code named like one is code 
   }
   symlinkSync("../../../count.txt", join(dir, at, "task.9.dod.3.ac.json"));
   assert.equal(run().rec.reason, "dirty-tree", "a link");
+});
+
+test("the reports and gates that wait for the acceptance commit are not code; a file named like one is (T319-CR-603)", (t) => {
+  const at = dirname(DOC);
+  const { dir, run } = fixture(t, {
+    config: `${LIST("echo a")}ci:\n  docsOnly:\n    patterns:\n      - "README.md"\n`,
+    criteria: ["`echo a` passes"],
+  });
+  const put = (name) => writeFileSync(join(dir, at, name), "x\n");
+  mkdirSync(join(dir, at, "task.9.qa.2.x.security.run.json.d"));
+  const records = [
+    "task.9.bug.1.x.md",
+    "task.9.dod.1.x.security.run.json",
+    "task.9.gate.2.x.yml",
+    "task.9.implementation.1.x.md",
+    "task.9.pr-review.1.x.md",
+    "task.9.qa.2.security.cases-held.json",
+    "task.9.qa.2.security.cases.json",
+    "task.9.qa.2.security.run.json",
+    "task.9.qa.2.x.md",
+    "task.9.qa.2.x.security.run.json",
+    "task.9.qa.2.x.security.run.json.d/ab.json",
+    "task.9.review.1.x.md",
+  ];
+  records.forEach(put);
+  const r = run();
+  assert.equal(r.rec.reason, "ran", r.rec.message);
+  assert.deepEqual(
+    r.rec.uncommitted_docs,
+    records.map((n) => `${at}/${n}`),
+  );
+  for (const name of [
+    "task.9.implementation.1.x.js",
+    "task.9.implementation.x.md",
+    "task.9.bug.1.x.sh",
+    "task.9.qa.2.x.security.run.json.d/evil.js",
+    "task.9.qa.2.x.json",
+    "task.9.gate.2.x.md.yaml",
+    "task.90.implementation.1.x.md",
+    "notes.md",
+  ]) {
+    put(name);
+    assert.equal(run().rec.reason, "dirty-tree", name);
+    rmSync(join(dir, at, name));
+  }
+});
+
+test("a submodule is never documentation: its commit, its entry and what is inside it (T319-CR-602)", (t) => {
+  const { dir, sub, run } = everything(t, {
+    config: 'ci:\n  docsOnly:\n    patterns:\n      - "docs/**"\n',
+  });
+  git(
+    dir,
+    "-c",
+    "protocol.file.allow=always",
+    "submodule",
+    "add",
+    "-q",
+    sub,
+    "docs/theme",
+  );
+  git(dir, "commit", "-q", "-m", "theme");
+  const theme = join(dir, "docs/theme");
+  const pinned = git(theme, "rev-parse", "HEAD");
+  assert.equal(run().rec.reason, "ran");
+  const refused = (what) => {
+    const r = run();
+    assert.equal(r.rec.reason, "dirty-tree", what);
+    assert.match(r.rec.message, /docs\/theme/, what);
+  };
+  git(theme, "commit", "-q", "--allow-empty", "-m", "moved");
+  refused("another commit checked out");
+  git(dir, "add", "docs/theme");
+  refused("and staged");
+  git(theme, "checkout", "-q", pinned);
+  refused("staged, and the checkout back at the head's");
+  git(dir, "reset", "-q");
+  writeFileSync(join(theme, "count.txt"), "0 broken\n");
+  refused("an edit inside");
+  git(theme, "checkout", "-q", "--", ".");
+  writeFileSync(join(theme, "new.md"), "x\n");
+  refused("an untracked file inside");
+  rmSync(join(theme, "new.md"));
+  assert.equal(run().rec.reason, "ran", "back as it was");
+  // an entry that only the head has
+  git(dir, "update-index", "--force-remove", "docs/theme");
+  refused("no longer in the index");
+  git(dir, "reset", "-q");
+  assert.equal(run().rec.reason, "ran", "back as it was");
+  // an entry that only the index has
+  git(
+    dir,
+    "update-index",
+    "--add",
+    "--cacheinfo",
+    `160000,${pinned},docs/theme2`,
+  );
+  refused("index only");
+  git(dir, "reset", "-q");
+  // control: an ordinary file beside it is documentation
+  writeFileSync(join(dir, "docs/note.md"), "x\n");
+  assert.deepEqual(run().rec.uncommitted_docs, ["docs/note.md"]);
+  // removed, its entry too: no untracked directory is left to say so
+  rmSync(theme, { recursive: true, force: true });
+  git(dir, "update-index", "--force-remove", "docs/theme");
+  refused("removed");
+});
+
+test("a command's output is saved whole when it exits with all of it just written (T319-CR-601)", (t) => {
+  const { dir, run } = fixture(t, {
+    config: LIST("node big.js"),
+    criteria: ["`node big.js` prints no ERROR"],
+  });
+  writeFileSync(
+    join(dir, "big.js"),
+    'for (const s of ["log", "error"]) { console[s]("x".repeat(2000000)); console[s]("ERROR"); }\nprocess.exit(0);\n',
+  );
+  git(dir, "add", "-A");
+  git(dir, "commit", "-q", "-m", "big");
+  const [one] = run().rec.runs;
+  assert.equal(one.exit_code, 0);
+  assert.equal(one.output_capped, false);
+  for (const f of [one.stdout, one.stderr]) {
+    const text = readFileSync(f, "utf8");
+    assert.equal(text.length, 2000007);
+    assert.ok(text.endsWith("\nERROR\n"));
+  }
+});
+
+test("a command that writes over its own output is recorded as having done so (T319-CR-601)", (t) => {
+  const go = (script) => {
+    const { dir, run } = fixture(t, {
+      config: LIST("sh chk.sh"),
+      criteria: ["`sh chk.sh` prints no ERROR"],
+    });
+    writeFileSync(join(dir, "chk.sh"), script);
+    git(dir, "add", "-A");
+    git(dir, "commit", "-q", "-m", "chk");
+    const { rec } = run();
+    return {
+      one: rec.runs[0],
+      out: readFileSync(rec.runs[0].stdout, "utf8"),
+      md: readFileSync(join(dirname(rec.runs[0].stdout), "run.md"), "utf8"),
+    };
+  };
+  const long = "echo ERROR; echo ".concat("y".repeat(200), "; ");
+  for (const script of [
+    "echo ERROR >&2; echo done > /dev/stderr\n",
+    "echo ERROR; echo x | tee /dev/stderr; : > /dev/stdout\n",
+    `${long}echo ok > /dev/stdout; ${long}\n`,
+    "echo ERROR; printf clean | dd of=/dev/stdout conv=notrunc 2>/dev/null\n",
+  ]) {
+    const r = go(script);
+    assert.equal(r.one.output_overwritten, true, script);
+    assert.match(r.md, /its output not whole/, script);
+  }
+  // control: appending to it, and writing to it in the ordinary way, keep every line in order
+  const r = go("echo one; echo ERROR >> /dev/stdout; echo two; echo e >&2\n");
+  assert.equal(r.one.output_overwritten, false);
+  assert.equal(r.out, "one\nERROR\ntwo\n");
+  assert.doesNotMatch(r.md, /not whole/);
+});
+
+test("a listed command on an unindented line of a criterion is refused, not read past (T319-CR-605)", (t) => {
+  const read = (section, config = LIST("echo a")) => {
+    const { dir, run } = fixture(t, {
+      config,
+      criteria: ["`echo a` passes"],
+    });
+    writeFileSync(
+      join(dir, DOC),
+      `# T\n\n## Success Criteria\n\n${section}\n\n## Other\n\n- [ ] x\n\`echo a\`\n`,
+    );
+    return run().rec;
+  };
+  for (const [section, n] of [
+    ["- [ ] the links are clean:\n`echo a` passes", 1],
+    ["- [ ] first\n- [x] run `echo\na` first", 2],
+    ["1. the links\n   are clean\n\n   and more:\n`echo a`", 1],
+    ["- [ ] the links:\nthat is\n  `echo a`", 1],
+    ["- [ ] `echo a` passes, and then\n`echo a` again", 1],
+  ]) {
+    const r = read(section);
+    assert.equal(r.reason, "scan-broken", section);
+    assert.match(r.message, new RegExp(`criterion #${n} names \`echo a\``));
+  }
+  // a line that starts a block of its own, or stands apart, is not part of the criterion
+  for (const section of [
+    "- [ ] `echo a` passes\nand so on",
+    "- [ ] `echo a` passes\n\nRun `echo a` with the server up.",
+    "Run `echo a` with the server up.\n\n- [ ] `echo a` passes",
+    "- [ ] `echo a` passes\n- `echo a` is in the list",
+    "- [ ] `echo a` passes\n### Notes on `echo a`",
+    "- [ ] `echo a` passes\n> `echo a`",
+    "- [ ] `echo a` passes\n| `echo a` | x |",
+    "- [ ] `echo a` passes\n---\nNote: `echo a`",
+  ])
+    assert.equal(read(section).reason, "ran", section);
+});
+
+test("CRLF line endings do not hide the criteria (T319-CR-606)", (t) => {
+  const { dir, run } = fixture(t, {
+    config: LIST("echo a"),
+    criteria: ["`echo a` passes"],
+  });
+  const doc = join(dir, DOC);
+  writeFileSync(doc, readFileSync(doc, "utf8").replaceAll("\n", "\r\n"));
+  const { rec } = run();
+  assert.equal(rec.reason, "ran", rec.message);
+  assert.deepEqual(rec.runs[0].criteria, [
+    { index: 1, text: "`echo a` passes" },
+  ]);
+});
+
+test("a file whose name is not UTF-8 is read by its bytes (T319-CR-607)", (t) => {
+  const { dir, run } = fixture(t, {
+    config: LIST("echo a"),
+    criteria: ["`echo a` passes"],
+  });
+  const odd = Buffer.concat([
+    Buffer.from(`${dir}/caf`),
+    Buffer.from([0xe9]),
+    Buffer.from(".js"),
+  ]);
+  try {
+    writeFileSync(odd, "1\n");
+  } catch {
+    t.skip("this filesystem takes UTF-8 names only");
+    return;
+  }
+  writeFileSync(join(dir, "café.js"), "1\n");
+  git(dir, "add", "-A");
+  git(dir, "commit", "-q", "-m", "odd");
+  assert.equal(run().rec.reason, "ran");
+  writeFileSync(odd, "2\n");
+  assert.match(run().rec.message, /: caf.\.js$/);
+  writeFileSync(odd, "1\n");
+  writeFileSync(join(dir, "café.js"), "2\n");
+  assert.match(run().rec.message, /: café\.js$/);
 });
 
 test("a tracked file under the pipeline's state directory is the head's, and its edit is not let through", (t) => {

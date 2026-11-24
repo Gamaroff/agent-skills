@@ -140,6 +140,14 @@ case "$CMD" in
       [ "$(git rev-list --count "refs/remotes/origin/$BASE..$ref")" -gt 0 ] || continue
       if landed "$ref"; then LANDED="$ref"; continue; fi
       if [ "$ref" = "refs/heads/$TICK_BRANCH" ]; then
+        # The remote branch can hold more (the forge's "Update branch"): resumed at the local commit, every
+        # push is rejected (T319-CR-702). The local branch holds nothing of its own then, so the next turn
+        # of this loop resumes at the remote's.
+        REMOTE_REF="refs/remotes/origin/$TICK_BRANCH"
+        if git rev-parse --verify --quiet "$REMOTE_REF^{commit}" >/dev/null && ! git merge-base --is-ancestor "$REMOTE_REF" "$ref"; then
+          git merge-base --is-ancestor "$ref" "$REMOTE_REF" && continue
+          halt "the local $TICK_BRANCH and origin's have diverged: keep one of them"
+        fi
         git checkout --quiet "$TICK_BRANCH" || halt "cannot check out $TICK_BRANCH"
       else
         git checkout --quiet -B "$TICK_BRANCH" "$ref" || halt "cannot check out $TICK_BRANCH"
@@ -165,7 +173,9 @@ case "$CMD" in
     [ "$(git symbolic-ref --short -q HEAD)" = "$TICK_BRANCH" ] || halt "HEAD is not on $TICK_BRANCH"
     [ "$(git rev-list --count "refs/remotes/origin/$BASE..HEAD")" -gt 0 ] || halt "$TICK_BRANCH has no tick commit over origin/$BASE"
     [ "$(bash "$HERE/push-policy.sh" --site tick)" != defer ] || halt "push-policy.sh deferred the tick push"
-    git push --quiet -u origin "$TICK_BRANCH" >&2 || halt "the push of $TICK_BRANCH was rejected"
+    # Both sides named: under push.default=upstream a bare name is pushed to the branch's upstream, which
+    # can be the base (T319-CR-701).
+    git push --quiet -u origin "refs/heads/$TICK_BRANCH:refs/heads/$TICK_BRANCH" >&2 || halt "the push of $TICK_BRANCH was rejected"
     if ! find_pr; then
       BODY="Records a merged work item. Documentation only; opened by tick-pr.sh (\`developNext.tickVia: pr\`)."
       if [ "$VCS" = bitbucket ]; then

@@ -1,0 +1,13 @@
+[
+  {"id":"space","input":" ","direction":"hostile","correct":"usage error","spec_ref":"shared/resources/push-held.sh:24"},
+  {"id":"unknown","input":"qa-cycle","direction":"hostile","correct":"usage error","spec_ref":"shared/resources/push-held.sh:24"},
+  {"id":"case","input":"HALT","direction":"hostile","correct":"usage error","spec_ref":"shared/resources/push-held.sh:24"},
+  {"id":"trailing-space","input":"halt ","direction":"hostile","correct":"usage error","spec_ref":"shared/resources/push-held.sh:24"},
+  {"id":"trailing-newline","input":"halt\n","direction":"hostile","correct":"usage error","spec_ref":"shared/resources/push-held.sh:24"},
+  {"id":"two","input":"halt finalise-entry","direction":"hostile","correct":"usage error","spec_ref":"shared/resources/push-held.sh:24"},
+  {"id":"glob","input":"*","direction":"hostile","correct":"usage error","spec_ref":"shared/resources/push-held.sh:24"},
+  {"id":"class","input":"hal[t]","direction":"hostile","correct":"usage error","spec_ref":"shared/resources/push-held.sh:24"},
+  {"id":"substitution","input":"$(touch probe)","direction":"hostile","correct":"usage error","spec_ref":"shared/resources/push-held.sh:24"},
+  {"id":"option","input":"--site","direction":"hostile","correct":"usage error","spec_ref":"shared/resources/push-held.sh:24"},
+  {"id":"legit-halt","input":"halt","direction":"legitimate","correct":"an answer, exit 0: no PR is recorded here","spec_ref":"shared/resources/push-held.sh:22"}
+]

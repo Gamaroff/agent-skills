@@ -290,7 +290,7 @@ test("performance: the measured task's push sequence, before and after", (t) => 
     ["pause", "docs/t/pause.2.md"],
     ["pause", "docs/t/pause.3.md"],
     ["qa-pre-5c", "docs/t/gate.3.md"],
-    ["finalise-gaps", "docs/t/gaps.md"],
+    ["halt", "docs/t/gaps.md"],
     ["finalise-accept", "docs/t/dod.md"],
     ["step8", "docs/t/report.md"],
   ];
@@ -349,11 +349,8 @@ test("a remote reader and an end push a record-only commit; a spent push holds c
     commit(wt, "docs/a.md");
     for (const id of [
       "qa-pre-5c",
-      "qa-halt",
-      "qa-escalation",
       "halt",
       "finalise-entry",
-      "finalise-gaps",
       "finalise-accept",
       "finalise-fix",
       "step8",
@@ -852,7 +849,7 @@ test("scan: an instruction to push in a pipeline step document's prose names its
   ]) {
     assert.equal(unguardedProse(`${s}\n`, ids).length, 1, s);
     assert.equal(
-      unguardedProse(`${s}\n\npush-policy.sh --site qa-halt\n`, ids).length,
+      unguardedProse(`${s}\n\npush-policy.sh --site qa-cycle\n`, ids).length,
       0,
       s,
     );
@@ -1211,12 +1208,7 @@ test("scan: a mark is asked only where the commit was just made, and these are a
     .sort();
   assert.deepEqual(found, [
     "SKILL.md finalise-accept",
-    "develop-bug-step-5-6-verify-loop.md qa-escalation",
-    "develop-bug-step-7-close-bug.md finalise-gaps",
-    "develop-pipeline-step-5-6-qa-loop.md qa-escalation",
-    "develop-pipeline-step-5-6-qa-loop.md qa-halt",
     "develop-pipeline-step-5-6-qa-loop.md qa-pre-5c",
-    "develop-pipeline-step-7-finalise.md finalise-gaps",
     "develop-pipeline-step-8-commit.md step8",
   ]);
   // /finalise 6a can meet a commit an earlier run made: the mark is in the arm that has just committed
@@ -1228,23 +1220,29 @@ test("scan: a mark is asked only where the commit was just made, and these are a
   assert.ok(accept.indexOf("git commit -m") < accept.indexOf("--mark"));
 });
 
-test("scan: a HALT inside the two fix loops, and the entry to /finalise, each name a push site (T319-CR-102, CR-106)", () => {
+test("scan: a HALT has one push, push-held.sh in the HALT block, and the entry to /finalise names its site (T319-CR-102, CR-106, CR-703)", () => {
   const read = (f) => readFileSync(join(ROOT, f), "utf8");
   const bug = "skills/develop-bug/references/develop-bug-step-";
   const pipe = "shared/resources/develop-pipeline-step-";
+  // the six HALTs that had a push of their own say what sends their commit out, and run nothing
+  for (const [file, from, to] of [
+    [`${bug}5-6-verify-loop.md`, "3. **Check for actual changes**", "3a."],
+    [`${bug}5-6-verify-loop.md`, "Final Status to `Escalated`", "⚠️ Bug Fix"],
+    [`${bug}7-close-bug.md`, "- DoD gaps found →", "⚠️ Finalise"],
+    [`${pipe}5-6-qa-loop.md`, "2. **The no-code-change HALT**", "Those two"],
+    [`${pipe}5-6-qa-loop.md`, '- `"MERGED"` or `"CLOSED"` →', "- `null`"],
+    [`${pipe}5-6-qa-loop.md`, "#### develop-task escalation commit", "####"],
+    [`${pipe}7-finalise.md`, "## If DoD Gaps Are Found", "⚠️ Finalise"],
+  ]) {
+    const text = read(file);
+    const a = text.indexOf(from);
+    const b = text.indexOf(to, a + from.length);
+    assert.ok(a >= 0 && b > a, `${file}: ${from}`);
+    const part = text.slice(a, b);
+    assert.match(part, /`push-held\.sh --site halt`/, `${file}: ${from}`);
+    assert.doesNotMatch(part, /git push|push-policy\.sh/, `${file}: ${from}`);
+  }
   for (const [file, from, to, id] of [
-    [
-      `${bug}5-6-verify-loop.md`,
-      "3. **Check for actual changes**",
-      "3a.",
-      "qa-halt",
-    ],
-    [
-      `${pipe}5-6-qa-loop.md`,
-      '- `"MERGED"` or `"CLOSED"` →',
-      "HALT:",
-      "qa-halt",
-    ],
     [`${bug}7-close-bug.md`, "## Part A", "Skill(finalise", "finalise-entry"],
     [
       `${pipe}7-finalise.md`,
@@ -1257,15 +1255,78 @@ test("scan: a HALT inside the two fix loops, and the entry to /finalise, each na
     const a = text.indexOf(from);
     const b = text.indexOf(to, a);
     assert.ok(a >= 0 && b > a, `${file}: ${from}`);
-    assert.match(text.slice(a, b), new RegExp(`--site ${id}\\b`), file);
+    const entry = text.slice(a, b);
+    assert.match(entry, new RegExp(`--site ${id}\\b`), file);
+    // the call outlives the tool's default timeout, and an answer that never came is not an answer
+    // (T319-CR-704)
+    const ms = Number(/tool\s+timeout of (\d+) ms/.exec(entry)?.[1]);
+    const bound = (name) =>
+      Number(new RegExp(`${name}[^\\n]*?(\\d+)`).exec(held)[1]);
+    const held = read("shared/resources/push-held.sh");
+    const needs = bound("finalise-entry\\) PUSH_SECONDS=") + bound(":-");
+    assert.ok(needs > 120 && ms >= needs * 1000, `${file}: ${ms}, ${needs} s`);
+    assert.match(entry, /no line at all/i, file);
   }
-  // the MERGED / CLOSED HALT comes after the head's hash was logged, and a mark amends the head (T319-CR-310)
-  const loop = read(`${pipe}5-6-qa-loop.md`);
-  const from = loop.indexOf('- `"MERGED"` or `"CLOSED"` →');
-  assert.match(
-    loop.slice(from, loop.indexOf("HALT:", from)),
-    /\*\*without its `--mark` line\*\*/,
-  );
+});
+
+test("a HALT says when it could not read the run's lock, and does not call it a run with no PR (T319-CR-705)", (t) => {
+  const held = join(RES, "push-held.sh");
+  const halt = (prepare, env = ENV) => {
+    const { wt, up, dir } = fixture(t);
+    installed(wt, "develop-task");
+    writeLock(wt);
+    commit(wt, "docs/gate.md");
+    const r = run("bash", [held, "--site", "halt"], {
+      cwd: wt,
+      env: prepare(wt, dir) ?? env,
+    });
+    assert.equal(r.status, 0, r.stderr);
+    return {
+      out: r.stdout.trim(),
+      pushed: remoteHead(up) === git(wt, "rev-parse", "HEAD"),
+    };
+  };
+  const unread = /^halt: not pushed — the pipeline lock could not be read/;
+  for (const [what, prepare] of [
+    [
+      "no jq",
+      (wt, dir) => {
+        mkdirSync(join(dir, "nojq"));
+        writeFileSync(join(dir, "nojq/jq"), "#!/bin/sh\nexit 127\n");
+        chmodSync(join(dir, "nojq/jq"), 0o755);
+        return { ...ENV, PATH: `${join(dir, "nojq")}:${process.env.PATH}` };
+      },
+    ],
+    ["not JSON", (wt) => void writeFileSync(join(wt, LOCK_FILE), "{")],
+    ["empty", (wt) => void writeFileSync(join(wt, LOCK_FILE), "")],
+    ["a list", (wt) => void writeFileSync(join(wt, LOCK_FILE), "[1]")],
+    ["null", (wt) => void writeFileSync(join(wt, LOCK_FILE), "null")],
+    ["two objects", (wt) => void writeFileSync(join(wt, LOCK_FILE), "{}{}")],
+  ]) {
+    const r = halt(prepare);
+    assert.match(r.out, unread, what);
+    assert.equal(r.pushed, false, what);
+  }
+  for (const [want, prepare] of [
+    [
+      "halt: kept local — there is no pipeline lock",
+      (wt) => rmSync(join(wt, LOCK_FILE)),
+    ],
+    [
+      "halt: kept local — no PR is recorded",
+      (wt) => writeLock(wt, { pr_url: "" }),
+    ],
+    [
+      "halt: kept local — no PR is recorded",
+      (wt) => writeLock(wt, { pr_url: null }),
+    ],
+    [
+      "halt: kept local — the checkout is not on the run's branch",
+      (wt) => writeLock(wt, { branch: undefined }),
+    ],
+    ["halt: pushed", () => {}],
+  ])
+    assert.equal(halt((wt) => void prepare(wt)).out, want);
 });
 
 test("scan: the detector flags an unlisted push and an unknown site (non-vacuity)", () => {

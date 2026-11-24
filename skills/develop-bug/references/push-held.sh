@@ -18,7 +18,7 @@
 #   commit-staged  (finalise-entry) commits are held and a set is staged that they may link to: commit the
 #                  staged set and nothing else, then run this again
 #   kept local     (halt) the held commits were left, and why
-#   not pushed     the remote could not be read, or the push failed or ran out of time, and why
+#   not pushed     the remote or the lock could not be read, or the push failed or ran out of time, and why
 #
 # Exit 0, except finalise-entry's `not pushed`, which exits 1: a reading there would be of another commit.
 # A HALT goes on whatever happened here, so `halt` never exits 1 and never waits longer than its bounds.
@@ -81,8 +81,13 @@ why() { # exit status, the bound in seconds
 
 BRANCH=$(git symbolic-ref --short -q HEAD)
 if [ "$SITE" = halt ]; then
-  [ -n "$(jq -r '.pr_url // empty' "$LOCK" 2>/dev/null)" ] || answer "kept local — no PR is recorded"
-  [ -n "$BRANCH" ] && [ "$(jq -r .branch "$LOCK" 2>/dev/null)" = "$BRANCH" ] \
+  # A lock that cannot be read is not a lock with no PR: the PR may be open, and the HALT must say so.
+  [ -e "$LOCK" ] || answer "kept local — there is no pipeline lock"
+  RUN=$(jq -ers 'if length == 1 and (.[0] | type) == "object" then .[0] else error end
+    | [.pr_url // "", .branch // ""] | @tsv' "$LOCK" 2>/dev/null) \
+    || refused "the pipeline lock could not be read (no jq, or not JSON)"
+  [ -n "${RUN%%$'\t'*}" ] || answer "kept local — no PR is recorded"
+  [ -n "$BRANCH" ] && [ "${RUN#*$'\t'}" = "$BRANCH" ] \
     || answer "kept local — the checkout is not on the run's branch"
 fi
 [ -n "$BRANCH" ] || refused "HEAD is detached"

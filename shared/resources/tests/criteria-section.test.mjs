@@ -97,4 +97,7 @@ test("continuation: indented lines up to the next criterion, heading or unindent
     { line: "Third, numbered.", continuation: ["its note"] },
   ]);
   assert.equal(cs.readCriteriaEntries("# x\n\n## Overview\n"), null);
+  // the same document with CRLF endings, and with both kinds (T319-CR-606)
+  assert.deepEqual(cs.readCriteriaEntries(body.replaceAll("\n", "\r\n")), e);
+  assert.deepEqual(cs.readCriteriaEntries(body.replace("\n- [", "\r\n- [")), e);
 });

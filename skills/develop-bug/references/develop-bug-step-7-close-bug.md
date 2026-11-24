@@ -16,7 +16,9 @@ Runs in full in **both lite and standard modes**.
 ### Push what the verify loop held
 
 `/finalise` takes CI reading 1 on the PR head while recording `HEAD`, so a commit still local would be
-accepted on a reading of another commit:
+accepted on a reading of another commit. Give the call a tool timeout of 600000 ms: the push
+waits up to 540 s for the project's own pre-push hook, and the default tool timeout ends the call before
+it answers:
 
 ```bash
 bash .agents/skills/develop-bug/references/push-held.sh --site finalise-entry
@@ -24,7 +26,8 @@ bash .agents/skills/develop-bug/references/push-held.sh --site finalise-entry
 
 `commit-staged`: a commit is held and something is staged that it may link to. Commit the staged set and
 nothing else through `/commit-changes` (`docs({bug-prefix}): records, ahead of finalise`), then run the
-block again. `not pushed` (exit 1): HALT with the line; `HEAD` is not on the PR. Any other line: go on.
+block again. `not pushed` (exit 1): HALT with the line; `HEAD` is not on the PR. No line at all: the call
+was cut off; run it again with that timeout, and HALT when it is cut off again. Any other line: go on.
 
 ### DO NOT inline this step
 
@@ -40,14 +43,7 @@ Do NOT write a DoD file directly or set any accepted/closed status without runni
 
 After finalise returns, read its output:
 - DoD satisfied → continue to Part B.
-- DoD gaps found → do **not** advance the lock (it stays at 7, where `/finalise` held it — task 222); log each gap in the Issues Log, commit the report via `/commit-changes` (`docs({bug-prefix}): implementation report — finalise gaps identified`), push it (a HALT always pushes, held commits included), and **HALT**:
-
-  ```bash
-  bash .agents/skills/develop-bug/references/push-policy.sh --mark --site finalise-gaps
-  if [ "$(bash .agents/skills/develop-bug/references/push-policy.sh --site finalise-gaps)" != defer ]; then
-    git push origin HEAD
-  fi
-  ```
+- DoD gaps found → do **not** advance the lock (it stays at 7, where `/finalise` held it — task 222); log each gap in the Issues Log, commit the report via `/commit-changes` (`docs({bug-prefix}): implementation report — finalise gaps identified`), and **HALT** (the terminal HALT block's `push-held.sh --site halt` sends it out, held commits included):
 
   ```
   ⚠️ Finalise identified Definition of Done gaps.

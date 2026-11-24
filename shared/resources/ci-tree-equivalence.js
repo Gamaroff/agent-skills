@@ -43,7 +43,7 @@
  * else on stdout. `changed` is capped at 200 entries; `changedCount` is the real length.
  * `--pr` is recorded in that payload for the caller's log. On Bitbucket it also names the pull request
  * whose destination branch filters the ancestors' statuses, unless `--destination` gives it; a destination
- * that cannot be read is `unverifiable`. With neither, every status of an ancestor counts.
+ * that cannot be read, or is named by neither, is `unverifiable`.
  * The local check's own output goes to stderr for that reason.
  *
  * Config (skills-config.yaml, every key optional):
@@ -1195,13 +1195,18 @@ async function run({
       (destination ??= Promise.resolve(
         args.destination || bitbucketDestination(bb, args.pr),
       ));
+    let noDestination = false;
     const rollupOf = async (sha) => {
       if (platform !== "bitbucket")
         return githubRollup(exec, root, sha, settleOpts);
       const dest = await destinationOf();
-      return dest === null
-        ? "UNKNOWN"
-        : bitbucketRollup({ ...bb, destination: dest, ...settleOpts }, sha);
+      if (dest !== null)
+        return bitbucketRollup(
+          { ...bb, destination: dest, ...settleOpts },
+          sha,
+        );
+      noDestination = true;
+      return "UNKNOWN";
     };
 
     if (ancestorShas === null && listError) {
@@ -1224,6 +1229,8 @@ async function run({
         patterns: cfg.patterns,
         enabled: cfg.enabled,
       });
+      if (noDestination && result.reason === REASONS.UNVERIFIABLE)
+        result.detail = `the pull request's destination branch is not known (--pr or --destination), so no ancestor's statuses were read; ${result.detail}`;
     }
 
     if (result.reason === REASONS.TREE_EQUIVALENT && cfg.checkCommand) {
