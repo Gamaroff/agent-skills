@@ -111,3 +111,21 @@ in the reference).
   repository with a bare remote; temp directories removed in `t.after`.
 - Extend `security-probe.test.mjs` and the ci-poll tests; add a develop-next tick test with a fake VCS.
 - `CI=true npm test` before the push.
+
+## Appendix: Phase 0 — who reads the remote after each push site
+
+Read at `0d5b5f71a`. The same table is the input of `push-policy.sh` (`SITES`); a step that starts
+reading the remote head changes its row there.
+
+| Site | Push (file:line) | First remote reader after it (file:line) | Must push before it |
+| --- | --- | --- | --- |
+| `pause` | `develop-pipeline-on-precompact.sh:432` | none: the resume reads the local commit. `qa-ci-read.sh:82,141` answers `HEAD_MISMATCH` (advisory) | no |
+| `qa-cycle` | `develop-pipeline-step-5-6-qa-loop.md:1466`; `develop-bug-step-5-6-verify-loop.md:295` | none before the next push: 5a reads the local tree; `qa-ci-read.sh` is advisory | only when the delta has code |
+| `qa-review-fix` | `develop-pipeline-step-5-6-qa-loop.md:1465` | none: the cycle's push was used before 5c | no |
+| `qa-pre-5c` | `develop-pipeline-step-5-6-qa-loop.md:1232` | `develop-pipeline-step-5-6-qa-loop.md:1586` (`git show origin/<branch>:<artifact>`); `skills/review-pr/SKILL.md:530` (`git diff origin/<base>...origin/<head>`) | yes |
+| `qa-halt`, `qa-escalation` | `develop-pipeline-step-5-6-qa-loop.md:1251`, `:2221` | a person reads the PR after the HALT | yes (end) |
+| `finalise-gaps` | `develop-pipeline-step-7-finalise.md:76` | a person reads the PR after the HALT | yes (end) |
+| `finalise-accept` | `skills/finalise/SKILL.md:2182` | `skills/finalise/SKILL.md:2264` (`git show origin/<branch>:<path>`), `:2292` (PR head), then the CI poll | yes |
+| `finalise-fix` | `skills/finalise/SKILL.md:3534` | CI reading 1 on the fix head | yes |
+| `step8` | `develop-pipeline-step-8-commit.md:118` | `verify-push-state.sh` (`:111`), then `skills/develop-next/SKILL.md:382` (`headRefOid`) | yes (end) |
+| `tick` | `skills/develop-next/SKILL.md:691,743,754`; `skills/develop-batch/SKILL.md:661,675` | the next run's resume reads the row on `origin/<base>` (`skills/develop-next/SKILL.md:193`) | yes |

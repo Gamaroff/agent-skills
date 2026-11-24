@@ -5,7 +5,7 @@ type: task
 description: "The develop pipelines push after almost every step, so a consumer's CI reruns unchanged code for every gate, report, pause and DoD commit. Push record-only commits with the next push that needs CI, add an opt-in skip marker for record-only heads, stop two finalise halts that are not defects, and close two Bitbucket gaps in the finalise CI poll and the develop-next tick."
 tags: [ci, push-policy, develop-pipeline, finalise, develop-next, bitbucket]
 category: infrastructure
-status: ready-for-development
+status: ready-for-review
 priority: High
 risk_level: medium
 created: 2026-11-24
@@ -18,7 +18,7 @@ github_issue: 936
 
 **GitHub Issue**: [#936](https://github.com/Gamaroff/agent-skills/issues/936)
 
-**Status:** Ready for Development
+**Status:** Ready for Review
 
 **Review**: ✅ All review recommendations from `task.319.review.2.ci-runs-only-where-needed.md` implemented 2026-11-24
 
@@ -91,9 +91,11 @@ The third row is the consumer's to fix, in its own CI configuration. The second 
 
 ### Benefits
 
-1. On the task above, about 9 record-only pushes become about 1, and about 140 runner-minutes become
-   about 16 (counted: pushes whose delta held only the paths in `ci.docsOnly.patterns`, and their PR
-   runs; the Performance criterion's test re-measures the push count).
+1. A record-only push that no step reads goes away: on the task above, the three pause pushes and any
+   record-only cycle. The modelled sequence goes from 9 pushes to 6 (measured by the Performance
+   criterion's test). The record-only pushes that stay each have a remote reader or end the run, and
+   `ci.skipMarker` is what stops their CI runs where the platform allows it. (An earlier draft
+   estimated 9 record-only pushes becoming about 1; the Phase 0 table does not support that.)
 2. A consumer on a metered runner pays only for runs that can find a defect.
 3. Fewer pushes cancel fewer in-flight runs, so each code commit keeps its own completed CI reading.
 4. Finalise halts only on a defect, not on its own bookkeeping.
@@ -255,51 +257,51 @@ assertion, and a test holds it (Phase 2).
 
 ### Phase 0: Who reads the remote (risk: low)
 
-- [ ] Re-run the search in § 3 and reconcile it with the site table
-- [ ] For each push site in § 3, record the next step that reads the remote head, with its `file:line`
+- [x] Re-run the search in § 3 and reconcile it with the site table
+- [x] For each push site in § 3, record the next step that reads the remote head, with its `file:line`
   witness, or "none before the next push". The readers include finalise's CI polls and
   `verify-push-state.sh`. This table is the helper's input
 
 ### Phase 1: The push-policy helper (risk: medium)
 
-- [ ] `shared/resources/push-policy` with `push | defer`, a `--self-test`, and tests over a simulated
+- [x] `shared/resources/push-policy` with `push | defer`, a `--self-test`, and tests over a simulated
   run: a five-cycle QA loop with two code cycles pushes on the code cycles and once at the end
-- [ ] `pipeline.pushRecordCommits` (`batched` default, `eager`) in the schema and the reference
+- [x] `pipeline.pushRecordCommits` (`batched` default, `eager`) in the schema and the reference
 
 ### Phase 2: Every push site calls it (risk: medium)
 
-- [ ] The sites in § 3 call the helper; the pause hook commits and does not push under `batched`
-- [ ] A test: a deferred record commit, then the helper's end-of-run flush, then `verify-push-state.sh`
+- [x] The sites in § 3 call the helper; the pause hook commits and does not push under `batched`
+- [x] A test: a deferred record commit, then the helper's end-of-run flush, then `verify-push-state.sh`
   exits 0; without the flush it exits non-zero
-- [ ] The helper takes its input as a table (site name, delta since the last pushed commit, whether a
+- [x] The helper takes its input as a table (site name, delta since the last pushed commit, whether a
   remote reader runs next), so no site invents its own
-- [ ] The three skills' "Push after every commit" rule is restated once, as the helper's contract
+- [x] The three skills' "Push after every commit" rule is restated once, as the helper's contract
 
 ### Phase 3: The skip marker (risk: low)
 
-- [ ] Widen the `ci` known keys in `ci-tree-equivalence.js` (`:521-523`) to include `skipMarker`; a
+- [x] Widen the `ci` known keys in `ci-tree-equivalence.js` (`:521-523`) to include `skipMarker`; a
   test whose fixture sets `skipMarker` must not exit 2, and one that sets an unknown key still must
-- [ ] The node mode `push-policy.sh` calls (see § 3 Target Architecture): reads the three keys from
+- [x] The node mode `push-policy.sh` calls (see § 3 Target Architecture): reads the three keys from
   `skills-config.yaml`, answers docs-only for a path list; the `pipeline` key block gets the same
   unknown-key handling as `ci`
-- [ ] `ci.skipMarker`, applied only when `ci-tree-equivalence.js` answers `tree-equivalent` for the
+- [x] `ci.skipMarker`, applied only when `ci-tree-equivalence.js` answers `tree-equivalent` for the
   pushed delta, and never on a commit with code
 
 ### Phase 4: Finalise halts (risk: medium)
 
-- [ ] `finalise.rerunAtHead`: a listed command named by a criterion is rerun at the head before the
+- [x] `finalise.rerunAtHead`: a listed command named by a criterion is rerun at the head before the
   AC agent grades it; its output and exit code are recorded in the DoD
-- [ ] The probe's `eslint:` entry form, with fixtures that must reach `rejected` and `accepted`
+- [x] The probe's `eslint:` entry form, with fixtures that must reach `rejected` and `accepted`
 
 ### Phase 5: Bitbucket (risk: medium)
 
-- [ ] `finalise-ci-poll.sh` Bitbucket arm, by status key, same output line and tokens
-- [ ] `developNext.tickVia: pr` in develop-next Step 4, covering the resume and retry pushes
+- [x] `finalise-ci-poll.sh` Bitbucket arm, by status key, same output line and tokens
+- [x] `developNext.tickVia: pr` in develop-next Step 4, covering the resume and retry pushes
   (`:192`, `:705`, `:708`, `:719`) and develop-batch's tick (`:656`, `:669`)
 
 ### Phase 6: Ship (risk: low)
 
-- [ ] `npm run bundle`, CHANGELOG `[Unreleased]`, `docs/reference/configuration.md`
+- [x] `npm run bundle`, CHANGELOG `[Unreleased]`, `docs/reference/configuration.md`
 
 ---
 
@@ -452,17 +454,18 @@ The bundled copies under `skills/*/references/` are regenerated by `npm run bund
 | 2026-11-24 | 1.1     | Review 1 (7/10): widened the `ci` parser for `skipMarker`, completed the push-site list and its search, named `verify-push-state.sh` and finalise's polls as remote readers, scan test for criterion 1, tests to update, `rerunAtHead` contract | review-task |
 | 2026-11-24 | 1.2     | Review 2 (9/10): added the two finalise push sites and the exemption classes to § 3, made the helper a shell entry over a node mode, Phase 3 builds that mode | review-task |
 | 2026-11-24 |         | Status → ready-for-development | review-task |
+| 2026-11-24 |         | Implementation complete, 7 of 7 phases; the Benefit's push estimate corrected to the measured 9 → 6; status → ready-for-review | develop |
 <!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 0: Who reads the remote
-- [ ] Phase 1: The push-policy helper
-- [ ] Phase 2: Every push site calls it
-- [ ] Phase 3: The skip marker
-- [ ] Phase 4: Finalise halts
-- [ ] Phase 5: Bitbucket
-- [ ] Phase 6: Ship
+- [x] Phase 0: Who reads the remote
+- [x] Phase 1: The push-policy helper
+- [x] Phase 2: Every push site calls it
+- [x] Phase 3: The skip marker
+- [x] Phase 4: Finalise halts
+- [x] Phase 5: Bitbucket
+- [x] Phase 6: Ship
 
 When implementation is done, QA writes `task.319.qa.{N}.ci-runs-only-where-needed.md` and
 `task.319.gate.{N}.ci-runs-only-where-needed.yml` here, and any bugs as `task.319.bug.{N}.{name}.md`.

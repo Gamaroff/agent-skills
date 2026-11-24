@@ -67,6 +67,18 @@ Push record-only commits with the next push that needs CI, add an opt-in skip ma
 - Step 3 inline — /develop not invoked: the plan names every part and the surface map is recorded.
 - Simulated-run definition (criterion 2): cycles 1–2 are code fixes (`qa-cycle`, push), cycles 3–4 are record-only fixes (`qa-cycle`, defer), cycle 5 is the record-only gate that reaches 5c (`qa-pre-5c`, a remote reader, push). Three pushes: two code, one at the loop's end. 5c reads the remote, so the loop's end push is the pre-5c push; the acceptance and Step 8 pushes follow it and are counted separately.
 
+### Step 3: develop — decisions
+
+- Phase 0's reader table is the plan's appendix; `push-policy.sh` carries the same rows as its input.
+- Push counts (`command node --test shared/resources/tests/push-policy.test.mjs`): `pushes before (eager): 9; after (batched): 6` for the modelled sequence (develop, two code cycles, three pauses, pre-5c, accept, step 8). The three removed pushes are the three pauses. The motivation's nine record-only pushes do not all go: each remaining one has a remote reader or ends the run.
+- Deviation from the plan, `eslint:` entry: the plan wrote each fixture to a temporary file in the repository. The entry instead names an existing file (`eslint:<path>#<rule-id>`) and ESLint's `lintText` lints the input AS that file. Same configuration, type-aware rules keep their project, nothing is written to the repository. Also run by hand against real ESLint 9.39.1 (flat) and 8.57.1 (flat and eslintrc): `no-eval` reported, a disable directive accepted, an `off` rule `absent`, an unnamed rule declined.
+- `finalise.rerunAtHead` matches a whole code span equal to a list entry, and reads the list and the code at `HEAD`; a criterion's text is never run. The DoD run number names its out directory (`.claude/state/finalise-rerun-at-head-<N>/`), not the DoD's folder: raw output is not a committed artefact, its block in the DoD is.
+- `test-runner-reach`: no `package.json` edit is needed; every new test matches `shared/resources/tests/*.test.mjs`.
+- Residual: under `batched` a held pause commit makes `qa-ci-read.sh` answer `HEAD_MISMATCH` at 5a (advisory), and `CI_HEAD_1` in `/finalise` Step 6 can be ahead of the sampled PR head by record-only commits. Both documented in the configuration reference or the table.
+- `tick-pr.sh`: a PR with no checks merges on the quality gate alone, after the full wait.
+- Mutations, each red as required: push-policy (always push: 3 red; batched pause pushes; unreadable pause pushes; step8 not an end: 3; pre-5c weakened: 3; mark without tree-equivalence; mark over a code head; mark over unpushed code; mark of a pushed head; compare with the configured upstream: 7; the scan with the step8 guard removed); hook ignoring the policy (batched step 2 and 5 red); poll (old poll 5/5 red; destination filter dropped 2 red); tick-pr (gate, CI and head checks dropped, each red); rerun (substring, prefix, dirty check off, working-tree configuration, stale record kept, unbounded command, cached output); eslint (any rule counts, always rejected, rule presence, ignored, parse error, package above root, child cwd, rule id), and the re-judge reason.
+- Remote run 1 (on `fe2a844e2`): red with four failures, all from this branch and fixed: two defaults tests that did not expect `skipMarker`, a wait-marking parity test on develop-next's new block, and a source scan that reads `@{upstream}` in a comment.
+
 ---
 
 ## Issues Log
