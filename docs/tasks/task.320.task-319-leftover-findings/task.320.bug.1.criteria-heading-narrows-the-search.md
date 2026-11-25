@@ -58,6 +58,20 @@ When no criterion is readable, let only the section the reader knows narrow the 
 
 **Verify**: the steps above, and the four inputs of T320-CR-202 to T320-CR-204, answer `scan-broken`.
 
+## Developer Fix Cycle 3
+
+**Date**: 2026-11-25
+
+**Root cause**: comments were removed from each section after the document was split, so a heading in a comment still split it (T320-CR-301); a first word alone made a line of prose a criterion (T320-CR-304); and the removal knew no fence (T320-CR-305).
+
+**Fix**: comments are removed once, from the whole document, before it is split. A fence or a code span opens none, and text after a comment does not begin its line. A `Then` line counts only after a `Given` or `When` line under the same heading. The command is searched for with the comments and without them.
+
+**What changed for a document**: a criteria section whose only criterion is one `Given`, `When` or `Then` line, with no list or table, no longer narrows the search.
+
+**Tests**: T319-CR-805 in `shared/resources/tests/finalise-rerun-at-head.test.mjs`, two of its tests red on `846320549`. The Given inputs have a `Then` line added.
+
+**Verify**: the inputs of T320-CR-301 and T320-CR-304 answer `scan-broken`, that of T320-CR-305 `none-named`.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
@@ -65,3 +79,5 @@ When no criterion is readable, let only the section the reader knows narrow the 
 | 2026-11-25 | Ready for QA | qa-fix | Fixed in QA cycle 1 |
 | 2026-11-25 | Reopened | qa-task | Not fixed by task.320.qa.2.task-319-leftover-findings.md |
 | 2026-11-25 | Ready for QA | qa-fix | Fixed in QA cycle 2 |
+| 2026-11-25 | Reopened | qa-task | Not fixed by task.320.qa.3.task-319-leftover-findings.md |
+| 2026-11-25 | Ready for QA | qa-fix | Fixed in QA cycle 3 |

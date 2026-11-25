@@ -1173,22 +1173,29 @@ test("a section with no criterion the reader can find is read past when it names
     "# T\n\nno criteria\n",
     "# T\n\n## Success Criteria\n\necho a, and `echo a b`\n",
     // a line in a fence ends no section, and outside one it does (T319-CR-1201)
-    "# T\n\n## Success Criteria\n\nGiven x\n\n```\n## x\n```\n\n## Other\n\n`echo a`\n",
+    "# T\n\n## Success Criteria\n\nGiven x\nThen y\n\n```\n## x\n```\n\n## Other\n\n`echo a`\n",
     // the criteria stand in the section, in a shape the reader does not read (T320-CR-101)
     ...[
       "### AC1\n\nText.\n",
       "### 1. AC-2: a title\n\n**Text**.\n",
       "## AC1\n\nText.\n",
       "| AC | Text |\n| -- | ---- |\n",
-      "Given x\n",
-      "**When** x\n",
+      "Given x\nThen y\n",
+      "**When** x\n**Then** y\n",
       "- Then x\n",
       "* x\n",
       "  - [ ] x\n",
       "  1. x\n",
       "- [x] \n\n- x\n",
-      "```gherkin\nGiven x\n```\n",
+      "```gherkin\nGiven x\nThen y\n```\n",
       "<!-- a -->\n\n- x\n\n<!-- b -->\n",
+      "<!---->\n- x\n",
+      "<!-->\n- x\n",
+      // an opener in a fence or in a code span opens nothing (T320-CR-305)
+      "```html\n<!-- x\n```\n\n- crit\n",
+      "Write `<!--` or ``a ` <!--`` first.\n\n- crit\n",
+      "A ``` and `<!--` too.\n\n- crit\n",
+      "A \\\\`<!--` too.\n\n- crit\n",
     ].map(
       (criteria) =>
         `# T\n\n## Acceptance Criteria\n\n${criteria}\n## Other\n\n\`echo a\`\n`,
@@ -1239,11 +1246,28 @@ test("a section with no criterion the reader can find is refused when a listed c
       "```gherkin\n```\n\n",
       '<a id="ac"></a>\n\n',
       "## Notes on AC-1\n\n- x\n\n",
+      // a heading in a comment is none, and a comment starts no line anew (T320-CR-301)
+      "<!--\n## AC1\n\n- x\n-->\n\n",
+      "<!--\n## Acceptance Criteria\n\n- x\n-->\n\n",
+      "<!--\n```\n-->\n\n<!--\n- x\n-->\n\n<!--\n```\n-->\n\n",
+      "<!-- a -->## AC1\n\n<!--\n-->- x\n\n",
+      "<!-- a -->| x |\n\n",
+      "+ [x] <!-- a -->\n\n",
+      "\\`<!-- \\`\n- x\n-->\n\n",
+      "### A\n\nWhen this is done.\n\n### B\n\nThen go on.\n\n",
+      // an introduction is no criterion, whatever its first word (T320-CR-304)
+      "When the list below passes, this is done.\n\n",
+      "Then this is done.\n\nGiven that, go on.\n\n",
     ].map(
       (none) =>
         `# T\n\n## Success Criteria\n\n${none}## Done when\n\n- [ ] \`echo a\` passes\n\n## Rollback criteria\n\nNone.\n`,
     ),
     "# T\n\n## Success Criteria\n\n## Acceptance Criteria\n\n## Done when\n\n- [ ] `echo a` passes\n\n## Rollback criteria\n\nNone.\n",
+    "# T\n\n<!--\n## Acceptance Criteria\n\n- x\n-->\n\n## Success Criteria\n\n## Done when\n\n- [ ] `echo a` passes\n",
+    // an opener that is never closed hides no command, and a line in a fence ends no section there either
+    "# T\r\n\r\n## Success Criteria\r\n\r\n- x\r\n\r\nUse <!-- here\r\n\r\n```\r\n## y\r\n```\r\n\r\n- `echo a` passes\r\n\r\n## Other\r\n\r\nNone.\r\n",
+    // and neither does a heading in a comment end the section it stands in (T320-CR-301)
+    "# T\n\n## Success Criteria\n\n- x\n\n<!--\n## old\n-->\n\n- `echo a` passes\n\n## Other\n\nNone.\n",
   ]) {
     const r = read(text);
     assert.equal(r.reason, "scan-broken", text);

@@ -71,8 +71,9 @@
  *   none-named      0  the list is set and no criterion names an entry of it, or there is no criterion
  *   not-configured  0  finalise.rerunAtHead is absent or an empty list
  *   dirty-tree      1  the working tree is not the head, or stopped being it; no record is kept
- *   scan-broken     1  the document could not be read, or a listed command stands in a criteria section of
- *                      which the reader returns no criterion at all, or on an unindented line of one, or
+ *   scan-broken     1  the document could not be read; or the reader returns no criterion at all and a listed
+ *                      command stands under a criteria heading, or anywhere when nothing says where the
+ *                      criteria are (holdsCriteria); or one stands on an unindented line of a criterion, or
  *                      after a backtick that has no partner
  *   failed          1  the engine itself failed (a file it could not write, git); no record is kept
  *   usage           2  bad arguments, or a configuration that cannot be read as a list of commands
@@ -266,43 +267,90 @@ function shows(text, command) {
 
 const RE_AC_HEADING = /^#{2,6} +(?:\d+[.)] *)?AC[ -]?\d/i;
 
-/** A text without its HTML comments. One that is not closed runs to the end. */
-function withoutComments(text) {
-  let out = "";
-  for (let at = 0; ;) {
-    const from = text.indexOf("<!--", at);
-    if (from === -1) return out + text.slice(at);
-    out += text.slice(at, from);
-    const end = text.indexOf("-->", from);
-    if (end === -1) return out;
-    at = end + 3;
+/** Where the next HTML comment opens in a line, past its code spans, or -1. */
+function commentAt(line, at) {
+  const mark = /\\[\\`]|`+|<!--/g;
+  mark.lastIndex = at;
+  for (let m; (m = mark.exec(line));) {
+    if (m[0] === "<!--") return m.index;
+    if (m[0].startsWith("\\")) continue;
+    const run = /`+/g;
+    run.lastIndex = mark.lastIndex;
+    for (let r; (r = run.exec(line));)
+      if (r[0].length === m[0].length) {
+        mark.lastIndex = run.lastIndex;
+        break;
+      }
   }
+  return -1;
+}
+
+/**
+ * A document without its HTML comments, line for line. One that is not closed runs to the end, and one that a
+ * fence or a code span holds is text (T320-CR-305). A NUL stands where a comment was, so that what follows
+ * it on the line does not begin the line: Markdown reads no heading or list item there.
+ */
+function withoutComments(text) {
+  const isFenceLine = makeFenceTracker();
+  let open = false;
+  return text
+    .split(/\r?\n/)
+    .map((line) => {
+      if (!open && isFenceLine(line)) return line;
+      let out = open ? "\0" : "";
+      for (let at = 0; ;) {
+        if (open) {
+          const end = line.indexOf("-->", at);
+          if (end === -1) return out;
+          open = false;
+          at = end + 3;
+        }
+        const from = commentAt(line, at);
+        if (from === -1) return out + line.slice(at);
+        out += `${line.slice(at, from)}\0`;
+        open = true;
+        at = from + 2; // `<!-->` is a whole comment
+      }
+    })
+    .join("\n");
+}
+
+/** A document's parts, each a list of lines: what stands before the first `## ` line, then from each on. */
+function partsOf(text) {
+  const isFenceLine = makeFenceTracker();
+  const parts = [[]];
+  for (const line of text.split(/\r?\n/)) {
+    if (!isFenceLine(line) && line.startsWith("## ")) parts.push([]);
+    parts.at(-1).push(line);
+  }
+  return parts;
 }
 
 /**
  * Does a criteria section hold criteria in a shape the reader does not read: a list item, a table row, a
- * Given, When or Then line, a line of text under an AC heading? These shapes are the whole list. What is
- * none of them (an introduction, a placeholder, an empty fence) does not say that the criteria stand here
- * (T320-CR-101, T320-CR-202 to 204).
+ * Given or When line with a Then line after it, a line of text under an AC heading? These shapes are the
+ * whole list. What is none of them (an introduction, a placeholder, an empty fence) does not say that the
+ * criteria stand here (T320-CR-101, T320-CR-202 to 204, T320-CR-304).
  */
 function holdsCriteria(section) {
   let underAc = false;
-  return withoutComments(section)
-    .split("\n")
-    .some((l) => {
-      if (/^ {0,3}#{1,6}(?:\s|$)/.test(l)) {
-        underAc = RE_AC_HEADING.test(l);
-        return false;
-      }
-      return (
-        (underAc && /^\s*[*_"'(]{0,3}[\p{L}\p{N}]/u.test(l)) ||
-        /^\s*[*_]{0,2}(?:Given|When|Then)\b/.test(l) ||
-        /^\s*\|.*[\p{L}\p{N}]/u.test(l) ||
-        /^\s*(?:[-*+]|\d{1,9}[.)])\s+(?=\S)(?!\[[ xX]\]\s*$).*[\p{L}\p{N}]/u.test(
-          l,
-        )
-      );
-    });
+  let given = false;
+  return section.split("\n").some((l) => {
+    if (/^ {0,3}#{1,6}(?:\s|$)/.test(l)) {
+      underAc = RE_AC_HEADING.test(l);
+      given = false;
+      return false;
+    }
+    given = given || /^\s*[*_]{0,2}(?:Given|When)\b/.test(l);
+    return (
+      (underAc && /^\s*[*_"'(]{0,3}[\p{L}\p{N}]/u.test(l)) ||
+      (given && /^\s*[*_]{0,2}Then\b/.test(l)) ||
+      /^\s*\|.*[\p{L}\p{N}]/u.test(l) ||
+      /^\s*(?:[-*+]|\d{1,9}[.)])\s+(?=\S)(?!\[[ xX]\][\s\0]*$).*[\p{L}\p{N}]/u.test(
+        l,
+      )
+    );
+  });
 }
 
 /** [{ command, criteria: [{ index, text }] }] in list order, only for commands a criterion names. */
@@ -924,22 +972,19 @@ async function run(argv) {
       // Under every heading that speaks of criteria, and in the whole document when nothing stands there
       // (T319-CR-1003). A line in a fence is no heading. Only a section the reader knows that holds criteria,
       // or an AC heading, says where they are: a heading that contains the word (`## Rollback criteria`)
-      // does not (T319-CR-1201).
-      const isFenceLine = makeFenceTracker();
-      const parts = [[]];
-      for (const line of body.split(/\r?\n/)) {
-        if (!isFenceLine(line) && line.startsWith("## ")) parts.push([]);
-        parts.at(-1).push(line);
-      }
+      // does not (T319-CR-1201), and neither does one in a comment (T320-CR-301). The command is searched for
+      // under the headings with the comments and without them: one in a comment ends no section.
+      const visible = withoutComments(body);
+      const parts = partsOf(visible);
       const placed =
         CRITERIA_HEADINGS.some((name) =>
-          holdsCriteria(extractSection(body, name) ?? ""),
+          holdsCriteria(extractSection(visible, name) ?? ""),
         ) ||
         parts.some(
           (part) =>
             RE_AC_HEADING.test(part[0]) && holdsCriteria(part.join("\n")),
         );
-      const under = parts
+      const under = [...parts, ...partsOf(body)]
         .filter((part) => /^## .*(?:criteri|\bAC[ -]?\d)/i.test(part[0]))
         .map((part) => part.slice(1).join("\n"))
         .join("\n");

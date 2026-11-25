@@ -1,0 +1,108 @@
+schema: 2
+task: 'task.320.task-319-leftover-findings'
+task_title: "Task 319's leftover findings are closed"
+gate: CONCERNS
+status_reason: 'One medium and five low findings, in the fixes of cycle 2. A commented-out criteria heading hides a listed command that the commit of gate 2 refused.'
+reviewer: 'QA Engineer'
+head: '8463205492d8812e4bd757579371294813d7ee0d'
+updated: '2026-11-25T19:41:14Z'
+
+top_issues:
+  - id: 'T320-CR-301'
+    severity: medium
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'Line 940, and 936: comments are removed after the document is split into sections, so a commented-out `## AC1` or `## Acceptance Criteria` counts as holding the criteria: none-named, where 5afd1ebd5 answered scan-broken (reproduced; with no `## ` line in the comment it is scan-broken). origin/develop answers none-named too.'
+    suggested_action: 'Remove comments from the whole document before it is split, and before the known sections are read.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.320.bug.1.criteria-heading-narrows-the-search.md'
+  - id: 'T320-CR-302'
+    severity: low
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'Line 560: `(.*)` stops at U+2028 and U+2029, so a line or paragraph separator at an end of the skipMarker row is dropped in silence (reproduced in three places; a no-break space there is refused).'
+    suggested_action: 'Let the row pattern cross line terminators.'
+    suggested_owner: dev
+    status: open
+  - id: 'T320-CR-303'
+    severity: low
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'Line 566: the test of the ends also reads the comment, so a valid row is refused for a no-break space at the end of its comment, or before a `#` in it (reproduced; both parse at the base; a no-break space elsewhere in the comment is accepted).'
+    suggested_action: 'Cut the comment off the row before testing the ends.'
+    suggested_owner: dev
+    status: open
+  - id: 'T320-CR-304'
+    severity: low
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'Line 299: a line of prose that starts with When, Given or Then counts as a criterion, so an introduction (`When the list below passes, this is done.`) hides the command: none-named (reproduced; `Below.` is scan-broken).'
+    suggested_action: 'Ask for a Then line with a Given or a When line.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.320.bug.1.criteria-heading-narrows-the-search.md'
+  - id: 'T320-CR-305'
+    severity: low
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'Line 290: comment removal knows no fence, so a literal `<!--` in one removes every criterion after it and a document with criteria is refused (reproduced: scan-broken; without the opener none-named, as at the base).'
+    suggested_action: 'Open no comment in a fenced line or a code span.'
+    suggested_owner: dev
+    status: open
+  - id: 'T320-CR-306'
+    severity: low
+    file: 'docs/reference/configuration.md'
+    finding: 'Line 314 limits the search of the whole document to one with neither criteria section, and the engine header does not mention it; a section that holds only a plain paragraph is refused too since 846320549 (reproduced).'
+    suggested_action: 'State the rule in the reference row and the engine header.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 8897
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 3, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 81
+    escaped: 0
+    boundary: true
+    boundary_signals: ["refused","refuses"]
+    notes: 'parseConfig 37 of 37 over three case files, the criteria search 17 of 17, parsePipelineConfig 9 of 9, push-held --site 18 of 18. The inputs of T320-CR-301 to 305 were not in them.'
+  performance:
+    status: PASS
+    notes: 'T320-CR-205 is closed: the engine takes as long for 20000 unclosed openers as for other lines.'
+  reliability:
+    status: PASS
+    notes: 'The suite was red once, on SEC-1b, and green on the second run of the same head; see the QA report.'
+  maintainability:
+    status: PASS
+    notes: 'The deny-list became an allow-list.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'SEC-1b waits one second for a killed process to be gone, and failed once on a loaded server. Neither the test nor the signal code changed on this branch. Wait longer, or mark it load-sensitive.'
+      refs: ['shared/resources/tests/ci-tree-equivalence.test.mjs']
+      provenance: pre-existing
+      remedy: unverified
+    - action: 'lockctl.sh takes its lock with mkdir, which uutils coreutils (the ubuntu-26.04 runner image) does not make atomic; see gate 1. CI was green on this head.'
+      refs: ['scripts/remote-test/lockctl.sh', 'tests/test-remote-runner.test.js']
+      provenance: pre-existing
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'T320-CR-301 is closed'

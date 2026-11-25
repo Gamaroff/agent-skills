@@ -557,13 +557,15 @@ function assertMarkerRow(text) {
   let block = null;
   for (const l of text.split(/\r?\n|\r$/)) {
     block = topLevelKey(l) ?? block;
-    const row = /^\s+["']?skipMarker["']?\s*:(.*)/.exec(l);
+    const row = /^\s+["']?skipMarker["']?\s*:(.*)/s.exec(l);
     if (block !== "ci" || !row) continue;
-    // What is inside the quotes is skipMarkerOf's to judge.
-    const outside = row[1].replace(/"[^"]*"|'[^']*'/, '""');
+    // What is inside the quotes is skipMarkerOf's to judge, and a space in the comment is no one's.
+    const outside = row[1]
+      .replace(/^(\s*)(?:"[^"]*"|'[^']*')/, '$1""')
+      .replace(/(^|\s)#.*$/s, "$1");
     if (
       UNPRINTABLE.test(l.replace(/\t/g, "")) ||
-      /^[ \t]*[^\S \t]|[^\S \t][ \t]*(?:#|$)/.test(outside)
+      /^[ \t]*[^\S \t]|[^\S \t][ \t]*$/.test(outside)
     )
       throw new UsageError(MARKER_RULE);
   }

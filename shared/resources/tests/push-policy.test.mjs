@@ -301,6 +301,28 @@ test("config: ci.skipMarker is one printable line: a control, format, surrogate 
           `${JSON.stringify(text)} U+${code.toString(16)}`,
         );
       }
+  // A line or paragraph separator at an end is one of them (T320-CR-302).
+  for (const row of [": ?[x", ": [x?", ': "[x]"?', ': ?"[x]"', ": [x?# why"])
+    for (const code of [0x2028, 0x2029])
+      assert.throws(
+        () =>
+          eng.parseConfig(
+            `ci:\n  skipMarker${row}\n`.replace("?", String.fromCharCode(code)),
+          ),
+        /ci\.skipMarker must be one printable line/,
+        `${row} U+${code.toString(16)}`,
+      );
+  // Quotes further on in the row do not hide it.
+  assert.throws(
+    () =>
+      eng.parseConfig(
+        `ci:\n  skipMarker: it's ?# don't\n`.replace(
+          "?",
+          String.fromCharCode(0xa0),
+        ),
+      ),
+    /ci\.skipMarker must be one printable line/,
+  );
   assert.equal(marker("   "), "");
   // A tab inside the value is refused, where one outside the quotes is dropped.
   for (const row of [': "[a\tb]"', ": '[a\tb]'", ": [a\tb"])
@@ -314,12 +336,18 @@ test("config: ci.skipMarker is one printable line: a control, format, surrogate 
     [': "[a?#b]"', "[a?#b]"],
     [": '[a?b]' # why", "[a?b]"],
     [": [a?b", "[a?b"],
+    // and in the comment it is none of the value's (T320-CR-303)
+    [': "[x]" # why?', "[x]"],
+    [": [x # see?#12", "[x"],
+    [': "[x]" #?why', "[x]"],
   ]) {
-    const nbsp = (s) => s.replace("?", String.fromCharCode(0xa0));
-    assert.equal(
-      eng.parseConfig(nbsp(`ci:\n  skipMarker${row}\n`)).skipMarker,
-      nbsp(value),
-    );
+    for (const code of value.includes("?") ? [0xa0] : [0xa0, 0x2028]) {
+      const put = (s) => s.replace("?", String.fromCharCode(code));
+      assert.equal(
+        eng.parseConfig(put(`ci:\n  skipMarker${row}\n`)).skipMarker,
+        put(value),
+      );
+    }
   }
   // A tab outside the quotes parts the value from what stands beside it.
   for (const row of [" [x\t", "\t[x", " [x\t# why"])

@@ -501,19 +501,19 @@ Phase 1's file and is reverted first.
 
 ### QA Report
 
-- **Full Report**: [task.320.qa.2.task-319-leftover-findings.md](./task.320.qa.2.task-319-leftover-findings.md)
-- **Gate File**: [task.320.gate.2.task-319-leftover-findings.yml](./task.320.gate.2.task-319-leftover-findings.yml)
+- **Full Report**: [task.320.qa.3.task-319-leftover-findings.md](./task.320.qa.3.task-319-leftover-findings.md)
+- **Gate File**: [task.320.gate.3.task-319-leftover-findings.yml](./task.320.gate.3.task-319-leftover-findings.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 8895
+- **Tests Executed**: 8897
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-Cycle 2, all in the fixes of cycle 1. One medium: the recovery stated for T319-CR-1301 cannot be carried out as written (T320-CR-201). Five low: T320-CR-202 to T320-CR-206.
+Cycle 3, all in the fixes of cycle 2. One medium: a commented-out criteria heading hides a listed command (T320-CR-301). Five low: T320-CR-302 to T320-CR-306. The suite was red once on SEC-1b, which this branch does not touch, and green on the second run.
 <!-- change-log-start -->
 ## Change Log
 
@@ -527,6 +527,8 @@ Cycle 2, all in the fixes of cycle 1. One medium: the recovery stated for T319-C
 | 2026-11-25 |  | QA findings fixed — cycle 1, 5 findings | qa-fix |
 | 2026-11-25 |  | QA gate CONCERNS (90/100) — 6 findings | qa-task |
 | 2026-11-25 |  | QA findings fixed — cycle 2, 6 findings | qa-fix |
+| 2026-11-25 |  | QA gate CONCERNS (90/100) — 6 findings | qa-task |
+| 2026-11-25 |  | QA findings fixed — cycle 3, 6 findings | qa-fix |
 <!-- change-log-end -->
 
 ---

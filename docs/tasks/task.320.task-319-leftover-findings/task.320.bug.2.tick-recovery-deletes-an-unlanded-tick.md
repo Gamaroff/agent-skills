@@ -4,7 +4,7 @@
 **Bug ID**: TASK-320-BUG-2
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-11-25
 
@@ -63,3 +63,4 @@ Give the recovery its condition: the row on `origin/<base>` records the item. Ot
 | 2026-11-25 | Ready for QA | qa-fix | Fixed in QA cycle 1 |
 | 2026-11-25 | Reopened | qa-task | Not fixed by task.320.qa.2.task-319-leftover-findings.md |
 | 2026-11-25 | Ready for QA | qa-fix | Fixed in QA cycle 2 |
+| 2026-11-25 | Closed | qa-task | Verified by task.320.qa.3.task-319-leftover-findings.md |
