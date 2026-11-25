@@ -81,7 +81,11 @@ on:
 ```
 
 On Bitbucket, list the same branches under `pipelines: branches:` and nothing that matches a feature
-branch (`feature/**`, `**`, or a `default:` section, which runs on every branch no other entry names).
+branch: `feature/**`, `**`, or a `default:` section, which runs on every push to a branch that no other
+entry matches ([start conditions](https://support.atlassian.com/bitbucket-cloud/docs/pipeline-start-conditions/)).
+
+A `release/**` branch still runs twice while its own PR is open. Leave it out of the list if its PR
+opens with its first push.
 
 **What it costs:**
 
@@ -121,8 +125,8 @@ Inputs (job `env`):
 | `EVENT_NAME`, `EVENT_ACTION`, `BASE_REF`, `BEFORE_SHA`, `AFTER_SHA`, `GITHUB_TOKEN` | yes | From the event, as the snippet passes them. |
 | `CI_OK_LOOKUP_FILE` | **never** | Tests only: replaces the API call. A workflow that sets it decides from a file. |
 
-**Your required check must pass when the heavy jobs skip.** A skipped job's result is `skipped`,
-not `success`. The snippet's `ci-ok` job runs `if: always()` and fails unless `changes` succeeded and
+**Your required check must pass when the heavy jobs skip.** Inside the workflow, a skipped job's
+`needs.<job>.result` is `skipped`, not `success`. The snippet's `ci-ok` job runs `if: always()` and fails unless `changes` succeeded and
 each heavy job succeeded or was skipped. Branch protection then requires `ci-ok`, never the heavy jobs
 themselves. Add every heavy job to its `needs` and its `case`: one left out can fail with `ci-ok`
 green. Two reasons:
@@ -296,6 +300,10 @@ It is simpler than this template and needs no credential. What it compares depen
 | --- | --- | --- |
 | Pull request | the whole PR against its destination | Yes. Code anywhere in the PR runs the step, so a later docs-only push to a code PR also runs in full. This template's increment rule is what saves that run |
 | Branch | the pushed commit against its first parent | Two risks, below |
+
+Atlassian's page states the first row ("the target branch (not `HEAD~1`)"). The second row is what one
+repository measured in 2026-11, merge commits included: Atlassian's page only implies it. Check it on
+yours before you rely on it.
 
 Use `excludePaths`, never `includePaths`. With `excludePaths` a step is skipped only when **every**
 changed file is listed, so a path nobody listed runs the step. With `includePaths` a path nobody

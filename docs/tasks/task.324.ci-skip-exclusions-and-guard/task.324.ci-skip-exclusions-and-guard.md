@@ -109,8 +109,8 @@ scripts/* */scripts/* test/* */test/* tests/* */tests/* __tests__/* */__tests__/
 | Rule | Fails when |
 | :-- | :-- |
 | 1 gate | a job that is not on the light list lacks `needs: changes`, or its `if:` is not one of two exact forms: `needs.changes.outputs.code == 'true'`, or that with `github.event_name == 'push' \|\|` before it. A job that needs a gated job, with no `if:` of its own, is gated through it |
-| 2 aggregate | the aggregate job lacks `if: always()`, or its `needs` lacks `changes` or any heavy job |
-| 3 trigger | in any workflow that also runs on `pull_request`, `push` has no `branches:`, uses `branches-ignore:`, or names a branch outside the long-lived list (`main master develop release/** hotfix/**`). A `push` limited to `tags:` passes |
+| 2 aggregate | the aggregate job lacks `if: always()`, its `needs` lacks `changes` or any heavy job, or its steps do not read `needs.<job>.result` for each of them |
+| 3 trigger | in any workflow not on the exempt list, `push` has no `branches:`, uses `branches-ignore:`, or names a branch outside the long-lived list (`main master develop release/**`, the runbook's). A `push` limited to `tags:` passes |
 | 4 never docs | a tracked test file, script, build config or workflow reads as docs |
 | 5 reader | a test or build config names a tracked file that reads as docs, and the pair is not on the accept list |
 
@@ -120,7 +120,8 @@ scripts/* */scripts/* test/* */test/* tests/* */tests/* __tests__/* */__tests__/
   It reads the block style the snippet uses. A shape it cannot read (a flow mapping of jobs, an anchor
   in `on:` or `jobs:`, an expression as `DOCS_PATTERNS`, a reusable-workflow job) is exit 2 and names
   the line.
-- **Lists are arguments**: `--light`, `--aggregate`, `--long-lived`, `--accept <file>`. An accept line
+- **Lists are arguments**: `--light`, `--aggregate`, `--long-lived`, `--exempt` (workflow files),
+  `--accept <file>`. An accept line
   is `<reader> <path>  # <reason>`. A line that matches nothing fails, so the list cannot go stale.
 - Exit 0 pass, 1 a rule failed, 2 cannot read. `--self-test` builds one violating repository per rule
   and one clean one, and fails unless each rule fires on its own case only.
@@ -161,6 +162,8 @@ name counts only in a file that also calls a directory or glob read.
 - **The default diverges from `ci.docsOnly` on purpose.** The pipelines' rule keeps calling
   `tests/fixtures/a.md` docs. The parity test gains a list of the divergent paths. CI then runs where
   the pipeline may not wait, which the runbook already warns about.
+- **Rule 2 sees that a result is read, not what is done with it.** A step that reads a failed result and
+  exits 0 passes the guard. The guard's output and the runbook say so.
 - **Rule 5 is a search, not a proof.** It cannot see a path built from variables, a script a heavy job
   runs, or a file read through another file. The guard's output and the runbook say so.
 
@@ -333,9 +336,11 @@ None.
 | an ungated job on the light list | exit 0 |
 | a job that needs a gated job, with no `if:`; with `if: always()` | exit 0; exit 1 |
 | the aggregate without one heavy job, without `changes`, or without `if: always()` | exit 1, rule 2 |
+| a heavy job in the aggregate's `needs`, whose result no step reads | exit 1, rule 2, the job named |
 | `on: [push, pull_request]`; `push:` with no branches; `feature/**`; `**`; `branches-ignore` | exit 1, rule 3 |
 | the same trigger in a second workflow file | exit 1, rule 3, the file named |
-| `push: tags:` only; `push` in a workflow with no `pull_request` | exit 0 |
+| a push-only workflow on `feature/**` beside a pull-request one | exit 1, rule 3, the file named |
+| `push: tags:` only; a workflow on the exempt list | exit 0 |
 | `DOCS_PATTERNS: "*"`, with `CODE_PATTERNS` empty | exit 1, rule 4 |
 | each of the five readers of § 3, on a skipped file | exit 1, rule 5, reader and path named |
 | the same reader, accepted; an accept line that matches nothing | exit 0; exit 1 |
@@ -510,7 +515,7 @@ A false finding of the guard is fixed forward; the accept list covers it meanwhi
 The prose half of the same lessons (triggers, the docs set, Bitbucket's step condition, the adoption
 prompt) is in the runbook already, on the branch that added this document.
 
-Rule 2 (the aggregate) was not asked for. It is here because a heavy job missing from the aggregate is
-the one wiring mistake that merges untested code with every check green.
+Rule 2 (the aggregate) was not asked for. It is here because a heavy job missing from the aggregate, or
+whose result the aggregate does not read, can fail while the required check is green.
 
 QA will create, beside this document: the QA report, bug reports if any, and the quality gate.
