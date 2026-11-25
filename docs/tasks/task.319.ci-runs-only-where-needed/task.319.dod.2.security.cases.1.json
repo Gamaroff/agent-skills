@@ -1,0 +1,277 @@
+[
+  {
+    "id": "legit-pause-default",
+    "input": "pause",
+    "direction": "legitimate",
+    "why": "batched is the default",
+    "correct": "defer: the pause hook leaves the remote unmoved",
+    "expected": {
+      "stdout": "defer\n",
+      "exit": 0
+    },
+    "spec_ref": "docs/reference/configuration.md:482"
+  },
+  {
+    "id": "legit-pause-eager",
+    "input": "pause",
+    "direction": "legitimate",
+    "why": "eager is the old behaviour",
+    "correct": "push: eager pushes after every commit",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "pipeline:\n  pushRecordCommits: eager\n"
+      }
+    },
+    "expected": {
+      "stdout": "push\n",
+      "exit": 0
+    },
+    "spec_ref": "docs/reference/configuration.md:313"
+  },
+  {
+    "id": "legit-qa-cycle-eager",
+    "input": "qa-cycle",
+    "direction": "legitimate",
+    "why": "eager is the old behaviour",
+    "correct": "push",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "pipeline:\n  pushRecordCommits: eager\n"
+      }
+    },
+    "expected": {
+      "stdout": "push\n",
+      "exit": 0
+    },
+    "spec_ref": "docs/reference/configuration.md:313"
+  },
+  {
+    "id": "legit-step8",
+    "input": "step8",
+    "direction": "legitimate",
+    "why": "the end of a run",
+    "correct": "push: Step 8 always pushes",
+    "expected": {
+      "stdout": "push\n",
+      "exit": 0
+    },
+    "spec_ref": "docs/reference/configuration.md:478"
+  },
+  {
+    "id": "legit-halt",
+    "input": "halt",
+    "direction": "legitimate",
+    "why": "the end of a run",
+    "correct": "push: the HALT paths push",
+    "expected": {
+      "stdout": "push\n",
+      "exit": 0
+    },
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:172"
+  },
+  {
+    "id": "legit-finalise-entry",
+    "input": "finalise-entry",
+    "direction": "legitimate",
+    "why": "a remote reader runs next",
+    "correct": "push",
+    "expected": {
+      "stdout": "push\n",
+      "exit": 0
+    },
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:171"
+  },
+  {
+    "id": "hostile-pause-malformed-config",
+    "input": "pause",
+    "direction": "hostile",
+    "why": "a configuration that cannot be read must not make the pause push",
+    "correct": "defer when it cannot decide",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "pipeline: eager\n"
+      }
+    },
+    "expected": {
+      "stdout": "defer\n",
+      "exit": 0
+    },
+    "spec_ref": "docs/reference/configuration.md:504"
+  },
+  {
+    "id": "hostile-qa-cycle-no-remote",
+    "input": "qa-cycle",
+    "direction": "hostile",
+    "why": "no remote branch to compare with must not hide a commit",
+    "correct": "push when it cannot decide",
+    "expected": {
+      "stdout": "push\n",
+      "exit": 0
+    },
+    "spec_ref": "docs/reference/configuration.md:503"
+  },
+  {
+    "id": "hostile-qa-cycle-malformed-config",
+    "input": "qa-cycle",
+    "direction": "hostile",
+    "why": "an unreadable configuration must not hide a commit",
+    "correct": "push when it cannot decide",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "pipeline:\n  pushRecordCommits: always\n"
+      }
+    },
+    "expected": {
+      "stdout": "push\n",
+      "exit": 0
+    },
+    "spec_ref": "docs/reference/configuration.md:503"
+  },
+  {
+    "id": "hostile-unknown",
+    "input": "nope",
+    "direction": "hostile",
+    "why": "a site outside the table",
+    "correct": "usage error, no token",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    },
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:280"
+  },
+  {
+    "id": "hostile-empty",
+    "input": "",
+    "direction": "hostile",
+    "why": "no site",
+    "correct": "usage error, no token",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    },
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:280"
+  },
+  {
+    "id": "hostile-case",
+    "input": "PAUSE",
+    "direction": "hostile",
+    "why": "case variant",
+    "correct": "usage error, no token",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    },
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:280"
+  },
+  {
+    "id": "hostile-prefix",
+    "input": "qa",
+    "direction": "hostile",
+    "why": "prefix of listed ids",
+    "correct": "usage error, no token",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    },
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:280"
+  },
+  {
+    "id": "hostile-regex",
+    "input": ".*",
+    "direction": "hostile",
+    "why": "a pattern is not an id",
+    "correct": "usage error, no token",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    },
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:280"
+  },
+  {
+    "id": "hostile-glob",
+    "input": "qa-*",
+    "direction": "hostile",
+    "why": "a glob is not an id",
+    "correct": "usage error, no token",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    },
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:280"
+  },
+  {
+    "id": "hostile-awk-escape",
+    "input": "\\160ause",
+    "direction": "hostile",
+    "why": "awk -v would decode it to a listed id",
+    "correct": "usage error, no token",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    },
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:280"
+  },
+  {
+    "id": "hostile-row",
+    "input": "pause\tpause",
+    "direction": "hostile",
+    "why": "a whole row",
+    "correct": "usage error, no token",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    },
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:280"
+  },
+  {
+    "id": "hostile-two-lines",
+    "input": "pause\nqa-cycle",
+    "direction": "hostile",
+    "why": "two ids",
+    "correct": "usage error, no token",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    },
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:280"
+  },
+  {
+    "id": "hostile-trailing-newline",
+    "input": "pause\n",
+    "direction": "hostile",
+    "why": "trailing newline",
+    "correct": "usage error, no token",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    },
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:280"
+  },
+  {
+    "id": "hostile-flag",
+    "input": "--mark",
+    "direction": "hostile",
+    "why": "a flag used as an id",
+    "correct": "usage error, no token",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    },
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:280"
+  },
+  {
+    "id": "hostile-substitution",
+    "input": "$(touch owned)",
+    "direction": "hostile",
+    "why": "command substitution",
+    "correct": "usage error, and nothing runs",
+    "expected": {
+      "stdout": "",
+      "exit": 2,
+      "absent": [
+        "owned"
+      ]
+    },
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:280"
+  }
+]

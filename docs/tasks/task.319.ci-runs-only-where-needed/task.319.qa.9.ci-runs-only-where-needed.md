@@ -128,7 +128,9 @@ pushes before (eager): 9; after (batched): 6
 
 | Replaced | Result |
 | -------- | ------ |
-| `finalise-rerun-at-head.js` by a stub with its names and no behaviour | `finalise-rerun-at-head.test.mjs`: 41 red, 0 green. `finalise-rerun-scope-blocks.test.mjs`: "Step 3a end to end …" red in both shells |
+| `finalise-rerun-at-head.js` by a stub with its names and no behaviour | `finalise-rerun-at-head.test.mjs`: 41 red, 0 green. `finalise-rerun-scope-blocks.test.mjs`: "Step 3a end to end …" and "Steps 3a + 3c as substituted …" red in both shells |
+| the placeholder check of the Step 3a re-run block removed (run on `109a5f998`) | "Steps 3a and 3c run as delivered …": red in both shells |
+| the pre-compact hook writes `**Pushed:** no` after a push too (run on `109a5f998`) | `develop-pipeline-on-precompact.test.sh`, the control scenario 17g: red |
 | `security-probe.mjs` at the merge base, plus an empty `checkEslintRuntime` | `security-probe-eslint.test.mjs`: 13 red, 1 green |
 | `probe-boundary-rule.md` at the merge base | that one, "every document that lists the engine's entry forms …": red |
 | the `DOD_N` number check of the Step 3a re-run block removed | "Step 3a's re-run block refuses a DOD_N …": red in both shells |

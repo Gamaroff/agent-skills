@@ -1,0 +1,579 @@
+{
+  "schema": 1,
+  "dod_n": 2,
+  "head": "109a5f998d2385f8f0b84b488a18a718973728a3",
+  "dirty_paths": [
+    "docs/reference/configuration.md",
+    "docs/tasks/task.319.ci-runs-only-where-needed/task.319.implementation.1.ci-runs-only-where-needed-initial-run.md",
+    "docs/tasks/task.319.ci-runs-only-where-needed/task.319.pr-review.3.ci-runs-only-where-needed.md",
+    "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.ci-runs-only-where-needed.md"
+  ],
+  "document": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md",
+  "result": {
+    "bytes": 24083,
+    "sha256": "8568d6ebaf4bc192af6f38ec2151decd84069ff1ddb8ae79ec1003f8cbb4ee5f",
+    "verified": true
+  },
+  "scope": {
+    "mode": "scoped",
+    "reason": "prior-record",
+    "rejudged": 7,
+    "carried": 6
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "ab92eaec32b385c3bf26722dc81ae11d075d5297a8b28ecff033cd687c3bca57",
+      "status": "PASS",
+      "description": "Every push site calls push-policy; scan test fails on an unlisted push",
+      "code_citation": "shared/resources/push-policy.sh:110",
+      "test_citation": "shared/resources/tests/push-policy.test.mjs:827",
+      "members": [
+        {
+          "member": "PreCompact pause hook",
+          "evidence": "shared/resources/develop-pipeline-on-precompact.sh:358",
+          "status": "PASS"
+        },
+        {
+          "member": "Pause procedure (prose: pause.md, hooks.md)",
+          "evidence": "shared/resources/develop-pipeline-pause.md:149",
+          "status": "PASS"
+        },
+        {
+          "member": "QA loop, once per cycle (qa-pre-5c, qa-cycle, qa-review-fix)",
+          "evidence": "shared/resources/develop-pipeline-step-5-6-qa-loop.md:1232",
+          "status": "PASS"
+        },
+        {
+          "member": "QA loop escalation",
+          "evidence": "shared/resources/develop-pipeline-step-5-6-qa-loop.md:2232",
+          "status": "PASS"
+        },
+        {
+          "member": "Finalise gaps",
+          "evidence": "shared/resources/develop-pipeline-step-7-finalise.md:96",
+          "status": "PASS"
+        },
+        {
+          "member": "Finalise 6a acceptance commit",
+          "evidence": "skills/finalise/SKILL.md:2185",
+          "status": "PASS"
+        },
+        {
+          "member": "Step 8 report",
+          "evidence": "shared/resources/develop-pipeline-step-8-commit.md:118",
+          "status": "PASS"
+        },
+        {
+          "member": "develop-next tick, with resume and retry paths",
+          "evidence": "skills/develop-next/SKILL.md:714",
+          "status": "PASS"
+        },
+        {
+          "member": "develop-batch tick",
+          "evidence": "skills/develop-batch/SKILL.md:662",
+          "status": "PASS"
+        },
+        {
+          "member": "Finalise acceptance push",
+          "evidence": "skills/finalise/SKILL.md:2190",
+          "status": "PASS"
+        },
+        {
+          "member": "Finalise fix-and-recheck",
+          "evidence": "skills/finalise/SKILL.md:3542",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Sites re-grepped at head 109a5f998 and unchanged. Non-vacuity case at push-policy.test.mjs:1648, exemptions at :1678. I ran the file at head: 42 pass, 0 fail. Lane: npm test in test.yml, pull_request to develop, hosted job green on 109a5f998. Known limit, not a fail: the scan accepts a push-policy mention in a comment near a push (on-precompact.sh:441-442; the real call is :358)."
+    },
+    {
+      "id": "#2",
+      "text_hash": "69027a54bf746a2c6cfb33fbabc5bd34e868f098b853e484d23e4a98b589e823",
+      "status": "PASS",
+      "description": "Batched five-cycle run pushes three times; eager pushes after every commit",
+      "code_citation": "shared/resources/push-policy.sh:204",
+      "test_citation": "shared/resources/tests/push-policy.test.mjs:311",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Batched at :311, eager at :317; both pass at head. Removing the eager line of push-policy.sh in a scratch copy turned the eager, performance and pause tests red while the batched test stayed green. Same per-PR lane as #1."
+    },
+    {
+      "id": "#3",
+      "text_hash": "ae3597105f09af6c1eeec8aff2f2547e500e3eeb8dc0c9a40f58b7db7ab670bc",
+      "status": "PASS",
+      "description": "Batched pause hook leaves the remote unmoved and reports not pushed",
+      "code_citation": "shared/resources/develop-pipeline-on-precompact.sh:358",
+      "test_citation": "shared/resources/develop-pipeline-on-precompact.test.sh:837",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Scenario 17j at steps 2 and 5 compares the bare remote tip and requires '**Pushed:** no' in the report; 17g is the eager control. The suite is listed in package.json test:suite."
+    },
+    {
+      "id": "#4",
+      "text_hash": "89376fabe3559ad3d42dd02364e6fc1be783b3cea065ef0e9c1840e45ed637a4",
+      "status": "PASS",
+      "description": "ci.skipMarker is never applied to a commit with code",
+      "code_citation": "shared/resources/push-policy.sh:162",
+      "test_citation": "shared/resources/tests/push-policy.test.mjs:518",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Lines 162-163 refuse when the unpushed delta or the head commit changes code, and an unreadable policy refuses too. The evidence change is the parser in ci-tree-equivalence.js:549, which only narrows the accepted marker text. The test passes at head, in the same per-PR lane as #1."
+    },
+    {
+      "id": "#5",
+      "text_hash": "bd8c4a9bb2685a7cf58fe7144d78f6e29746981db49ce2ae129b6202b55376db",
+      "status": "PASS",
+      "description": "A criterion naming a rerunAtHead command is graded at head, recorded in DoD",
+      "code_citation": "skills/finalise/SKILL.md:599",
+      "test_citation": "shared/resources/tests/finalise-rerun-at-head.test.mjs:106",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Fresh output at the later head is tested at :106 and the DoD block at :133 (engine finalise-rerun-at-head.js:467). The documented Step 3a block is run in evals/shared/tests/finalise-rerun-scope-blocks.test.mjs:224. Grading rule: shared/resources/finalise-dod-ac-prompt.md, re-run criterion."
+    },
+    {
+      "id": "#6",
+      "text_hash": "5cc771494447d74d76b8cb2536d77e953eac64c95aa2b353514c663e7427c815",
+      "status": "PASS",
+      "description": "Security probe scores an eslint: entry instead of declining it",
+      "code_citation": "shared/resources/security-probe.mjs:878",
+      "test_citation": "shared/resources/tests/security-probe-eslint.test.mjs:111",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The test reaches rejected and accepted with verdict engages; control rule at :122; plan route at :352."
+    },
+    {
+      "id": "#7",
+      "text_hash": "421bc78d1cf887b8a8b1b1b107083c9c900293c4c4978c5734e792f969150b98",
+      "status": "PASS",
+      "description": "Bitbucket poll writes the GitHub result line from the destination's status key",
+      "code_citation": "shared/resources/finalise-ci-poll.sh:165",
+      "test_citation": "shared/resources/tests/finalise-ci-poll.test.mjs:155",
+      "members": [],
+      "non_member_fail": null,
+      "note": "One printf writes the line for both hosts; the test gives a two-destination commit and asserts SUCCESS for develop and FAILURE for main."
+    },
+    {
+      "id": "#8",
+      "text_hash": "aa16c12ab0c7e789d1bbb2e2156ae0edc662c8e4b5e9caaacbb9292311233596",
+      "status": "PASS",
+      "description": "developNext.tickVia: pr ticks through a PR merged by the merge gate",
+      "code_citation": "shared/resources/tick-pr.sh:253",
+      "test_citation": "shared/resources/tests/tick-pr.test.mjs:188",
+      "members": [],
+      "non_member_fail": null,
+      "note": "GitHub and Bitbucket cases open the PR and merge on green; red, pending or unread CI never merges (:205), and the quality gate is run by the script (:226). develop-next's documented blocks are run at :800."
+    },
+    {
+      "id": "#9",
+      "text_hash": "2e24c56bda6a588cb497854cfe90a8886a499ebce0d541eb6bb64a4b989711d5",
+      "status": "PASS",
+      "description": "Simulated push count before and after, with command, in the QA report",
+      "code_citation": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.ci-runs-only-where-needed.md:100",
+      "test_citation": "shared/resources/tests/push-policy.test.mjs:324",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Line 97 names 'command node --test shared/resources/tests/push-policy.test.mjs'; line 100 reads 'pushes before (eager): 9; after (batched): 6'. My run at the head printed the same line."
+    },
+    {
+      "id": "#10",
+      "text_hash": "d0160e9ece1ed8a4d030967bdb843e2033cefbae8f2b766465f7b79b4aa9dfe9",
+      "status": "PASS",
+      "description": "npm test passes under CI=true; every new test red before its change",
+      "code_citation": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.ci-runs-only-where-needed.md:107",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "npm test under CI=true",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.8.ci-runs-only-where-needed.md:108",
+          "status": "PASS"
+        },
+        {
+          "member": "finalise-ci-poll.test.mjs, all new tests",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.1.ci-runs-only-where-needed.md:104",
+          "status": "PASS"
+        },
+        {
+          "member": "pre-compact suite scenario 17j",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.1.ci-runs-only-where-needed.md:103",
+          "status": "PASS"
+        },
+        {
+          "member": "pr-read.test.sh time-limit section",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.3.ci-runs-only-where-needed.md:132",
+          "status": "PASS"
+        },
+        {
+          "member": "ci-tree-equivalence.test.mjs, new tests (CR-201, CR-306)",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.3.ci-runs-only-where-needed.md:125",
+          "status": "PASS"
+        },
+        {
+          "member": "finalise-rerun-scope.test.mjs, never-carried and CR-2 tests",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.1.ci-runs-only-where-needed.md:112",
+          "status": "PASS"
+        },
+        {
+          "member": "finalise-rerun-scope-blocks.test.mjs, Step 8a regrading test",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.3.ci-runs-only-where-needed.md:133",
+          "status": "PASS"
+        },
+        {
+          "member": "push-policy.test.mjs, tests not listed below",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.1.ci-runs-only-where-needed.md:100",
+          "status": "PASS"
+        },
+        {
+          "member": "finalise-rerun-at-head.test.mjs, tests not listed below",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.1.ci-runs-only-where-needed.md:107",
+          "status": "PASS"
+        },
+        {
+          "member": "security-probe-eslint.test.mjs, tests not listed below",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.1.ci-runs-only-where-needed.md:111",
+          "status": "PASS"
+        },
+        {
+          "member": "tick-pr.test.mjs, tests not listed below",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.2.ci-runs-only-where-needed.md:126",
+          "status": "PASS"
+        },
+        {
+          "member": "push-policy.test.mjs:140 engine mode: docs delta is docs-only",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:4",
+          "status": "PASS"
+        },
+        {
+          "member": "push-policy.test.mjs:152 engine mode: without --base",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:5",
+          "status": "PASS"
+        },
+        {
+          "member": "push-policy.test.mjs:158 engine mode: configuration file is code",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:6",
+          "status": "PASS"
+        },
+        {
+          "member": "push-policy.test.mjs:172 engine mode: enabled false",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:7",
+          "status": "PASS"
+        },
+        {
+          "member": "push-policy.test.mjs:182 engine mode: root commit and merge",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:8",
+          "status": "PASS"
+        },
+        {
+          "member": "push-policy.test.mjs:197 config: ci.skipMarker is known",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:9",
+          "status": "PASS"
+        },
+        {
+          "member": "push-policy.test.mjs:214 config: skipMarker does not exit 2",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:11",
+          "status": "PASS"
+        },
+        {
+          "member": "push-policy.test.mjs:231 config: pipeline block refuses",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:12",
+          "status": "PASS"
+        },
+        {
+          "member": "push-policy.test.mjs:276 eager pushes after every commit",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.ci-runs-only-where-needed.md:138",
+          "status": "PASS"
+        },
+        {
+          "member": "push-policy.test.mjs:319 a missing script pushes (CR-113)",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:16",
+          "status": "PASS"
+        },
+        {
+          "member": "push-policy.test.mjs:365 branch not on the remote yet",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:18",
+          "status": "PASS"
+        },
+        {
+          "member": "push-policy.test.mjs:373 delta against own remote ref",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:19",
+          "status": "PASS"
+        },
+        {
+          "member": "push-policy.test.mjs:383 what cannot be decided pushes",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:20",
+          "status": "PASS"
+        },
+        {
+          "member": "push-policy.test.mjs:421 flush before verify-push-state",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:22",
+          "status": "PASS"
+        },
+        {
+          "member": "push-policy.test.mjs:457 marker: record-only head carries it",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:23",
+          "status": "PASS"
+        },
+        {
+          "member": "push-policy.test.mjs:616 marker: pushed head never amended",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:28",
+          "status": "PASS"
+        },
+        {
+          "member": "push-policy.test.mjs:1607 scan non-vacuity",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:43",
+          "status": "PASS"
+        },
+        {
+          "member": "push-policy.test.mjs:1637 scan: every exemption still matches",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:44",
+          "status": "PASS"
+        },
+        {
+          "member": "finalise-rerun-at-head.test.mjs:106 recorded run predates the head",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:112",
+          "status": "PASS"
+        },
+        {
+          "member": "finalise-rerun-at-head.test.mjs:133 command's own failure is data",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:113",
+          "status": "PASS"
+        },
+        {
+          "member": "finalise-rerun-at-head.test.mjs:168 unlisted command",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:115",
+          "status": "PASS"
+        },
+        {
+          "member": "finalise-rerun-at-head.test.mjs:225 command outlives its bound",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:119",
+          "status": "PASS"
+        },
+        {
+          "member": "finalise-rerun-at-head.test.mjs:240 malformed list, stale record",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:120",
+          "status": "PASS"
+        },
+        {
+          "member": "finalise-rerun-at-head.test.mjs:348 uncommitted documentation (CR-4)",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:123",
+          "status": "PASS"
+        },
+        {
+          "member": "finalise-rerun-at-head.test.mjs:394 engine failure is failed (CR-6)",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:125",
+          "status": "PASS"
+        },
+        {
+          "member": "finalise-rerun-at-head.test.mjs:406 whole-run time bound (CR-10)",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:126",
+          "status": "PASS"
+        },
+        {
+          "member": "finalise-rerun-at-head.test.mjs:1374 missing document is scan-broken",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:151",
+          "status": "PASS"
+        },
+        {
+          "member": "finalise-rerun-at-head.test.mjs:1385 list deduplicated",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:152",
+          "status": "PASS"
+        },
+        {
+          "member": "security-probe-eslint.test.mjs:111 hostile rejected, legitimate accepted",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:167",
+          "status": "PASS"
+        },
+        {
+          "member": "security-probe-eslint.test.mjs:148 documents name the eslint form (CR-12)",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.ci-runs-only-where-needed.md:135",
+          "status": "PASS"
+        },
+        {
+          "member": "security-probe-eslint.test.mjs:188 disable directive",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:172",
+          "status": "PASS"
+        },
+        {
+          "member": "security-probe-eslint.test.mjs:222 nearest package and config",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:174",
+          "status": "PASS"
+        },
+        {
+          "member": "security-probe-eslint.test.mjs:241 nothing is written",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:175",
+          "status": "PASS"
+        },
+        {
+          "member": "security-probe-eslint.test.mjs:255 malformed entry declined",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:176",
+          "status": "PASS"
+        },
+        {
+          "member": "security-probe-eslint.test.mjs:352 the route /finalise takes",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:179",
+          "status": "PASS"
+        },
+        {
+          "member": "security-probe-eslint.test.mjs:398 options of other forms refused",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:180",
+          "status": "PASS"
+        },
+        {
+          "member": "tick-pr.test.mjs:188 tick opens a PR and merges on green",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:47",
+          "status": "PASS"
+        },
+        {
+          "member": "tick-pr.test.mjs:279 PR with no checks merges on the gate",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:53",
+          "status": "PASS"
+        },
+        {
+          "member": "tick-pr.test.mjs:431 merge judged by the PR's state",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:59",
+          "status": "PASS"
+        },
+        {
+          "member": "tick-pr.test.mjs:442 resume of an interrupted tick",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:60",
+          "status": "PASS"
+        },
+        {
+          "member": "tick-pr.test.mjs:865 open refuses a branch with no tick commit",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:71",
+          "status": "PASS"
+        },
+        {
+          "member": "finalise-rerun-scope.test.mjs:397 --rerun-at-head re-judges (CR-5)",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:98",
+          "status": "PASS"
+        },
+        {
+          "member": "finalise-rerun-scope-blocks.test.mjs:170 Step 3a order",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.ci-runs-only-where-needed.md:137",
+          "status": "PASS"
+        },
+        {
+          "member": "finalise-rerun-scope-blocks.test.mjs:209 DOD_N refused (CR-211)",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.ci-runs-only-where-needed.md:136",
+          "status": "PASS"
+        },
+        {
+          "member": "finalise-rerun-scope-blocks.test.mjs:224 Step 3a end to end (CR-5)",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:158",
+          "status": "PASS"
+        },
+        {
+          "member": "push-policy.test.mjs, config: ci.skipMarker is one printable line (new since dod.1)",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.ci-runs-only-where-needed.md:142",
+          "status": "PASS"
+        },
+        {
+          "member": "finalise-rerun-scope-blocks.test.mjs, Steps 3a and 3c run as delivered (changed)",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.ci-runs-only-where-needed.md:132",
+          "status": "PASS"
+        },
+        {
+          "member": "finalise-rerun-scope-blocks.test.mjs, Steps 3a + 3c as substituted (changed)",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.red-first.txt:159",
+          "status": "PASS"
+        },
+        {
+          "member": "pre-compact suite control scenario 17g (changed)",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.ci-runs-only-where-needed.md:133",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "PASS from merged members (60 counted)"
+    },
+    {
+      "id": "#11",
+      "text_hash": "bad773b50f695d13c2a54d19244cdf056f68e90613bfff1e19e66489aed3eb45",
+      "status": "PASS",
+      "description": "npm run bundle leaves no diff; QA report records git status after it",
+      "code_citation": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.8.ci-runs-only-where-needed.md:114",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "npm run bundle then git status, recorded",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.8.ci-runs-only-where-needed.md:114",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "QA 8 records bundle:check 129 skills, 0 problems and a git status with only this work item's records. It does not name the bundle run; .githooks/pre-commit:108 runs npm run bundle on each commit, and QA 1 records the named command with its status. I re-ran the read-only check: 129 skills, 0 problems. The validate job regenerates and diffs per PR and is green."
+    },
+    {
+      "id": "#12",
+      "text_hash": "0427ae9371eb4c3b836121ec71463e8271777a822856c24e10495015e901d836",
+      "status": "PASS",
+      "description": "Four keys in configuration reference with defaults; eager documented as old behaviour",
+      "code_citation": "docs/reference/configuration.md:313",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [
+        {
+          "member": "ci.skipMarker",
+          "evidence": "docs/reference/configuration.md:312",
+          "status": "PASS"
+        },
+        {
+          "member": "pipeline.pushRecordCommits",
+          "evidence": "docs/reference/configuration.md:313",
+          "status": "PASS"
+        },
+        {
+          "member": "finalise.rerunAtHead",
+          "evidence": "docs/reference/configuration.md:314",
+          "status": "PASS"
+        },
+        {
+          "member": "developNext.tickVia",
+          "evidence": "docs/reference/configuration.md:320",
+          "status": "PASS"
+        },
+        {
+          "member": "eager as the old behaviour",
+          "evidence": "docs/reference/configuration.md:313",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Read from the working tree (staged). Defaults stated: empty (off), batched, absent, push. Line 313 says eager 'pushes after every commit, the behaviour before task 319'. Row 312 now states the 80-character and control/format limits, which match ci-tree-equivalence.js:549. The HALT sentence at 479 agrees with push-held.sh:42 (50 seconds) and :135 (no PR recorded)."
+    },
+    {
+      "id": "#13",
+      "text_hash": "20d2268a410825bcd750014cc54b904c0a904f18b6656bb6b35eb452a15b859a",
+      "status": "PASS",
+      "description": "CHANGELOG [Unreleased] names each part",
+      "code_citation": "CHANGELOG.md:9",
+      "test_citation": "evals/shared/tests/changelog-entry-drift.test.mjs",
+      "members": [
+        {
+          "member": "A. Push less",
+          "evidence": "CHANGELOG.md:9",
+          "status": "PASS"
+        },
+        {
+          "member": "B. Skip marker",
+          "evidence": "CHANGELOG.md:19",
+          "status": "PASS"
+        },
+        {
+          "member": "C. Two finalise halts (rerunAtHead, eslint entry)",
+          "evidence": "CHANGELOG.md:25",
+          "status": "PASS"
+        },
+        {
+          "member": "D. Bitbucket poll and tickVia",
+          "evidence": "CHANGELOG.md:33",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "[Unreleased] is lines 5 to 93; entries at 9, 19, 25, 30, 33 and 37 cite task 319 and name parts A to D. The only change since dod.1 limits the skipMarker claim (lines 19-24), now committed. The guard runs per PR and requires the citation once the task is accepted and its PR merged."
+    }
+  ],
+  "advisories": []
+}

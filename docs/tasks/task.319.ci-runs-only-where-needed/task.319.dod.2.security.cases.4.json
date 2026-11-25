@@ -1,0 +1,390 @@
+[
+  {
+    "id": "legit-named",
+    "input": "docs/t.md",
+    "direction": "legitimate",
+    "why": "a whole code span equal to the entry",
+    "correct": "ran",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "finalise:\n  rerunAtHead:\n    - touch .claude/state/ran\n",
+        "docs/t.md": "# T\n\n## Success Criteria\n\n- [ ] `touch .claude/state/ran` exits 0\n"
+      }
+    },
+    "expected": {
+      "stdout": "ran\n",
+      "exit": 0
+    },
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "legit-double-backticks",
+    "input": "docs/t.md",
+    "direction": "legitimate",
+    "why": "a longer fence is still a code span",
+    "correct": "ran",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "finalise:\n  rerunAtHead:\n    - touch .claude/state/ran\n",
+        "docs/t.md": "# T\n\n## Success Criteria\n\n- [ ] ``touch .claude/state/ran`` exits 0\n"
+      }
+    },
+    "expected": {
+      "stdout": "ran\n",
+      "exit": 0
+    },
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "legit-continuation",
+    "input": "docs/t.md",
+    "direction": "legitimate",
+    "why": "an indented continuation line",
+    "correct": "ran",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "finalise:\n  rerunAtHead:\n    - touch .claude/state/ran\n",
+        "docs/t.md": "# T\n\n## Success Criteria\n\n- [ ] Links\n  `touch .claude/state/ran` exits 0\n"
+      }
+    },
+    "expected": {
+      "stdout": "ran\n",
+      "exit": 0
+    },
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "legit-non-zero-command",
+    "input": "docs/t.md",
+    "direction": "legitimate",
+    "why": "output and exit code are recorded; the run is not a verdict",
+    "correct": "ran",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "finalise:\n  rerunAtHead:\n    - exit 3\n",
+        "docs/t.md": "# T\n\n## Success Criteria\n\n- [ ] `exit 3` exits 0\n"
+      }
+    },
+    "expected": {
+      "stdout": "ran\n",
+      "exit": 0
+    },
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "legit-not-configured",
+    "input": "docs/t.md",
+    "direction": "legitimate",
+    "why": "the key is absent",
+    "correct": "nothing is re-run",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "tracker: github\n",
+        "docs/t.md": "# T\n\n## Success Criteria\n\n- [ ] `touch .claude/state/ran` exits 0\n"
+      }
+    },
+    "expected": {
+      "stdout": "not-configured\n",
+      "exit": 0,
+      "absent": [
+        ".claude/state/ran"
+      ]
+    },
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-chained",
+    "input": "docs/t.md",
+    "direction": "hostile",
+    "why": "document text after a listed command",
+    "correct": "nothing runs: the span is not the entry",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "finalise:\n  rerunAtHead:\n    - touch .claude/state/ran\n",
+        "docs/t.md": "# T\n\n## Success Criteria\n\n- [ ] `touch .claude/state/ran && touch .claude/state/evil` ok\n"
+      }
+    },
+    "expected": {
+      "stdout": "none-named\n",
+      "exit": 0,
+      "absent": [
+        ".claude/state/ran",
+        ".claude/state/evil"
+      ]
+    },
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:211"
+  },
+  {
+    "id": "hostile-semicolon",
+    "input": "docs/t.md",
+    "direction": "hostile",
+    "why": "document text after a listed command",
+    "correct": "nothing runs",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "finalise:\n  rerunAtHead:\n    - touch .claude/state/ran\n",
+        "docs/t.md": "# T\n\n## Success Criteria\n\n- [ ] `touch .claude/state/ran; touch .claude/state/evil` ok\n"
+      }
+    },
+    "expected": {
+      "stdout": "none-named\n",
+      "exit": 0,
+      "absent": [
+        ".claude/state/ran",
+        ".claude/state/evil"
+      ]
+    },
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:212"
+  },
+  {
+    "id": "hostile-substitution",
+    "input": "docs/t.md",
+    "direction": "hostile",
+    "why": "command substitution in document text",
+    "correct": "nothing runs",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "finalise:\n  rerunAtHead:\n    - touch .claude/state/ran\n",
+        "docs/t.md": "# T\n\n## Success Criteria\n\n- [ ] `$(touch .claude/state/ran)` ok\n"
+      }
+    },
+    "expected": {
+      "stdout": "none-named\n",
+      "exit": 0,
+      "absent": [
+        ".claude/state/ran"
+      ]
+    },
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:212"
+  },
+  {
+    "id": "hostile-unlisted",
+    "input": "docs/t.md",
+    "direction": "hostile",
+    "why": "a command the project did not list",
+    "correct": "nothing runs",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "finalise:\n  rerunAtHead:\n    - touch .claude/state/ran\n",
+        "docs/t.md": "# T\n\n## Success Criteria\n\n- [ ] `touch .claude/state/evil` exits 0\n"
+      }
+    },
+    "expected": {
+      "stdout": "none-named\n",
+      "exit": 0,
+      "absent": [
+        ".claude/state/ran",
+        ".claude/state/evil"
+      ]
+    },
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-case",
+    "input": "docs/t.md",
+    "direction": "hostile",
+    "why": "case variant of the entry",
+    "correct": "nothing runs",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "finalise:\n  rerunAtHead:\n    - touch .claude/state/ran\n",
+        "docs/t.md": "# T\n\n## Success Criteria\n\n- [ ] `Touch .claude/state/ran` exits 0\n"
+      }
+    },
+    "expected": {
+      "stdout": "none-named\n",
+      "exit": 0,
+      "absent": [
+        ".claude/state/ran"
+      ]
+    },
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:211"
+  },
+  {
+    "id": "hostile-plain-text",
+    "input": "docs/t.md",
+    "direction": "hostile",
+    "why": "not a code span",
+    "correct": "nothing runs",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "finalise:\n  rerunAtHead:\n    - touch .claude/state/ran\n",
+        "docs/t.md": "# T\n\n## Success Criteria\n\n- [ ] Run touch .claude/state/ran first\n"
+      }
+    },
+    "expected": {
+      "stdout": "none-named\n",
+      "exit": 0,
+      "absent": [
+        ".claude/state/ran"
+      ]
+    },
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-escaped-backticks",
+    "input": "docs/t.md",
+    "direction": "hostile",
+    "why": "escaped backticks are text, not a code span",
+    "correct": "nothing runs",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "finalise:\n  rerunAtHead:\n    - touch .claude/state/ran\n",
+        "docs/t.md": "# T\n\n## Success Criteria\n\n- [ ] \\`touch .claude/state/ran\\` is text\n"
+      }
+    },
+    "expected": {
+      "stdout": "none-named\n",
+      "exit": 0,
+      "absent": [
+        ".claude/state/ran"
+      ]
+    },
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-other-section",
+    "input": "docs/t.md",
+    "direction": "hostile",
+    "why": "named outside the criteria",
+    "correct": "nothing runs",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "finalise:\n  rerunAtHead:\n    - touch .claude/state/ran\n",
+        "docs/t.md": "# T\n\n## Notes\n\n- [ ] `touch .claude/state/ran` exits 0\n\n## Success Criteria\n\n- [ ] It works\n"
+      }
+    },
+    "expected": {
+      "stdout": "none-named\n",
+      "exit": 0,
+      "absent": [
+        ".claude/state/ran"
+      ]
+    },
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-unindented",
+    "input": "docs/t.md",
+    "direction": "hostile",
+    "why": "a lazy continuation line hides the command",
+    "correct": "refused, never read past",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "finalise:\n  rerunAtHead:\n    - touch .claude/state/ran\n",
+        "docs/t.md": "# T\n\n## Success Criteria\n\n- [ ] The command\n`touch .claude/state/ran` exits 0\n"
+      }
+    },
+    "expected": {
+      "stdout": "scan-broken: criterion #1 names `touch .claude/state/ran` on an unindented line, which is not read as part of it: indent the line\n",
+      "exit": 1,
+      "absent": [
+        ".claude/state/ran"
+      ]
+    },
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-lone-backtick",
+    "input": "docs/t.md",
+    "direction": "hostile",
+    "why": "a stray backtick takes the span's opener",
+    "correct": "refused, never read past",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "finalise:\n  rerunAtHead:\n    - touch .claude/state/ran\n",
+        "docs/t.md": "# T\n\n## Success Criteria\n\n- [ ] The ` mark, and `touch .claude/state/ran` exits 0\n"
+      }
+    },
+    "expected": {
+      "stdout": "scan-broken: criterion #1 names `touch .claude/state/ran` after a backtick that has no partner, which hides it: remove that backtick\n",
+      "exit": 1,
+      "absent": [
+        ".claude/state/ran"
+      ]
+    },
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-no-criterion",
+    "input": "docs/t.md",
+    "direction": "hostile",
+    "why": "a criteria section in which no criterion can be read",
+    "correct": "refused",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "finalise:\n  rerunAtHead:\n    - touch .claude/state/ran\n",
+        "docs/t.md": "# T\n\n## Success Criteria\n\nRun `touch .claude/state/ran`.\n"
+      }
+    },
+    "expected": {
+      "stdout": "scan-broken: the document names `touch .claude/state/ran` and has no criteria the reader can find\n",
+      "exit": 1,
+      "absent": [
+        ".claude/state/ran"
+      ]
+    },
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-writes-code",
+    "input": "docs/t.md",
+    "direction": "hostile",
+    "why": "a command that writes code makes the tree not the head",
+    "correct": "refused, and no record is kept",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "finalise:\n  rerunAtHead:\n    - touch code.js\n",
+        "docs/t.md": "# T\n\n## Success Criteria\n\n- [ ] `touch code.js` exits 0\n"
+      }
+    },
+    "expected": {
+      "stdout": "dirty-tree: after `touch code.js`: the working tree is not the head: code.js\n",
+      "exit": 1,
+      "absent": [
+        ".claude/state/rerun/run.json"
+      ]
+    },
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-moves-head",
+    "input": "docs/t.md",
+    "direction": "hostile",
+    "why": "the head moves during the run",
+    "correct": "refused, and no record is kept",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "finalise:\n  rerunAtHead:\n    - git commit --allow-empty -q -m moved\n",
+        "docs/t.md": "# T\n\n## Success Criteria\n\n- [ ] `git commit --allow-empty -q -m moved` exits 0\n"
+      }
+    },
+    "expected": {
+      "exit": 1,
+      "absent": [
+        ".claude/state/rerun/run.json"
+      ]
+    },
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-dropped-list",
+    "input": "docs/t.md",
+    "direction": "hostile",
+    "why": "a list the subset would drop, through the CLI",
+    "correct": "usage error, nothing runs",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "finalise:\n  rerunAtHead:\n  - touch .claude/state/ran\n",
+        "docs/t.md": "# T\n\n## Success Criteria\n\n- [ ] `touch .claude/state/ran` exits 0\n"
+      }
+    },
+    "expected": {
+      "exit": 2,
+      "absent": [
+        ".claude/state/ran"
+      ]
+    },
+    "spec_ref": "docs/reference/configuration.md:314"
+  }
+]
