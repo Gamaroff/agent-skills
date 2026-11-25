@@ -106,6 +106,8 @@ const CI_KEYS = Object.freeze(["docsOnly", "skipMarker"]);
 const PIPELINE_KEYS = Object.freeze(["pushRecordCommits"]);
 const PUSH_RECORD_COMMITS = Object.freeze(["batched", "eager"]);
 const SKIP_MARKER_MAX = 80;
+const UNPRINTABLE = /[\p{Cc}\p{Cf}\p{Cs}]/u;
+const MARKER_RULE = `ci.skipMarker must be one printable line of at most ${SKIP_MARKER_MAX} characters`;
 
 const USAGE =
   "usage: ci-tree-equivalence.js --head-rollup <PENDING|NONE|...> [--head <sha>] [--pr <n>] " +
@@ -541,7 +543,26 @@ function parseConfig(rawText) {
   // cause; the completeness check below is the net under all of them.
   const cfg = interpretConfig(parsed);
   assertBlockRows(text, parsed, "ci");
+  assertMarkerRow(text);
   return cfg;
+}
+
+/**
+ * Refuse a `skipMarker` row with a control or format character anywhere in it, its comment included: the
+ * parse trims a BOM outside the quotes, so `skipMarkerOf` never sees it (T320-CR-104). A tab there parts the
+ * value from what stands beside it.
+ */
+function assertMarkerRow(text) {
+  let block = null;
+  for (const l of text.split(/\r?\n|\r$/)) {
+    block = topLevelKey(l) ?? block;
+    if (
+      block === "ci" &&
+      /^\s+["']?skipMarker["']?\s*:/.test(l) &&
+      UNPRINTABLE.test(l.replace(/\t/g, ""))
+    )
+      throw new UsageError(MARKER_RULE);
+  }
 }
 
 /**
@@ -558,10 +579,8 @@ function skipMarkerOf(v) {
   }
   const m = v.trim();
   // `v`: trim() drops a tab and a BOM at the ends too, and only a space there is dropped in silence (task 320)
-  if (/[\p{Cc}\p{Cf}\p{Cs}]/u.test(v) || [...m].length > SKIP_MARKER_MAX) {
-    throw new UsageError(
-      `ci.skipMarker must be one printable line of at most ${SKIP_MARKER_MAX} characters`,
-    );
+  if (UNPRINTABLE.test(v) || [...m].length > SKIP_MARKER_MAX) {
+    throw new UsageError(MARKER_RULE);
   }
   if (/^[>|][+\-0-9]*$/.test(m)) {
     throw new UsageError(

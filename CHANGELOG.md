@@ -16,7 +16,8 @@ All notable changes to this project will be documented in this file. Format foll
 - **Two spellings in `skills-config.yaml` are refused that were read past (task 320).** A top-level key
   that is `ci`, `pipeline` or `finalise` with a YAML escape in it (`"c\x69":`) was ignored, and with it
   an `enabled: false`: write the key plainly. A control or format character at either end of
-  `ci.skipMarker` (a tab, a BOM) was dropped: delete it. Spaces at the ends are still dropped.
+  `ci.skipMarker` (a BOM, a tab inside the quotes) was dropped: delete it, in the row's comment too.
+  Spaces at the ends, and a tab outside the quotes, are still dropped.
 
 ### Fixed
 
@@ -25,7 +26,7 @@ All notable changes to this project will be documented in this file. Format foll
   line hid from it, and an untracked file in a directory that differs from a submodule's only in case.
   `push-held.sh` no longer says a commit could not be fetched that was, or that a push failed which
   reached the server while the script was stopped. `tick-pr.sh start` answers the same from a
-  subdirectory.
+  subdirectory. `develop-next` says when a tick PR that conflicts may be closed and its branch deleted.
 
 ## [v0.69.0] - 2026-11-25
 

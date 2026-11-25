@@ -252,15 +252,50 @@ test("config: ci.skipMarker is one printable line: a control, format, surrogate 
   assert.throws(() => marker("🚫".repeat(81)), /at most 80 characters/);
   // At the ends too, and not only inside: what is dropped there is a space, in a CRLF file as well
   // (task 320).
-  for (const edge of ["\t", "\u0001", "\u0085", "​", "﻿"])
-    for (const m of [`${edge}[skip ci]`, `[skip ci]${edge}`])
+  for (const code of [0x09, 0x01, 0x85, 0x200b, 0xfeff])
+    for (const m of ["?[skip ci]", "[skip ci]?"])
       assert.throws(
-        () => marker(m),
+        () => marker(m.replace("?", String.fromCharCode(code))),
         /ci\.skipMarker must be one printable line/,
-        JSON.stringify(m),
+        `${m} U+${code.toString(16)}`,
       );
   assert.equal(marker("  [skip ci]  "), "[skip ci]");
   assert.equal(marker(` ${"x".repeat(80)} `), "x".repeat(80));
+  // Without quotes, or outside them, the parse drops it before the value is seen (T320-CR-104).
+  for (const row of [
+    ": ?[x",
+    ":? [x",
+    " : [x?",
+    " : [x?",
+    ": [x?",
+    ': "[x]"?',
+    ":?'[x]'",
+    ": [x? # why",
+    ": it's #x?",
+    ': "[x]#"?',
+    ": [x # ?why",
+  ])
+    for (const code of [0xfeff, 0x200b, 0x85])
+      for (const end of ["\n", "\r\n", ""]) {
+        const text = `ci:\n  skipMarker${row}${end}`;
+        assert.throws(
+          () => eng.parseConfig(text.replace("?", String.fromCharCode(code))),
+          /ci\.skipMarker must be one printable line/,
+          `${JSON.stringify(text)} U+${code.toString(16)}`,
+        );
+      }
+  // A tab outside the quotes parts the value from what stands beside it.
+  for (const row of [" [x\t", "\t[x", " [x\t# why"])
+    assert.equal(
+      eng.parseConfig(`ci:\n  skipMarker:${row}\n`).skipMarker,
+      "[x",
+    );
+  const bom = String.fromCharCode(0xfeff);
+  assert.equal(
+    eng.parseConfig(`ci:\n  skipMarker: "[x"\nother:\n  skipMarker: y${bom}\n`)
+      .skipMarker,
+    "[x",
+  );
   for (const text of [
     'ci:\r\n  skipMarker: "[skip ci]"\r\n',
     "ci:\r\n  skipMarker: '[skip ci]' # why\r\n",

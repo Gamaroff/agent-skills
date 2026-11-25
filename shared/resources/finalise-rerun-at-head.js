@@ -85,9 +85,11 @@ const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const { parseYamlSubset } = require("./yaml-subset.js");
 const {
+  CRITERIA_HEADINGS,
   RE_CHECKBOX,
   RE_NUMBERED,
   criteriaSection,
+  extractSection,
   makeFenceTracker,
   readCriteriaEntries,
 } = require("./criteria-section.js");
@@ -262,6 +264,19 @@ function shows(text, command) {
   );
 }
 
+/** Is anything written in this text besides headings, comments, rules and space? */
+function saysSomething(text) {
+  const isFenceLine = makeFenceTracker();
+  return text
+    .replace(/<!--[^]*?-->/g, "")
+    .split("\n")
+    .some(
+      (l) =>
+        (isFenceLine(l) || !/^ {0,3}#{1,6}(?:\s|$)/.test(l)) &&
+        /[\p{L}\p{N}]/u.test(l),
+    );
+}
+
 /** [{ command, criteria: [{ index, text }] }] in list order, only for commands a criterion names. */
 function namedCommands(list, criteria) {
   return list
@@ -299,7 +314,8 @@ const RE_BLOCK_START = new RegExp(
 
 /**
  * The text of each criterion, in the reader's order, with its lazy continuation: an unindented line directly
- * under it, which Markdown renders as part of it and the criteria reader ends it at.
+ * under it, which Markdown renders as part of it and the criteria reader ends it at. Its line breaks are
+ * kept: `shows` reads a text line by line too (T320-CR-103).
  */
 function lazyTexts(body) {
   let inItem = false; // an indented line belongs to the last criterion
@@ -311,9 +327,11 @@ function lazyTexts(body) {
       whole.push(m[1]);
       inItem = true;
       open = true;
-    } else if (line.trim() === "") open = false;
-    else if (/^\s/.test(line) ? inItem : open && !RE_BLOCK_START.test(line)) {
-      whole.push(`${whole.pop()} ${line.trim()}`);
+    } else if (line.trim() === "") {
+      open = false;
+      if (inItem) whole.push(`${whole.pop()}\n`);
+    } else if (/^\s/.test(line) ? inItem : open && !RE_BLOCK_START.test(line)) {
+      whole.push(`${whole.pop()}\n${line.trim()}`);
       open = true;
     } else {
       inItem = false;
@@ -332,7 +350,7 @@ function lazilyNamed(list, whole, texts) {
     codeSpans(text).filter((s) => s === command).length;
   for (const [i, text] of whole.entries())
     for (const command of list)
-      if (count(text, command) > count(texts[i], command))
+      if (count(text.replace(/\n+/g, " "), command) > count(texts[i], command))
         return { index: i + 1, command };
   return null;
 }
@@ -553,6 +571,21 @@ const gitLine = (cwd, ...args) =>
     .toString("utf8")
     .replace(/\r?\n$/, "");
 const bytes = (f) => Buffer.from(f, "latin1");
+
+/** Which of these paths the repository at `cwd` ignores. An answer that cannot be had is none of them. */
+function ignoredOf(cwd, files) {
+  if (files.length === 0) return new Set();
+  try {
+    const out = gitIn(
+      cwd,
+      ["check-ignore", "-z", "--stdin"],
+      bytes(files.map((f) => `${f}\0`).join("")),
+    );
+    return new Set(out.toString("latin1").split("\0").filter(Boolean));
+  } catch {
+    return new Set(); // exit 1: none is ignored
+  }
+}
 const shown = (f) => bytes(f).toString("utf8");
 // As git folds a name under core.ignorecase: ASCII only.
 const folded = (f) => f.replace(/[A-Z]/g, (c) => c.toLowerCase());
@@ -641,8 +674,11 @@ function differing(dir, commit, prefix = "") {
     }
     return false;
   };
-  for (const f of gitRows(dir, "-c", "core.ignorecase=false", ...listed)) {
-    if (besideSub(f)) bad.add(f);
+  const exact = gitRows(dir, "-c", "core.ignorecase=false", ...listed);
+  const beside = exact.filter(besideSub);
+  const ignored = ignoredOf(dir, beside); // by the repository's own case rule (T320-CR-105)
+  for (const f of beside) if (!ignored.has(f)) bad.add(f);
+  for (const f of exact) {
     if (!byFold.has(folded(f))) continue;
     const [own, known] = [lstat(f), lstat(byFold.get(folded(f)))];
     if (
@@ -858,20 +894,28 @@ async function run(argv) {
     if (entries === null || entries.length === 0) {
       // Criteria the reader cannot see, or none at all: only the first can hide a command (T319-CR-805).
       // Under every heading that speaks of criteria, and in the whole document when nothing stands there
-      // (T319-CR-1003). A line in a fence is no heading. A document with no heading the reader knows is
-      // searched whole: one that only contains the word (`## Rollback criteria`) says nothing about where
-      // its criteria are (T319-CR-1201).
+      // (T319-CR-1003). A line in a fence is no heading. Only a section the reader knows, or an AC heading,
+      // says where the criteria are, and only when something is written under it: a heading that contains
+      // the word (`## Rollback criteria`) does not (T319-CR-1201, T320-CR-101).
       const isFenceLine = makeFenceTracker();
       const parts = [[]];
       for (const line of body.split(/\r?\n/)) {
         if (!isFenceLine(line) && line.startsWith("## ")) parts.push([]);
         parts.at(-1).push(line);
       }
-      const under = parts
-        .filter((part) => /^## .*(?:criteri|\bAC[ -]?\d)/i.test(part[0]))
-        .map((part) => part.slice(1).join("\n"))
-        .join("\n");
-      const where = entries === null || under.trim() === "" ? body : under;
+      const under = (heading) =>
+        parts
+          .filter((part) => heading.test(part[0]))
+          .map((part) => part.slice(1).join("\n"))
+          .join("\n");
+      const placed = [
+        ...CRITERIA_HEADINGS.map((name) => extractSection(body, name) ?? ""),
+        under(/^## .*\bAC[ -]?\d/i),
+      ].join("\n");
+      const where =
+        entries === null || !saysSomething(placed)
+          ? body
+          : under(/^## .*(?:criteri|\bAC[ -]?\d)/i);
       const hidden = list.find((command) => shows(where, command));
       if (hidden === undefined)
         return { reason: "none-named", exitCode: 0, ...base };

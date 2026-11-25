@@ -657,8 +657,11 @@ without its extension (`docs/task-registry-tick-<id>` for the registry arm):
 1. **Before the edit**, move to the tick branch. `new` → edit and commit as the arm says. `resume` → an
    earlier run committed the tick: skip to 2. `landed` → an earlier run's tick is already on the base:
    mark `ticked: true` and go to Step 5. One landed tick still reads `resume`: its conflict was resolved
-   on the forge, then it was squashed and its branch deleted there. Nothing is deleted; the second PR
-   that 2 opens conflicts. Close it, delete the tick branch, local and remote, and mark `ticked: true`.
+   on the forge, then it was squashed and its branch deleted there; the PR that 2 opens conflicts. A tick
+   that never landed can conflict the same way, so read the item's row on the base
+   (`git show origin/<baseBranch>:<file>`). Only when that row records the item as done and names its
+   merged PR: close the tick PR, delete the tick branch, local and remote, and mark `ticked: true`.
+   Otherwise **HALT** and delete nothing: the tick is on that branch alone.
    ```bash
    # INPUTS, substituted into THIS block: every {…}.
    BASE="{baseBranch}"; TICK_BRANCH="docs/{roadmap}-tick-{id}"

@@ -1,0 +1,11 @@
+[
+  { "id": "legit-eager", "input": "pipeline:\n  pushRecordCommits: eager\n", "direction": "legitimate", "why": "a documented value", "correct": "accepted", "spec_ref": "docs/reference/configuration.md:313" },
+  { "id": "legit-batched", "input": "pipeline:\n  pushRecordCommits: batched\n", "direction": "legitimate", "why": "a documented value", "correct": "accepted", "spec_ref": "docs/reference/configuration.md:313" },
+  { "id": "legit-absent", "input": "project: x\n", "direction": "legitimate", "why": "no pipeline block", "correct": "accepted", "spec_ref": "docs/reference/configuration.md:313" },
+  { "id": "legit-escaped-other", "input": "\"pr\\x6fject\": x\npipeline:\n  pushRecordCommits: eager\n", "direction": "legitimate", "why": "an escaped key that is not ours", "correct": "accepted", "spec_ref": "docs/reference/configuration.md:313" },
+  { "id": "hostile-x", "input": "\"pipelin\\x65\":\n  pushRecordCommits: eager\n", "direction": "hostile", "why": "pipeline under a \\x escape, alone", "correct": "REJECT", "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:399" },
+  { "id": "hostile-u", "input": "\"pipelin\\u0065\":\n  pushRecordCommits: eager\n", "direction": "hostile", "why": "pipeline under a \\u escape, alone", "correct": "REJECT", "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:399" },
+  { "id": "hostile-U", "input": "\"pipelin\\U00000065\":\n  pushRecordCommits: eager\n", "direction": "hostile", "why": "pipeline under a \\U escape, alone", "correct": "REJECT", "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:399" },
+  { "id": "hostile-beside", "input": "pipeline:\n  pushRecordCommits: batched\n\"\\x70ipeline\":\n  pushRecordCommits: eager\n", "direction": "hostile", "why": "escaped beside the plain key", "correct": "REJECT", "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:399" },
+  { "id": "hostile-whole", "input": "\"\\x70\\x69\\x70\\x65\\x6c\\x69\\x6e\\x65\":\n  pushRecordCommits: eager\n", "direction": "hostile", "why": "every letter escaped", "correct": "REJECT", "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:399" }
+]

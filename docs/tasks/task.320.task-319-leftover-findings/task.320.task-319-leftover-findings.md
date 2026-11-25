@@ -490,6 +490,30 @@ Phase 1's file and is reverted first.
 **Non-Critical (Forward Fix)**: a refusal whose message does not name the cause.
 
 ---
+
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-25
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.320.qa.1.task-319-leftover-findings.md](./task.320.qa.1.task-319-leftover-findings.md)
+- **Gate File**: [task.320.gate.1.task-319-leftover-findings.yml](./task.320.gate.1.task-319-leftover-findings.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 8895
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+Two medium: a heading with the word "criteria" still narrows the search (T320-CR-101), and the recovery stated for T319-CR-1301 can delete a tick that never landed (T320-CR-102). Three low: T320-CR-103, T320-CR-104, T320-CR-105.
 <!-- change-log-start -->
 ## Change Log
 
@@ -499,6 +523,8 @@ Phase 1's file and is reverted first.
 | 2026-11-25 | 1.1     | Review passed (9/10) — added the test that holds `listKeyRows`' decoding, the two merge-gate linters and where the durations are measured | review-task |
 | 2026-11-25 |         | Status → ready-for-development | review-task |
 | 2026-11-25 |  | Implemented — 31 files, 5 tests added and 6 extended | develop |
+| 2026-11-25 |  | QA gate CONCERNS (90/100) — 5 findings | qa-task |
+| 2026-11-25 |  | QA findings fixed — cycle 1, 5 findings | qa-fix |
 <!-- change-log-end -->
 
 ---

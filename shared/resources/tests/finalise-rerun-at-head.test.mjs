@@ -1171,6 +1171,8 @@ test("a section with no criterion the reader can find is refused only when it na
     // a line in a fence ends no section, and outside one it does (T319-CR-1201)
     "# T\n\n## Success Criteria\n\n```\n## x\n```\n\n## Other\n\n`echo a`\n",
     "# T\n\n## Success Criteria\n\nBelow.\n\n## x\n\n`echo a`\n",
+    // and so does an AC heading of its own that holds the criteria
+    "# T\n\n## Acceptance Criteria\n\n## AC1\n\nGiven x\n\n## Other\n\n`echo a`\n",
   ])
     assert.equal(read(text).reason, "none-named", text);
   for (const text of [
@@ -1190,6 +1192,20 @@ test("a section with no criterion the reader can find is refused only when it na
     "# T\n\n## Success Criteria\n\n```\n# x\n```\n\nThen `echo a` passes\n",
     "# T\n\n## Done when\n\n- [ ] `echo a` passes\n\n## Rollback criteria\n\nNone.\n",
     "# T\n\n## Done when\n\n- [ ] `echo a` passes\n\n## Rollback\n\nNone.\n",
+    // with AC headings, and no section the reader knows
+    "# T\n\n## AC1\n\nGiven x\n\n## Done when\n\n- [ ] `echo a` passes\n",
+    // beside one with nothing to read under it (T320-CR-101)
+    ...[
+      "",
+      "### Functional\n\n",
+      "---\n\n",
+      "<!-- to be written -->\n\n",
+      "### AC\n\n* * *\n\n",
+    ].map(
+      (none) =>
+        `# T\n\n## Success Criteria\n\n${none}## Done when\n\n- [ ] \`echo a\` passes\n\n## Rollback criteria\n\nNone.\n`,
+    ),
+    "# T\n\n## Success Criteria\n\n## Acceptance Criteria\n\n## Done when\n\n- [ ] `echo a` passes\n\n## Rollback criteria\n\nNone.\n",
   ]) {
     const r = read(text);
     assert.equal(r.reason, "scan-broken", text);
@@ -1208,6 +1224,11 @@ test("a section with no criterion the reader can find is refused only when it na
     ["Press the ` key\nthen `echo a` passes", "scan-broken"],
     ["Press the ` key, and\nthen `echo a` passes\n- [ ] other", "scan-broken"],
     ["Press the ` key\n\nThen `echo a` passes", "none-named"],
+    // in a span with a space inside it, or two backticks (T320-CR-103)
+    ["Press the ` key, and\nthen ` echo a ` passes", "scan-broken"],
+    ["Press the `` key, and\nthen ``echo a`` passes", "scan-broken"],
+    ["Press the ` key\n\n  Then `echo\na` passes", "scan-broken"],
+    ["Press the ` key, and\nthen ` echo a b ` passes", "none-named"],
   ]) {
     const r = read(`# T\n\n## Success Criteria\n\n- [ ] ${criterion}\n`);
     assert.equal(r.reason, reason, criterion);
@@ -1215,11 +1236,14 @@ test("a section with no criterion the reader can find is refused only when it na
       assert.match(r.message, /#1 names `echo a` after a backtick/);
   }
   // without the stray backtick the unindented line is the one that is named
-  const lazy = read(
-    "# T\n\n## Success Criteria\n\n- [ ] Press the key\nthen `echo a` passes\n",
-  );
-  assert.equal(lazy.reason, "scan-broken");
-  assert.match(lazy.message, /#1 names `echo a` on an unindented line/);
+  for (const criterion of [
+    "Press the key\nthen `echo a` passes",
+    "Press the key\nthen `echo\na` passes",
+  ]) {
+    const lazy = read(`# T\n\n## Success Criteria\n\n- [ ] ${criterion}\n`);
+    assert.equal(lazy.reason, "scan-broken");
+    assert.match(lazy.message, /#1 names `echo a` on an unindented line/);
+  }
 });
 
 // git takes an untracked SUB/x.js for a file inside the submodule `sub` under core.ignorecase, and lists it
@@ -1232,6 +1256,11 @@ test("a file beside a submodule, in a directory that differs from it only in cas
     ["under another name", "SUB2/x.js", "dirty-tree"],
     ["a repository beside it", "SUB/.git/x", "dirty-tree"],
     ["nothing beside it", null, "ran"],
+    // what the repository ignores is not compared, by its own rule for case (T320-CR-105)
+    ["an ignored one beside it", "SUB/x.log", "ran"],
+    ["ignored by its directory", "SUB/out/x.js", "ran"],
+    ["ignored, with a newline in its name", "SUB/a\nb.log", "ran"],
+    ["not the ignored one", "SUB/x.logs", "dirty-tree"],
   ]) {
     const { dir, run } = fixture(t, {
       config: LIST("echo a"),
@@ -1250,6 +1279,8 @@ test("a file beside a submodule, in a directory that differs from it only in cas
       "--cacheinfo",
       `160000,${git(at, "rev-parse", "HEAD")},${sub}`,
     );
+    writeFileSync(join(dir, ".gitignore"), ".claude/\n/sub/*.log\n/sub/out/\n");
+    git(dir, "add", ".gitignore");
     git(dir, "commit", "-q", "-m", "sub");
     git(dir, "config", "core.ignorecase", "true");
     if (existsSync(join(dir, "SUB"))) return; // a disk that folds names: SUB is sub
@@ -1262,7 +1293,8 @@ test("a file beside a submodule, in a directory that differs from it only in cas
     }
     const { rec } = run();
     assert.equal(rec.reason, reason, `${what}: ${rec.message}`);
-    if (file) assert.ok(rec.message.includes(file.split("/")[0]), rec.message);
+    if (reason === "dirty-tree")
+      assert.ok(rec.message.includes(file.split("/")[0]), rec.message);
   }
 });
 
