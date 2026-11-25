@@ -493,16 +493,16 @@ Phase 1's file and is reverted first.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-25
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
 
-- **Full Report**: [task.320.qa.3.task-319-leftover-findings.md](./task.320.qa.3.task-319-leftover-findings.md)
-- **Gate File**: [task.320.gate.3.task-319-leftover-findings.yml](./task.320.gate.3.task-319-leftover-findings.yml)
+- **Full Report**: [task.320.qa.4.task-319-leftover-findings.md](./task.320.qa.4.task-319-leftover-findings.md)
+- **Gate File**: [task.320.gate.4.task-319-leftover-findings.yml](./task.320.gate.4.task-319-leftover-findings.yml)
 
 ### Test Coverage Summary
 
@@ -513,7 +513,7 @@ Phase 1's file and is reverted first.
 
 ### Key Findings
 
-Cycle 3, all in the fixes of cycle 2. One medium: a commented-out criteria heading hides a listed command (T320-CR-301). Five low: T320-CR-302 to T320-CR-306. The suite was red once on SEC-1b, which this branch does not touch, and green on the second run.
+Cycle 4: no high and no medium finding. Four low: T320-CR-401 to T320-CR-404.
 <!-- change-log-start -->
 ## Change Log
 
@@ -529,6 +529,7 @@ Cycle 3, all in the fixes of cycle 2. One medium: a commented-out criteria headi
 | 2026-11-25 |  | QA findings fixed — cycle 2, 6 findings | qa-fix |
 | 2026-11-25 |  | QA gate CONCERNS (90/100) — 6 findings | qa-task |
 | 2026-11-25 |  | QA findings fixed — cycle 3, 6 findings | qa-fix |
+| 2026-11-25 |  | QA gate PASS (100/100) — 4 findings | qa-task |
 <!-- change-log-end -->
 
 ---
@@ -596,7 +597,10 @@ decoding).
 
 ## Deferred Work
 
-None.
+- **T320-CR-401** (LOW) — carried to gate 4 `recommendations.future` (route 2b, cycle 4): prose paragraphs that start with Given or When and with Then count as criteria
+- **T320-CR-402** (LOW) — carried to gate 4 `recommendations.future` (route 2b, cycle 4): with a quote that has no partner, the row check and the parse of `ci.skipMarker` disagree on where the comment starts
+- **T320-CR-403** (LOW) — carried to gate 4 `recommendations.future` (route 2b, cycle 4): the reference says an AC heading places the criteria of a document with neither criteria section; it is always searched whole
+- **T320-CR-404** (LOW) — carried to gate 4 `recommendations.future` (route 2b, cycle 4): an unclosed comment opener in an indented code block removes the criteria after it, and the document is refused
 
 ---
 
