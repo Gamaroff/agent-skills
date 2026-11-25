@@ -1,0 +1,102 @@
+schema: 2
+task: 'task.320.task-319-leftover-findings'
+task_title: "Task 319's leftover findings are closed"
+gate: CONCERNS
+status_reason: 'Cycle 5 findings all fixed and held. One medium and two low findings remain at the edges of the two rules cycle 5 introduced, each reproduced with its control. Criterion 10 holds on this head.'
+reviewer: 'QA Engineer'
+head: '7cae65a149fb9bcd1c6e59e6fdad07b6d8b1a769'
+updated: '2026-11-25T23:02:49Z'
+
+top_issues:
+  - id: 'T320-CR-601'
+    severity: medium
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'Line 334: a column-0 <!-- inside an open HTML block (<details>, <div>, <pre>, <table>) starts no Markdown comment, but partsOf opens a comment block that runs to a later -->, so a ## line in the real fence after it does not end the criteria section and the document is read past: none-named, where scan-broken is required (reproduced 4 of 4; control: with no later --> the answer is scan-broken). The same on 90aabca6c: a gap in the T320-CR-501 remedy, not a regression.'
+    suggested_action: 'Start no comment block while an HTML block is open, reusing the HTML block lists already in the file.'
+    suggested_owner: dev
+    status: open
+  - id: 'T320-CR-602'
+    severity: low
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'Line 463: an explicit key with a trailing comment (? ci # c) and an alias key (*k :) are not read as ci or pipeline, so the defaults apply where YAML reads docsOnly.enabled false and pushRecordCommits eager (reproduced; control: ? ci alone is refused).'
+    suggested_action: 'Strip a trailing comment before the explicit-key colon is added, and refuse an alias key at the top level.'
+    suggested_owner: dev
+    status: open
+  - id: 'T320-CR-603'
+    severity: low
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'Line 334: a closed comment indented 1 to 3 spaces, or inside a list item, is a comment in Markdown, but its fence marker opens a fence in partsOf, so a later ## heading is hidden and a document that names the command only under it is refused: scan-broken, where 90aabca6c gave none-named (reproduced 4 of 4). No tracked Markdown file splits differently (5021 checked).'
+    suggested_action: "Let an opener indented 0 to 3 spaces past its container's content start a comment block."
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 8898
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 126
+    escaped: 0
+    boundary: true
+    boundary_signals: ["refused","refuses"]
+    notes: '6 hostile cases of 126 reproduced (T320-CR-601: 2, T320-CR-602: 4) and 2 legitimate cases refused (T320-CR-603). All 117 cases of the earlier cycles and DoD run 1 hold, the 6 that reproduced at gate 5 included.'
+  performance:
+    status: PASS
+    notes: 'Criterion 10: five timed runs of the four suites on this head, 235 tests each; no test reaches 30 s in any run; slowest median 26.0 s (max 27.1 s); load 0.56 to 2.05.'
+  reliability:
+    status: PASS
+    notes: 'Full suite green on the server on this head: 8898 tests, 0 fail, 3 skipped.'
+  maintainability:
+    status: PASS
+    notes: 'The key checks live in assertBlockRows, which every block reader calls.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'T320-CR-601 to T320-CR-603'
+      refs: ['shared/resources/finalise-rerun-at-head.js', 'shared/resources/ci-tree-equivalence.js']
+  future:
+    - action: 'T320-CR-401: prose paragraphs that start with Given or When and with Then count as criteria. Tie the Then line to the block of the Given or When line.'
+      refs: ['shared/resources/finalise-rerun-at-head.js']
+      carried_from: top_issues (route 2b, cycle 4)
+      remedy: unverified
+    - action: "T320-CR-402: with a quote that has no partner, the row check and the parse disagree on where the comment of a skipMarker row starts. Use the parser's own comment rule."
+      refs: ['shared/resources/ci-tree-equivalence.js', 'shared/resources/yaml-subset.js']
+      carried_from: top_issues (route 2b, cycle 4)
+      remedy: unverified
+    - action: 'T320-CR-403: the reference, the finalise table and a comment say an AC heading places the criteria of a document with neither criteria section; it is always searched whole. State that.'
+      refs: ['docs/reference/configuration.md', 'skills/finalise/SKILL.md', 'shared/resources/finalise-rerun-at-head.js']
+      carried_from: top_issues (route 2b, cycle 4)
+      remedy: unverified
+    - action: 'T320-CR-404: an unclosed comment opener in an indented code block removes the criteria after it, and the document is refused. State the limit beside the function.'
+      refs: ['shared/resources/finalise-rerun-at-head.js']
+      carried_from: top_issues (route 2b, cycle 4)
+      remedy: unverified
+    - action: 'SEC-1b waits one second for a killed process to be gone, and failed once on a loaded server (gate 3). Wait longer, or mark it load-sensitive.'
+      refs: ['shared/resources/tests/ci-tree-equivalence.test.mjs']
+      provenance: pre-existing
+      remedy: unverified
+    - action: 'lockctl.sh takes its lock with mkdir, which uutils coreutils (the ubuntu-26.04 runner image) does not make atomic; see gate 1. CI was green on this head.'
+      refs: ['scripts/remote-test/lockctl.sh', 'tests/test-remote-runner.test.js']
+      provenance: pre-existing
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T320-CR-601 fixed']

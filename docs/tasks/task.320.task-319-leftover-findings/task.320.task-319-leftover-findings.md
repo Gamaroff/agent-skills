@@ -534,19 +534,19 @@ Phase 1's file and is reverted first.
 
 ### QA Report
 
-- **Full Report**: [task.320.qa.5.task-319-leftover-findings.md](./task.320.qa.5.task-319-leftover-findings.md)
-- **Gate File**: [task.320.gate.5.task-319-leftover-findings.yml](./task.320.gate.5.task-319-leftover-findings.yml)
+- **Full Report**: [task.320.qa.6.task-319-leftover-findings.md](./task.320.qa.6.task-319-leftover-findings.md)
+- **Gate File**: [task.320.gate.6.task-319-leftover-findings.yml](./task.320.gate.6.task-319-leftover-findings.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 8897
+- **Tests Executed**: 8898
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-Cycle 5: the fixes of DoD gaps 1 and 2 close the recorded inputs. Two medium (T320-CR-501, T320-CR-502) and two low (T320-CR-503, T320-CR-504).
+Cycle 6: every gate-5 finding is fixed, and criterion 10 holds on the head. One medium (T320-CR-601) and two low (T320-CR-602, T320-CR-603) remain at the edges of the cycle-5 rules.
 
 ## Definition of Done - Gaps Identified
 
@@ -599,6 +599,7 @@ Cycle 5: the fixes of DoD gaps 1 and 2 close the recorded inputs. Two medium (T3
 | 2026-11-25 |  | DoD gaps 1 and 2 fixed — near-miss keys read from the source, fence markers in comments | qa-fix |
 | 2026-11-25 |  | QA gate CONCERNS (90/100) — 4 findings | qa-task |
 | 2026-11-25 |  | QA cycle 5 fixes — T320-CR-501 to 504 | qa-fix |
+| 2026-11-25 |  | QA gate CONCERNS (90/100) — 3 findings | qa-task |
 <!-- change-log-end -->
 
 ---
