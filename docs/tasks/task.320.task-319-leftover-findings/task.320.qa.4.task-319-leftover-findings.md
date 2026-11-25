@@ -119,6 +119,15 @@ Server `uptime`: before load 0.38, 2.22, 5.22; after 0.43, 1.48, 3.36.
 
 The second column is of the tests as they stand since cycle 2 split T319-CR-805; before the split, that test took 29.7 s ([QA report 2](./task.320.qa.2.task-319-leftover-findings.md)).
 
+### Document population (task § 10, medium risk 1)
+
+Added after the PR review (PC-1), at the code head c160ee638e2d. Tracked documents under `docs/` whose
+file name equals their directory's and starts `task.` or `story.`: 342. `readCriteriaEntries` returns
+`null` for none and an empty list for one, `task.308.pause-commits-cancel-the-step-7-ci-poll` (its
+criteria are plain list items). With a listed command under another heading, that document reads
+`none-named` here and on `origin/develop`; the control, a document with no criteria, reads `scan-broken`
+on both. No document's answer changes.
+
 ### Red before the change (criterion 11)
 
 The cases of cycle 3, run against `846320549`:

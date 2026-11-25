@@ -1,0 +1,98 @@
+[
+  {
+    "argv": [
+      "--sink",
+      "template-render",
+      "--entry",
+      "shared/resources/ci-tree-equivalence.js#parseConfig",
+      "--name",
+      "ci key spellings"
+    ],
+    "cases_file": "task.320.dod.1.security.cases.1.json",
+    "cases_sha256": "f153aeba687e4e356abac25bd7fc1217a81302cdb687d13ec626b3a7c5b94f79"
+  },
+  {
+    "argv": [
+      "--sink",
+      "template-render",
+      "--entry",
+      "shared/resources/ci-tree-equivalence.js#parseConfig",
+      "--name",
+      "ci.skipMarker row"
+    ],
+    "cases_file": "task.320.dod.1.security.cases.2.json",
+    "cases_sha256": "fc65b9141bcb16ad61ce152e1be609c083eac7386a83e2b21e3f7b0b7c292ade"
+  },
+  {
+    "argv": [
+      "--sink",
+      "template-render",
+      "--entry",
+      "shared/resources/ci-tree-equivalence.js#parsePipelineConfig",
+      "--name",
+      "pipeline key spellings"
+    ],
+    "cases_file": "task.320.dod.1.security.cases.3.json",
+    "cases_sha256": "dacf9167fb7b2e156e8796d8bd42a6cd3b6fb8e76a42652a6d5eacb494dcb0f2"
+  },
+  {
+    "argv": [
+      "--sink",
+      "template-render",
+      "--entry",
+      "shared/resources/finalise-rerun-at-head.js#parseRerunList",
+      "--name",
+      "finalise key spellings"
+    ],
+    "cases_file": "task.320.dod.1.security.cases.4.json",
+    "cases_sha256": "d3c87e84a02037c25de08dab314c1eed8a0c0504c35d3c90aa50a727ecdceee2"
+  },
+  {
+    "argv": [
+      "--sink",
+      "shell-exec",
+      "--entry",
+      "cli:shared/resources/finalise-rerun-at-head.js",
+      "--argv",
+      "[\"--doc\",\"{input}\",\"--out-dir\",\".claude/state/rerun\"]",
+      "--fixture-setup",
+      "shared/resources/tests/fixtures/security-probe/setup-git-repo.sh",
+      "--name",
+      "rerun criteria search"
+    ],
+    "cases_file": "task.320.dod.1.security.cases.5.json",
+    "cases_sha256": "bc4df266db32d53b22f76443c5d44501bf05996219febb6cb01d13028863a512"
+  },
+  {
+    "argv": [
+      "--sink",
+      "shell-exec",
+      "--entry",
+      "shell-argv:shared/resources/push-held.sh",
+      "--argv",
+      "[\"--site\",\"{input}\"]",
+      "--name",
+      "push-held --site"
+    ],
+    "cases_file": "task.320.dod.1.security.cases.6.json",
+    "cases_sha256": "81a2963720fbe8bca015b13419fdba3b453b838fffb5f2860500e2fa0cd53331"
+  },
+  {
+    "argv": [
+      "--sink",
+      "shell-exec",
+      "--entry",
+      "shell-argv:shared/resources/tick-pr.sh",
+      "--argv",
+      "[\"merge\",\"--base\",\"develop\",\"--branch\",\"docs/roadmap-tick-1\",\"--pr\",\"1\",\"--quality-gate\",\"{input}\"]",
+      "--fixture-setup",
+      "shared/resources/tests/fixtures/security-probe/setup-git-repo.sh",
+      "--fake-gh",
+      "tests/fixtures/fake-gh",
+      "--name",
+      "tick-pr merge --quality-gate"
+    ],
+    "cases_file": "task.320.dod.1.security.cases.7.json",
+    "cases_sha256": "af14f7fb4d261b07c8e508b8fd6d3533b5a1b43656a9c51abe11834ed7e22fce"
+  }
+]

@@ -1,0 +1,50 @@
+[
+  {
+    "id": "legit-list",
+    "input": "finalise:\n  rerunAtHead:\n    - npm test\n",
+    "direction": "legitimate",
+    "why": "the documented form",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "legit-escaped-other",
+    "input": "\"fin\\x61l\": x\nfinalise:\n  rerunAtHead:\n    - npm test\n",
+    "direction": "legitimate",
+    "why": "an escaped key that is not ours",
+    "correct": "accepted",
+    "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:181"
+  },
+  {
+    "id": "hostile-no-list",
+    "input": "\"finalis\\x65\":\n  deferralApprover: x\n",
+    "direction": "hostile",
+    "why": "escaped, holding no list",
+    "correct": "refused",
+    "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:427"
+  },
+  {
+    "id": "hostile-beside",
+    "input": "finalise:\n  rerunAtHead:\n    - npm test\n\"finalis\\x65\":\n  deferralApprover: x\n",
+    "direction": "hostile",
+    "why": "escaped beside the plain key",
+    "correct": "refused",
+    "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:427"
+  },
+  {
+    "id": "hostile-list-under-other-block",
+    "input": "notes:\n  \"rerun\\x41tHead\": x\nfinalise:\n  rerunAtHead:\n    - npm test\n",
+    "direction": "hostile",
+    "why": "the escaped list key under another block",
+    "correct": "refused",
+    "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:394"
+  },
+  {
+    "id": "hostile-beside-after-block-scalar",
+    "input": "finalise:\n  rerunAtHead:\n    - npm test\nnote: |\n  text\n\"finalis\\x65\":\n  deferralApprover: x\n",
+    "direction": "hostile",
+    "why": "a second block in an escaped spelling, after a block scalar",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:314"
+  }
+]

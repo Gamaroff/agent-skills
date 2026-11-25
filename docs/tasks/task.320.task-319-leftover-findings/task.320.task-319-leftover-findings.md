@@ -134,6 +134,11 @@ already holds the pipeline. With it, `tick-pr` is 25 of 25.
 The other three suites passed with every remedy applied (226 of 227 in that run, the one failure being
 the test above).
 
+**What landed is wider than the table in two rows.** QA cycles 1 to 3 found more inputs of the same
+class. For T319-CR-1201 the whole document is also searched when the criteria section is there and holds
+no criterion shape (§ 5, Breaking Change 3). For the marker's edge the whole row is checked, its comment
+included (§ 5, Breaking Change 2).
+
 ### Important Clarifications
 
 - **T319-CR-1301 stays a limit.** Asking the forge for a merged PR would not settle it: the head that
@@ -207,16 +212,37 @@ refused too: the parse does not keep the quote.
 ### Breaking Change 2: a marker with a control or format character at its edge is a usage error
 
 **What Changed**: a byte-order mark, a tab or another control or format character at the start or end
-of a quoted `ci.skipMarker` is refused.
+of a quoted `ci.skipMarker` is refused. So is a space that is not a plain one (a no-break space) at
+either end of the value, quoted or not, and a control or format character anywhere on the key's row, its
+comment included. A tab outside the quotes is still dropped.
 
 **Before**: `skipMarker: "[skip ci]<TAB>"` was read as `[skip ci]`.
 
-**After**: `ci.skipMarker must be one printable line of at most 80 characters`.
+**After**: `ci.skipMarker must be one printable line of at most 80 characters, with nothing but plain
+spaces at its ends`.
 
-**Impact**: a project with such a character in the value. The reference already forbids it, and the key
-first shipped in `v0.69.0` (2026-11-25).
+**Impact**: a project with such a character on that row. The reference already forbids it in the value,
+and the key first shipped in `v0.69.0` (2026-11-25).
 
-**Migration Path**: delete the character. Spaces at the ends need no change.
+**Migration Path**: delete the character. Plain spaces at the ends need no change.
+
+### Breaking Change 3: the re-run refuses more documents in which it can read no criterion
+
+**What Changed**: in a document in which no criterion can be read, a command listed in
+`finalise.rerunAtHead` is refused wherever it stands, when the document has no `Success Criteria` or
+`Acceptance Criteria` section, or when neither such a section nor an AC heading holds a criterion shape:
+a list item, a table row, a Given or When line with a Then line after it, or (under an AC heading) a
+line of text.
+
+**Before**: any heading with "criteria" in it narrowed the search to that section, so a command elsewhere
+was `none-named`.
+
+**After**: `scan-broken`, naming the command.
+
+**Impact**: a project that lists commands, with such a document. Of this repository's 342 task and story
+documents none changes its answer (§ 10).
+
+**Migration Path**: write the criteria as a checklist or a numbered list.
 
 ---
 
@@ -299,6 +325,7 @@ first shipped in `v0.69.0` (2026-11-25).
 
 - `docs/reference/configuration.md`
 - `skills/develop-next/SKILL.md`
+- `skills/finalise/SKILL.md` (added in QA: the re-run's refusals in its table)
 - `CHANGELOG.md`
 - `docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md`
 - the generated copies under `skills/*/references/`
@@ -338,10 +365,11 @@ first shipped in `v0.69.0` (2026-11-25).
 11. ✅ `skills/develop-next/SKILL.md`
 12. ✅ `CHANGELOG.md`
 13. ✅ `docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md`
+14. ✅ `skills/finalise/SKILL.md`
 
 ### Generated
 
-14. ✅ the copies of files 1 to 5 under `skills/*/references/`, listed by
+15. ✅ the copies of files 1 to 5 under `skills/*/references/`, listed by
     `git ls-files 'skills/*/references/<name>'` (measured 2026-11-25: 1, 6, 3, 2 and 6)
 
 ### Files to Delete
@@ -428,10 +456,10 @@ None. No remedy deletes, overwrites or pushes anything that is not pushed today.
 
 **1. The whole-document search refuses more documents**
 
-- **Risk**: a work item with no criteria heading the reader knows, and a listed command in prose, is now refused where a `… criteria` heading used to narrow the search.
+- **Risk**: a work item in which no criterion can be read, and a listed command in prose, is now refused where a `… criteria` heading used to narrow the search: one with no criteria section, and one whose criteria section and AC headings hold no criterion shape (§ 5, Breaking Change 3).
 - **Probability**: Low. Work items carry `Success Criteria` or `Acceptance Criteria`.
 - **Impact**: Minor. The refusal is loud and names the command.
-- **Mitigation**: measured 2026-11-25 over the tracked documents under `docs/` whose file name equals their directory's and starts `task.` or `story.` (337): `readCriteriaEntries` returns `null` for none of them, so no answer here changes. Repeat it at QA and put the count in the QA report.
+- **Mitigation**: measured 2026-11-25 over the tracked documents under `docs/` whose file name equals their directory's and starts `task.` or `story.` (337): `readCriteriaEntries` returns `null` for none of them, so no answer here changes. Repeat it at QA and put the count in the QA report. (Done in QA report 4: 342 documents, `null` for none, an empty list for one, whose answer is the same as on `develop`.)
 - **Rollback**: revert Phase 1's first change.
 
 **2. A SIGKILL that was not the watcher's is read as a timeout**
@@ -514,6 +542,37 @@ Phase 1's file and is reverted first.
 ### Key Findings
 
 Cycle 4: no high and no medium finding. Four low: T320-CR-401 to T320-CR-404.
+
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.320.qa.4.task-319-leftover-findings.md`
+**Gate File**: `task.320.gate.4.task-319-leftover-findings.yml`
+**Gate Status**: PASS (100/100)
+
+### Missing Criteria:
+
+1. **Security Review** (probes run on the PR head, `task.320.dod.1.security.run.json`):
+   - [ ] An escaped `ci`, `pipeline` or `finalise` key after a block scalar (`note: |`) is accepted and its block dropped. Criterion 8 and breaking change 1 say it is refused. Three probes medium, one low; the same on `origin/develop`
+   - [ ] A fence marker inside a closed HTML comment makes a legitimate document `scan-broken` (low, fails closed; `origin/develop` answers `none-named`)
+
+2. **Acceptance Criteria:**
+   - [ ] Criterion 10: the QA report records one measured run; the bound is graded on the median of five, each with its load (low; every reading meets the bound)
+
+### Next Steps:
+
+- [ ] Read near-miss keys from the source's top-level rows, as `ciBlockRows` does, and not from the parse
+- [ ] Make the fence split ignore a fence marker inside a comment
+- [ ] Record five timed runs, each with its load, in the next QA report
+
+**Estimated Effort:** Small (1-2 hours, a QA cycle included)
+
+**Gap Report Generated:** 2026-11-25
+
+**Detailed Verification Log:** See `task.320.dod.1.task-319-leftover-findings.md`.
 <!-- change-log-start -->
 ## Change Log
 
@@ -530,6 +589,8 @@ Cycle 4: no high and no medium finding. Four low: T320-CR-401 to T320-CR-404.
 | 2026-11-25 |  | QA gate CONCERNS (90/100) — 6 findings | qa-task |
 | 2026-11-25 |  | QA findings fixed — cycle 3, 6 findings | qa-fix |
 | 2026-11-25 |  | QA gate PASS (100/100) — 4 findings | qa-task |
+| 2026-11-25 |  | PR review CONCERNS — 5 document findings fixed (breaking changes, risk 1, file lists, notes, the QA report's population count) | review-pr |
+| 2026-11-25 |  | DoD incomplete — 3 gaps identified | finalise |
 <!-- change-log-end -->
 
 ---
@@ -620,6 +681,6 @@ decoding).
 none is worth a pipeline run of its own.
 
 **The trial is not the implementation.** It was made in a scratch clone outside the repository, and
-none of it was committed. Nothing in `shared/resources/` has been changed. Every test is still to be written red first.
+none of it was committed. When this document was written nothing in `shared/resources/` had been changed and no test had been written.
 
 QA will create, beside this document: the QA report, bug reports if any, and the quality gate.

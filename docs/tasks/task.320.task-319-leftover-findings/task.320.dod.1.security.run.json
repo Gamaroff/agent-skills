@@ -1,0 +1,224 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "template-render",
+      "entry": "shared/resources/finalise-rerun-at-head.js#parseRerunList",
+      "name": "finalise key spellings",
+      "call_site": null,
+      "verdict": "present-but-inert",
+      "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+      "executed": 6,
+      "passed": 5,
+      "reproduced": 1,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "observation_limits": [
+        "effects-after-accept"
+      ],
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "fixture_copy": null,
+      "ran_at": "2026-11-25T20:56:43.573Z"
+    },
+    {
+      "sink": "template-render",
+      "entry": "shared/resources/ci-tree-equivalence.js#parseConfig",
+      "name": "ci.skipMarker row",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 12,
+      "passed": 12,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "observation_limits": [
+        "effects-after-accept"
+      ],
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "fixture_copy": null,
+      "ran_at": "2026-11-25T20:56:42.340Z"
+    },
+    {
+      "sink": "shell-exec",
+      "entry": "cli:shared/resources/finalise-rerun-at-head.js",
+      "name": "rerun criteria search",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 19,
+      "passed": 18,
+      "reproduced": 0,
+      "overblocked": 1,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "observation_limits": [
+        "effects-after-accept"
+      ],
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "--doc",
+        "{input}",
+        "--out-dir",
+        ".claude/state/rerun"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": "/home/gamaroff/Development/agent-skills/shared/resources/tests/fixtures/security-probe/setup-git-repo.sh",
+      "fixture_copy": null,
+      "ran_at": "2026-11-25T20:56:48.151Z"
+    },
+    {
+      "sink": "shell-exec",
+      "entry": "shell-argv:shared/resources/tick-pr.sh",
+      "name": "tick-pr merge --quality-gate",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 16,
+      "passed": 16,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "observation_limits": [
+        "effects-after-accept"
+      ],
+      "shells": [
+        "bash",
+        "zsh"
+      ],
+      "interpreter": null,
+      "fake_gh": "/home/gamaroff/Development/agent-skills/tests/fixtures/fake-gh",
+      "argv": [
+        "merge",
+        "--base",
+        "develop",
+        "--branch",
+        "docs/roadmap-tick-1",
+        "--pr",
+        "1",
+        "--quality-gate",
+        "{input}"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": "/home/gamaroff/Development/agent-skills/shared/resources/tests/fixtures/security-probe/setup-git-repo.sh",
+      "fixture_copy": null,
+      "ran_at": "2026-11-25T20:56:50.364Z"
+    },
+    {
+      "sink": "template-render",
+      "entry": "shared/resources/ci-tree-equivalence.js#parseConfig",
+      "name": "ci key spellings",
+      "call_site": null,
+      "verdict": "present-but-inert",
+      "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+      "executed": 11,
+      "passed": 9,
+      "reproduced": 2,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "observation_limits": [
+        "effects-after-accept"
+      ],
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "fixture_copy": null,
+      "ran_at": "2026-11-25T20:56:40.337Z"
+    },
+    {
+      "sink": "shell-exec",
+      "entry": "shell-argv:shared/resources/push-held.sh",
+      "name": "push-held --site",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 16,
+      "passed": 16,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "observation_limits": [
+        "effects-after-accept"
+      ],
+      "shells": [
+        "bash",
+        "zsh"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "--site",
+        "{input}"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "fixture_copy": null,
+      "ran_at": "2026-11-25T20:56:48.448Z"
+    },
+    {
+      "sink": "template-render",
+      "entry": "shared/resources/ci-tree-equivalence.js#parsePipelineConfig",
+      "name": "pipeline key spellings",
+      "call_site": null,
+      "verdict": "present-but-inert",
+      "reason": "a-hostile-case-passed-a-control-that-rejects-others",
+      "executed": 6,
+      "passed": 5,
+      "reproduced": 1,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "observation_limits": [
+        "effects-after-accept"
+      ],
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "fixture_copy": null,
+      "ran_at": "2026-11-25T20:56:42.926Z"
+    }
+  ],
+  "totals": {
+    "executed": 86,
+    "reproduced": 4,
+    "escaped": 0
+  },
+  "updated_at": "2026-11-25T20:56:50.364Z"
+}

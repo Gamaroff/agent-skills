@@ -1,0 +1,98 @@
+[
+  {
+    "id": "legit-single-quotes",
+    "input": "ci:\n  skipMarker: '[skip ci]'\n",
+    "direction": "legitimate",
+    "why": "single quotes",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "legit-tab-before-comment",
+    "input": "ci:\n  skipMarker: \"[x]\"\t# why\n",
+    "direction": "legitimate",
+    "why": "a tab outside the quotes is dropped",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "legit-80",
+    "input": "ci:\n  skipMarker: \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"\n",
+    "direction": "legitimate",
+    "why": "80 characters",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "legit-nbsp-inside",
+    "input": "ci:\n  skipMarker: \"[a b]\"\n",
+    "direction": "legitimate",
+    "why": "a no-break space inside, not at an end",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-81",
+    "input": "ci:\n  skipMarker: \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"\n",
+    "direction": "hostile",
+    "why": "81 characters",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-ideographic-quoted",
+    "input": "ci:\n  skipMarker: \"[x]　\"\n",
+    "direction": "hostile",
+    "why": "an ideographic space at the end, inside the quotes",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-narrow-nbsp-outside",
+    "input": "ci:\n  skipMarker: \"[x]\" \n",
+    "direction": "hostile",
+    "why": "a narrow no-break space after the quotes",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-em-space-start",
+    "input": "ci:\n  skipMarker: ' [x]'\n",
+    "direction": "hostile",
+    "why": "an em space at the start, single quotes",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-tab-inside-start",
+    "input": "ci:\n  skipMarker: \"\t[x]\"\n",
+    "direction": "hostile",
+    "why": "a tab inside the quotes, at the start",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-soft-hyphen",
+    "input": "ci:\n  skipMarker: \"[skip­ci]\"\n",
+    "direction": "hostile",
+    "why": "a soft hyphen inside",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-tag-character",
+    "input": "ci:\n  skipMarker: \"[x]󠁁\"\n",
+    "direction": "hostile",
+    "why": "a tag character, beyond the BMP",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-lone-cr",
+    "input": "ci:\n  skipMarker: \"[x]\"\r# c\n",
+    "direction": "hostile",
+    "why": "a lone CR on the row",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:312"
+  }
+]
