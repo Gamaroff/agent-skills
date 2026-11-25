@@ -131,6 +131,7 @@ module.exports = {
   CRITERIA_HEADINGS,
   RE_CHECKBOX,
   RE_NUMBERED,
+  makeFenceTracker,
   extractSection,
   criteriaSection,
   readCriteriaEntries,

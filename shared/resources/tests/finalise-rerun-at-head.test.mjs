@@ -865,6 +865,17 @@ test("a list the parse ends early, or under a key spelt with an escape, is refus
     ],
     ["a tagged key", `!!str finalise:\n${list}`],
     ["another block's", `notes:\n${list}`],
+    // the block key is plain here, so nothing but the list key's own escape says it (task 320)
+    [
+      "another block's, with an escape",
+      'notes:\n  "rerun\\x41tHead":\n    - echo a\n',
+    ],
+    [
+      "another block's, with an escape, beside a plain one",
+      `${LIST("echo a")}notes:\n  "rerun\\x41tHead":\n    - echo b\n`,
+    ],
+    ["an escaped block key with no list", '"finalis\\x65":\n  other: 1\n'],
+    ["an escaped block key with nothing", 'finalise:\n"finalis\\u0065":\n'],
   ])
     assert.throws(
       () => eng.parseRerunList(config),
@@ -1157,6 +1168,9 @@ test("a section with no criterion the reader can find is refused only when it na
     "# T\n\n## Acceptance Criteria\n\n### AC1\n\nGiven x\n\n## Other\n\n`echo a`\n",
     "# T\n\nno criteria\n",
     "# T\n\n## Success Criteria\n\necho a, and `echo a b`\n",
+    // a line in a fence ends no section, and outside one it does (T319-CR-1201)
+    "# T\n\n## Success Criteria\n\n```\n## x\n```\n\n## Other\n\n`echo a`\n",
+    "# T\n\n## Success Criteria\n\nBelow.\n\n## x\n\n`echo a`\n",
   ])
     assert.equal(read(text).reason, "none-named", text);
   for (const text of [
@@ -1170,6 +1184,12 @@ test("a section with no criterion the reader can find is refused only when it na
     "# T\n\n## Acceptance Criteria\n\n## AC1\n\nThen `echo a` passes\n",
     "# T\n\n## Acceptance Criteria\n\nBelow.\n\n## AC1\n\nThen `echo a` passes\n",
     "# T\n\n## Acceptance Criteria\n\n### AC1\n\nPress the ` key, then `echo a` passes\n",
+    // past a line in a fence, and beside a heading that only contains the word (T319-CR-1201)
+    "# T\n\n## Success Criteria\n\n```\n## x\n```\n\nThen `echo a` passes\n",
+    "# T\n\n## Success Criteria\r\n\r\n~~~\r\n## x\r\n~~~\r\n\r\nThen `echo a` passes\r\n",
+    "# T\n\n## Success Criteria\n\n```\n# x\n```\n\nThen `echo a` passes\n",
+    "# T\n\n## Done when\n\n- [ ] `echo a` passes\n\n## Rollback criteria\n\nNone.\n",
+    "# T\n\n## Done when\n\n- [ ] `echo a` passes\n\n## Rollback\n\nNone.\n",
   ]) {
     const r = read(text);
     assert.equal(r.reason, "scan-broken", text);
@@ -1184,12 +1204,94 @@ test("a section with no criterion the reader can find is refused only when it na
     ["Press \\` then `echo a` passes", "ran"],
     ["In C:\\\\`echo a` passes", "ran"],
     ["``Press the ` key``\n\n  Then `echo a` passes", "ran"],
+    // and on an unindented line, which is read as part of it here alone (T319-CR-1202)
+    ["Press the ` key\nthen `echo a` passes", "scan-broken"],
+    ["Press the ` key, and\nthen `echo a` passes\n- [ ] other", "scan-broken"],
+    ["Press the ` key\n\nThen `echo a` passes", "none-named"],
   ]) {
     const r = read(`# T\n\n## Success Criteria\n\n- [ ] ${criterion}\n`);
     assert.equal(r.reason, reason, criterion);
-    if (reason !== "ran")
+    if (reason === "scan-broken")
       assert.match(r.message, /#1 names `echo a` after a backtick/);
   }
+  // without the stray backtick the unindented line is the one that is named
+  const lazy = read(
+    "# T\n\n## Success Criteria\n\n- [ ] Press the key\nthen `echo a` passes\n",
+  );
+  assert.equal(lazy.reason, "scan-broken");
+  assert.match(lazy.message, /#1 names `echo a` on an unindented line/);
+});
+
+// git takes an untracked SUB/x.js for a file inside the submodule `sub` under core.ignorecase, and lists it
+// nowhere (T319-CR-1203). A commit records the submodule; nothing needs to be cloned into it.
+test("a file beside a submodule, in a directory that differs from it only in case, is not the submodule's (T319-CR-1203)", (t) => {
+  for (const [what, file, reason, sub = "sub"] of [
+    ["beside it", "SUB/x.js", "dirty-tree"],
+    ["deeper beside it", "SUB/in/x.js", "dirty-tree"],
+    ["beside one that is deeper", "lib/SUB/x.js", "dirty-tree", "lib/sub"],
+    ["under another name", "SUB2/x.js", "dirty-tree"],
+    ["a repository beside it", "SUB/.git/x", "dirty-tree"],
+    ["nothing beside it", null, "ran"],
+  ]) {
+    const { dir, run } = fixture(t, {
+      config: LIST("echo a"),
+      criteria: ["`echo a` passes"],
+    });
+    const at = join(dir, sub);
+    mkdirSync(at, { recursive: true });
+    git(at, "init", "-q", ".");
+    writeFileSync(join(at, "in.js"), "in\n");
+    git(at, "add", "-A");
+    git(at, "commit", "-q", "-m", "sub");
+    git(
+      dir,
+      "update-index",
+      "--add",
+      "--cacheinfo",
+      `160000,${git(at, "rev-parse", "HEAD")},${sub}`,
+    );
+    git(dir, "commit", "-q", "-m", "sub");
+    git(dir, "config", "core.ignorecase", "true");
+    if (existsSync(join(dir, "SUB"))) return; // a disk that folds names: SUB is sub
+    if (file) {
+      mkdirSync(dirname(join(dir, file)), { recursive: true });
+      if (file.includes(".git/")) {
+        git(join(dir, "SUB"), "init", "-q", ".");
+        git(join(dir, "SUB"), "commit", "-q", "--allow-empty", "-m", "own");
+      } else writeFileSync(join(dir, file), "x\n");
+    }
+    const { rec } = run();
+    assert.equal(rec.reason, reason, `${what}: ${rec.message}`);
+    if (file) assert.ok(rec.message.includes(file.split("/")[0]), rec.message);
+  }
+});
+
+// Where the disk folds names, both spellings are one directory. As for T319-CR-1002, a link above it stands
+// in for that disk, and git's listing is added to.
+test("a second spelling of a submodule's directory is the submodule (T319-CR-1203)", (t) => {
+  const { dir, run } = fixture(t, {
+    config: LIST("echo a"),
+    criteria: ["`echo a` passes"],
+  });
+  const at = join(dir, "a/sub");
+  mkdirSync(at, { recursive: true });
+  git(at, "init", "-q", ".");
+  writeFileSync(join(at, "in.js"), "in\n");
+  git(at, "add", "-A");
+  git(at, "commit", "-q", "-m", "sub");
+  writeFileSync(join(dir, ".gitignore"), ".claude/\n/A\n");
+  git(dir, "add", ".gitignore");
+  git(
+    dir,
+    "update-index",
+    "--add",
+    "--cacheinfo",
+    `160000,${git(at, "rev-parse", "HEAD")},a/sub`,
+  );
+  git(dir, "commit", "-q", "-m", "sub");
+  if (existsSync(join(dir, "A"))) return; // a disk that folds names
+  symlinkSync("a", join(dir, "A"));
+  assert.equal(withListed(t, "A/sub/in.js", run).rec.reason, "ran");
 });
 
 test("what the repository ignores in any case is not compared, and what it does not ignore is (T319-CR-801)", (t) => {
@@ -1236,6 +1338,27 @@ test("what git status shows as untracked is never left out by case (T319-CR-1001
   }
 });
 
+/** `run()` where git's case-sensitive listing of what is untracked names `file` too. */
+function withListed(t, file, run) {
+  const bin = mkdtempSync(join(tmpdir(), "rerun-at-head-bin-"));
+  t.after(() => rmSync(bin, { recursive: true, force: true }));
+  const real = execFileSync("sh", ["-c", "command -v git"], {
+    encoding: "utf8",
+  }).trim();
+  writeFileSync(
+    join(bin, "git"),
+    `#!/bin/sh\n"${real}" "$@" || exit $?\ncase "$*" in *ignorecase=false*--others*) printf '${file}\\0' ;; esac\n`,
+  );
+  chmodSync(join(bin, "git"), 0o755);
+  const path = process.env.PATH;
+  ENV.PATH = `${bin}:${path}`;
+  try {
+    return run();
+  } finally {
+    ENV.PATH = path;
+  }
+}
+
 // What a disk that folds names gives the engine: the case-sensitive listing names a tracked file again, and
 // both names are one file. Here one directory of the second name is a link to the first, and git's listing
 // is added to, because this disk does not fold.
@@ -1271,24 +1394,7 @@ test("a second spelling of a tracked file is not a file of its own, and a second
     if (existsSync(join(dir, "SRC"))) return; // a disk that folds names cannot hold the other two
     make(dir);
     assert.equal(git(dir, "status", "--porcelain"), "", what);
-    const bin = mkdtempSync(join(tmpdir(), "rerun-at-head-bin-"));
-    t.after(() => rmSync(bin, { recursive: true, force: true }));
-    const real = execFileSync("sh", ["-c", "command -v git"], {
-      encoding: "utf8",
-    }).trim();
-    writeFileSync(
-      join(bin, "git"),
-      `#!/bin/sh\n"${real}" "$@" || exit $?\ncase "$*" in *ignorecase=false*--others*) printf 'SRC/a.js\\0' ;; esac\n`,
-    );
-    chmodSync(join(bin, "git"), 0o755);
-    const path = process.env.PATH;
-    ENV.PATH = `${bin}:${path}`;
-    let rec;
-    try {
-      rec = run().rec;
-    } finally {
-      ENV.PATH = path;
-    }
+    const { rec } = withListed(t, "SRC/a.js", run);
     assert.equal(rec.reason, reason, `${what}: ${rec.message}`);
   }
 });

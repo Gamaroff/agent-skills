@@ -97,6 +97,9 @@ bounded() {
   done
   wait "$pid" 2>/dev/null
   rc=${rc:-$?}
+  # Killed, and the time is up: the watcher did it while this script was stopped, and that is a timeout
+  # (T319-CR-1303).
+  if [ "$rc" -eq 137 ] && [ "$SECONDS" -gt "$end" ]; then rc=124; fi
   GROUP=""
   kill -9 -- "-$WATCHER" 2>/dev/null
   wait "$WATCHER" 2>/dev/null
@@ -152,9 +155,12 @@ if ! in_history "$REMOTE" HEAD; then
   # The remote has commits this branch does not. Whether this branch has any of its own is asked with the
   # remote's commit here, so that the answer is the same before and after somebody's fetch (T319-CR-905).
   if ! local_git cat-file -e "$REMOTE^{commit}"; then
-    bounded "$ASK_SECONDS" git fetch --quiet --no-tags origin "refs/heads/$BRANCH"
+    bounded "$ASK_SECONDS" git fetch --quiet --no-tags --no-recurse-submodules origin "refs/heads/$BRANCH"
     rc=$?
-    [ "$rc" -eq 0 ] || refused "origin's $BRANCH has another commit, which could not be fetched ($(why "$rc" "$ASK_SECONDS"))"
+    WHY=$(why "$rc" "$ASK_SECONDS") # now: the next question writes to the same file
+    # A fetch can fail after it brought the commit, on a locked tracking ref for one (T319-CR-1302).
+    [ "$rc" -eq 0 ] || local_git cat-file -e "$REMOTE^{commit}" \
+      || refused "origin's $BRANCH has another commit, which could not be fetched ($WHY)"
   fi
   if in_history HEAD "$REMOTE"; then
     [ "$SITE" = halt ] && answer "nothing held — origin's $BRANCH is ahead of this checkout"

@@ -250,6 +250,29 @@ test("config: ci.skipMarker is one printable line: a control, format, surrogate 
   ])
     assert.equal(marker(m), m);
   assert.throws(() => marker("🚫".repeat(81)), /at most 80 characters/);
+  // At the ends too, and not only inside: what is dropped there is a space, in a CRLF file as well
+  // (task 320).
+  for (const edge of ["\t", "\u0001", "\u0085", "​", "﻿"])
+    for (const m of [`${edge}[skip ci]`, `[skip ci]${edge}`])
+      assert.throws(
+        () => marker(m),
+        /ci\.skipMarker must be one printable line/,
+        JSON.stringify(m),
+      );
+  assert.equal(marker("  [skip ci]  "), "[skip ci]");
+  assert.equal(marker(` ${"x".repeat(80)} `), "x".repeat(80));
+  for (const text of [
+    'ci:\r\n  skipMarker: "[skip ci]"\r\n',
+    "ci:\r\n  skipMarker: '[skip ci]' # why\r\n",
+    "ci:\r\n  skipMarker: [skip-ci\r\n",
+    'ci:\r\n  skipMarker: "[skip ci]"\r',
+    'ci:\n  skipMarker: "[skip ci]"   \n',
+  ])
+    assert.match(
+      eng.parseConfig(text).skipMarker,
+      /^\[skip[ -]ci\]?$/,
+      JSON.stringify(text),
+    );
 });
 
 test("config: a ci block holding skipMarker does not exit 2 at the docs-only rule; an unknown key does", (t) => {
@@ -280,6 +303,8 @@ test("config: the pipeline block refuses what it cannot account for, and never t
     "pipeline: { pushRecordCommits: eager }\n",
     "pipeline:\n  pushRecordCommits: eager\n  pushRecordCommits: batched\n",
     "Pipeline:\n  pushRecordCommits: eager\n",
+    '"pipelin\\x65":\n  pushRecordCommits: eager\n',
+    'pipeline:\n  pushRecordCommits: batched\n"p\\u0069peline":\n  pushRecordCommits: eager\n',
     "pipeline:\n    pushRecordCommits: eager\n  extra: 1\n",
   ]) {
     assert.throws(() => p(bad), /pipeline/i, bad);
@@ -1113,8 +1138,8 @@ function alive(pid) {
   }
 }
 const pause = (ms) => new Promise((done) => setTimeout(done, ms));
-async function until(what, yes) {
-  for (let i = 0; i < 200; i += 1) {
+async function until(what, yes, seconds = 10) {
+  for (let i = 0; i < seconds * 20; i += 1) {
     if (yes()) return;
     await pause(50);
   }
@@ -1168,6 +1193,63 @@ test("what push-held stops is the push and its hook, when its time is up, when i
   }
 });
 
+// A script that was stopped (SIGSTOP, a laptop that slept) past its bound finds the push killed by its
+// watcher, which is its time being up; one killed by something else inside the bound is a push that failed.
+test("push-held: a push the watcher killed while the script was stopped ran out of time, and one killed inside its bound failed (T319-CR-1303)", async (t) => {
+  const start = (hookFile, hook, seconds, env = {}) => {
+    const f = fixture(t);
+    installed(f.wt, "develop-task");
+    writeLock(f.wt);
+    commit(f.wt, "docs/gate.md");
+    const file = hookFile(f);
+    mkdirSync(dirname(file), { recursive: true });
+    writeFileSync(file, hook(f));
+    chmodSync(file, 0o755);
+    const child = spawn("bash", [join(RES, "push-held.sh"), "--site", "halt"], {
+      cwd: f.wt,
+      env: { ...ENV, PUSH_HELD_SECONDS: seconds, ...env },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let out = "";
+    child.stdout.on("data", (d) => {
+      out += d;
+    });
+    const ended = new Promise((done) => child.on("close", done));
+    return { ...f, child, ended, out: () => out };
+  };
+
+  const marks = mkdtempSync(join(tmpdir(), "push-held-marks-"));
+  t.after(() => rmSync(marks, { recursive: true, force: true }));
+  const took = join(marks, "took");
+  const s = start(
+    ({ up }) => join(up, "hooks/post-receive"),
+    () =>
+      `#!/bin/sh\necho $$ > "${took}.new" && mv "${took}.new" "${took}"\nexec sleep 60\n`,
+    "5",
+  );
+  await until("the server took the push", () => existsSync(took));
+  s.child.kill("SIGSTOP");
+  const hook = Number(readFileSync(took, "utf8"));
+  // at the watcher's own bound: the push's, and five seconds
+  await until("the watcher killed the push", () => !alive(hook), 40);
+  s.child.kill("SIGCONT");
+  await s.ended;
+  assert.equal(
+    git(s.up, "rev-parse", "feature/x"),
+    git(s.wt, "rev-parse", "HEAD"),
+    "the server has it",
+  );
+  assert.equal(s.out(), "halt: pushed\n");
+
+  const c = start(
+    ({ wt }) => join(wt, ".git/hooks/pre-push"),
+    () => "#!/bin/sh\nkill -9 $PPID\n",
+    "20",
+  );
+  await c.ended;
+  assert.match(c.out(), /^halt: not pushed — the push failed \(exit 137: /);
+});
+
 test("push-held leaves no process of its own behind, whichever way it answers (T319-CR-1101)", (t) => {
   for (const [what, prepare, answer] of [
     ["pushed", () => {}, /^halt: pushed\n$/],
@@ -1201,23 +1283,96 @@ test("push-held leaves no process of its own behind, whichever way it answers (T
   }
 });
 
-test("push-held says what is the remote's, whether or not somebody fetched, and never guesses (T319-CR-904, CR-905, CR-907)", (t) => {
-  const held = (site, prepare) => {
+/** push-held.sh's answer in a fixture that `prepare` changes, with the environment it returns. */
+const heldIn = (t) => (site, prepare) => {
+  const f = fixture(t);
+  installed(f.wt, "develop-task");
+  writeLock(f.wt);
+  const env = prepare(f) ?? {};
+  const r = run("bash", [join(RES, "push-held.sh"), "--site", site], {
+    cwd: f.wt,
+    env: { ...ENV, ...env },
+  });
+  return { out: r.stdout.trim(), code: r.status };
+};
+/** Somebody else pushes a commit to the branch. */
+const ahead = ({ up, dir }) => {
+  git(dir, "clone", "-q", "-b", "feature/x", up, join(dir, "other"));
+  commit(join(dir, "other"), "docs/theirs.md");
+  git(join(dir, "other"), "push", "-q", "origin", "HEAD");
+};
+
+test("push-held: a fetch that brought the commit and then failed is an answer, and no submodule is asked (T319-CR-1302)", (t) => {
+  const held = heldIn(t);
+  // a fetch that brought the commit and then failed (a tracking ref that is locked) is the remote's answer;
+  // without the lock it is the same one (T319-CR-1302)
+  for (const locked of [true, false])
+    assert.deepEqual(
+      held("halt", (f) => {
+        ahead(f);
+        if (!locked) return;
+        const ref = join(f.wt, ".git/refs/remotes/origin/feature/x.lock");
+        mkdirSync(dirname(ref), { recursive: true });
+        writeFileSync(ref, "");
+      }),
+      {
+        out: "halt: nothing held — origin's feature/x is ahead of this checkout",
+        code: 0,
+      },
+      `locked: ${locked}`,
+    );
+  // and it is not asked of a submodule's remote, which could fail or take the whole bound
+  for (const [what, flags, asked] of [
+    ["push-held", null, false],
+    ["a plain fetch, as a control", ["fetch", "-q", "origin"], true],
+  ]) {
     const f = fixture(t);
     installed(f.wt, "develop-task");
     writeLock(f.wt);
-    const env = prepare(f) ?? {};
-    const r = run("bash", [join(RES, "push-held.sh"), "--site", site], {
-      cwd: f.wt,
-      env: { ...ENV, ...env },
-    });
-    return { out: r.stdout.trim(), code: r.status };
-  };
-  const ahead = ({ up, dir }) => {
-    git(dir, "clone", "-q", "-b", "feature/x", up, join(dir, "other"));
-    commit(join(dir, "other"), "docs/theirs.md");
-    git(join(dir, "other"), "push", "-q", "origin", "HEAD");
-  };
+    const own = join(f.dir, "sub.git");
+    git(f.dir, "init", "-q", "--bare", "-b", "main", own);
+    const sub = join(f.dir, "sub");
+    git(f.dir, "clone", "-q", own, sub);
+    commit(sub, "a.md");
+    git(sub, "push", "-q", "origin", "HEAD:main");
+    const link = (wt, oid) => {
+      git(wt, "update-index", "--add", "--cacheinfo", `160000,${oid},sub`);
+      git(wt, "commit", "-q", "-m", "sub");
+      git(wt, "push", "-q", "origin", "HEAD");
+    };
+    writeFileSync(
+      join(f.wt, ".gitmodules"),
+      `[submodule "sub"]\n\tpath = sub\n\turl = ${own}\n`,
+    );
+    git(f.wt, "add", ".gitmodules");
+    git(f.wt, "clone", "-q", own, "sub");
+    link(f.wt, git(sub, "rev-parse", "HEAD"));
+    git(f.wt, "config", "submodule.sub.url", own);
+    git(f.wt, "config", "submodule.sub.active", "true");
+    const log = join(f.dir, "sub-asked");
+    const server = join(f.dir, "sub-upload-pack");
+    writeFileSync(server, `#!/bin/sh\necho x >> "${log}"\nexit 1\n`);
+    chmodSync(server, 0o755);
+    git(join(f.wt, "sub"), "config", "remote.origin.uploadpack", server);
+    const other = join(f.dir, "other");
+    git(f.dir, "clone", "-q", "-b", "feature/x", f.up, other);
+    commit(sub, "b.md");
+    git(sub, "push", "-q", "origin", "HEAD:main");
+    link(other, git(sub, "rev-parse", "HEAD"));
+    if (flags) run("git", flags, { cwd: f.wt });
+    else
+      assert.equal(
+        run("bash", [join(RES, "push-held.sh"), "--site", "halt"], {
+          cwd: f.wt,
+        }).stdout,
+        "halt: nothing held — origin's feature/x is ahead of this checkout\n",
+      );
+    assert.equal(existsSync(log), asked, what);
+  }
+});
+
+test("push-held says what is the remote's, whether or not somebody fetched, and never guesses (T319-CR-904, CR-905, CR-907)", (t) => {
+  const held = heldIn(t);
   const fetched = (prepare) => (f) => {
     prepare(f);
     git(f.wt, "fetch", "-q", "origin");

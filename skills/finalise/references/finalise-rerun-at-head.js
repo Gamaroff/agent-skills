@@ -89,6 +89,7 @@ const {
   RE_CHECKBOX,
   RE_NUMBERED,
   criteriaSection,
+  makeFenceTracker,
   readCriteriaEntries,
 } = require("./criteria-section.js");
 const {
@@ -102,6 +103,7 @@ const {
   parseConfig,
   spawnCheck,
   topLevelKey,
+  unescaped,
 } = require("./ci-tree-equivalence.js");
 const docId = require("./doc-id.js");
 
@@ -125,12 +127,7 @@ const FINALISE_KEYS = ["deferralApprover", "rerunAtHead"];
  * beside a plain block as a second copy nobody counted (T319-CR-406).
  */
 function listKeyRows(text) {
-  const plain = text.replace(
-    /\\(?:x([0-9a-fA-F]{2})|u([0-9a-fA-F]{4})|U([0-9a-fA-F]{8}))/g,
-    (_, x, u, U) =>
-      String.fromCodePoint(Math.min(parseInt(x ?? u ?? U, 16), 0xfffd)),
-  );
-  return plain
+  return unescaped(text)
     .split(/\r?\n/)
     .filter((l) =>
       /^\s*(?:[-?:]\s+)*[{\s]*["']?rerun[-_]?at[-_]?head["']?\s*(?::|$)/i.test(
@@ -302,11 +299,10 @@ const RE_BLOCK_START = new RegExp(
 );
 
 /**
- * The first criterion that names a listed command only by way of a lazy continuation: an unindented line
- * directly under it, which Markdown renders as part of it and the criteria reader ends it at. `null` when
- * there is none. Read past, the command would not be run and nothing would say so (T319-CR-605).
+ * The text of each criterion, in the reader's order, with its lazy continuation: an unindented line directly
+ * under it, which Markdown renders as part of it and the criteria reader ends it at.
  */
-function lazilyNamed(list, body, texts) {
+function lazyTexts(body) {
   let inItem = false; // an indented line belongs to the last criterion
   let open = false; // and so does an unindented one: no blank line stands between
   const whole = [];
@@ -325,6 +321,14 @@ function lazilyNamed(list, body, texts) {
       open = false;
     }
   }
+  return whole;
+}
+
+/**
+ * The first criterion that names a listed command only by way of a lazy continuation, or `null`. Read past,
+ * the command would not be run and nothing would say so (T319-CR-605).
+ */
+function lazilyNamed(list, whole, texts) {
   const count = (text, command) =>
     codeSpans(text).filter((s) => s === command).length;
   for (const [i, text] of whole.entries())
@@ -621,7 +625,25 @@ function differing(dir, commit, prefix = "") {
   // (T319-CR-801). It is a file of its own unless the disk folds names too and both name one file
   // (T319-CR-1002); a second hard link is not one name.
   const byFold = new Map([...tree.keys()].map((f) => [folded(f), f]));
+  // And one more: what stands in a directory SUB beside a submodule `sub` is taken for the submodule's own
+  // and listed nowhere (T319-CR-1203). It is the checkout's, unless both names are one directory.
+  const subs = new Map();
+  for (const [f, { mode }] of tree)
+    if (mode === "160000") subs.set(folded(f), f);
+  const besideSub = (f) => {
+    const parts = f.split("/");
+    for (let i = 1; i < parts.length; i++) {
+      const d = parts.slice(0, i).join("/");
+      const sub = subs.get(folded(d));
+      if (sub === undefined || sub === d) continue;
+      const [own, known] = [lstat(d), lstat(sub)];
+      if (!known || own?.ino !== known.ino || own.dev !== known.dev)
+        return true;
+    }
+    return false;
+  };
   for (const f of gitRows(dir, "-c", "core.ignorecase=false", ...listed)) {
+    if (besideSub(f)) bad.add(f);
     if (!byFold.has(folded(f))) continue;
     const [own, known] = [lstat(f), lstat(byFold.get(folded(f)))];
     if (
@@ -837,13 +859,20 @@ async function run(argv) {
     if (entries === null || entries.length === 0) {
       // Criteria the reader cannot see, or none at all: only the first can hide a command (T319-CR-805).
       // Under every heading that speaks of criteria, and in the whole document when nothing stands there
-      // (T319-CR-1003).
-      const under = body
-        .split(/^(?=## )/m)
-        .filter((part) => /^## .*(?:criteri|\bAC[ -]?\d)/i.test(part))
-        .map((part) => part.replace(/^.*/, ""))
+      // (T319-CR-1003). A line in a fence is no heading. A document with no heading the reader knows is
+      // searched whole: one that only contains the word (`## Rollback criteria`) says nothing about where
+      // its criteria are (T319-CR-1201).
+      const isFenceLine = makeFenceTracker();
+      const parts = [[]];
+      for (const line of body.split(/\r?\n/)) {
+        if (!isFenceLine(line) && line.startsWith("## ")) parts.push([]);
+        parts.at(-1).push(line);
+      }
+      const under = parts
+        .filter((part) => /^## .*(?:criteri|\bAC[ -]?\d)/i.test(part[0]))
+        .map((part) => part.slice(1).join("\n"))
         .join("\n");
-      const where = under.trim() === "" ? body : under;
+      const where = entries === null || under.trim() === "" ? body : under;
       const hidden = list.find((command) => shows(where, command));
       if (hidden === undefined)
         return { reason: "none-named", exitCode: 0, ...base };
@@ -857,7 +886,8 @@ async function run(argv) {
     const texts = entries.map((e) =>
       [e.line, ...e.continuation].filter(Boolean).join(" ").trim(),
     );
-    const lazy = lazilyNamed(list, body, texts);
+    const joined = lazyTexts(body);
+    const lazy = lazilyNamed(list, joined, texts);
     if (lazy)
       return {
         reason: "scan-broken",
@@ -866,11 +896,13 @@ async function run(argv) {
         ...base,
       };
     // A backtick without a partner takes the one that opens a later span, and the span is gone
-    // (T319-CR-1005).
+    // (T319-CR-1005), on an unindented line as well (T319-CR-1202).
     for (const [i, e] of entries.entries()) {
       const raw = [e.line, ...e.continuation].join("\n");
       const whole = codeSpans(texts[i]);
-      const lost = list.find((c) => !whole.includes(c) && shows(raw, c));
+      const lost = list.find(
+        (c) => !whole.includes(c) && (shows(raw, c) || shows(joined[i], c)),
+      );
       if (lost)
         return {
           reason: "scan-broken",

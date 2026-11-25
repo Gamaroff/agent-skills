@@ -13,6 +13,20 @@ All notable changes to this project will be documented in this file. Format foll
   prompt. Corrected: requiring a heavy job does not block a docs-only PR. GitHub counts a skipped job
   as passed, so it can merge untested code when the `changes` job fails. Require the aggregate job.
 
+- **Two spellings in `skills-config.yaml` are refused that were read past (task 320).** A top-level key
+  that is `ci`, `pipeline` or `finalise` with a YAML escape in it (`"c\x69":`) was ignored, and with it
+  an `enabled: false`: write the key plainly. A control or format character at either end of
+  `ci.skipMarker` (a tab, a BOM) was dropped: delete it. Spaces at the ends are still dropped.
+
+### Fixed
+
+- **What task 319 carried forward (task 320).** `/finalise`'s re-run refuses a listed command that a
+  fenced `## ` line, a heading that only contains "criteria", or a stray backtick with an unindented
+  line hid from it, and an untracked file in a directory that differs from a submodule's only in case.
+  `push-held.sh` no longer says a commit could not be fetched that was, or that a push failed which
+  reached the server while the script was stopped. `tick-pr.sh start` answers the same from a
+  subdirectory.
+
 ## [v0.69.0] - 2026-11-25
 
 ### Changed

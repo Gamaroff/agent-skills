@@ -1484,6 +1484,18 @@ test("CR3-3: a ci block that is not a mapping, or a near-miss spelling, is a usa
     ["ci:\n  docs-only:\n    enabled: false\n", /docs-only/],
     ["ci:\n  docs_only:\n    enabled: false\n", /docs_only/],
     ["CI:\n  docsOnly:\n    enabled: false\n", /looks like ci/],
+    // an escape in a quoted key, which the YAML subset keeps as text (task 320)
+    [
+      '"c\\x69":\n  docsOnly:\n    enabled: false\n',
+      /c\\x69 looks like ci; the key is exactly "ci"/,
+    ],
+    [
+      'ci:\n  docsOnly:\n    enabled: true\n"\\u0063i":\n  docsOnly:\n    enabled: false\n',
+      /looks like ci/,
+    ],
+    ['"\\U00000063i":\n  skipMarker: x\n', /looks like ci/],
+    ["'c\\x69':\n  skipMarker: x\n", /looks like ci/], // literal in YAML; the parse keeps no quote
+    ['ci:\n  "docs\\x4fnly":\n    enabled: false\n', /docs\\x4fnly/],
     [
       "ci:\n  docsOnly: { enabled: false }\n",
       /ci\.docsOnly must be a block mapping/,

@@ -395,7 +395,18 @@ class UsageError extends Error {}
  * defaults, because a typo'd `patterns` that quietly widened to the default is a rule applied to
  * files its owner did not choose.
  */
-const normKey = (k) => String(k).toLowerCase().replace(/[-_]/g, "");
+const normKey = (k) => unescaped(k).toLowerCase().replace(/[-_]/g, "");
+
+/**
+ * Text with YAML's character escapes read. The YAML subset keeps one in a quoted key as text, so a block
+ * under `"c\x69"` was neither read nor refused (task 320).
+ */
+const unescaped = (s) =>
+  String(s).replace(
+    /\\(?:x([0-9a-fA-F]{2})|u([0-9a-fA-F]{4})|U([0-9a-fA-F]{8}))/g,
+    (_, x, u, U) =>
+      String.fromCodePoint(Math.min(parseInt(x ?? u ?? U, 16), 0xfffd)),
+  );
 
 function defaultConfig() {
   return {
@@ -546,7 +557,8 @@ function skipMarkerOf(v) {
     throw new UsageError("ci.skipMarker must be a string (empty means off)");
   }
   const m = v.trim();
-  if (/[\p{Cc}\p{Cf}\p{Cs}]/u.test(m) || [...m].length > SKIP_MARKER_MAX) {
+  // `v`: trim() drops a tab and a BOM at the ends too, and only a space there is dropped in silence (task 320)
+  if (/[\p{Cc}\p{Cf}\p{Cs}]/u.test(v) || [...m].length > SKIP_MARKER_MAX) {
     throw new UsageError(
       `ci.skipMarker must be one printable line of at most ${SKIP_MARKER_MAX} characters`,
     );
@@ -1530,6 +1542,7 @@ module.exports = {
   // The bounded runner and the block reader's refusals, for finalise-rerun-at-head.js (task.319).
   UsageError,
   normKey,
+  unescaped,
   assertMapping,
   assertBlockRows,
   topLevelKey,
