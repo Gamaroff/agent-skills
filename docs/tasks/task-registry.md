@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-11-25
-**Next Available Task Number:** **324**
+**Next Available Task Number:** **325**
 
 ## How to use
 
@@ -365,6 +365,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 321 | [finalise's diff fallback is one commit, and its gap body leaks a marker](task.321.finalise-diff-and-gap-body/task.321.finalise-diff-and-gap-body.md) | planned | refactoring | Medium | 2026-11-25 | — | observation #178: one reader for the PR's whole change that names its source or refuses, on both forges; `dod-gap-count.sh --body` ends at the change-log marker · four phases · independent |
 | 322 | [QA lists every new test, and reviewers end only their own processes](task.322.review-evidence-is-complete-and-clean/task.322.review-evidence-is-complete-and-clean.md) | planned | refactoring | Medium | 2026-11-25 | — | observations #176, #177: a red-first criterion is checked against the list of tests the branch adds; a reviewer ends a process by its recorded pid · four phases · independent |
 | 323 | [The QA loop's globs have a command, and a skill load leaves a record](task.323.pipeline-inputs-and-loads-have-a-check/task.323.pipeline-inputs-and-loads-have-a-check.md) | planned | refactoring | Medium | 2026-11-25 | — | observations #175, #179: `qa.testArtifactGlobs` through one reader that refuses a bad shape; `skill-resolution.js` records each load on the lock and a compaction clears it · four phases · independent |
+| 324 | [The CI skip template can exclude paths, and a guard holds its wiring](task.324.ci-skip-exclusions-and-guard/task.324.ci-skip-exclusions-and-guard.md) | planned | infrastructure | Medium | 2026-11-25 | — | `CODE_PATTERNS` in both classifier templates, scripts and test files on it by default; an optional dependency-free guard for GitHub Actions (gate, aggregate, trigger, never-docs, reader) · four phases · independent |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
