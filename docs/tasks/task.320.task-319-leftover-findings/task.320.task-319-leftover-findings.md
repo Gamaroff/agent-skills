@@ -5,7 +5,7 @@ type: task
 description: "Close the seven low findings task 319 carried forward and the two points its Definition of Done left to the owner: three in the re-run engine, two in push-held.sh, two in tick-pr.sh, escaped configuration keys, and the edge characters of ci.skipMarker."
 tags: [ci, push-policy, finalise, develop-next, skills-config]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Low
 risk_level: low
 created: 2026-11-25
@@ -18,7 +18,9 @@ github_issue: 938
 
 **GitHub Issue**: [#938](https://github.com/Gamaroff/agent-skills/issues/938)
 
-**Status:** Planned
+**Status:** Ready for Review
+
+**Review**: ✅ All review recommendations from `task.320.review.1.task-319-leftover-findings.md` implemented 2026-11-25
 
 ---
 
@@ -197,7 +199,8 @@ c\x69 looks like ci; the key is exactly "ci"
 ```
 
 **Impact**: a project that wrote an escape in one of these names. None is known. The block was never
-read, so nothing that worked stops working.
+read, so nothing that worked stops working. A single-quoted `'c\x69'` is literal text in YAML and is
+refused too: the parse does not keep the quote.
 
 **Migration Path**: write the key plainly.
 
@@ -210,7 +213,8 @@ of a quoted `ci.skipMarker` is refused.
 
 **After**: `ci.skipMarker must be one printable line of at most 80 characters`.
 
-**Impact**: a project with such a character in the value. The reference already forbids it.
+**Impact**: a project with such a character in the value. The reference already forbids it, and the key
+first shipped in `v0.69.0` (2026-11-25).
 
 **Migration Path**: delete the character. Spaces at the ends need no change.
 
@@ -232,10 +236,10 @@ of a quoted `ci.skipMarker` is refused.
 
 **Changes**:
 
-- [ ] Write the failing cases of T319-CR-1201, 1202 and 1203, each with its control
-- [ ] Split the document on headings outside fences; search the whole document when the reader knows no heading
-- [ ] Take the joining loop out of `lazilyNamed`; apply `shows` to the joined text
-- [ ] Count an untracked path under a directory that folds to a submodule and is not it
+- [x] Write the failing cases of T319-CR-1201, 1202 and 1203, each with its control
+- [x] Split the document on headings outside fences; search the whole document when the reader knows no heading
+- [x] Take the joining loop out of `lazilyNamed`; apply `shows` to the joined text
+- [x] Count an untracked path under a directory that folds to a submodule and is not it
 
 **Dependencies**: none
 
@@ -254,11 +258,11 @@ of a quoted `ci.skipMarker` is refused.
 
 **Changes**:
 
-- [ ] Write the failing cases of T319-CR-1302, 1303 and 1304, each with its control
-- [ ] After a failed fetch, refuse only when the commit is still absent; fetch without submodules
-- [ ] Answer 124 for a SIGKILL past the bound
-- [ ] Search for the landing commit from the top of the repository
-- [ ] State T319-CR-1301 as a limit in `tick-pr.sh`'s header
+- [x] Write the failing cases of T319-CR-1302, 1303 and 1304, each with its control
+- [x] After a failed fetch, refuse only when the commit is still absent; fetch without submodules
+- [x] Answer 124 for a SIGKILL past the bound
+- [x] Search for the landing commit from the top of the repository
+- [x] State T319-CR-1301 as a limit in `tick-pr.sh`'s header
 
 **Dependencies**: none
 
@@ -278,9 +282,10 @@ of a quoted `ci.skipMarker` is refused.
 
 **Changes**:
 
-- [ ] Write the failing cases: an escaped `ci`, `pipeline` and `finalise`, alone and beside a plain block
-- [ ] Decode the escapes in `normKey`, through one helper that `listKeyRows` uses too
-- [ ] Check `ci.skipMarker` before it is trimmed, with a spaces case and a CRLF case that stay accepted
+- [x] Write the failing cases: an escaped `ci`, `pipeline` and `finalise`, alone and beside a plain block
+- [x] Write the case that holds `listKeyRows`' own use of the helper (green before and after, red when that use is reverted)
+- [x] Decode the escapes in `normKey`, through one helper that `listKeyRows` uses too
+- [x] Check `ci.skipMarker` before it is trimmed, with a spaces case and a CRLF case that stay accepted
 
 **Dependencies**: Phase 1 (the same engine file)
 
@@ -300,11 +305,11 @@ of a quoted `ci.skipMarker` is refused.
 
 **Changes**:
 
-- [ ] Reference: the trimming of `ci.skipMarker`, the escaped-key refusal, and the T319-CR-1301 limit in the `developNext.tickVia` row
-- [ ] `develop-next`: the limit beside its `resume` and `landed` sentence
-- [ ] CHANGELOG `[Unreleased]`, citing `(task 320)`
-- [ ] Task 319 § Deferred Work: each entry names task 320 (a Change Log row with it)
-- [ ] `npm run bundle`, committed
+- [x] Reference: the trimming of `ci.skipMarker`, the escaped-key refusal, and the T319-CR-1301 limit in the `developNext.tickVia` row
+- [x] `develop-next`: the limit beside its `resume` and `landed` sentence
+- [x] CHANGELOG `[Unreleased]`, citing `(task 320)`
+- [x] Task 319 § Deferred Work: each entry names task 320 (a Change Log row with it)
+- [x] `npm run bundle`, committed
 
 **Dependencies**: Phases 1 to 3
 
@@ -354,22 +359,25 @@ that already holds its neighbours.
 
 **Actions**:
 
-- [ ] Each case of § 3's first table, and its control, as a test
-- [ ] T319-CR-1203 on a disk that folds names: the same directory under two spellings is not a second one (the fake-`git` fixture of T319-CR-1002 stands in for that disk)
-- [ ] T319-CR-1303 both ways: a SIGKILL past the bound, and one inside it
-- [ ] T319-CR-1302 both ways: a failed fetch that brought the commit, and one that did not
-- [ ] Every temporary directory is removed in `t.after`
+- [x] Each case of § 3's first table, and its control, as a test
+- [x] T319-CR-1203 on a disk that folds names: the same directory under two spellings is not a second one (the fake-`git` fixture of T319-CR-1002 stands in for that disk)
+- [x] T319-CR-1303 both ways: a SIGKILL past the bound, and one inside it
+- [x] T319-CR-1302 both ways: a failed fetch that brought the commit, and one that did not
+- [x] An escaped list key under another block (`notes:` holding `"rerun\x41tHead":`) is still refused. Once `normKey` decodes, it refuses every other escaped case before `listKeyRows` is reached, so this input alone holds that half of the shared helper (review 1, I-1)
+- [x] Every temporary directory is removed in `t.after`
 
 **Command**: `command node --test shared/resources/tests/finalise-rerun-at-head.test.mjs shared/resources/tests/tick-pr.test.mjs shared/resources/tests/push-policy.test.mjs shared/resources/tests/ci-tree-equivalence.test.mjs`
 
 **Mutations**: revert each remedy alone. Each must turn at least one named test red. For T319-CR-1302
 the check that the commit is present and `--no-recurse-submodules` are two layers: a test with a
 submodule whose fetch fails must go red when only the second is removed, or the second is left out.
+The escape helper has two uses, `normKey` and `listKeyRows`: revert the decoding in each alone.
 
 ### Consumer Tests
 
 **Scope**: `npm run test:remote` on the LAN server, which runs `ci:fast`; then the suite under
-`CI=true`.
+`CI=true`. `ci:fast` runs neither linter of the merge gate (`npm run ci`), and this task edits two
+shell scripts: run `npm run lint:shell` and `npm run lint:secrets` too.
 
 ### Performance Tests
 
@@ -393,7 +401,7 @@ None. T319-CR-1203 adds one lookup per untracked path.
 
 ### Performance
 
-- [ ] The four suites gain no test that waits longer than 30 s (the SIGSTOP case needs about 15), read from their per-test durations in the QA report
+- [ ] The four suites gain no test that waits longer than 30 s (the SIGSTOP case needs about 15), read from their per-test durations, measured on the PR's head commit with `uptime` beside them, in the QA report
 
 ### Code Quality
 
@@ -482,13 +490,15 @@ Phase 1's file and is reverted first.
 **Non-Critical (Forward Fix)**: a refusal whose message does not name the cause.
 
 ---
-
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-25 | 1.0     | Initial draft | create-task |
+| 2026-11-25 | 1.1     | Review passed (9/10) — added the test that holds `listKeyRows`' decoding, the two merge-gate linters and where the durations are measured | review-task |
+| 2026-11-25 |         | Status → ready-for-development | review-task |
+| 2026-11-25 |  | Implemented — 31 files, 5 tests added and 6 extended | develop |
 <!-- change-log-end -->
 
 ---
@@ -497,31 +507,66 @@ Phase 1's file and is reverted first.
 
 ### Phase 1: The re-run engine
 
-- [ ] Failing cases
-- [ ] T319-CR-1201
-- [ ] T319-CR-1202
-- [ ] T319-CR-1203
+- [x] Failing cases
+- [x] T319-CR-1201
+- [x] T319-CR-1202
+- [x] T319-CR-1203
 
 ### Phase 2: The push and the tick
 
-- [ ] Failing cases
-- [ ] T319-CR-1302
-- [ ] T319-CR-1303
-- [ ] T319-CR-1304
-- [ ] T319-CR-1301 stated
+- [x] Failing cases
+- [x] T319-CR-1302
+- [x] T319-CR-1303
+- [x] T319-CR-1304
+- [x] T319-CR-1301 stated
 
 ### Phase 3: The configuration
 
-- [ ] Failing cases
-- [ ] Escaped keys
-- [ ] Marker edge
+- [x] Failing cases
+- [x] Escaped keys
+- [x] Marker edge
 
 ### Phase 4: Records and bundle
 
-- [ ] Documents
-- [ ] CHANGELOG
-- [ ] Task 319 entries
-- [ ] Bundle
+- [x] Documents
+- [x] CHANGELOG
+- [x] Task 319 entries
+- [x] Bundle
+
+---
+
+## Implementation Summary
+
+**Completion Date**: 2026-11-25
+
+**Approach**: each remedy as the plan gives it, tests first. The eight with a remedy were red before
+their change, each for its stated reason; T319-CR-1301 is a stated limit. Two decisions the plan left open:
+
+- **T319-CR-1302, `--no-recurse-submodules` is kept.** It was unverified in the trial. A populated
+  submodule whose pointer the fetched commit moves is asked by a plain fetch (the control) and not by
+  `push-held.sh`; removing the flag alone turns that test red.
+- **T319-CR-1301's advice names the remote branch too.** `open` has pushed it by the time the second PR
+  exists.
+
+Beyond the plan: the `finalise.rerunAtHead` row of the configuration reference says what the
+whole-document search refuses and that an escaped `finalise` is refused.
+
+**Testing Results**: `ci:fast` on the LAN server, 8895 tests, 8892 pass, 0 fail, 3 skipped; 232 of them
+are the four suites (227 before). ShellCheck, gitleaks and `bundle:check` clean. Mutations, each in a scratch
+copy of the tree, each remedy reverted alone: 20 of 21 red. The green one,
+`sub === d` in `besideSub`, is a shortcut: the same directory has the same inode, so the answer does not
+change. Population of § 10's first risk, measured again: 342 documents, `readCriteriaEntries` is `null`
+for none.
+
+**Red before the change**: the test of each finding. Within a test the first failing case ends the run,
+so T319-CR-1202's and the later cases were seen red through their own mutation. The controls were green
+before, as controls are: among them `a second spelling of a submodule's directory is the submodule`
+(red when the inode comparison is removed) and the escaped list key (red when `listKeyRows` stops
+decoding).
+
+## Deferred Work
+
+None.
 
 ---
 
