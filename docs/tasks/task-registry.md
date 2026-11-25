@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-11-25
-**Next Available Task Number:** **326**
+**Next Available Task Number:** **327**
 
 ## How to use
 
@@ -367,6 +367,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 323 | [The QA loop's globs have a command, and a skill load leaves a record](task.323.pipeline-inputs-and-loads-have-a-check/task.323.pipeline-inputs-and-loads-have-a-check.md) | planned | refactoring | Medium | 2026-11-25 | — | observations #175, #179: `qa.testArtifactGlobs` through one reader that refuses a bad shape; `skill-resolution.js` records each load on the lock and a compaction clears it · four phases · independent |
 | 324 | [The CI skip template can exclude paths, and a guard holds its wiring](task.324.ci-skip-exclusions-and-guard/task.324.ci-skip-exclusions-and-guard.md) | planned | infrastructure | Medium | 2026-11-25 | — | `CODE_PATTERNS` in both classifier templates, scripts and test files on it by default; an optional dependency-free guard for GitHub Actions (gate, aggregate, trigger, never-docs, reader) · four phases · independent |
 | 325 | [The docs-only CI rule can exclude a path](task.325.docs-only-rule-exclusions/task.325.docs-only-rule-exclusions.md) | planned | infrastructure | Medium | 2026-11-25 | task.320 | a `!` pattern in `ci.docsOnly.patterns` excludes, inside `isDocsPath` only; tried, 222 tests green · three phases · edits the engine task 320 edits |
+| 326 | [doc-id reads request and input records](task.326.request-and-input-records/task.326.request-and-input-records.md) | planned | refactoring | Medium | 2026-11-25 | — | `request` and `input` join `ARTIFACTS`; `finalise` still refuses to edit either; tried, 534 tests green before and after, so none holds it · three phases |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
