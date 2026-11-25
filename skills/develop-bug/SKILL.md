@@ -113,7 +113,7 @@ find {bug-directory} -maxdepth 1 \( -name "{bug-prefix}.implementation.*.md" -o 
 
 ### Graceful Pause on Imminent Compaction (CRITICAL — read this second)
 
-This complements the recovery above. **Pre**-compaction graceful pause requires the `PreCompact` hook (see Setup). When the hook fires it appends a "Pipeline Paused" entry to the report, commits, pushes, posts a PR/issue comment (all best-effort), **keeps** the lock and marks it `paused` (2026-11; the `Stop` hook allows the halt while the mark is set), and emits `🛑 PIPELINE-PAUSE-SIGNAL` as a `<system-reminder>`.
+This complements the recovery above. **Pre**-compaction graceful pause requires the `PreCompact` hook (see Setup). When the hook fires it appends a "Pipeline Paused" entry to the report, commits it (pushed only under `pipeline.pushRecordCommits: eager`), posts a PR/issue comment (all best-effort), **keeps** the lock and marks it `paused` (2026-11; the `Stop` hook allows the halt while the mark is set), and emits `🛑 PIPELINE-PAUSE-SIGNAL` as a `<system-reminder>`.
 
 **When you observe `🛑 PIPELINE-PAUSE-SIGNAL`:**
 
@@ -265,7 +265,7 @@ Follow the generic mechanics in [`references/develop-pipeline-step-4-create-pr.m
 
 ### Step 5–6: Verify & Fix Loop
 
-See [`references/develop-bug-step-5-6-verify-loop.md`](references/develop-bug-step-5-6-verify-loop.md): QA verifies the **bug scenario is gone** and no regressions were introduced. On PASS → write the **QA Verification (✅ Fixed)** subsection into the current iteration and mark the bug for close. On FAIL → **reopen**: append `### Iteration N+1`, set status `reopened`, invoke `/qa-fix` (a PR now exists, so qa-fix's bug-update machinery applies cleanly), commit/push per cycle. Bounded `MAX_ITER=5`. Step 3a's fast gate is classified by
+See [`references/develop-bug-step-5-6-verify-loop.md`](references/develop-bug-step-5-6-verify-loop.md): QA verifies the **bug scenario is gone** and no regressions were introduced. On PASS → write the **QA Verification (✅ Fixed)** subsection into the current iteration and mark the bug for close. On FAIL → **reopen**: append `### Iteration N+1`, set status `reopened`, invoke `/qa-fix` (a PR now exists, so qa-fix's bug-update machinery applies cleanly), commit per cycle (pushed unless `push-policy.sh` answers `defer`). Bounded `MAX_ITER=5`. Step 3a's fast gate is classified by
 `references/fast-gate-outcome.sh` — not measured or attributable — and only an attributable red
 re-enters the fix loop (task.238).
 
@@ -345,13 +345,14 @@ If a situation arises that is not in this table or the shared defaults table and
 - **Never silently continue past a failed step.** Every failure is logged and surfaced.
 - **Always use `/commit-changes` to commit** — never raw `git commit`.
 - **Commit the report before any halt.** Invoke `/commit-changes` for the report before surfacing any HALT so the audit trail is in git even when the pipeline doesn't complete — and **lint it first** (call site (2) of four): `command node .agents/skills/develop-bug/references/report-lint.js --file "{implementation-report-path}" --json; rc=$?; case $rc in 0) ;; 1) echo "⚠️ report failed lint — HALT commit skipped; repair {implementation-report-path} by hand" ;; 2) echo "⚠️ report-lint usage error (rc 2) — the call site is wrong, not the report; causes: develop-pipeline-step-8-commit.md § report-lint usage error; HALT commit skipped" ;; *) echo "⚠️ report-lint.js not runnable (rc $rc) — HALT commit skipped" ;; esac`. A report that fails the linter is **not committed** by this rule, and the HALT **still proceeds** to the snapshot and lock removal below — the same decision the PreCompact hook makes, because the snapshot and the lock removal are what resume depends on and a lint failure must not strand the lock (task.124 QA cycle 2, CR-5). The corruption stays in the working tree, named, for a human to repair before the next commit. The HALT commit is the one most likely to carry a half-written report, because it is written under the pressure that caused the halt.
-- **Push after every commit during the fix loop.** The PR must stay current.
+- **Every push asks `push-policy.sh` first.** A commit with code is pushed at once; a record-only commit rides the next push, unless a step that reads the remote runs first or the run ends. The script's site table is the contract; no step decides for itself, and a `defer` is logged in the Decisions Log with the site that deferred. `pipeline.pushRecordCommits: eager` restores a push after every commit. The script: `references/push-policy.sh`.
 - **The implementation report is the primary recovery tool.** Always include its path in halt messages.
-- **Snapshot then remove the lock file before every terminal HALT** (same protocol as develop-task):
+- **Push what the run held, then snapshot and remove the lock file, before every terminal HALT** (same protocol as develop-task):
 
-  Run **one call** — it writes the snapshot, removes the lock and the transient test logs, and is idempotent. Run it **before** the HALT message, never after (a HALT that only printed its message left the lock in place with no snapshot on three runs, obs #49). `--step` defaults to the lock's `current_step`; a non-zero exit means nothing was halted:
+  Run **this one block** — once a PR is open it pushes the record commits the run was holding, whichever step halts (repeat a `halt: kept local` or `halt: not pushed` line in the HALT message); then it writes the snapshot, removes the lock and the transient test logs, and is idempotent. Run it **before** the HALT message, never after (a HALT that only printed its message left the lock in place with no snapshot on three runs, obs #49). `--step` defaults to the lock's `current_step`; a non-zero exit means nothing was halted:
 
   ```bash
+  bash .agents/skills/develop-bug/references/push-held.sh --site halt
   bash .agents/skills/develop-bug/references/advance-pipeline-lock.sh --halt --reason "{halt_reason}" --step {halt_step} {bug-directory}
   ```
 

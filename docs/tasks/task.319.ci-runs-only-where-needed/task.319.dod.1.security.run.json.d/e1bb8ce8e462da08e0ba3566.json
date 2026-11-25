@@ -1,0 +1,27 @@
+{
+  "sink": "path",
+  "entry": "shared/resources/security-probe.mjs#resolveEntry",
+  "name": "resolveEntry eslint form",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 14,
+  "passed": 14,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "observation_limits": [
+    "effects-after-accept"
+  ],
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "fixture_copy": null,
+  "ran_at": "2026-11-24T22:34:19.303Z"
+}

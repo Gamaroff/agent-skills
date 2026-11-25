@@ -1,0 +1,143 @@
+schema: 2
+task: 'task.319.ci-runs-only-where-needed'
+task_title: 'Pipelines spend a CI run only where a run can answer something'
+gate: PASS
+status_reason: 'All 8 findings of cycle 6 are fixed for the reported case and the suites and CI are green. The re-review of the files changed since gate 6 found no high and no medium defect; seven low defects stand, each reproduced by QA with a control.'
+reviewer: 'QA Engineer'
+head: 'd5ed9e499923024c89111cd54a4f096ecbb2ee43'
+updated: '2026-11-24T21:18:35Z'
+
+top_issues:
+  - id: 'T319-CR-1201'
+    severity: low
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'With no criterion read, the search for a listed command covers less than before in two documents: a fenced line "## set up" in the criteria section cuts off what follows it, and an H2 that merely contains "criteri" and holds text stops the search of the whole document. Both answer none-named (origin: code-review, reproduced by QA; controls "# set up" and "## Rollback" answer scan-broken).'
+    suggested_action: 'Search the section the reader chose together with the other criteria headings, and the whole document when those hold nothing.'
+    suggested_owner: dev
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+  - id: 'T319-CR-1202'
+    severity: low
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'A criterion with both a backtick that has no partner and an unindented line that names a listed command answers none-named, although each alone is refused (origin: code-review, reproduced by QA; control without the stray backtick answers scan-broken).'
+    suggested_action: 'Apply the wider search to the lazily joined text of each criterion too.'
+    suggested_owner: dev
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+  - id: 'T319-CR-1203'
+    severity: low
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'Under core.ignorecase=true on a case-sensitive disk, an untracked SUB/x.js beside a submodule sub is not listed, and the engine answers ran (origin: code-review, reproduced by QA; control SUB2/x.js answers dirty-tree). git status hides the file too.'
+    suggested_action: 'Count a case-sensitive-only path as untracked when a parent directory folds to a submodule entry and is not that directory.'
+    suggested_owner: dev
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+  - id: 'T319-CR-1301'
+    severity: low
+    file: 'shared/resources/tick-pr.sh'
+    finding: 'A tick whose PR conflict was resolved on the forge and squash-merged with its remote branch deleted reads resume, because no commit of the base takes the stale local tick without a conflict; the second tick PR that follows conflicts at its merge (origin: code-review, resume reproduced by QA, the second PR traced; control with the remote branch kept answers landed).'
+    suggested_action: 'State the case as a limit in develop-next and the configuration reference, or ask the forge for a merged PR of the tick branch.'
+    suggested_owner: dev
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+  - id: 'T319-CR-1302'
+    severity: low
+    file: 'shared/resources/push-held.sh'
+    finding: 'A fetch that brought the commit and then failed at something else, such as a locked tracking ref, is answered "could not be fetched" (origin: code-review, reproduced by QA; control without the lock answers nothing held).'
+    suggested_action: 'After the fetch, refuse only when the commit is still absent, and fetch without submodules.'
+    suggested_owner: dev
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+  - id: 'T319-CR-1303'
+    severity: low
+    file: 'shared/resources/push-held.sh'
+    finding: 'When the script is stopped past its bound, its watcher kills the push, the status is 137 and not 124, and the question to the remote that follows a timeout is skipped: a push that reached the server is answered as failed (origin: code-review, reproduced by QA with SIGSTOP; control without the stop answers pushed).'
+    suggested_action: 'Answer 124 whenever the bound has passed and the command ended by a kill.'
+    suggested_owner: dev
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+  - id: 'T319-CR-1304'
+    severity: low
+    file: 'shared/resources/tick-pr.sh'
+    finding: 'Started in a subdirectory, the search for the commit that landed a conflicting tick reads its paths from there, finds none and answers resume (origin: code-review, reproduced by QA; control from the top answers landed).'
+    suggested_action: 'Run the search from the top of the repository.'
+    suggested_owner: dev
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 8889
+  phases_verified: '7/7'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5, 6]
+    phases_with_issues: [2, 4, 5]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 108
+    escaped: 0
+    boundary: true
+    boundary_signals: ["never"]
+    notes: 'parseRerunList engages, 38 of 38; push-policy --site, 48 of 48; push-held --site, 22 of 22.'
+  performance:
+    status: PASS
+    notes: 'pushes before (eager): 9; after (batched): 6, re-run at this head.'
+  reliability:
+    status: PASS
+    notes: 'Seven low findings. In the push and tick scripts every one is loud and refuses or resumes where it could have gone on, and none deletes or overwrites anything. In the re-run engine the three are silent and need an unusual document or setting.'
+  maintainability:
+    status: PASS
+    notes: 'One decision helper, one site table, and one push per HALT; the tick row comparison and the ignored-path filter of cycle 5 are gone.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'T319-CR-1201: with no criterion read, a fenced "## " line or another heading that contains "criteri" narrows the search for a listed command, and the answer is none-named. Search the section the reader chose together with the other criteria headings, and the whole document when those hold nothing.'
+      refs: ['shared/resources/finalise-rerun-at-head.js']
+      carried_from: 'top_issues (route 2b, cycle 7)'
+    - action: 'T319-CR-1202: a backtick with no partner and an unindented line in one criterion together hide a listed command. Apply the wider search to the lazily joined text of each criterion too.'
+      refs: ['shared/resources/finalise-rerun-at-head.js']
+      carried_from: 'top_issues (route 2b, cycle 7)'
+    - action: 'T319-CR-1203: under core.ignorecase=true on a case-sensitive disk, an untracked SUB/x.js beside a submodule sub is not listed. Count a case-sensitive-only path as untracked when a parent directory folds to a submodule entry and is not that directory.'
+      refs: ['shared/resources/finalise-rerun-at-head.js']
+      carried_from: 'top_issues (route 2b, cycle 7)'
+    - action: 'T319-CR-1301: a tick whose PR conflict was resolved on the forge and squash-merged with its remote branch deleted reads resume. State the case as a limit in develop-next and the configuration reference, or ask the forge for a merged PR of the tick branch.'
+      refs: ['shared/resources/tick-pr.sh']
+      carried_from: 'top_issues (route 2b, cycle 7)'
+    - action: 'T319-CR-1302: a fetch that brought the commit and then failed at something else is answered "could not be fetched". After the fetch, refuse only when the commit is still absent, and fetch without submodules.'
+      refs: ['shared/resources/push-held.sh']
+      carried_from: 'top_issues (route 2b, cycle 7)'
+    - action: 'T319-CR-1303: a script stopped past its bound answers that the push failed when it reached the server. Answer 124 whenever the bound has passed and the command ended by a kill.'
+      refs: ['shared/resources/push-held.sh']
+      carried_from: 'top_issues (route 2b, cycle 7)'
+    - action: 'T319-CR-1304: started in a subdirectory, a landed tick whose merge conflicts reads resume. Run the search from the top of the repository.'
+      refs: ['shared/resources/tick-pr.sh']
+      carried_from: 'top_issues (route 2b, cycle 7)'
+    - action: 'A scan example for an inline-backticked push-policy call in prose, which the push-site scan would still count as a call (a trace, not executed)'
+      refs: ['shared/resources/tests/push-policy.test.mjs']
+      remedy: unverified
+    - action: 'A test for the watcher check of a killed script that nothing collects; it was checked by hand in a process namespace only'
+      refs: ['shared/resources/push-held.sh']
+      remedy: unverified
+
+bug_resolution:
+  bugs_fixed: 0
+  bugs_remaining: 0
+  verification_method: 'the cycle 6 reproduction scripts re-run on this code, and the committed tests; no bug report is open'
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []

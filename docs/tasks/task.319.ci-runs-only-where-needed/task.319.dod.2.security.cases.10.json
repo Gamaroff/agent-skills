@@ -1,0 +1,266 @@
+[
+  {
+    "id": "legit-marker",
+    "input": "ci:\n  skipMarker: \"[skip ci]\"\n",
+    "direction": "legitimate",
+    "why": "the documented marker",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "legit-latin",
+    "input": "ci:\n  skipMarker: \"[überspringen]\"\n",
+    "direction": "legitimate",
+    "why": "printable letters outside ASCII",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "legit-cjk",
+    "input": "ci:\n  skipMarker: \"[跳过 ci]\"\n",
+    "direction": "legitimate",
+    "why": "printable CJK letters",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "legit-non-bmp",
+    "input": "ci:\n  skipMarker: \"[skip 🚫]\"\n",
+    "direction": "legitimate",
+    "why": "a printable character outside the BMP",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "legit-80",
+    "input": "ci:\n  skipMarker: \"abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij\"\n",
+    "direction": "legitimate",
+    "why": "80 characters",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "legit-80-non-bmp",
+    "input": "ci:\n  skipMarker: \"🍏🍎🍐🍊🍋🍌🍉🍇🍓🍒🍏🍎🍐🍊🍋🍌🍉🍇🍓🍒🍏🍎🍐🍊🍋🍌🍉🍇🍓🍒🍏🍎🍐🍊🍋🍌🍉🍇🍓🍒🍏🍎🍐🍊🍋🍌🍉🍇🍓🍒🍏🍎🍐🍊🍋🍌🍉🍇🍓🍒🍏🍎🍐🍊🍋🍌🍉🍇🍓🍒🍏🍎🍐🍊🍋🍌🍉🍇🍓🍒\"\n",
+    "direction": "legitimate",
+    "why": "80 characters, each two UTF-16 units",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "legit-file-bom",
+    "input": "﻿ci:\n  skipMarker: \"[skip ci]\"\n",
+    "direction": "legitimate",
+    "why": "a BOM before the file, not in the value",
+    "correct": "accepted: a leading BOM is ignored",
+    "spec_ref": "docs/reference/configuration.md:466"
+  },
+  {
+    "id": "hostile-del",
+    "input": "ci:\n  skipMarker: \"ab\"\n",
+    "direction": "hostile",
+    "why": "DEL",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-c1-first",
+    "input": "ci:\n  skipMarker: \"ab\"\n",
+    "direction": "hostile",
+    "why": "C1 control",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-c1-nel",
+    "input": "ci:\n  skipMarker: \"ab\"\n",
+    "direction": "hostile",
+    "why": "C1 control, the run 1 reproduction",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-c1-csi",
+    "input": "ci:\n  skipMarker: \"ab\"\n",
+    "direction": "hostile",
+    "why": "C1 control, 8-bit CSI",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-c1-last",
+    "input": "ci:\n  skipMarker: \"ab\"\n",
+    "direction": "hostile",
+    "why": "C1 control",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-soft-hyphen",
+    "input": "ci:\n  skipMarker: \"a­b\"\n",
+    "direction": "hostile",
+    "why": "format character",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-alm",
+    "input": "ci:\n  skipMarker: \"a؜b\"\n",
+    "direction": "hostile",
+    "why": "format character, bidi mark",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-lrm",
+    "input": "ci:\n  skipMarker: \"a‎b\"\n",
+    "direction": "hostile",
+    "why": "format character, bidi mark",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-rlm",
+    "input": "ci:\n  skipMarker: \"a‏b\"\n",
+    "direction": "hostile",
+    "why": "format character, bidi mark",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-bidi-lre",
+    "input": "ci:\n  skipMarker: \"a‪b\"\n",
+    "direction": "hostile",
+    "why": "format character, bidi embedding",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-bidi-pdf",
+    "input": "ci:\n  skipMarker: \"a‬b\"\n",
+    "direction": "hostile",
+    "why": "format character, bidi pop",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-bidi-rlo",
+    "input": "ci:\n  skipMarker: \"a‮b\"\n",
+    "direction": "hostile",
+    "why": "a bidi override",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-bidi-lri",
+    "input": "ci:\n  skipMarker: \"a⁦b\"\n",
+    "direction": "hostile",
+    "why": "format character, bidi isolate",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-bidi-pdi",
+    "input": "ci:\n  skipMarker: \"a⁩b\"\n",
+    "direction": "hostile",
+    "why": "format character, bidi isolate pop",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-zwsp",
+    "input": "ci:\n  skipMarker: \"a​b\"\n",
+    "direction": "hostile",
+    "why": "a zero-width space",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-zwnj",
+    "input": "ci:\n  skipMarker: \"a‌b\"\n",
+    "direction": "hostile",
+    "why": "format character, zero width",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-zwj",
+    "input": "ci:\n  skipMarker: \"a‍b\"\n",
+    "direction": "hostile",
+    "why": "format character, zero width",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-word-joiner",
+    "input": "ci:\n  skipMarker: \"a⁠b\"\n",
+    "direction": "hostile",
+    "why": "format character, zero width",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-bom-inside",
+    "input": "ci:\n  skipMarker: \"a﻿b\"\n",
+    "direction": "hostile",
+    "why": "format character, BOM inside the value",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-line-separator",
+    "input": "ci:\n  skipMarker: \"a b\"\n",
+    "direction": "hostile",
+    "why": "not one line",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-paragraph-separator",
+    "input": "ci:\n  skipMarker: \"a b\"\n",
+    "direction": "hostile",
+    "why": "not one line",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-tag-non-bmp",
+    "input": "ci:\n  skipMarker: \"a󠁁b\"\n",
+    "direction": "hostile",
+    "why": "format character outside the BMP",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-musical-non-bmp",
+    "input": "ci:\n  skipMarker: \"a𝅳b\"\n",
+    "direction": "hostile",
+    "why": "format character outside the BMP",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-81",
+    "input": "ci:\n  skipMarker: \"abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijk\"\n",
+    "direction": "hostile",
+    "why": "81 characters",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-81-non-bmp",
+    "input": "ci:\n  skipMarker: \"🍏🍎🍐🍊🍋🍌🍉🍇🍓🍒🍏🍎🍐🍊🍋🍌🍉🍇🍓🍒🍏🍎🍐🍊🍋🍌🍉🍇🍓🍒🍏🍎🍐🍊🍋🍌🍉🍇🍓🍒🍏🍎🍐🍊🍋🍌🍉🍇🍓🍒🍏🍎🍐🍊🍋🍌🍉🍇🍓🍒🍏🍎🍐🍊🍋🍌🍉🍇🍓🍒🍏🍎🍐🍊🍋🍌🍉🍇🍓🍒🥝\"\n",
+    "direction": "hostile",
+    "why": "81 characters, each two UTF-16 units",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-81-mixed",
+    "input": "ci:\n  skipMarker: \"abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghijabcdefghij🚫\"\n",
+    "direction": "hostile",
+    "why": "80 ASCII characters and one outside the BMP",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  }
+]

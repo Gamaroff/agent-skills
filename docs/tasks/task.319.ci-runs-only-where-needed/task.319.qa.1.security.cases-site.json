@@ -1,0 +1,15 @@
+[
+  {"id":"legit-pause","input":"pause","direction":"legitimate","correct":"a listed site id: exit 0","spec_ref":"shared/resources/push-policy.sh:46"},
+  {"id":"legit-qa-cycle","input":"qa-cycle","direction":"legitimate","correct":"a listed site id: exit 0","spec_ref":"shared/resources/push-policy.sh:46"},
+  {"id":"legit-step8","input":"step8","direction":"legitimate","correct":"a listed site id: exit 0","spec_ref":"shared/resources/push-policy.sh:46"},
+  {"id":"hostile-unknown","input":"nope","direction":"hostile","correct":"REJECT an unlisted id: exit 2","spec_ref":"shared/resources/push-policy.sh:46"},
+  {"id":"hostile-case","input":"PAUSE","direction":"hostile","correct":"REJECT: ids are case-sensitive","spec_ref":"shared/resources/push-policy.sh:46"},
+  {"id":"hostile-prefix","input":"qa","direction":"hostile","correct":"REJECT a prefix of listed ids","spec_ref":"shared/resources/push-policy.sh:46"},
+  {"id":"hostile-regex","input":".*","direction":"hostile","correct":"REJECT: ids are not patterns","spec_ref":"shared/resources/push-policy.sh:46"},
+  {"id":"hostile-rule","input":"delta","direction":"hostile","correct":"REJECT a rule name used as an id","spec_ref":"shared/resources/push-policy.sh:46"},
+  {"id":"hostile-tab","input":"pause\tpause","direction":"hostile","correct":"REJECT a whole row","spec_ref":"shared/resources/push-policy.sh:46"},
+  {"id":"hostile-newline","input":"pause\nqa-cycle","direction":"hostile","correct":"REJECT two ids","spec_ref":"shared/resources/push-policy.sh:46"},
+  {"id":"hostile-awk-escape","input":"\\160ause","direction":"hostile","correct":"REJECT: an escape that awk -v decodes to a listed id is not that id","spec_ref":"shared/resources/push-policy.sh:46"},
+  {"id":"hostile-space","input":" pause","direction":"hostile","correct":"REJECT leading whitespace","spec_ref":"shared/resources/push-policy.sh:46"},
+  {"id":"hostile-subst","input":"$(touch owned)","direction":"hostile","correct":"REJECT and run nothing","spec_ref":"shared/resources/push-policy.sh:46"}
+]

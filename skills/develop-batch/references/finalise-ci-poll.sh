@@ -1,0 +1,166 @@
+#!/usr/bin/env bash
+# AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/finalise-ci-poll.sh. Regenerate via `npm run bundle`.
+# finalise Step 7 action 6c — the CI reading 2 poll, shipped as a file and run, never copied.
+#
+# It used to live in finalise/SKILL.md as a heredoc with a `rollup()` placeholder the agent spliced
+# in by hand. Copying it out by line range dropped its final `printf`, and the truncated poll exited
+# 0 without a result — which the reader cannot tell from a poll that was killed (obs #148). A file
+# has no copy step to lose a line in.
+#
+# usage: finalise-ci-poll.sh <PR_NUMBER> <EXPECTED_HEAD> <MAX_WAIT_SECONDS> <RESULT_FILE> [EXPECTED_CHECKS] [ENGINE]
+# Writes ONE line to RESULT_FILE when it concludes: "<STATE> <HEAD> <CHECKS> <WAITED>s TREE_EQ=<sha12 or empty>".
+# <STATE> is the rollup token, or UNDECIDED when MAX_WAIT ran out on a SUCCESS that never qualified.
+# ENGINE is the path of ci-tree-equivalence.js; absent means the docs-only rule is off for this poll.
+# Runs on GitHub and Bitbucket (task.319): resolve-platform.sh beside this file names the forge, and when
+# it is missing or rejects the configuration the forge is GitHub, as before. The Bitbucket arm is below
+# the GitHub reads; both write the same line with the same tokens.
+#
+# Siblings the Bitbucket arm runs (spelled out so the bundler ships them):
+#   shared/resources/resolve-platform.sh      (which forge)
+#   shared/resources/pr-read.sh               (the PR's head and destination)
+#   shared/resources/bitbucket-auth.sh        (the credential)
+#   shared/resources/ci-tree-equivalence.js   (--reduce-bitbucket: the rollup token)
+if [ "$#" -lt 4 ] || [ -z "${1:-}" ] || [ -z "${2:-}" ] || [ -z "${3:-}" ] || [ -z "${4:-}" ]; then
+  echo "usage: finalise-ci-poll.sh <PR_NUMBER> <EXPECTED_HEAD> <MAX_WAIT_SECONDS> <RESULT_FILE> [EXPECTED_CHECKS] [ENGINE]" >&2
+  exit 2
+fi
+PR_NUMBER=${1}; EXPECTED_HEAD=${2}; MAX_WAIT=${3}; RESULT=${4}; EXPECTED_CHECKS=${5:-0}; ENGINE=${6:-}
+TREE_EQ=""; TE_LATCHED=0
+BB_DESTINATION="" # Bitbucket: the PR's destination, for the ancestors the engine reads (T319-CR-306)
+# The docs-only arm parses the engine's JSON with jq. Without jq nothing could ever be latched and a
+# configured checkCommand would be re-run every 30 s for the whole wait, so the rule is OFF here and the
+# poll waits as before (QA cycle 3, review CR-10).
+command -v jq >/dev/null 2>&1 || { [ -z "$ENGINE" ] || echo "ci-tree-equivalence off: jq not found" >&2; ENGINE=""; }
+# The Step 6 rollup query, the same jq program as reading 1 (finalise/SKILL.md Step 6, CI_ROLLUP).
+# A test holds the two equal: ci-tree-equivalence.test.mjs › "the 6c poll's rollup() is Step 6's query".
+rollup() {
+  # shellcheck disable=SC2016  # $st is a jq variable, not a shell one: single quotes are intended
+  gh pr view "$PR_NUMBER" --json statusCheckRollup \
+    -q '[ .statusCheckRollup[]
+          | (.status // "") as $st
+          | (if   $st == ""          then (.state // "")        # StatusContext
+             elif $st == "COMPLETED" then (.conclusion // "")   # finished CheckRun
+             else "PENDING" end)                                 # QUEUED/IN_PROGRESS/WAITING
+          | if . == "" then "PENDING" else . end ]               # empty ⇒ undecided, never green
+        | if length == 0 then "NONE"
+          elif any(. == "FAILURE" or . == "TIMED_OUT" or . == "ERROR"
+                   or . == "STARTUP_FAILURE" or . == "ACTION_REQUIRED") then "FAILURE"
+          elif any(. == "PENDING" or . == "EXPECTED" or . == "QUEUED"
+                   or . == "IN_PROGRESS" or . == "WAITING") then "PENDING"
+          elif any(. == "CANCELLED") then "CANCELLED"
+          else "SUCCESS" end' 2>/dev/null || echo "UNKNOWN"
+}
+# The head CI was actually sampled on — read from the PR, never echoed back from the argument.
+# "unknown" on failure makes the later-turn head check HALT rather than pass.
+sampled_head() { gh pr view "$PR_NUMBER" --json headRefOid -q .headRefOid 2>/dev/null || echo unknown; }
+# How many checks the rollup is green OVER. A push registers its fast lanes first; a rollup
+# sampled in that window is SUCCESS across three checks while the slow lanes have not yet
+# appeared (obs #87). Distinct checks, the same query as CI_CHECKS_1 (obs #3).
+checks() { gh pr view "$PR_NUMBER" --json statusCheckRollup -q '[.statusCheckRollup[] | (.name // .context // "")] | unique | length' 2>/dev/null || echo 0; }
+sample() { STATE=$(rollup); CHECKS=$(checks); }
+# The head the result line carries: read when the line is written, so a push during the last sample or
+# the tree-equivalence check shows.
+final_head() { sampled_head; }
+
+# ── Bitbucket ────────────────────────────────────────────────────────────────
+# One sample = the PR (its head and destination), then that head's commit statuses, reduced by
+# ci-tree-equivalence.js: no status is parsed here. A pull-request pipeline reports under the key
+# `prs:<pattern>:<destination>`, and one commit can carry a key per destination (a branch with a PR
+# into develop and another into main), so only the keys of THIS PR's destination count. Any read that
+# fails is UNKNOWN, which is never green.
+SELF_DIR="$(CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+POLL_VCS=$( . "$SELF_DIR/resolve-platform.sh" >/dev/null 2>&1 && printf '%s' "$VCS") || POLL_VCS=github
+if [ "$POLL_VCS" = bitbucket ]; then
+  # shellcheck source=/dev/null
+  . "$SELF_DIR/pr-read.sh" || { echo "finalise-ci-poll: pr-read.sh is missing beside this file" >&2; exit 2; }
+  BB_HEAD=unknown
+  sampled_head() { printf '%s\n' "$BB_HEAD"; }
+  final_head() { if pr_read --pr "$PR_NUMBER"; then printf '%s\n' "$PR_READ_HEAD"; else echo unknown; fi; }
+  sample() {
+    STATE=UNKNOWN; CHECKS=0; BB_HEAD=unknown
+    local body code reduced
+    pr_read --pr "$PR_NUMBER" || { echo "finalise-ci-poll: $PR_READ_ERROR" >&2; return 0; }
+    BB_HEAD=$PR_READ_HEAD; BB_DESTINATION=$PR_READ_BASE
+    body=$(mktemp) || return 0
+    code=$(curl -s --max-time 30 -o "$body" -w '%{http_code}' "${BB_CURL_AUTH[@]}" \
+      "${PR_READ_BB_API}/repositories/${PR_READ_REPO}/commit/${PR_READ_HEAD}/statuses?pagelen=100" 2>/dev/null)
+    if [ "$code" = 200 ]; then
+      reduced=$(command node "$SELF_DIR/ci-tree-equivalence.js" --reduce-bitbucket --destination "$PR_READ_BASE" < "$body" 2>/dev/null)
+      case "$reduced" in
+        *' '[0-9]*) STATE=${reduced%% *}; CHECKS=${reduced##* } ;;
+      esac
+    else
+      echo "finalise-ci-poll: the commit statuses answered HTTP ${code:-000}" >&2
+    fi
+    rm -f "$body"
+  }
+fi
+
+WAITED=0; PREV_CHECKS=-1
+sample
+# A terminal state is accepted only when ALL of:
+#   (1) WAITED > 0 — the pre-loop sample can still be the PREVIOUS head's rollup, which a
+#       fresh push has not yet replaced (obs #108: a stale SUCCESS accepted at 0s);
+#   (2) the sampled head is the expected head — never gate one commit and read another;
+#   (3) the check count is at least reading 1's count and unchanged since the previous sample —
+#       a rollup that is still growing is not decided, whatever its state says.
+# FAILURE is terminal under (1) and (2) only: a red on a partial rollup is still a red.
+# A PENDING/NONE head may also conclude as SUCCESS when the docs-only rule (task.172) holds —
+# still under (1) and (2), so it is never taken on a stale or foreign head. The engine exits 0 for
+# tree-equivalent and for nothing else. Once it has answered code-changed, check-failed or disabled
+# the answer cannot change (the head is pinned), so it is latched and not re-run every 30 s — a
+# configured checkCommand is a full local suite. code-changed is only ever reported when no nearer
+# ancestor was left undecided, so it IS final; behind an undecided ancestor the engine says
+# no-green-ancestor instead (a CANCELLED ancestor counts as undecided and is re-asked too: that
+# costs polling, never a wrong answer). no-green-ancestor / unverifiable can change (an ancestor's
+# run may finish), so those are asked again.
+tree_equivalent() {
+  [ -n "$ENGINE" ] && [ "$TE_LATCHED" -eq 0 ] || return 1
+  local out sha
+  if out=$(command node "$ENGINE" --head-rollup "$STATE" --head "$EXPECTED_HEAD" --pr "$PR_NUMBER" \
+    ${BB_DESTINATION:+--destination "$BB_DESTINATION"} --json 2>/dev/null); then
+    sha=$(printf '%s' "$out" | jq -r '.greenSha[0:12] // empty')
+    [ -n "$sha" ] || return 1
+    TREE_EQ=$sha; return 0
+  fi
+  case "$(printf '%s' "$out" | jq -r '.reason // empty' 2>/dev/null)" in
+    code-changed|check-failed|disabled) TE_LATCHED=1 ;;
+  esac
+  return 1
+}
+decided() {
+  [ "$WAITED" -gt 0 ] || return 1
+  [ "$(sampled_head | cut -c1-12)" = "$(printf '%s' "$EXPECTED_HEAD" | cut -c1-12)" ] || return 1
+  case "$STATE" in
+    FAILURE) return 0 ;;
+    SUCCESS) [ "$CHECKS" -ge "$EXPECTED_CHECKS" ] && [ "$CHECKS" -eq "$PREV_CHECKS" ] ;;
+    PENDING|NONE) if tree_equivalent; then STATE=SUCCESS; return 0; fi; return 1 ;;
+    *) return 1 ;;
+  esac
+}
+DECIDED=0
+while [ "$WAITED" -lt "$MAX_WAIT" ]; do
+  decided && { DECIDED=1; break; }
+  sleep 30; WAITED=$((WAITED + 30)); PREV_CHECKS=$CHECKS; sample
+done
+# MAX_WAIT ran out. The last sample was taken after the loop's last decided(), so judge it once.
+# Only a SUCCESS is re-judged: decided() on a PENDING/NONE head asks the engine, and FAILURE is
+# terminal for the reader anyway. A SUCCESS that still fails the floor or the stable-count rule is
+# NOT a green reading: printed as sampled, the reader accepted a rollup that stayed partial for the
+# whole wait, which is the case the floor exists to refuse (obs #4). UNDECIDED makes the reader HALT.
+if [ "$DECIDED" -eq 0 ] && [ "$STATE" = SUCCESS ]; then
+  if ! decided; then
+    STATE=UNDECIDED
+    # Say WHY on stderr; the result line stays as it was, because readers parse it. The floor is a
+    # measurement from reading 1 on this PR, never a figure carried over from another PR: a floor
+    # above the checks this head has started (path-filtered workflows start fewer on a small diff)
+    # can never be met, and without this line that reads as a CI that hung (obs #166).
+    if [ "$CHECKS" -lt "$EXPECTED_CHECKS" ]; then
+      echo "UNDECIDED: the rollup is SUCCESS but has ${CHECKS} check(s) and the floor is ${EXPECTED_CHECKS} (floor ${EXPECTED_CHECKS}, saw ${CHECKS}). Take the floor from reading 1 on this PR, or 0 when there is none; workflows with a paths: filter start fewer checks on a small diff." >&2
+    else
+      echo "UNDECIDED: the rollup is SUCCESS but the check count was still changing (${PREV_CHECKS} then ${CHECKS}), or the head moved." >&2
+    fi
+  fi
+fi
+printf '%s %s %s %ss TREE_EQ=%s\n' "$STATE" "$(final_head)" "$CHECKS" "$WAITED" "$TREE_EQ" > "$RESULT"

@@ -9,7 +9,8 @@
 #      mid-flow by the harness (SIGTERM/timeout) leaves recoverable resume state for
 #      the Phase 0b resume detector
 #   1. Appends a "Paused — Context Compaction" entry to the implementation report
-#   2. Commits the report and pushes to remote (best-effort) — the push is held when
+#   2. Commits the report (best-effort). The commit is pushed only under
+#      `pipeline.pushRecordCommits: eager`, and even then held at steps 7 and 8 and when
 #      the report links to a path staged but not in the commit (a 5c carry)
 #   3. Posts a pause comment to the PR (best-effort) — through the access gate
 #      (`tracker_write`), opening with the plain-language lead for the
@@ -67,6 +68,7 @@
 #   shared/resources/stakeholder-summary-cli.js (the lead for the PR comment)
 #   shared/resources/defer-mutation.js          (the deferred record, via both)
 #   shared/resources/qa-cycle.sh                (the QA cycle the pause comment names)
+#   shared/resources/push-policy.sh             (whether the pause commit is pushed)
 #
 # Always exits 0. Failures are logged to stderr and never block compaction.
 
@@ -346,6 +348,16 @@ fi
 
 # Append pause entry to report
 if [ -n "$REPORT" ] && [ -f "$REPORT" ]; then
+  # Decided before the append, so the entry can say whether its commit was pushed. Steps 7 and 8 hold
+  # for their own reasons (below), in both modes. At any other step push-policy.sh answers: `batched`
+  # (the default) never pushes a pause commit, `pipeline.pushRecordCommits: eager` does (task.319).
+  # Anything but `push` is a hold, a missing script included.
+  PUSH_HOLD_REASON=""
+  case "$CURRENT_STEP" in
+    7) PUSH_HOLD_REASON=step7 ;;
+    8) PUSH_HOLD_REASON=step8 ;;
+    *) [ "$(bash "$HOOK_DIR/push-policy.sh" --site pause 2>/dev/null)" = push ] || PUSH_HOLD_REASON=batched ;;
+  esac
   {
     echo ""
     echo "---"
@@ -361,6 +373,7 @@ if [ -n "$REPORT" ] && [ -f "$REPORT" ]; then
     echo "- Last step boundary: Step ${CURRENT_STEP}"
     echo "- PR: ${PR_URL:-not yet created}"
     echo "- Tracker: ${LOCK_TRACKER:-none} ${TRACKER_ISSUE:+#${TRACKER_ISSUE}}"
+    [ -z "$PUSH_HOLD_REASON" ] || echo "- **Pushed:** no — rides the next push. Resuming on another machine? Push this commit from here first: \`git push origin HEAD\`."
     echo ""
     echo "**Resume**: re-invoke \`/${SKILL} <path>\` (same path) and choose **Resume from last completed step** when prompted. Phase 0b will read this report, verify completed-step artifacts, and re-run Step ${CURRENT_STEP}."
     echo ""
@@ -414,20 +427,19 @@ if [ -n "$REPORT" ] && [ -f "$REPORT" ]; then
     # comes during the 6c wait (which follows the acceptance push). Held, local HEAD is ahead of the
     # PR head, so /finalise
     # reads the acceptance head from the file its poll block records, never from local HEAD.
-    PUSH_HOLD_REASON=""
     DANGLING=""
-    case "$CURRENT_STEP" in
-      7) PUSH_HOLD_REASON=step7 ;;
-      8) PUSH_HOLD_REASON=step8 ;;
-      *) DANGLING=$(report_dangling_links) ;;
-    esac
-    if [ "$PUSH_HOLD_REASON" = step8 ]; then
+    [ -n "$PUSH_HOLD_REASON" ] || DANGLING=$(report_dangling_links)
+    if [ "$PUSH_HOLD_REASON" = batched ]; then
+      PUSH_HELD=true
+      echo "on-precompact: pause commit NOT pushed — record-only commits are batched (push-policy.sh --site pause); it rides the next push" >&2
+    elif [ "$PUSH_HOLD_REASON" = step8 ]; then
       PUSH_HELD=true
       echo "on-precompact: pause commit NOT pushed — at Step 8 a push would supersede the head's CI run; Step 8's own commit carries it" >&2
     elif [ "$PUSH_HOLD_REASON" = step7 ]; then
       PUSH_HELD=true
       echo "on-precompact: pause commit NOT pushed — at Step 7 a push would supersede the CI run /finalise is waiting on; the next commit (/finalise's, or Step 8's for a pause during the CI wait) carries it" >&2
     elif [ -z "$DANGLING" ]; then
+      # reached only when `push-policy.sh --site pause` answered push (eager), above
       git push origin HEAD >/dev/null 2>&1 || true
     else
       PUSH_HELD=true
@@ -593,6 +605,9 @@ REPORT_LINT_SUMMARY=", committed the report, and pushed to remote"
 if [ "${REPORT_LINT_OK:-true}" != true ]; then
   REPORT_LINT_NOTE=" but NOT committed — the report FAILED report-lint.js; repair it by hand, then commit"
   REPORT_LINT_SUMMARY=" (report NOT committed: it failed report-lint.js — repair by hand)"
+elif [ "${PUSH_HELD:-false}" = true ] && [ "${PUSH_HOLD_REASON:-}" = batched ]; then
+  REPORT_LINT_NOTE=", committed, but NOT pushed — record-only commits are batched (pipeline.pushRecordCommits); it rides the next push. To resume on another machine, push it from here first"
+  REPORT_LINT_SUMMARY=", and committed the report (not pushed: it rides the next push)"
 elif [ "${PUSH_HELD:-false}" = true ] && [ "${PUSH_HOLD_REASON:-}" = step8 ]; then
   REPORT_LINT_NOTE=", committed, but NOT pushed — at Step 8 a push would supersede the head's CI run; Step 8's own commit carries it and pushes once"
   REPORT_LINT_SUMMARY=", and committed the report (not pushed: at Step 8 Step 8's own commit pushes it)"

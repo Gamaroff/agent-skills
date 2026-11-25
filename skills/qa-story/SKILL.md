@@ -1250,7 +1250,10 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
    `fixture: {env, files}` supplies what else it reads, and every hostile case carries `expected` with the
    guard's own refusal output (a non-empty stdout or stderr) — or is declined (scoring order:
    `scoreFenceRun`); "it is prose,
-   not a script" is never a reason to record `boundary: false`.
+   not a script" is never a reason to record `boundary: false`. A **lint rule** takes the eslint form:
+   `--entry 'eslint:<a file the rule applies to>#<rule-id>' --cases-file <cases.json>` — each input is
+   source text linted as that file by the repository's own ESLint and configuration (task.319); "it is
+   a lint rule" is never a reason to record `boundary: false`.
    A predicate the engine cannot import because it is **not exported** — a module-private `const` —
    takes the same answer: export it (one word) and probe it. "It is not exported" is never a reason to
    record `boundary: false`; the engine's `entry-not-probeable` detail names the remedy. On task.139

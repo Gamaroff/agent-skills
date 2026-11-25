@@ -25,6 +25,29 @@ If you find yourself reaching for `Write` to author a DoD file, STOP and invoke 
 
 ## Invoke /finalise
 
+**First push what the run held.** `/finalise` takes CI reading 1 on the PR head while recording
+`HEAD`, so a commit still local would be accepted on a reading of another commit. Give the call a tool
+timeout of 600000 ms: the push waits up to 500 s for the project's own pre-push hook, and the default
+tool timeout ends the call before it answers:
+
+```bash
+bash .agents/skills/{develop-story|develop-task}/references/push-held.sh --site finalise-entry
+```
+
+| It prints | Do this |
+| :-- | :-- |
+| `nothing held` or `pushed` | Go on. What 5c staged stays staged for 6a |
+| `commit-staged` | A commit is held and 5c's set is staged: the held report links to it, so neither goes out without the other. Commit the staged set and nothing else through `/commit-changes` (`docs(...): review evidence, ahead of finalise`), then run the block again |
+| `not pushed …` (exit 1) | HALT with the line. `HEAD` is not known to be the PR head, so there is no reading to take. Where origin is ahead, pull first; where a push was stopped, ask origin again, because it may still have taken it |
+| no line at all | The call was cut off. Run it again with the timeout above; cut off again, HALT |
+
+A resume during the 6c wait takes this block too. It moves the PR head off the commit the old reading
+waited for, and `/finalise` runs whole again: both of its readings are then of the new head.
+
+**Which push carries a pause commit made at step 7**: this block's, when the pause came before 6a and
+the step is run again; `/finalise` 6a's, when the session carried on in place; Step 8's, when it came
+during the 6c wait.
+
 #### develop-story
 
 Invoke the `/finalise` skill with the story file path.
@@ -69,13 +92,8 @@ Suggested commit message: `docs(story.{P}.{E}.{S}): implementation report — fi
 
 Suggested commit message: `docs(task.{id}): implementation report — finalise gaps identified`
 
-Then push:
-
-```bash
-git push origin HEAD
-```
-
-Then HALT:
+Then HALT. The terminal HALT block sends the commit out, deferred record commits included
+(`push-held.sh --site halt`):
 
 ```
 ⚠️ Finalise identified Definition of Done gaps.

@@ -100,7 +100,7 @@ answer to a question nobody asked.
 
 - **A real, importable ES module export — or a shell script via the `shell:` entry form, a
   sourced library via `shell-fn:`, a Node or Python CLI via `cli:`, a multi-argument shell script via
-  `shell-argv:`, or a fenced bash block via `fence:`.** A bash script taking one positional argument is probed with
+  `shell-argv:`, a fenced bash block via `fence:`, or a lint rule via `eslint:`.** A bash script taking one positional argument is probed with
   `--entry 'shell:<path>'` (and a materialised sink such as `filename`); a bash script taking
   **several arguments or flags** with `--entry 'shell-argv:<path>' --argv '["--flag","{input}"]'`,
   plus `--fixture-setup <setup.sh>` when it needs a scratch repository (a setup that fails is
@@ -271,7 +271,8 @@ over-read a clean result.
 3. **A non-JS entry point is routed to `--entry 'shell:<path>'`** — or, for a sourced library,
    `--entry 'shell-fn:<path>#<function>'`, for a Node or Python CLI, `--entry 'cli:<path>' --argv …`, for a
    shell script with several arguments or flags, `--entry 'shell-argv:<path>' --argv …`, and for
-   a fenced bash block in a step doc, `--entry 'fence:<doc.md>#<heading>' --slot '<placeholder>'`
+   a fenced bash block in a step doc, `--entry 'fence:<doc.md>#<heading>' --slot '<placeholder>'`,
+   and for a lint rule, `--entry 'eslint:<a file it applies to>#<rule-id>' --cases-file <cases.json>`
    — not recorded `unverifiable`; only a target no entry form reaches (stdin, network) is declined — and the decline names the reason. The `cli:`
    form's verdict is only as good as the CLI's exit status: one that exits 0 while refusing is
    scored as accepting, which a case's `expected` is the answer to.

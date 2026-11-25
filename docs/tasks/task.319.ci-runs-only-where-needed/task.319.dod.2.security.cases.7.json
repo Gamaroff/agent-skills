@@ -1,0 +1,106 @@
+[
+  {
+    "id": "legit-marker",
+    "input": "ci:\n  skipMarker: \"[skip ci]\"\n",
+    "direction": "legitimate",
+    "why": "the documented marker",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "legit-empty",
+    "input": "ci:\n  skipMarker: \"\"\n",
+    "direction": "legitimate",
+    "why": "off",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "legit-beside-docs-only",
+    "input": "ci:\n  docsOnly:\n    enabled: true\n  skipMarker: \"[ci skip]\"\n",
+    "direction": "legitimate",
+    "why": "both known keys",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:466"
+  },
+  {
+    "id": "hostile-unknown-key",
+    "input": "ci:\n  skipMarkers: \"[skip ci]\"\n",
+    "direction": "hostile",
+    "why": "unknown key",
+    "correct": "REJECT",
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:286"
+  },
+  {
+    "id": "hostile-near-miss-key",
+    "input": "ci:\n  skip-marker: \"[skip ci]\"\n",
+    "direction": "hostile",
+    "why": "near-miss key",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:466"
+  },
+  {
+    "id": "hostile-near-miss-block",
+    "input": "CI:\n  skipMarker: \"[skip ci]\"\n",
+    "direction": "hostile",
+    "why": "near-miss block",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:466"
+  },
+  {
+    "id": "hostile-under-docs-only",
+    "input": "ci:\n  docsOnly:\n    skipMarker: x\n",
+    "direction": "hostile",
+    "why": "unknown key under docsOnly",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:466"
+  },
+  {
+    "id": "hostile-flow",
+    "input": "ci: {skipMarker: x}\n",
+    "direction": "hostile",
+    "why": "flow mapping",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:466"
+  },
+  {
+    "id": "hostile-duplicate",
+    "input": "ci:\n  skipMarker: \"a\"\nci:\n  skipMarker: \"\"\n",
+    "direction": "hostile",
+    "why": "second block",
+    "correct": "REJECT an unaccounted row",
+    "spec_ref": "docs/reference/configuration.md:466"
+  },
+  {
+    "id": "hostile-tab",
+    "input": "ci:\n  skipMarker: \"[skip\tci]\"\n",
+    "direction": "hostile",
+    "why": "a tab is not printable",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-escape",
+    "input": "ci:\n  skipMarker: \"[skip\u001bci]\"\n",
+    "direction": "hostile",
+    "why": "a terminal escape in a commit subject",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-block-scalar",
+    "input": "ci:\n  skipMarker: >-\n    [skip ci]\n",
+    "direction": "hostile",
+    "why": "not one line",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-c1-control",
+    "input": "ci:\n  skipMarker: \"ab\"\n",
+    "direction": "hostile",
+    "why": "U+0085 is a C1 control and a line break to some readers",
+    "correct": "REJECT: the marker is one printable line",
+    "spec_ref": "docs/reference/configuration.md:312"
+  }
+]

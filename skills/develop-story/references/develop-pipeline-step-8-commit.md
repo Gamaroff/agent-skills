@@ -24,7 +24,7 @@ Before invoking `/commit-changes`, update the implementation report one final ti
   - develop-story: what was **built**, QA iterations taken, notable decisions
   - develop-task: what was **implemented**, QA iterations taken, notable decisions
 
-**The Step 8 row is written before the step's work, so it is not the evidence that Step 8 finished — and neither is the git state.** A PreCompact pause commits **and pushes** the report, so after one the row reads `✅` and the branch can look exactly like a finished run. The evidence is the **resume record**. This is the one statement of the rule; the resume contract cites it.
+**The Step 8 row is written before the step's work, so it is not the evidence that Step 8 finished — and neither is the git state.** A PreCompact pause commits the report, and a later push can carry that commit, so after one the row reads `✅` and the branch can look exactly like a finished run. The evidence is the **resume record**. This is the one statement of the rule; the resume contract cites it.
 
 - **What the record covers: all of Step 8.** The lock stays at `current_step` 8 from the start of Step 8 until its Completion Checklist passes. The checklist's last action is `advance-pipeline-lock.sh --complete`, which is the lock's one terminal remover. `/commit-changes`' lock cooperation (`advance-pipeline-lock.sh --skill commit-changes`) removes nothing at any step, so the lock survives the Step 8 commit, the push and Cleanup, and a failed check exits before `--complete` (task 161). The record reaches 8 slightly early: `/finalise`, when it accepts, moves the lock to 8 as its last action, before the orchestrator finishes Step 7's tail. A lock (surviving or restored), halt snapshot or orphaned claim at step 8 for this work item therefore means Step 8's checklist had not passed, and possibly that Step 7's tail was unfinished. A resume from it goes back to the first unfinished row at or below Step 7, and otherwise re-runs Step 8 from the start, whatever the Step 8 row reads (resume contract, Phase 0b).
 - **Every Step 8 HALT is resumable.** The HALT rule commits the report through `/commit-changes`, then snapshots the lock. The lock is still there at step 8, so the snapshot records `halt_step: 8` like a HALT at any other step. Cleanup removes this run's halt snapshot only once the run reaches it.
@@ -107,10 +107,22 @@ After `/commit-changes` completes, run `git log --oneline -1` to capture the fin
 
 ## Final Push
 
-Push the final commit so the PR reflects the completed implementation report and DoD summary:
+Push the final commit so the PR reflects the completed implementation report and DoD summary. This is
+the run's end-of-run flush: every record-only commit an earlier site deferred goes out with it, and it
+comes **before** `verify-push-state.sh` in the checklist below, which fails on a commit that is not on
+the remote:
+
 ```bash
-git push origin HEAD
+# --mark appends ci.skipMarker to a record-only head's subject (off unless the key is set), which
+# amends the unpushed commit. Anything but `defer` pushes, so a missing script still pushes.
+bash .agents/skills/{develop-story|develop-task|develop-bug}/references/push-policy.sh --mark --site step8
+if [ "$(bash .agents/skills/{develop-story|develop-task|develop-bug}/references/push-policy.sh --site step8)" != defer ]; then
+  git push origin HEAD
+fi
 ```
+
+When the mark line prints `marked`, the commit's hash changed: read it again with `git log --oneline -1`
+for the Phase 2 completion output.
 
 The Pipeline Progress row for Step 8 was already set before the commit (§ Final Implementation Report Update); there is nothing to update here.
 

@@ -518,8 +518,14 @@ test("6c head-binds the second reading: the poll records the sampled PR head and
   assert.match(
     poll,
     // task.172: a fifth field, TREE_EQ=<sha12 or empty>, names the commit a docs-only SUCCESS rests on.
-    /"\$\(sampled_head\)" "\$CHECKS" "\$WAITED" "\$TREE_EQ" > "\$RESULT"/,
+    // task.319: final_head is sampled_head on GitHub, and a fresh PR read on Bitbucket.
+    /"\$\(final_head\)" "\$CHECKS" "\$WAITED" "\$TREE_EQ" > "\$RESULT"/,
     "the result line carries the sampled head AND the check count it was green over (obs #87)",
+  );
+  assert.match(
+    poll,
+    /^final_head\(\) \{ sampled_head; \}$/m,
+    "on GitHub the result line's head is read from the PR",
   );
   // The stop condition, not the sample, decides (obs #87, #108): never at 0s, never on a
   // different head, and SUCCESS only over a count that is ≥ reading 1's and stable.

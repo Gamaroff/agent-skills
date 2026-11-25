@@ -19,7 +19,7 @@ import {
   existsSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { neverRan, spawnBudget } from "../spawn-budget.mjs";
 
@@ -351,6 +351,108 @@ test("scope: a criterion added → new-criterion; reworded → criterion-changed
     assert.equal(reasonOf(s, "SC-5"), "new-criterion");
     assert.equal(reasonOf(s, "SC-2"), "criterion-changed");
     assert.equal(reasonOf(s, "SC-1"), "unchanged");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("scope: a PASS graded on a command re-run at the head → rerun-at-head, never carried (task 319)", () => {
+  const dir = mkRepo();
+  try {
+    const a = git(dir, "rev-parse", "HEAD");
+    const prior = record(dir, a, {
+      "SC-1": { test_citation: "NOT_APPLICABLE: command re-run at the head" },
+      "SC-2": { test_citation: "NOT_APPLICABLE: measured criterion" },
+    });
+    commit(dir, { "README.md": "unrelated\n" });
+    const s = scopeAt(dir, prior);
+    assert.equal(reasonOf(s, "SC-1"), "rerun-at-head");
+    assert.equal(reasonOf(s, "SC-2"), "unchanged");
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("scope: a re-run criterion is judged whole whatever its prior status, so members cannot overturn it (T319-CR-2)", () => {
+  const dir = mkRepo();
+  try {
+    const a = git(dir, "rev-parse", "HEAD");
+    const prior = record(dir, a, {
+      "SC-1": {
+        status: "FAIL",
+        test_citation: "NOT_APPLICABLE: command re-run at the head",
+        members: [{ member: "m1", status: "PASS", citation: "src/a.js:1" }],
+      },
+    });
+    commit(dir, { "README.md": "unrelated\n" });
+    const s = scopeAt(dir, prior);
+    const entry = s.rejudge.find((r) => r.id === "SC-1");
+    assert.equal(entry.reason, "rerun-at-head");
+    assert.equal(entry.carried_members, undefined);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("scope: --rerun-at-head re-judges what this run's record lists, however the prior run graded it (T319-CR-5)", () => {
+  const dir = mkRepo();
+  try {
+    const a = git(dir, "rev-parse", "HEAD");
+    writeFileSync(join(dir, "prior.json"), record(dir, a, {}));
+    const head = commit(dir, { "README.md": "unrelated\n" });
+    const scopeWith = (rec) => {
+      writeFileSync(join(dir, "run.json"), JSON.stringify(rec));
+      const r = cli(dir, [
+        "scope",
+        "--doc",
+        DOC,
+        "--head",
+        head,
+        "--prior",
+        "prior.json",
+        "--rerun-at-head",
+        "run.json",
+        "--json",
+      ]);
+      return { code: r.status, out: JSON.parse(r.stdout) };
+    };
+    const text = "SC-2: the engine carries an untouched PASS";
+    const rec = (over = {}) => ({
+      reason: "ran",
+      document: basename(DOC),
+      head,
+      runs: [{ command: "x", criteria: [{ index: 2, text }] }],
+      ...over,
+    });
+    const ok = scopeWith(rec());
+    assert.equal(ok.code, 0);
+    assert.equal(reasonOf(ok.out, "SC-2"), "rerun-at-head");
+    assert.equal(reasonOf(ok.out, "SC-1"), "unchanged");
+    for (const reason of ["none-named", "not-configured"])
+      assert.equal(
+        reasonOf(scopeWith(rec({ reason, runs: [] })).out, "SC-2"),
+        "unchanged",
+        "a record that named nothing changes nothing",
+      );
+    // another head's record, another document's, a refused run's, and one that is not a record
+    for (const bad of [
+      rec({ head: a }),
+      rec({ runs: [{ criteria: [{ index: 40, text }] }] }),
+      rec({ runs: [{ criteria: [{ index: 2, text: "SC-2: other words" }] }] }),
+      rec({ document: "task.8.other.md" }),
+      rec({ document: undefined, reason: "none-named", runs: [] }),
+      rec({ reason: "dirty-tree", runs: [] }),
+      rec({ reason: "scan-broken", runs: [] }),
+      rec({ reason: undefined, runs: [] }),
+      rec({ runs: null }),
+      rec({ runs: [] }),
+      rec({ runs: [{ command: "x" }] }),
+      rec({ runs: [{ command: "x", criteria: [] }] }),
+      rec({ reason: "none-named" }),
+      rec({ reason: "not-configured" }),
+      [],
+    ])
+      assert.equal(scopeWith(bad).code, 2, JSON.stringify(bad));
   } finally {
     cleanup(dir);
   }

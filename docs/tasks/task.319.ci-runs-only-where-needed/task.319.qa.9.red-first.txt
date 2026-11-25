@@ -1,0 +1,180 @@
+Part A: the new tests against the source at the merge base a511895a0
+
+== push-policy
+not ok 1 - engine mode: a docs delta is docs-only, and one code path makes it not
+not ok 2 - engine mode: without --base the delta is unknown, never docs-only
+not ok 3 - engine mode: the configuration file is code, whatever the patterns say
+not ok 4 - engine mode: ci.docsOnly.enabled false makes every delta code
+not ok 5 - engine mode: a root commit and a merge that brings code are not docs-only heads
+not ok 6 - config: ci.skipMarker is known, an unknown ci key is still refused, and its value is checked
+not ok 7 - config: ci.skipMarker is one printable line: a control, format, surrogate or line-separator character is refused
+not ok 8 - config: a ci block holding skipMarker does not exit 2 at the docs-only rule; an unknown key does
+not ok 9 - config: the pipeline block refuses what it cannot account for, and never the ci rule
+not ok 10 - batched: a five-cycle loop with two code cycles pushes three times, and the remote ends complete
+not ok 12 - performance: the measured task's push sequence, before and after
+not ok 13 - pause: batched never pushes, even over unpushed code; eager does
+not ok 14 - a missing script pushes: every call site holds on `defer` and on nothing else (T319-CR-113)
+not ok 15 - a remote reader and an end push a record-only commit; a spent push holds code in both modes
+not ok 16 - a branch not on the remote yet pushes, and one with nothing to send defers
+not ok 17 - the delta is measured against the branch's own remote ref, not its upstream
+not ok 18 - what cannot be decided pushes, except a pause, which waits
+not ok 19 - usage: an unknown site, a missing site and an unknown flag exit 2 with nothing on stdout
+not ok 20 - the end-of-run flush goes out before verify-push-state: with it the check passes, without it it fails
+not ok 21 - marker: a record-only head over a green code commit carries it, body and staged files intact
+not ok 22 - marker: never on a commit with code, off when the key is unset, and never without a green ancestor
+not ok 23 - marker: only under a stated merge-commit strategy, so it never reaches the base branch's head (T319-CR-101, bug 2)
+not ok 24 - marker: never when a checkCommand is configured, and the command is not run (T319-CR-108)
+not ok 25 - marker: the engine is told the run's own PR, whose destination decides a Bitbucket green (T319-CR-407)
+not ok 26 - marker: a head already on the remote is never amended
+not ok 27 - scan: every git push in a pipeline document or pipeline skill asks push-policy, or is exempt by name
+not ok 28 - scan: an instruction to push in a pipeline step document's prose names its site (T319-CR-107)
+not ok 29 - every terminal HALT pushes what the run held: each --halt call sits behind the flush, run as written (T319-CR-307)
+not ok 30 - a HALT whose push is refused is still a HALT, and says so (T319-CR-307)
+not ok 31 - a HALT whose push, or whose look at the remote, answers nothing still halts, in bounded time (T319-CR-505)
+not ok 32 - what push-held stops is the push and its hook, when its time is up, when it is told to end, and when it is killed (T319-CR-901, CR-1101)
+not ok 33 - push-held leaves no process of its own behind, whichever way it answers (T319-CR-1101)
+not ok 34 - push-held says what is the remote's, whether or not somebody fetched, and never guesses (T319-CR-904, CR-905, CR-907)
+not ok 35 - a HALT never re-creates a deleted branch, never parts a commit from a staged file, and never moves a head CI is being read on (T319-CR-507, CR-508)
+not ok 36 - the entry to /finalise: nothing held leaves 5c's set staged; a held commit goes out with it; the 6c wait is never disturbed (T319-CR-301, CR-308)
+not ok 37 - push-held: a usage error is exit 2, and an argument is never read as a site
+not ok 38 - scan: a mark is asked only where the commit was just made, and these are all of them (T319-CR-503)
+not ok 39 - scan: a HALT has one push, push-held.sh in the HALT block, and the entry to /finalise names its site (T319-CR-102, CR-106, CR-703)
+not ok 40 - a HALT says when it could not read the run's lock, and does not call it a run with no PR (T319-CR-705)
+not ok 41 - scan: the detector flags an unlisted push and an unknown site (non-vacuity)
+not ok 42 - scan: every exemption still matches a line in its file
+
+== tick-pr
+not ok 1 - github: the tick opens a PR, leaves the base alone, and merges on green
+not ok 2 - github: red, pending or unread CI never merges
+not ok 3 - bitbucket: the tick opens a PR, leaves the base alone, and merges on green
+not ok 4 - bitbucket: red, pending or unread CI never merges
+not ok 5 - the quality gate is run here, on the tick's own tree: absent or red refuses before any CI read (T319-CR-112)
+not ok 6 - a head that moved since the tick, and another destination, are refused
+not ok 7 - a PR with no checks merges on the quality gate alone
+not ok 8 - a quality gate that holds no command is refused before the PR is read (T319-CR-506)
+not ok 9 - every Bitbucket request on the tick's path has a time limit (T319-CR-504)
+not ok 10 - no checks is an answer only after the whole wait and under no floor; a wait that is not a number is a usage error (T319-CR-303)
+not ok 11 - a gate that rewrites a tracked file, or leaves the tick branch, passed on something else (T319-CR-305)
+not ok 12 - a remote that cannot be asked for the tick branch is a HALT, never `new` (T319-CR-304)
+not ok 13 - the merge is judged by the PR's state, not by the command's exit status
+not ok 14 - resume: an interrupted tick is found again, locally or only on the remote, and no second PR opens
+not ok 15 - resume at the newer of the two tick branches, and at neither when they have parted (T319-CR-702)
+not ok 16 - the tick is pushed to its own branch whatever the push and tracking settings are (T319-CR-701)
+not ok 17 - bitbucket: the head is read again just before the merge call (T319-CR-109)
+not ok 18 - start recognises a tick that landed by squash, and leaves the checkout on the updated base (T319-CR-104)
+not ok 19 - a landed tick is recognised when the base changed the row beside it since, and an absent one is not (T319-CR-902)
+not ok 20 - a read that fails is never a landed tick: the branch with it would be deleted (T319-CR-902)
+not ok 21 - finish: a row that already reads ticked returns to the base; a commit or an edit is refused (T319-CR-104)
+not ok 22 - once the PR is merged the answer is merged: tidying that fails is a warning (T319-CR-105)
+not ok 23 - ticked-unpushed: a local base holding the tick commit goes back to origin's, so a squash merge can fast-forward it (T319-CR-105)
+not ok 24 - develop-next's three tick blocks run as written: every input is bound in the block, and an unsubstituted one HALTs (T319-CR-103)
+not ok 25 - open refuses a branch with no tick commit, and usage errors exit 2
+
+== finalise-ci-poll
+not ok 1 - Bitbucket: the result line carries the rollup of the PR's own destination
+not ok 2 - Bitbucket: a status that is not a PR pipeline's counts: an external failure is a failure (T319-CR-110)
+not ok 3 - Bitbucket: pending resolves on a later sample; statuses for another destination only are PENDING, none at all is NONE
+not ok 4 - Bitbucket: a status list without prs: keys is read whole, and a paged or unreadable one is UNKNOWN
+not ok 5 - Bitbucket: a PR that cannot be read is `unknown`, and a moved head never decides
+not ok 6 - Bitbucket: the head in the result line is read when the line is written (T319-CR-109)
+not ok 7 - Bitbucket: the docs-only rule is asked with the PR's destination, so ancestors are read as the head is (T319-CR-306)
+not ok 8 - Bitbucket: every request carries a time limit, so a stalled server cannot hold the poll (T319-CR-311)
+not ok 9 - Bitbucket: the check floor holds a partial rollup
+
+== ci-tree-equivalence
+not ok 16 - readConfig: no file or no block gives the defaults
+not ok 17 - readConfig: a block list, enabled and checkCommand are read
+not ok 55 - CR3-5: a Bitbucket next link is followed only on the Bitbucket API; the credential never leaves it
+not ok 60 - Bitbucket: SUCCESSFUL statuses on the ancestor are tree-equivalent
+not ok 61 - Bitbucket: an ancestor is read for the PR's own destination, given or read from the PR (T319-CR-306)
+not ok 62 - a block whose key is quoted twice is refused, for every block that shares the row count (T319-CR-201)
+not ok 63 - Bitbucket: a 403 is unverifiable — never 'no CI'
+not ok 64 - Bitbucket: an empty status list is NONE, so the walk ends no-green-ancestor
+not ok 65 - Bitbucket: no credential is unverifiable, and a partial page list is not decided on
+
+== finalise-rerun-scope
+not ok 12 - scope: a PASS graded on a command re-run at the head → rerun-at-head, never carried (task 319)
+not ok 13 - scope: a re-run criterion is judged whole whatever its prior status, so members cannot overturn it (T319-CR-2)
+not ok 14 - scope: --rerun-at-head re-judges what this run's record lists, however the prior run graded it (T319-CR-5)
+
+== finalise-bug-mode
+not ok 1 - the skip table carries exactly the expected keys, each with its expected verb
+
+== finalise-publish-boundary
+not ok 16 - 6c head-binds the second reading: the poll records the sampled PR head and the later turn re-derives CI_HEAD_2
+
+== criteria-section
+not ok 3 - continuation: indented lines up to the next criterion, heading or unindented line
+
+Part B: the files that fail at load against that source, against a replaced engine
+
+== finalise-rerun-at-head
+not ok 1 - a recorded run predates the head: the command runs again, and the saved output is the head's
+not ok 2 - the command's own failure is data: exit 0 here, the status in the record and the DoD block
+not ok 3 - only a whole code span equal to a listed entry names a command: never a prefix, a suffix or prose
+not ok 4 - an unlisted command keeps today's rule: nothing runs without the key
+not ok 5 - a command added to the configuration in the working tree only is not run
+not ok 6 - a working tree that is not the head refuses: staged, unstaged or untracked code; documentation passes
+not ok 7 - the pipeline's own state directory is not code, ignored by git or not; a file beside it is
+not ok 8 - a command that outlives its bound is killed with what it started, and has no status
+not ok 9 - a malformed list is a usage error with nothing run, and a stale record never survives a later run
+not ok 10 - a list the reader cannot read whole is refused, never read as shorter or absent (T319-CR-1)
+not ok 11 - a command that writes code, or moves the head, refuses the record; one that writes documentation does not (T319-CR-3)
+not ok 12 - the record lists the uncommitted documentation a command could read, and not the engine's own output (T319-CR-4)
+not ok 13 - a command's output is bounded: it is stopped, has no status, and the excerpt reads only the tail (T319-CR-6)
+not ok 14 - the engine's own failure is `failed`, not a usage error (T319-CR-6)
+not ok 15 - the time bound is the whole run's: a command past it is recorded as not started (T319-CR-10)
+not ok 16 - a block whose key is quoted is the same block: a second copy in any spelling is refused, a lone one is read (T319-CR-201)
+not ok 17 - a list under a key nobody reads is refused by name, not read as absent (T319-CR-208)
+not ok 18 - the work item's own DoD records are not code, whatever the documentation patterns are; another's are (T319-CR-203)
+not ok 19 - an edit git status is told not to see is seen: skip-worktree and assume-unchanged (T319-CR-204)
+not ok 20 - a command that ends by itself over the bound keeps its status and has its output cut (T319-CR-209)
+not ok 21 - a checkout of the head answers ran: links, modes, filters, line endings, odd names, submodules (T319-CR-410)
+not ok 22 - no setting, flag or index state makes an edited tree answer ran (T319-CR-401, CR-402, CR-403)
+not ok 23 - a mode is compared where the filesystem keeps one (T319-CR-403)
+not ok 24 - what a command leaves running cannot grow the saved output, or hold the engine (T319-CR-404, CR-405)
+not ok 25 - a list the parse ends early, or under a key spelt with an escape, is refused (T319-CR-406)
+not ok 26 - only a file /finalise writes is a DoD record: code named like one is code (T319-CR-408)
+not ok 27 - the reports and gates that wait for the acceptance commit are not code; a file named like one is (T319-CR-603)
+not ok 28 - a submodule is never documentation: its commit, its entry and what is inside it (T319-CR-602)
+not ok 29 - a command's output is saved whole when it exits with all of it just written (T319-CR-601)
+not ok 30 - a command that writes over its own output is recorded as having done so (T319-CR-601)
+not ok 31 - a listed command on an unindented line of a criterion is refused, not read past (T319-CR-605)
+not ok 32 - a section with no criterion the reader can find is refused only when it names a listed command (T319-CR-805)
+not ok 33 - what the repository ignores in any case is not compared, and what it does not ignore is (T319-CR-801)
+not ok 34 - what git status shows as untracked is never left out by case (T319-CR-1001, CR-1004)
+not ok 35 - a second spelling of a tracked file is not a file of its own, and a second file is (T319-CR-1002)
+not ok 36 - the list is the head's own, whatever a replacement says (T319-CR-804)
+not ok 37 - CRLF line endings do not hide the criteria (T319-CR-606)
+not ok 38 - a file whose name is not UTF-8 is read by its bytes (T319-CR-607)
+not ok 39 - a tracked file under the pipeline's state directory is the head's, and its edit is not let through
+not ok 40 - a document that is missing is scan-broken
+not ok 41 - the list is deduplicated, a criterion can name two commands, and one run serves every criterion naming it
+
+== finalise-rerun-scope-blocks
+ok 1 - Step 3a runs the named commands before it computes the scope, and after the record preflight that can commit
+ok 2 - Step 8a grades the re-run on the fix head again, output as well as exit code, and cut output decides nothing (T319-CR-202, CR-209)
+not ok 3 - [bash] Step 3a's re-run block refuses a DOD_N that is not a number, before anything runs (T319-CR-211)
+not ok 4 - [bash] Step 3a end to end: a criterion the re-run lists is re-judged although the last run passed it (T319-CR-5)
+not ok 5 - [bash] Steps 3a + 3c as substituted: a first run is full and writes ${STEM}.dod.1.ac.json; the next run finds it and is scoped
+ok 6 - [bash] Steps 3a and 3c run as delivered (placeholders unsubstituted) HALT before reaching the engine
+not ok 7 - [zsh] Step 3a's re-run block refuses a DOD_N that is not a number, before anything runs (T319-CR-211)
+not ok 8 - [zsh] Step 3a end to end: a criterion the re-run lists is re-judged although the last run passed it (T319-CR-5)
+not ok 9 - [zsh] Steps 3a + 3c as substituted: a first run is full and writes ${STEM}.dod.1.ac.json; the next run finds it and is scoped
+ok 10 - [zsh] Steps 3a and 3c run as delivered (placeholders unsubstituted) HALT before reaching the engine
+
+== security-probe-eslint
+not ok 1 - a hostile case the rule reports is rejected, a legitimate one is accepted, and the rule engages
+not ok 2 - control: a rule the fixtures never mention reports nothing, so the probe says absent
+not ok 3 - a rule the configuration turns off is scored absent; one it never names is declined, never scored
+not ok 4 - a configured rule no plugin defines is declined, not scored as rejecting everything (T319-CR-8)
+ok 5 - every document that lists the engine's entry forms names the eslint form (T319-CR-12)
+not ok 6 - a disable directive in the input is what it is in the repository: not reported
+not ok 7 - a run that never reached the rule is declined: an ignored file, an input that does not parse
+not ok 8 - the repository's own ESLint and configuration answer: the nearest package and config, never one above the root
+not ok 9 - nothing is written to the repository and the linted file keeps its content
+not ok 10 - a malformed entry, an escape from the root and a missing file are each declined by name
+not ok 11 - an eslint entry without cases is declined by name, never scored on the corpus: API, CLI and plan (T319-CR-205)
+not ok 12 - ESLint's own report of an inline configuration it cannot take is not the rule's: declined alone, scored beside a report (T319-CR-210)
+not ok 13 - the route /finalise takes: a plan entry runs, records, and renders in the security_review block
+not ok 14 - the options of other forms are refused, through the API and through the CLI

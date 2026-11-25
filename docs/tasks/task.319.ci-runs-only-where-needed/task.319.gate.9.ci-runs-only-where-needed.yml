@@ -1,0 +1,87 @@
+schema: 2
+task: 'task.319.ci-runs-only-where-needed'
+task_title: 'Pipelines spend a CI run only where a run can answer something'
+gate: PASS
+status_reason: 'The three gaps of Definition of Done run 1 are closed: the marker refuses control and format characters, the HALT sentence is corrected, and the red-first record is complete test by test. One review of the fixes found four low points, all fixed. The seven low findings gate 7 carried are unchanged and stay carried.'
+reviewer: 'QA Engineer'
+head: '60e31933baaeebca42eebe7333df1de0f1155417'
+updated: '2026-11-25T05:10:01Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 8890
+  phases_verified: '7/7'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5, 6]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 129
+    escaped: 0
+    boundary: true
+    boundary_signals: ["never"]
+    notes: 'parseConfig engages, 16 of 16 marker characters and 13 of 13 of the DoD cases; parsePipelineConfig 9 of 9; push-policy --site 42 of 42; push-held --site 18 of 18; parseRerunList 31 of 31.'
+  performance:
+    status: PASS
+    notes: 'pushes before (eager): 9; after (batched): 6, re-run on this tree.'
+  reliability:
+    status: PASS
+    notes: 'The marker parser is the only behaviour that changed. The seven low findings gate 7 carried stand.'
+  maintainability:
+    status: PASS
+    notes: 'One rule for the marker in the code, the test and the reference.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'T319-CR-1201: with no criterion read, a fenced "## " line or another heading that contains "criteri" narrows the search for a listed command, and the answer is none-named. Search the section the reader chose together with the other criteria headings, and the whole document when those hold nothing.'
+      refs: ['shared/resources/finalise-rerun-at-head.js']
+      carried_from: 'top_issues (route 2b, cycle 7)'
+    - action: 'T319-CR-1202: a backtick with no partner and an unindented line in one criterion together hide a listed command. Apply the wider search to the lazily joined text of each criterion too.'
+      refs: ['shared/resources/finalise-rerun-at-head.js']
+      carried_from: 'top_issues (route 2b, cycle 7)'
+    - action: 'T319-CR-1203: under core.ignorecase=true on a case-sensitive disk, an untracked SUB/x.js beside a submodule sub is not listed. Count a case-sensitive-only path as untracked when a parent directory folds to a submodule entry and is not that directory.'
+      refs: ['shared/resources/finalise-rerun-at-head.js']
+      carried_from: 'top_issues (route 2b, cycle 7)'
+    - action: 'T319-CR-1301: a tick whose PR conflict was resolved on the forge and squash-merged with its remote branch deleted reads resume. State the case as a limit in develop-next and the configuration reference, or ask the forge for a merged PR of the tick branch.'
+      refs: ['shared/resources/tick-pr.sh']
+      carried_from: 'top_issues (route 2b, cycle 7)'
+    - action: 'T319-CR-1302: a fetch that brought the commit and then failed at something else is answered "could not be fetched". After the fetch, refuse only when the commit is still absent, and fetch without submodules.'
+      refs: ['shared/resources/push-held.sh']
+      carried_from: 'top_issues (route 2b, cycle 7)'
+    - action: 'T319-CR-1303: a script stopped past its bound answers that the push failed when it reached the server. Answer 124 whenever the bound has passed and the command ended by a kill.'
+      refs: ['shared/resources/push-held.sh']
+      carried_from: 'top_issues (route 2b, cycle 7)'
+    - action: 'T319-CR-1304: started in a subdirectory, a landed tick whose merge conflicts reads resume. Run the search from the top of the repository.'
+      refs: ['shared/resources/tick-pr.sh']
+      carried_from: 'top_issues (route 2b, cycle 7)'
+    - action: 'A scan example for an inline-backticked push-policy call in prose, which the push-site scan would still count as a call (a trace, not executed)'
+      refs: ['shared/resources/tests/push-policy.test.mjs']
+      remedy: unverified
+    - action: 'A test for the watcher check of a killed script that nothing collects; it was checked by hand in a process namespace only'
+      refs: ['shared/resources/push-held.sh']
+      remedy: unverified
+
+bug_resolution:
+  bugs_fixed: 0
+  bugs_remaining: 0
+  verification_method: 'each gap of the DoD file read against its fix; no bug report is open'
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []
