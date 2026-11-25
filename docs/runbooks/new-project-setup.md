@@ -70,5 +70,6 @@ Before step 1:
 - [`shard-prd` SKILL.md](../../skills/shard-prd/SKILL.md)
 - [PRD documents standard](../standards/prd-documents.md)
 - [Architecture documents standard](../standards/architecture-docs.md) — required `docs/architecture/` layout, with copy-paste skeleton at [`docs/examples/architecture/`](../examples/architecture/)
+- [Docs-Only CI Skip](./ci-docs-only-skip.md) — optional: one CI run per push, with heavy jobs skipped on a docs-only change
 - [PM Workflows Runbook](./pm-workflows.md)
 - [Story Development Runbook](./story-development.md)

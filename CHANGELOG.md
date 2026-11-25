@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+### Changed
+
+- **The docs-only CI skip runbook covers one run per push, unsafe docs sets and adoption.**
+  [`ci-docs-only-skip.md`](./docs/runbooks/ci-docs-only-skip.md) now says how to remove a duplicate
+  branch trigger and what that costs, how to find the files tests read before you skip on them, what
+  Bitbucket's own step condition compares on a branch pipeline, and carries a paste-ready adoption
+  prompt. Corrected: requiring a heavy job does not block a docs-only PR. GitHub counts a skipped job
+  as passed, so it can merge untested code when the `changes` job fails. Require the aggregate job.
+
 ## [v0.69.0] - 2026-11-25
 
 ### Changed
