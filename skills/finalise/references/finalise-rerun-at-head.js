@@ -106,6 +106,7 @@ const {
   parseConfig,
   spawnCheck,
   topLevelKey,
+  topLevelKeys,
   unescaped,
 } = require("./ci-tree-equivalence.js");
 const docId = require("./doc-id.js");
@@ -191,7 +192,7 @@ function parseRerunList(rawText) {
   const parsed = parseYamlSubset(text) || {};
   assertMapping(text, parsed);
   // A list under a key nobody reads is a list that is silently not run (T319-CR-208).
-  for (const k of Object.keys(parsed)) {
+  for (const k of topLevelKeys(text)) {
     if (k !== "finalise" && ["finalise", "finalize"].includes(normKey(k)))
       throw new UsageError(
         `${k} looks like finalise; the key is exactly "finalise"`,
@@ -289,14 +290,16 @@ function commentAt(line, at) {
 /**
  * A document without its HTML comments, line for line. One that is not closed runs to the end, and one that a
  * fence or a code span holds is text (T320-CR-305). A NUL stands where a comment was, so that what follows
- * it on the line does not begin the line: Markdown reads no heading or list item there.
+ * it on the line does not begin the line: Markdown reads no heading or list item there. With `closedOnly`
+ * one that no later line closes is text.
  */
-function withoutComments(text) {
+function withoutComments(text, closedOnly = false) {
   const isFenceLine = makeFenceTracker();
+  const lines = text.split(/\r?\n/);
+  const last = lines.findLastIndex((line) => line.includes("-->"));
   let open = false;
-  return text
-    .split(/\r?\n/)
-    .map((line) => {
+  return lines
+    .map((line, i) => {
       if (!open && isFenceLine(line)) return line;
       let out = open ? "\0" : "";
       for (let at = 0; ;) {
@@ -307,7 +310,8 @@ function withoutComments(text) {
           at = end + 3;
         }
         const from = commentAt(line, at);
-        if (from === -1) return out + line.slice(at);
+        if (from === -1 || (closedOnly && i >= last))
+          return out + line.slice(at);
         out += `${line.slice(at, from)}\0`;
         open = true;
         at = from + 2; // `<!-->` is a whole comment
@@ -316,12 +320,18 @@ function withoutComments(text) {
     .join("\n");
 }
 
-/** A document's parts, each a list of lines: what stands before the first `## ` line, then from each on. */
+/**
+ * A document's parts, each a list of lines: what stands before the first `## ` line, then from each on. A
+ * fence marker in a comment opens no fence (task 320); after an opener that is never closed, it does.
+ */
 function partsOf(text) {
   const isFenceLine = makeFenceTracker();
+  const fenced = withoutComments(text, true)
+    .split("\n")
+    .map((line) => isFenceLine(line));
   const parts = [[]];
-  for (const line of text.split(/\r?\n/)) {
-    if (!isFenceLine(line) && line.startsWith("## ")) parts.push([]);
+  for (const [i, line] of text.split(/\r?\n/).entries()) {
+    if (!fenced[i] && line.startsWith("## ")) parts.push([]);
     parts.at(-1).push(line);
   }
   return parts;

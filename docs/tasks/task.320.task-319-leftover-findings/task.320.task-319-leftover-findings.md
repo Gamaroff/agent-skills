@@ -187,7 +187,9 @@ in prose, and a test for the watcher of a killed script): they are test ideas, n
 ### Breaking Change 1: an escaped block name is a usage error
 
 **What Changed**: a top-level key that decodes to `ci`, `pipeline` or `finalise` is refused where it
-was ignored. (An escaped key **under** one of them is refused today, as an unknown key.)
+was ignored. (An escaped key **under** one of them is refused today, as an unknown key.) After a block
+scalar (`note: |`), at which the parse stops, every near miss of these names was ignored (`CI` too); it
+is refused there as it is elsewhere.
 
 **Before**:
 
@@ -591,6 +593,7 @@ Cycle 4: no high and no medium finding. Four low: T320-CR-401 to T320-CR-404.
 | 2026-11-25 |  | QA gate PASS (100/100) — 4 findings | qa-task |
 | 2026-11-25 |  | PR review CONCERNS — 5 document findings fixed (breaking changes, risk 1, file lists, notes, the QA report's population count) | review-pr |
 | 2026-11-25 |  | DoD incomplete — 3 gaps identified | finalise |
+| 2026-11-25 |  | DoD gaps 1 and 2 fixed — near-miss keys read from the source, fence markers in comments | qa-fix |
 <!-- change-log-end -->
 
 ---

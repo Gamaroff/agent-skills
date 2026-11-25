@@ -406,10 +406,27 @@ test("config: the pipeline block refuses what it cannot account for, and never t
     '"pipelin\\x65":\n  pushRecordCommits: eager\n',
     'pipeline:\n  pushRecordCommits: batched\n"p\\u0069peline":\n  pushRecordCommits: eager\n',
     "pipeline:\n    pushRecordCommits: eager\n  extra: 1\n",
+    // past a row at which the parse stops (task 320, DoD run 1)
+    'note: |\n  text\n"pipelin\\x65":\n  pushRecordCommits: eager\n',
+    "note: |\n  text\nPipeline:\n  pushRecordCommits: eager\n",
+    'tracker: github\nnote: x\r"pipelin\\x65":\n  pushRecordCommits: eager\n',
   ]) {
     assert.throws(() => p(bad), /pipeline/i, bad);
     // A push key written wrong must not turn a CI wait into a usage error.
     assert.doesNotThrow(() => eng.parseConfig(bad), bad);
+  }
+  // Inside a block scalar, under another block, or in a comment, a key is no key of the file.
+  for (const name of ["ci", "pipeline", "finalise"]) {
+    const spelt = `"${name.replace("i", "\\x69")}":`;
+    for (const fine of [
+      `note: |\n  ${spelt}\n    x: 1\n`,
+      `note: |\n  ${spelt}\n    x: 1\nother: 1\n`,
+      `notes:\n  ${spelt}\n    x: 1\n`,
+      `note: |\n  text\n# ${spelt}\n`,
+    ]) {
+      assert.doesNotThrow(() => eng.parseConfig(fine), fine);
+      assert.equal(p(fine), "batched", fine);
+    }
   }
 });
 

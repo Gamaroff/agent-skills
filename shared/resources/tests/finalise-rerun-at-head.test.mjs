@@ -876,6 +876,19 @@ test("a list the parse ends early, or under a key spelt with an escape, is refus
     ],
     ["an escaped block key with no list", '"finalis\\x65":\n  other: 1\n'],
     ["an escaped block key with nothing", 'finalise:\n"finalis\\u0065":\n'],
+    // past a row at which the parse stops (task 320, DoD run 1)
+    [
+      "an escaped block key after a block scalar",
+      'note: |\n  text\n"finalis\\x65":\n  deferralApprover: x\n',
+    ],
+    [
+      "an escaped block key after a block scalar, beside a plain one",
+      `${LIST("echo a")}note: |\n  text\n"finalis\\x65":\n  deferralApprover: x\n`,
+    ],
+    [
+      "a near miss after a block scalar",
+      "note: |\n  text\nFinalize:\n  deferralApprover: x\n",
+    ],
   ])
     assert.throws(
       () => eng.parseRerunList(config),
@@ -887,6 +900,7 @@ test("a list the parse ends early, or under a key spelt with an escape, is refus
     "workflows:\n- name: x\n- y\n",
     `workflows:\n- name: x\n${LIST("echo a")}my key: 1\n`,
     '"acc\\x65ss":\n  tracker: full\n',
+    'note: |\n  "finalis\\x65":\n    x: 1\n',
   ])
     assert.doesNotThrow(() => eng.parseRerunList(config), config);
 });
@@ -1196,6 +1210,9 @@ test("a section with no criterion the reader can find is read past when it names
       "Write `<!--` or ``a ` <!--`` first.\n\n- crit\n",
       "A ``` and `<!--` too.\n\n- crit\n",
       "A \\\\`<!--` too.\n\n- crit\n",
+      // a fence marker in a comment opens no fence (task 320, DoD run 1)
+      "<!--\n```\n-->\n\n- crit\n",
+      "- crit\n\n<!-- a\n~~~\n-->\n",
     ].map(
       (criteria) =>
         `# T\n\n## Acceptance Criteria\n\n${criteria}\n## Other\n\n\`echo a\`\n`,
@@ -1266,6 +1283,7 @@ test("a section with no criterion the reader can find is refused when a listed c
     "# T\n\n<!--\n## Acceptance Criteria\n\n- x\n-->\n\n## Success Criteria\n\n## Done when\n\n- [ ] `echo a` passes\n",
     // an opener that is never closed hides no command, and a line in a fence ends no section there either
     "# T\r\n\r\n## Success Criteria\r\n\r\n- x\r\n\r\nUse <!-- here\r\n\r\n```\r\n## y\r\n```\r\n\r\n- `echo a` passes\r\n\r\n## Other\r\n\r\nNone.\r\n",
+    "# T\n\n## Success Criteria\n\n- x\n\n<!-- a --> Use <!-- here\n\n```\n## y\n```\n\n- `echo a` passes\n\n## Other\n\nNone.\n",
     // and neither does a heading in a comment end the section it stands in (T320-CR-301)
     "# T\n\n## Success Criteria\n\n- x\n\n<!--\n## old\n-->\n\n- `echo a` passes\n\n## Other\n\nNone.\n",
   ]) {

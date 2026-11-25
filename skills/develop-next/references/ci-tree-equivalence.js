@@ -447,6 +447,20 @@ function topLevelKey(line) {
 }
 
 /**
+ * The file's top-level keys: every key row of the source at the first row's indent or under it. The parse
+ * has fewer: it stops at a row it does not read (the text of a block scalar), and a near miss after it was
+ * neither read nor refused (task 320). A lone CR ends a line here, as it does in YAML and not in the parse.
+ */
+function topLevelKeys(text) {
+  const rows = significantLines(text.replace(/\r(?!\n)/g, "\n"));
+  const indent = (l) => l.length - l.trimStart().length;
+  return rows
+    .filter((l) => indent(l) <= indent(rows[0]))
+    .map((l) => topLevelKey(l.trimStart()))
+    .filter((k) => k !== null);
+}
+
+/**
  * How many source rows belong to a top-level `ci:` key: the `ci:` row itself and every row up to the
  * next row at column 0. Read from the text, not from the parse, so a row the parse dropped still
  * counts. Only this block is held to account (CR6-1): it is the only part of the file this engine
@@ -542,7 +556,7 @@ function parseConfig(rawText) {
   assertMapping(text, parsed);
   // The specific diagnostics (a block scalar, an unknown key) are produced first so they name the
   // cause; the completeness check below is the net under all of them.
-  const cfg = interpretConfig(parsed);
+  const cfg = interpretConfig(parsed, topLevelKeys(text));
   assertBlockRows(text, parsed, "ci");
   assertMarkerRow(text);
   return cfg;
@@ -614,7 +628,7 @@ function parsePipelineConfig(rawText) {
   const parsed = parseYamlSubset(text) || {};
   const cfg = { pushRecordCommits: "batched" };
   if (typeof parsed !== "object" || Array.isArray(parsed)) return cfg;
-  for (const k of Object.keys(parsed)) {
+  for (const k of topLevelKeys(text)) {
     if (k !== "pipeline" && normKey(k) === "pipeline") {
       throw new UsageError(
         `${k} looks like pipeline; the key is exactly "pipeline"`,
@@ -669,10 +683,10 @@ function statedMergeStrategy(rawText) {
   return typeof v === "string" && v !== "" ? v : null;
 }
 
-/** Interpret a parsed top-level mapping as the ci.docsOnly configuration. */
-function interpretConfig(parsed) {
+/** Interpret a parsed top-level mapping, and the file's top-level keys, as the ci.docsOnly configuration. */
+function interpretConfig(parsed, keys) {
   const cfg = defaultConfig();
-  for (const k of Object.keys(parsed)) {
+  for (const k of keys) {
     if (k !== "ci" && normKey(k) === "ci") {
       throw new UsageError(`${k} looks like ci; the key is exactly "ci"`);
     }
@@ -1578,6 +1592,7 @@ module.exports = {
   assertMapping,
   assertBlockRows,
   topLevelKey,
+  topLevelKeys,
   spawnCheck,
   killProcessGroup,
   settle,

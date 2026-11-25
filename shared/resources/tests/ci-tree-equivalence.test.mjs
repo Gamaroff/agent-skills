@@ -1494,8 +1494,24 @@ test("CR3-3: a ci block that is not a mapping, or a near-miss spelling, is a usa
       /looks like ci/,
     ],
     ['"\\U00000063i":\n  skipMarker: x\n', /looks like ci/],
-    ["'c\\x69':\n  skipMarker: x\n", /looks like ci/], // literal in YAML; the parse keeps no quote
-    ['ci:\n  "docs\\x4fnly":\n    enabled: false\n', /docs\\x4fnly/],
+    ["'c\\x69':\n  skipMarker: x\n", /looks like ci/], // literal in YAML; the parse keeps no quote    ['ci:\n  "docs\\x4fnly":\n    enabled: false\n', /docs\\x4fnly/],
+    // past a row at which the parse stops (task 320, DoD run 1)
+    [
+      'note: |\n  text\n"c\\x69":\n  docsOnly:\n    enabled: false\n',
+      /looks like ci/,
+    ],
+    [
+      'ci:\n  skipMarker: skip\nnote: >-\n  text\n"c\\x69":\n  docsOnly:\n    enabled: false\n',
+      /looks like ci/,
+    ],
+    [
+      "note: |\n  text\nCI:\n  docsOnly:\n    enabled: false\n",
+      /looks like ci/,
+    ],
+    [
+      '  note: |\n    text\n  "c\\x69":\n    docsOnly:\n      enabled: false\n',
+      /looks like ci/,
+    ],
     [
       "ci:\n  docsOnly: { enabled: false }\n",
       /ci\.docsOnly must be a block mapping/,

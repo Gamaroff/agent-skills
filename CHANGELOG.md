@@ -15,7 +15,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 - **Two spellings in `skills-config.yaml` are refused that were read past (task 320).** A top-level key
   that is `ci`, `pipeline` or `finalise` with a YAML escape in it (`"c\x69":`) was ignored, and with it
-  an `enabled: false`: write the key plainly. A control or format character, or a space
+  an `enabled: false`: write the key plainly. So was any near miss of these names (`CI`) after a block
+  scalar (`note: |`), at which the parse stops. A control or format character, or a space
   that is not a plain one, at either end of `ci.skipMarker` (a BOM, a tab inside the quotes, a no-break
   space) was dropped: delete it, and any control or format character in the row's comment too. Plain
   spaces at the ends, and a tab outside the quotes, are still dropped.
