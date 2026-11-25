@@ -535,7 +535,10 @@ function parseConfig(rawText) {
 
 /**
  * `ci.skipMarker`: the text push-policy.sh appends to the subject of a record-only head (task.319).
- * Absent, null or empty means off. It goes into a commit subject, so it is one printable line.
+ * Absent, null or empty means off. It goes into a commit subject, so it is one printable line: no
+ * control or format character (a C1 control and a bidi override are neither seen nor harmless where a
+ * subject is displayed), and no surrogate on its own. A line or paragraph separator inside the value
+ * never reaches this: the parse does not account for its row, and parseConfig refuses the block.
  */
 function skipMarkerOf(v) {
   if (v === undefined || v === null) return "";
@@ -543,8 +546,7 @@ function skipMarkerOf(v) {
     throw new UsageError("ci.skipMarker must be a string (empty means off)");
   }
   const m = v.trim();
-  // eslint-disable-next-line no-control-regex
-  if (/[\u0000-\u001f\u007f]/.test(m) || m.length > SKIP_MARKER_MAX) {
+  if (/[\p{Cc}\p{Cf}\p{Cs}]/u.test(m) || m.length > SKIP_MARKER_MAX) {
     throw new UsageError(
       `ci.skipMarker must be one printable line of at most ${SKIP_MARKER_MAX} characters`,
     );

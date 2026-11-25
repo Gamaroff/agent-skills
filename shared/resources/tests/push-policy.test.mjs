@@ -211,6 +211,42 @@ test("config: ci.skipMarker is known, an unknown ci key is still refused, and it
     assert.throws(() => eng.parseConfig(text), /ci/, text);
 });
 
+test("config: ci.skipMarker is one printable line: a control, format, surrogate or line-separator character is refused", () => {
+  const marker = (m) =>
+    eng.parseConfig(`ci:\n  skipMarker: "${m}"\n`).skipMarker;
+  for (const code of [
+    0x01,
+    0x1b,
+    0x7f, // C0 and DEL
+    0x80,
+    0x85,
+    0x9b,
+    0x9f, // C1
+    0x200b,
+    0x202e,
+    0x2066,
+    0xfeff, // format: zero width, bidi override and isolate, BOM
+    0xd800, // a surrogate on its own
+  ])
+    assert.throws(
+      () => marker(`a${String.fromCharCode(code)}b`),
+      /ci\.skipMarker must be one printable line/,
+      `U+${code.toString(16)}`,
+    );
+  // A line or paragraph separator is refused before the value is looked at.
+  for (const c of [" ", " "])
+    assert.throws(() => marker(`a${c}b`), /row\(s\) under ci/);
+  // What is printable stays: punctuation, a space, letters outside ASCII, a character outside the BMP.
+  for (const m of [
+    "[skip ci]",
+    "[überspringen]",
+    "[跳过 ci]",
+    "a b",
+    "[skip 🚫]",
+  ])
+    assert.equal(marker(m), m);
+});
+
 test("config: a ci block holding skipMarker does not exit 2 at the docs-only rule; an unknown key does", (t) => {
   const { wt } = fixture(t, {
     config: `${DOCS_CONFIG}  skipMarker: "[skip ci]"\n`,
