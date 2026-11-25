@@ -3,7 +3,7 @@
 **Task**: `task.319.ci-runs-only-where-needed.md`
 **Run Number**: 1
 **Started**: 2026-11-24 09:43
-**Status**: In Progress
+**Status**: Completed
 **Report format**: 2
 
 ---
@@ -36,9 +36,9 @@ Push record-only commits with the next push that needs CI, add an opt-in skip ma
 | 2. review-task             | ⏭️ Skipped | `task.319.review.{N}.{name}.md` exists (or skip logged)                | Ready for Development + `review.2` exists | —                    | 2026-11-24T09:44Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | 7 of 7 phases; `ci:fast` and `eval:all` green on `f87488f55` | —                    | 2026-11-24T10:51Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #937: https://github.com/Gamaroff/agent-skills/pull/937 | —                    | 2026-11-24T10:52Z |
-| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.319.qa.{N}.*.md`; `task.319.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 8 cycles; gate 8 PASS; PR review 2 APPROVE | `.summaries/step-5-post-fix-tracker-6.json` | 2026-11-24T22:20Z |
-| 7. finalise                | ⏳ Pending | `task.319.dod.{N}.*.md`; task `status: accepted`                       | Run 1 halted on 3 Definition of Done gaps (`dod.1`) | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.319.qa.{N}.*.md`; `task.319.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 9 cycles; gate 9 PASS; PR review 3 APPROVE | `.summaries/step-5-post-fix-tracker-6.json` | 2026-11-24T22:20Z |
+| 7. finalise                | ✅ Done    | `task.319.dod.{N}.*.md`; task `status: accepted`                       | Run 1 halted on 3 Definition of Done gaps (`dod.1`); run 2 ACCEPTED (`dod.2`) | —                    | 2026-11-25T05:39Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | The commit that carries this report | —                    | 2026-11-25T05:39Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -107,6 +107,19 @@ Push record-only commits with the next push that needs CI, add an opt-in skip ma
 - QA re-entry after finalise DoD gaps: reenter-qa: re-entered QA at step 5 / qa_phase 5a — qa_max_cycles=10 (base 8), gate_head=5c0de1ea3fe528beb934aca1d023ff701059ca05. The owner said "Go ahead".
 - The marker refuses every format character (bidi overrides, zero-width), and not the C1 controls alone: DoD run 1 asked the owner whether "one printable line" allows them, and the stricter reading loses no plain-text marker (an emoji joined with a zero-width joiner is refused). The other spec question (an escaped `pipeline` key) is left to the owner.
 - QA Cycle 9: gate 9 PASS (100), no open entry; route 1. One read-only reviewer (222 s), four low points, each confirmed and fixed before the gate. `ci:fast` on the LAN server on `60e31933b`: 8887 passed, 0 failed.
+- QA Cycle 9, 5c: `/review-pr` → APPROVE, 2 low findings, `OPEN_COVERAGE=0`; both doc-only and fixed in the carry.
+
+### Step 7: finalise — decisions
+
+- DoD summary: `task.319.dod.2.ci-runs-only-where-needed.md` — ACCEPTED. Criteria 13 of 13 (7 re-judged, 6 carried from run 1), security PASS (201 probes over 10 controls, 0 reproduced), docs PASS, compliance not applicable.
+- CI reading 1: SUCCESS @ `109a5f998d23` (6 checks). CI reading 2: SUCCESS (tree-equivalent to `109a5f998d23`) @ `918876017684`, over 6 checks after 30 s; the head's own 6 checks read SUCCESS afterwards.
+- DoD body posted to PR — comment URL: https://github.com/Gamaroff/agent-skills/pull/937#issuecomment-7154011347. Canonical summary: https://github.com/Gamaroff/agent-skills/pull/937#issuecomment-7153996664.
+- GitHub Issue #936 — comment `done`: `posted`; Document link re-pointed to `develop`; close: CLOSED ✅ (read back with `gh`, the poller subagent not dispatched).
+- GitHub Issue #936 — board: done → already (the close moved the card; read back as Done).
+- Run 2 of `/finalise` followed the skill's steps from the skill loaded for run 1; the Skill tool was not called a second time. The DoD file was written from the four agents' answers and the probe record.
+- The run-1 section "Definition of Done - Gaps Identified" in the task document was replaced by the PASSED section, so the document holds one verdict; run 1 stays in `dod.1` and in the Issues Log below. The success criteria were ticked in the same edit.
+- The owner's two open points: a second `pipeline` block with an escaped key is not refused (spec challenge, `configuration.md:313`), and `ci.skipMarker` is trimmed before it is checked, which line 312 does not mention.
+- Task completed.
 
 ---
 
@@ -341,7 +354,8 @@ _Track each QA review/fix cycle._
 **HIGH findings**: 0
 **MEDIUM findings**: 0
 **Traceability**: skipped (no Success Criteria table)
-**PR Review**: pending — 5c not yet run
+**PR Review**: APPROVE — task.319.pr-review.3.ci-runs-only-where-needed.md; 2 low findings, both doc-only and fixed here (the missing red-first rows with two new mutation runs; one sentence of the configuration reference)
+**Carried to 6a**: docs/tasks/task.319.ci-runs-only-where-needed/task.319.pr-review.3.ci-runs-only-where-needed.md docs/reference/configuration.md docs/tasks/task.319.ci-runs-only-where-needed/task.319.qa.9.ci-runs-only-where-needed.md
 **Loop exit**: n/a — this exit not taken (route 1, a clean gate)
 **Action**: Proceeding to 5c (PR conformance review)
 
@@ -349,10 +363,12 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-11-25T05:39Z
+**Final Status**: Completed
 **Branch**: feature/task.319.ci-runs-only-where-needed
 **PR**: https://github.com/Gamaroff/agent-skills/pull/937
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7}
+**QA Iterations**: 9
+**DoD Summary**: task.319.dod.2.ci-runs-only-where-needed.md — ACCEPTED
+**Tracker debt**: none
+
+**Completion Summary**: the pipelines ask `push-policy.sh` before each push, so a record-only commit waits for the next push that needs CI; `push-held.sh` sends what was held. In the simulated run 9 pushes became 6. `ci.skipMarker`, `finalise.rerunAtHead`, the probe's `eslint:` entry, the Bitbucket poll arm and `developNext.tickVia: pr` are delivered beside it. QA took nine cycles, three of them granted by the owner after two loop limits; the first finalise run found three gaps, closed in cycle 9. Seven low findings stay under Deferred Work in the task document. The merge is the owner's.
