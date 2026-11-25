@@ -10,9 +10,13 @@ priority: Low
 risk_level: low
 created: 2026-11-25
 updated: 2026-11-25
+estimated_effort_hours: 8
+github_issue: 938
 ---
 
 # Technical Task: Task 319's leftover findings are closed
+
+**GitHub Issue**: [#938](https://github.com/Gamaroff/agent-skills/issues/938)
 
 **Status:** Planned
 
