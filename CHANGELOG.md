@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.69.0] - 2026-11-25
+
 ### Changed
 
 - **The develop pipelines push when a run can answer something, not after every commit (task 319).**
