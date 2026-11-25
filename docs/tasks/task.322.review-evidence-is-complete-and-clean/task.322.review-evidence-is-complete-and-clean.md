@@ -11,9 +11,12 @@ risk_level: low
 created: 2026-11-25
 updated: 2026-11-25
 estimated_effort_hours: 8
+github_issue: 942
 ---
 
 # Technical Task: QA lists every new test, and reviewers end only their own processes
+
+**GitHub Issue**: [#942](https://github.com/Gamaroff/agent-skills/issues/942)
 
 **Status:** Planned
 
@@ -125,7 +128,7 @@ by the pid or process group you recorded when you started it, and never by name 
 ### What was tried, and what was not
 
 The listing was run on PR #937 (`a511895a0` to `b5057a5d2`) in a scratch clone: four test files, 48
-seconds, load 2.
+seconds in one run.
 
 | File | New | Red | Green |
 | :-- | --: | --: | --: |
@@ -134,8 +137,8 @@ seconds, load 2.
 | `criteria-section.test.mjs` | 0 | 0 | 0 |
 | `tick-pr.test.mjs` (a new file) | 25 | 25 | 0 |
 
-**What the last row shows.** Its 25 tests are red because `tick-pr.sh` does not exist on the merge base.
-That meets "red before its change" and proves nothing about each test. The table's `why` column says
+**What the last row shows.** Its 25 tests are red because `tick-pr.sh` does not exist on the merge base
+(`git cat-file -e a511895a0:shared/resources/tick-pr.sh` fails). That meets "red before its change" and proves nothing about each test. The table's `why` column says
 `subject absent`, so nobody reads it as a mutation proof.
 
 **Not exercised**: `red-first.js` itself, and a file that fails at load.

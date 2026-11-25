@@ -11,9 +11,12 @@ risk_level: medium
 created: 2026-11-25
 updated: 2026-11-25
 estimated_effort_hours: 8
+github_issue: 943
 ---
 
 # Technical Task: The QA loop's globs have a command, and a skill load leaves a record
+
+**GitHub Issue**: [#943](https://github.com/Gamaroff/agent-skills/issues/943)
 
 **Status:** Planned
 
@@ -117,7 +120,9 @@ with nothing folded. The Decisions Log gets the reason in both.
 
 **The load record.** On a present lock, `check` writes
 `skill_loads.<name> = {at, reason, base}`. The exit code and the JSON of `check` do not change. A lock that
-is absent or is not an object is left alone. `check --no-base-dir` records `unreadable`, for the two cases
+is absent or is not an object is left alone. A paused mark is cleared before the write, through
+`advance-pipeline-lock.sh --clear-pause`, as `set-waiting-on.sh` and `set-qa-phase.sh` do. A load is
+the first thing a session does after a compaction, and while the mark is set the Stop hook allows every stop. `check --no-base-dir` records `unreadable`, for the two cases
 the rule treats as one: no `Base directory` line, and "Unknown skill".
 
 `skill-resolution.js loaded --name <skill> [--json]`:
@@ -136,7 +141,9 @@ the rule treats as one: no `Base directory` line, and "Unknown skill".
 - a finalise hold whose DoD does not read ACCEPTED deletes `.skill_loads.finalise`: run 2 needs its own load.
 
 **The checklists.** Step 7's first item becomes the command `loaded --name finalise`. Step 8 gets
-`loaded --name commit-changes`. On `not-recorded`: load the skill through the Skill tool, run `check`, and
+`loaded --name commit-changes`. The Step 7 item proves "loaded since the last compaction and since the
+last gaps result". The Step 8 item proves less, "loaded since the last compaction", because Steps 4 to 6
+also load `commit-changes`. Each item says so. On `not-recorded`: load the skill through the Skill tool, run `check`, and
 compare what was done with its text. A step already done and accepted is not run again.
 
 **What it proves, and what it does not.** The record is written by a command the agent runs. It catches a
@@ -323,7 +330,8 @@ permission (skipped loudly for root). The classifier and the reader are one func
 | No `check` | `not-recorded` |
 | `check`, then a pause mark | `not-recorded` |
 | `check`, a pause, the pause cleared | `not-recorded` |
-| A pause, `check` while the mark is set, the pause cleared | `recorded` |
+| A pause, then `check` while the mark is set | `recorded`; the mark is gone, its snapshot is consumed, and `last_pause_at` is the pause's time |
+| The same, with no `advance-pipeline-lock.sh` beside the script | `recorded`; the mark stays |
 | `check` in the same second as the pause | `not-recorded` |
 | `check`, a halt, `--restore` | `not-recorded` |
 | `check finalise`, then a hold on a DoD with gaps | `not-recorded` |
@@ -344,7 +352,7 @@ malformed one and none. On a malformed one the route block answers no route, and
 ### Consumer Tests
 
 `skill-resolution-reach.test.mjs` runs the rule's command from a consumer-shaped tree that holds that one
-script and no lock. It must stay green unchanged: the record needs no sibling file.
+script and no lock. It must stay green unchanged: without a lock nothing is written and no sibling is called.
 
 ### Performance Tests
 

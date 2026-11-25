@@ -64,6 +64,9 @@ binding in its own fenced block above, and let the wiring test run the second bl
 
 - Lock path: `process.env.PIPELINE_LOCK`, else `<root>/.claude/state/develop-pipeline.lock`. For
   `loaded`, `<root>` is `--root`, else the current directory.
+- First, when the lock is there and the sibling `advance-pipeline-lock.sh` is too, run it with
+  `--clear-pause` (pass `PIPELINE_LOCK` on). Add the `bundle-dependency` comment line that
+  `set-waiting-on.sh` has. Its output goes to stderr, and never into `check`'s JSON.
 - Write: read, parse, refuse anything that is not an object, set `skill_loads[name]`, write to a
   temporary file in the same directory with `wx`, rename. Mode 0600, as the shell helper leaves it.
 - A failed write prints one line to stderr. It never changes `check`'s exit code.
@@ -92,10 +95,10 @@ Update the header comment's "paused mark" paragraph and the lock's field table i
 - Step 7 checklist, first item:
 
   ```markdown
-  - [ ] `/finalise` was loaded for this run: `command node .agents/skills/{develop-story|develop-task}/references/skill-resolution.js loaded --name finalise` exits 0 (not inlined with `Write`)
+  - [ ] `/finalise` was loaded since the last compaction and the last gaps result: `command node .agents/skills/{develop-story|develop-task}/references/skill-resolution.js loaded --name finalise` exits 0 (not inlined with `Write`)
   ```
 
-- Step 8: the same for `commit-changes`, as an item and not inside the checklist's bash block. That block
+- Step 8: the same for `commit-changes`, worded "loaded since the last compaction", as an item and not inside the checklist's bash block. That block
   is run by tests with no lock record.
 - `develop-bug/SKILL.md` Step 7: the same item.
 - `develop-pipeline-hooks.md`, beside "Why no `PostToolUse:Skill` auto-advance hook?": one sentence. A
@@ -116,6 +119,6 @@ list, as `ci.docsOnly.patterns` already says. Then `CHANGELOG.md`, `npm run bund
 
 ## Testing Approach
 
-Drive the CLIs and the extracted blocks. Mutations: `.last_pause_at` not kept; `.skill_loads` not deleted
+Drive the CLIs and the extracted blocks. Mutations: the `--clear-pause` call dropped; `.last_pause_at` not kept; `.skill_loads` not deleted
 on restore; the hold deletes nothing; the hold deletes on every arm; `>=` in place of `>` in `loaded`; an
 inline list accepted. Name the test each turns red.

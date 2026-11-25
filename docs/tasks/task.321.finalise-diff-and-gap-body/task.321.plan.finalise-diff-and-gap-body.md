@@ -28,7 +28,9 @@ Edit `shared/resources/` only: `npm run bundle` makes the copies.
 # exit: 0 resolved · 1 unresolved (<file> is empty) · 2 usage
 ```
 
-The core, as it was run in the trial:
+The core, as it was run in the trial, where the PR's head was `HEAD`. Replace `HEAD` with the PR's head
+commit, and the `-e` test with `git cat-file -e "$HEAD_SHA:shared/resources/$rel"`, so that a checkout on
+another branch reads the same change. The trial did not run that form.
 
 ```bash
 MB=$(git merge-base "origin/$PR_READ_BASE" HEAD) || unresolved "no merge base with origin/$PR_READ_BASE"
@@ -49,12 +51,13 @@ Points to keep:
 
 - `${EXCL[@]}` with `set -u` and an empty array fails on bash 4.3 and older. Use
   `${EXCL[@]+"${EXCL[@]}"}`.
-- Run the `-e` test and the diff from the repository's top: `cd "$(git rev-parse --show-toplevel)"`
+- An empty merge-base diff goes on to the forge arm, and is `unresolved` only when that gives nothing too.
+- Run the lookup and the diff from the repository's top: `cd "$(git rev-parse --show-toplevel)"`
   after `--out` is made absolute.
 - A removed copy (its source removed in the same change) has no source in the tree. It stays in the
   patch. That is right, and it is a test row.
 - `literal` pathspec magic, not `GIT_LITERAL_PATHSPECS`: the variable would also turn off `:(top)`.
-- Compare the head by prefix: Bitbucket returns 12 characters.
+- Bitbucket returns 12 characters of the head: resolve it with `git rev-parse --verify --quiet "$PR_READ_HEAD^{commit}"`.
 - The merge-base arm asks `git`, and not the forge. The forge arm asks `gh pr diff`, and takes its names
   from the patch's `diff --git` lines.
 - If the patch holds only excluded copies, `-s` is false while the list is not empty. Say
@@ -115,5 +118,5 @@ start marker, and run the script on it. A fourth pair added there turns the test
 
 Every test makes a temporary repository with a bare `origin`, sets `GIT_CONFIG_GLOBAL=/dev/null`, and
 puts a stub `gh` first on `PATH`. The Bitbucket rows set `PR_READ_BB_API` to a local stub, as
-`pr-read.test.sh` does. Mutations: drop the `-e` test; drop the `-s` test; drop the marker rule. Name
+`pr-read.test.sh` does. Mutations: drop the source lookup; drop the `-s` test; drop the marker rule. Name
 the test each one turns red.

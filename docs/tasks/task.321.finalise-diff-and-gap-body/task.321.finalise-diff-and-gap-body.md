@@ -11,9 +11,12 @@ risk_level: low
 created: 2026-11-25
 updated: 2026-11-25
 estimated_effort_hours: 8
+github_issue: 941
 ---
 
 # Technical Task: finalise's diff fallback is one commit, and its gap body leaks a marker
+
+**GitHub Issue**: [#941](https://github.com/Gamaroff/agent-skills/issues/941)
 
 **Status:** Planned
 
@@ -48,8 +51,7 @@ the tests.
    the forge refuses the diff (`PullRequest.diff too_large`). The fallback then gives 1 file where the
    change has 250 (§ 3).
 2. **It is silent.** Both commands send stderr to `/dev/null`, and nothing in the running summary says
-   which one answered. A network failure takes the same route: the first reproduction of this failure
-   on 2026-11-25 was a TLS timeout, and not the size limit.
+   which one answered. Any other failure of `gh`, such as a network error, takes the same route.
 3. **On Bitbucket it is every run.** `gh pr diff` cannot read a Bitbucket pull request, so each run
    there is graded on its last commit.
 4. **An empty diff can pass a criterion.** The AC agent's quantifier rule lists the members from
@@ -92,10 +94,10 @@ Every name below was grepped or run at `6f6c67aad` (v0.69.0).
 
 ### The measurements
 
-| Read of PR #937 (`a511895a0`, `b5057a5d2`) | Files | Lines |
+| Read of PR #937 (`a511895a0`, `b5057a5d2`) | Files | Patch lines |
 | :-- | --: | --: |
 | `gh pr diff 937` | refused, exit 1 | |
-| `git diff HEAD~1 HEAD` (today's fallback) | 1 | 36 changed |
+| `git diff HEAD~1 HEAD` (today's fallback) | 1 | 74 |
 | merge base to head | 250 | 38,067 |
 | the same, without 76 bundled copies | 174 | 24,934 |
 
@@ -110,9 +112,10 @@ copy is a file under `skills/<skill>/references/` whose relative path exists und
 `shared/resources/finalise-diff.sh --out <file> [--pr <n>]` writes two files and prints one line.
 
 1. `pr_read` gives the base and the head. No PR, or a failed read → `unresolved`.
-2. The PR's head is the local `HEAD` (by prefix, as `pr-read.sh` asks): fetch the base, then
-   `git diff <merge-base> HEAD` without the bundled copies. `source=merge-base`.
-3. It is not (a merged PR, a moved checkout), and the forge is GitHub: `gh pr diff`. `source=forge`.
+2. The PR's head commit is here, wherever `HEAD` is: fetch the base, then `git diff <merge-base> <head>`
+   without the bundled copies. `source=merge-base`. A bundled copy is looked up in the head's tree.
+3. It is not here, or it adds nothing to the base (a merged PR), and the forge is GitHub: `gh pr diff`.
+   `source=forge`.
 4. Otherwise: `unresolved`, with the reason.
 
 `<file>` holds the patch. `<file>.names` holds **every** changed path, the excluded copies included, so
@@ -282,7 +285,8 @@ None.
 | The PR is merged and the checkout is the base, GitHub | the forge's diff | `source=forge` |
 | The same, and `gh` fails | the last commit of the base | `unresolved`, exit 1, empty file |
 | No PR | the last commit | `unresolved`, exit 1 |
-| The branch adds nothing | an empty file, exit 0 | `unresolved`, exit 1 |
+| The branch adds nothing, and the forge's diff is empty | an empty file, exit 0 | `unresolved`, exit 1 |
+| The PR is open, and the checkout is on another branch that has its head commit | the forge's diff, or another branch's last commit | `source=merge-base`, of the PR's head |
 | A bundled copy and a hand-written `references/` file change | both, or neither | the second in the patch, both in the names |
 | A repository with no `shared/resources/` | all files | all files |
 | A path with a space, a quote or a newline | as git prints it | in the names list, NUL-delimited |
