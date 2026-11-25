@@ -1155,26 +1155,51 @@ test("a listed command on an unindented line of a criterion is refused, not read
     assert.equal(read(section).reason, "ran", section);
 });
 
-test("a section with no criterion the reader can find is refused only when it names a listed command (T319-CR-805)", (t) => {
-  const read = (text) => {
-    const { dir, run } = fixture(t, {
-      config: LIST("echo a"),
-      criteria: ["`echo a` passes"],
-    });
+// One repository, with `echo a` on the list, and the document rewritten for each reading.
+function reader(t) {
+  const { dir, run } = fixture(t, {
+    config: LIST("echo a"),
+    criteria: ["`echo a` passes"],
+  });
+  return (text) => {
     writeFileSync(join(dir, DOC), text);
     return run().rec;
   };
+}
+
+test("a section with no criterion the reader can find is read past when it names no listed command (T319-CR-805)", (t) => {
+  const read = reader(t);
   for (const text of [
-    "# T\n\n## Acceptance Criteria\n\n### AC1\n\nGiven x\n\n## Other\n\n`echo a`\n",
     "# T\n\nno criteria\n",
     "# T\n\n## Success Criteria\n\necho a, and `echo a b`\n",
     // a line in a fence ends no section, and outside one it does (T319-CR-1201)
-    "# T\n\n## Success Criteria\n\n```\n## x\n```\n\n## Other\n\n`echo a`\n",
-    "# T\n\n## Success Criteria\n\nBelow.\n\n## x\n\n`echo a`\n",
-    // and so does an AC heading of its own that holds the criteria
-    "# T\n\n## Acceptance Criteria\n\n## AC1\n\nGiven x\n\n## Other\n\n`echo a`\n",
+    "# T\n\n## Success Criteria\n\nGiven x\n\n```\n## x\n```\n\n## Other\n\n`echo a`\n",
+    // the criteria stand in the section, in a shape the reader does not read (T320-CR-101)
+    ...[
+      "### AC1\n\nText.\n",
+      "### 1. AC-2: a title\n\n**Text**.\n",
+      "## AC1\n\nText.\n",
+      "| AC | Text |\n| -- | ---- |\n",
+      "Given x\n",
+      "**When** x\n",
+      "- Then x\n",
+      "* x\n",
+      "  - [ ] x\n",
+      "  1. x\n",
+      "- [x] \n\n- x\n",
+      "```gherkin\nGiven x\n```\n",
+      "<!-- a -->\n\n- x\n\n<!-- b -->\n",
+    ].map(
+      (criteria) =>
+        `# T\n\n## Acceptance Criteria\n\n${criteria}\n## Other\n\n\`echo a\`\n`,
+    ),
+    "# T\n\n## Success Criteria\n\n## Acceptance Criteria\n\n- x\n\n## Other\n\n`echo a`\n",
   ])
     assert.equal(read(text).reason, "none-named", text);
+});
+
+test("a section with no criterion the reader can find is refused when a listed command is named (T319-CR-805)", (t) => {
+  const read = reader(t);
   for (const text of [
     "# T\n\n## Acceptance Criteria\n\n### AC1\n\nThen `echo a` passes\n",
     "# T\n\n## Criteria for success\n\n- [ ] `echo a` passes\n",
@@ -1194,13 +1219,26 @@ test("a section with no criterion the reader can find is refused only when it na
     "# T\n\n## Done when\n\n- [ ] `echo a` passes\n\n## Rollback\n\nNone.\n",
     // with AC headings, and no section the reader knows
     "# T\n\n## AC1\n\nGiven x\n\n## Done when\n\n- [ ] `echo a` passes\n",
-    // beside one with nothing to read under it (T320-CR-101)
+    // beside one that holds none (T320-CR-101, T320-CR-202 to T320-CR-204)
     ...[
       "",
+      "Below.\n\n",
       "### Functional\n\n",
+      "Functional\n----------\n\n",
       "---\n\n",
+      "* * *\n\n",
+      "- [x]\n\n",
+      "| | |\n|--|--|\n\n",
+      "### AC1\n\n",
+      "### AC1\n\n### Notes\n\nText.\n\n",
+      "## AC1\n\n",
+      '### AC1\n\n<a id="ac"></a>\n\n```js\n```\n\n',
       "<!-- to be written -->\n\n",
-      "### AC\n\n* * *\n\n",
+      "<!--\n- x\n-->\n\n",
+      "<!--\n- x\n## old\n-->\n\n",
+      "```gherkin\n```\n\n",
+      '<a id="ac"></a>\n\n',
+      "## Notes on AC-1\n\n- x\n\n",
     ].map(
       (none) =>
         `# T\n\n## Success Criteria\n\n${none}## Done when\n\n- [ ] \`echo a\` passes\n\n## Rollback criteria\n\nNone.\n`,
@@ -1211,7 +1249,14 @@ test("a section with no criterion the reader can find is refused only when it na
     assert.equal(r.reason, "scan-broken", text);
     assert.match(r.message, /names `echo a` and has no criteria/);
   }
-  // a backtick with no partner hides a command of a criterion, unless it is escaped (T319-CR-1005)
+  // a comment that is not closed is read once, however many there are: read once for each, these do not
+  // end within the time the run has (T320-CR-205)
+  const many = read(`# T\n\n## Success Criteria\n\n${"<!--\n".repeat(400000)}`);
+  assert.equal(many.reason, "none-named");
+});
+
+test("a backtick with no partner hides a command of a criterion, and that is refused, unless it is escaped (T319-CR-1005)", (t) => {
+  const read = reader(t);
   for (const [criterion, reason] of [
     ["Press the ` key\n\n  Then `echo a` passes", "scan-broken"],
     ["Press the ` key\n  - then `echo a` passes", "scan-broken"],

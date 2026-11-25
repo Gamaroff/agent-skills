@@ -284,6 +284,43 @@ test("config: ci.skipMarker is one printable line: a control, format, surrogate 
           `${JSON.stringify(text)} U+${code.toString(16)}`,
         );
       }
+  // A space that is no U+0020 is no plain space: in quotes, outside them, and without (T320-CR-206).
+  for (const row of [
+    ': "?[x]"',
+    ': "[x] ? "',
+    ": ?[x",
+    ": [x?",
+    ': "[x]" ?# why',
+  ])
+    for (const code of [0xa0, 0x3000, 0x2003, 0x0b])
+      for (const end of ["\n", "\r\n", ""]) {
+        const text = `ci:\n  skipMarker${row}${end}`;
+        assert.throws(
+          () => eng.parseConfig(text.replace("?", String.fromCharCode(code))),
+          /ci\.skipMarker must be one printable line/,
+          `${JSON.stringify(text)} U+${code.toString(16)}`,
+        );
+      }
+  assert.equal(marker("   "), "");
+  // A tab inside the value is refused, where one outside the quotes is dropped.
+  for (const row of [': "[a\tb]"', ": '[a\tb]'", ": [a\tb"])
+    assert.throws(
+      () => eng.parseConfig(`ci:\n  skipMarker${row}\n`),
+      /ci\.skipMarker must be one printable line/,
+      JSON.stringify(row),
+    );
+  // and inside the value such a space is a character like any other
+  for (const [row, value] of [
+    [': "[a?#b]"', "[a?#b]"],
+    [": '[a?b]' # why", "[a?b]"],
+    [": [a?b", "[a?b"],
+  ]) {
+    const nbsp = (s) => s.replace("?", String.fromCharCode(0xa0));
+    assert.equal(
+      eng.parseConfig(nbsp(`ci:\n  skipMarker${row}\n`)).skipMarker,
+      nbsp(value),
+    );
+  }
   // A tab outside the quotes parts the value from what stands beside it.
   for (const row of [" [x\t", "\t[x", " [x\t# why"])
     assert.equal(

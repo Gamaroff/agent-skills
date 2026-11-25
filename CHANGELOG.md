@@ -15,18 +15,19 @@ All notable changes to this project will be documented in this file. Format foll
 
 - **Two spellings in `skills-config.yaml` are refused that were read past (task 320).** A top-level key
   that is `ci`, `pipeline` or `finalise` with a YAML escape in it (`"c\x69":`) was ignored, and with it
-  an `enabled: false`: write the key plainly. A control or format character at either end of
-  `ci.skipMarker` (a BOM, a tab inside the quotes) was dropped: delete it, in the row's comment too.
-  Spaces at the ends, and a tab outside the quotes, are still dropped.
+  an `enabled: false`: write the key plainly. A control or format character, or a space
+  that is not a plain one, at either end of `ci.skipMarker` (a BOM, a tab inside the quotes, a no-break
+  space) was dropped: delete it, and any control or format character in the row's comment too. Plain
+  spaces at the ends, and a tab outside the quotes, are still dropped.
 
 ### Fixed
 
 - **What task 319 carried forward (task 320).** `/finalise`'s re-run refuses a listed command that a
-  fenced `## ` line, a heading that only contains "criteria", or a stray backtick with an unindented
-  line hid from it, and an untracked file in a directory that differs from a submodule's only in case.
+  fenced `## ` line, a heading that only contains "criteria", a criteria section that holds none, or a
+  stray backtick with an unindented line hid from it, and an untracked file in a directory that differs from a submodule's only in case.
   `push-held.sh` no longer says a commit could not be fetched that was, or that a push failed which
   reached the server while the script was stopped. `tick-pr.sh start` answers the same from a
-  subdirectory. `develop-next` says when a tick PR that conflicts may be closed and its branch deleted.
+  subdirectory. The reference on `developNext.tickVia` says how to settle a tick PR that conflicts.
 
 ## [v0.69.0] - 2026-11-25
 

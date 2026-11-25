@@ -103,8 +103,8 @@ tidy() {
 # A LIMIT (T319-CR-1301): a tick whose conflict was resolved on the forge, and whose PR was then squashed
 # and its branch deleted there, is on the base in the forge's words and in nothing this can compare with.
 # `start` answers `resume` for it, and nothing is deleted; the PR that `open` then makes conflicts. A tick
-# that never landed can do the same, so only when the base's own row records the item may that PR be closed
-# and the tick branch deleted, here and on the remote (T320-CR-102).
+# that never landed can do the same, so the owner decides: `developNext.tickVia` in the configuration
+# reference (T320-CR-201).
 landed() {
   local base="refs/remotes/origin/$BASE" from at
   holds "$base" "$1"

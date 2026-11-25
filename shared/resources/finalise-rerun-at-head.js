@@ -264,17 +264,45 @@ function shows(text, command) {
   );
 }
 
-/** Is anything written in this text besides headings, comments, rules and space? */
-function saysSomething(text) {
-  const isFenceLine = makeFenceTracker();
-  return text
-    .replace(/<!--[^]*?-->/g, "")
+const RE_AC_HEADING = /^#{2,6} +(?:\d+[.)] *)?AC[ -]?\d/i;
+
+/** A text without its HTML comments. One that is not closed runs to the end. */
+function withoutComments(text) {
+  let out = "";
+  for (let at = 0; ;) {
+    const from = text.indexOf("<!--", at);
+    if (from === -1) return out + text.slice(at);
+    out += text.slice(at, from);
+    const end = text.indexOf("-->", from);
+    if (end === -1) return out;
+    at = end + 3;
+  }
+}
+
+/**
+ * Does a criteria section hold criteria in a shape the reader does not read: a list item, a table row, a
+ * Given, When or Then line, a line of text under an AC heading? These shapes are the whole list. What is
+ * none of them (an introduction, a placeholder, an empty fence) does not say that the criteria stand here
+ * (T320-CR-101, T320-CR-202 to 204).
+ */
+function holdsCriteria(section) {
+  let underAc = false;
+  return withoutComments(section)
     .split("\n")
-    .some(
-      (l) =>
-        (isFenceLine(l) || !/^ {0,3}#{1,6}(?:\s|$)/.test(l)) &&
-        /[\p{L}\p{N}]/u.test(l),
-    );
+    .some((l) => {
+      if (/^ {0,3}#{1,6}(?:\s|$)/.test(l)) {
+        underAc = RE_AC_HEADING.test(l);
+        return false;
+      }
+      return (
+        (underAc && /^\s*[*_"'(]{0,3}[\p{L}\p{N}]/u.test(l)) ||
+        /^\s*[*_]{0,2}(?:Given|When|Then)\b/.test(l) ||
+        /^\s*\|.*[\p{L}\p{N}]/u.test(l) ||
+        /^\s*(?:[-*+]|\d{1,9}[.)])\s+(?=\S)(?!\[[ xX]\]\s*$).*[\p{L}\p{N}]/u.test(
+          l,
+        )
+      );
+    });
 }
 
 /** [{ command, criteria: [{ index, text }] }] in list order, only for commands a criterion names. */
@@ -894,28 +922,28 @@ async function run(argv) {
     if (entries === null || entries.length === 0) {
       // Criteria the reader cannot see, or none at all: only the first can hide a command (T319-CR-805).
       // Under every heading that speaks of criteria, and in the whole document when nothing stands there
-      // (T319-CR-1003). A line in a fence is no heading. Only a section the reader knows, or an AC heading,
-      // says where the criteria are, and only when something is written under it: a heading that contains
-      // the word (`## Rollback criteria`) does not (T319-CR-1201, T320-CR-101).
+      // (T319-CR-1003). A line in a fence is no heading. Only a section the reader knows that holds criteria,
+      // or an AC heading, says where they are: a heading that contains the word (`## Rollback criteria`)
+      // does not (T319-CR-1201).
       const isFenceLine = makeFenceTracker();
       const parts = [[]];
       for (const line of body.split(/\r?\n/)) {
         if (!isFenceLine(line) && line.startsWith("## ")) parts.push([]);
         parts.at(-1).push(line);
       }
-      const under = (heading) =>
-        parts
-          .filter((part) => heading.test(part[0]))
-          .map((part) => part.slice(1).join("\n"))
-          .join("\n");
-      const placed = [
-        ...CRITERIA_HEADINGS.map((name) => extractSection(body, name) ?? ""),
-        under(/^## .*\bAC[ -]?\d/i),
-      ].join("\n");
-      const where =
-        entries === null || !saysSomething(placed)
-          ? body
-          : under(/^## .*(?:criteri|\bAC[ -]?\d)/i);
+      const placed =
+        CRITERIA_HEADINGS.some((name) =>
+          holdsCriteria(extractSection(body, name) ?? ""),
+        ) ||
+        parts.some(
+          (part) =>
+            RE_AC_HEADING.test(part[0]) && holdsCriteria(part.join("\n")),
+        );
+      const under = parts
+        .filter((part) => /^## .*(?:criteri|\bAC[ -]?\d)/i.test(part[0]))
+        .map((part) => part.slice(1).join("\n"))
+        .join("\n");
+      const where = entries === null || !placed ? body : under;
       const hidden = list.find((command) => shows(where, command));
       if (hidden === undefined)
         return { reason: "none-named", exitCode: 0, ...base };

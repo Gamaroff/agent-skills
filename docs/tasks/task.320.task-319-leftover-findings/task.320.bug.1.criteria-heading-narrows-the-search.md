@@ -44,8 +44,24 @@ When no criterion is readable, let only the section the reader knows narrow the 
 
 **Verify**: the steps above answer `scan-broken`.
 
+## Developer Fix Cycle 2
+
+**Date**: 2026-11-25
+
+**Root cause**: the rule of cycle 1 listed what does not count as content, and every text outside that list still narrowed the search (T320-CR-202, T320-CR-203, T320-CR-204).
+
+**Fix**: the rule is now an allow-list. A section the reader knows, or one under an AC heading of its own, narrows the search only when it holds a list item, a table row, a Given, When or Then line, or a line of text under an AC heading. A comment that is not closed runs to the end of the section.
+
+**What changed for a document**: a criteria section that holds only plain text, or only a fence, no longer narrows the search. Such a document is refused when it names a listed command anywhere.
+
+**Tests**: `shared/resources/tests/finalise-rerun-at-head.test.mjs`, T319-CR-805, red on `5afd1ebd5`. It is three tests now, each on one repository. Two inputs changed with the rule: the fenced one has a `Given` line added, and `Below.` moved to the refused ones.
+
+**Verify**: the steps above, and the four inputs of T320-CR-202 to T320-CR-204, answer `scan-broken`.
+
 ## Status History
 
 | Date | Status | Changed By | Notes |
 | --- | --- | --- | --- |
 | 2026-11-25 | Ready for QA | qa-fix | Fixed in QA cycle 1 |
+| 2026-11-25 | Reopened | qa-task | Not fixed by task.320.qa.2.task-319-leftover-findings.md |
+| 2026-11-25 | Ready for QA | qa-fix | Fixed in QA cycle 2 |

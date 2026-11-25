@@ -501,8 +501,8 @@ Phase 1's file and is reverted first.
 
 ### QA Report
 
-- **Full Report**: [task.320.qa.1.task-319-leftover-findings.md](./task.320.qa.1.task-319-leftover-findings.md)
-- **Gate File**: [task.320.gate.1.task-319-leftover-findings.yml](./task.320.gate.1.task-319-leftover-findings.yml)
+- **Full Report**: [task.320.qa.2.task-319-leftover-findings.md](./task.320.qa.2.task-319-leftover-findings.md)
+- **Gate File**: [task.320.gate.2.task-319-leftover-findings.yml](./task.320.gate.2.task-319-leftover-findings.yml)
 
 ### Test Coverage Summary
 
@@ -513,7 +513,7 @@ Phase 1's file and is reverted first.
 
 ### Key Findings
 
-Two medium: a heading with the word "criteria" still narrows the search (T320-CR-101), and the recovery stated for T319-CR-1301 can delete a tick that never landed (T320-CR-102). Three low: T320-CR-103, T320-CR-104, T320-CR-105.
+Cycle 2, all in the fixes of cycle 1. One medium: the recovery stated for T319-CR-1301 cannot be carried out as written (T320-CR-201). Five low: T320-CR-202 to T320-CR-206.
 <!-- change-log-start -->
 ## Change Log
 
@@ -525,6 +525,8 @@ Two medium: a heading with the word "criteria" still narrows the search (T320-CR
 | 2026-11-25 |  | Implemented — 31 files, 5 tests added and 6 extended | develop |
 | 2026-11-25 |  | QA gate CONCERNS (90/100) — 5 findings | qa-task |
 | 2026-11-25 |  | QA findings fixed — cycle 1, 5 findings | qa-fix |
+| 2026-11-25 |  | QA gate CONCERNS (90/100) — 6 findings | qa-task |
+| 2026-11-25 |  | QA findings fixed — cycle 2, 6 findings | qa-fix |
 <!-- change-log-end -->
 
 ---

@@ -107,7 +107,7 @@ const PIPELINE_KEYS = Object.freeze(["pushRecordCommits"]);
 const PUSH_RECORD_COMMITS = Object.freeze(["batched", "eager"]);
 const SKIP_MARKER_MAX = 80;
 const UNPRINTABLE = /[\p{Cc}\p{Cf}\p{Cs}]/u;
-const MARKER_RULE = `ci.skipMarker must be one printable line of at most ${SKIP_MARKER_MAX} characters`;
+const MARKER_RULE = `ci.skipMarker must be one printable line of at most ${SKIP_MARKER_MAX} characters, with nothing but plain spaces at its ends`;
 
 const USAGE =
   "usage: ci-tree-equivalence.js --head-rollup <PENDING|NONE|...> [--head <sha>] [--pr <n>] " +
@@ -548,18 +548,22 @@ function parseConfig(rawText) {
 }
 
 /**
- * Refuse a `skipMarker` row with a control or format character anywhere in it, its comment included: the
- * parse trims a BOM outside the quotes, so `skipMarkerOf` never sees it (T320-CR-104). A tab there parts the
- * value from what stands beside it.
+ * Refuse a `skipMarker` row with a control or format character anywhere in it, its comment included, or
+ * with a space other than U+0020 at the value's ends: the parse trims both outside the quotes, so
+ * `skipMarkerOf` never sees them (T320-CR-104, T320-CR-206). A tab there parts the value from what stands
+ * beside it.
  */
 function assertMarkerRow(text) {
   let block = null;
   for (const l of text.split(/\r?\n|\r$/)) {
     block = topLevelKey(l) ?? block;
+    const row = /^\s+["']?skipMarker["']?\s*:(.*)/.exec(l);
+    if (block !== "ci" || !row) continue;
+    // What is inside the quotes is skipMarkerOf's to judge.
+    const outside = row[1].replace(/"[^"]*"|'[^']*'/, '""');
     if (
-      block === "ci" &&
-      /^\s+["']?skipMarker["']?\s*:/.test(l) &&
-      UNPRINTABLE.test(l.replace(/\t/g, ""))
+      UNPRINTABLE.test(l.replace(/\t/g, "")) ||
+      /^[ \t]*[^\S \t]|[^\S \t][ \t]*(?:#|$)/.test(outside)
     )
       throw new UsageError(MARKER_RULE);
   }
@@ -578,8 +582,14 @@ function skipMarkerOf(v) {
     throw new UsageError("ci.skipMarker must be a string (empty means off)");
   }
   const m = v.trim();
-  // `v`: trim() drops a tab and a BOM at the ends too, and only a space there is dropped in silence (task 320)
-  if (UNPRINTABLE.test(v) || [...m].length > SKIP_MARKER_MAX) {
+  // trim() drops a tab, a BOM and every kind of space; only U+0020 is dropped in silence (task 320)
+  const dropped =
+    v.slice(0, v.length - v.trimStart().length) + v.slice(v.trimEnd().length);
+  if (
+    UNPRINTABLE.test(m) ||
+    /[^ ]/.test(dropped) ||
+    [...m].length > SKIP_MARKER_MAX
+  ) {
     throw new UsageError(MARKER_RULE);
   }
   if (/^[>|][+\-0-9]*$/.test(m)) {

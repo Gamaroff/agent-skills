@@ -1,0 +1,106 @@
+schema: 2
+task: 'task.320.task-319-leftover-findings'
+task_title: "Task 319's leftover findings are closed"
+gate: CONCERNS
+status_reason: 'One medium and five low findings, all in the fixes of cycle 1. The recovery of T319-CR-1301 cannot be carried out as it is written, and the search for a hidden command is still narrowed by a section that holds no criterion.'
+reviewer: 'QA Engineer'
+head: '5afd1ebd54ae73f3be5f6d14516a5c4b3de137df'
+updated: '2026-11-25T18:25:16Z'
+
+top_issues:
+  - id: 'T320-CR-201'
+    severity: medium
+    file: 'skills/develop-next/SKILL.md'
+    finding: 'Line 663: the recovery deletes the tick branch while `start` has left the checkout on it, so `git branch -D` fails; and step 3 says any outcome but `merged` is a HALT, where step 1 says to delete and go on. tick-pr.sh also asks for less than the other two places: only that the row records the item, which a registry row does before any tick.'
+    suggested_action: 'Let the run HALT at step 3 as it does, and give the recovery to the owner, with the same two-part condition and the checkout in all three places.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.320.bug.2.tick-recovery-deletes-an-unlanded-tick.md'
+  - id: 'T320-CR-202'
+    severity: low
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'Line 271: a placeholder comment that spans a `## ` line is cut by the section reader, and its unclosed half counts as written criteria: none-named (reproduced; with no `## ` in the comment it is scan-broken).'
+    suggested_action: 'Treat an unclosed comment as running to the end of the section.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.320.bug.1.criteria-heading-narrows-the-search.md'
+  - id: 'T320-CR-203'
+    severity: low
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'Line 275: the opening line of a fence counts as content through its info string, and so do an anchor tag and an underlined heading: none-named for each (reproduced; a fence without an info string is scan-broken).'
+    suggested_action: 'Do not count a fence delimiter, a tag-only line or an underlined heading.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.320.bug.1.criteria-heading-narrows-the-search.md'
+  - id: 'T320-CR-204'
+    severity: low
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'Line 913: a heading that only mentions an AC (`## Notes on AC-1`) still says where the criteria are: none-named (reproduced; without it, scan-broken).'
+    suggested_action: 'Accept only a heading that starts with the AC id.'
+    suggested_owner: dev
+    status: open
+    bug_ref: 'task.320.bug.1.criteria-heading-narrows-the-search.md'
+  - id: 'T320-CR-205'
+    severity: low
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'Line 271: the comment matcher is quadratic on unclosed openers: 259, 514 and 1554 ms for the engine at 5000, 10000 and 20000 of them (control, other lines: 219 ms at 20000), outside the bound of the run.'
+    suggested_action: 'Scan for the opener and the closer with indexOf.'
+    suggested_owner: dev
+    status: open
+  - id: 'T320-CR-206'
+    severity: low
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'The quoted half of T320-CR-104 was not fixed: trim() drops a no-break space or U+3000 at the end of a quoted skipMarker, though the reference says only spaces and a tab outside the quotes are dropped (reproduced).'
+    suggested_action: 'Trim U+0020 only.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 8895
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 3, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 69
+    escaped: 0
+    boundary: true
+    boundary_signals: ["refused","refuses"]
+    notes: 'parseConfig 29 of 29 over two case files, the criteria search 13 of 13, parsePipelineConfig 9 of 9, push-held --site 18 of 18.'
+  performance:
+    status: PASS
+    notes: 'T320-CR-205 is counted as a finding. The T319-CR-805 test took 29.7 s on a loaded server, at the 30 s bound of criterion 10: it must not grow as it is built.'
+  reliability:
+    status: PASS
+    notes: 'T320-CR-201 is a wrong instruction, counted as a finding.'
+  maintainability:
+    status: PASS
+    notes: 'No new module; one helper added.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'lockctl.sh takes its lock with mkdir, which uutils coreutils (the ubuntu-26.04 runner image) does not make atomic; see gate 1. CI was green on this head.'
+      refs: ['scripts/remote-test/lockctl.sh', 'tests/test-remote-runner.test.js']
+      provenance: pre-existing
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions:
+    - 'T320-CR-201 is closed'
