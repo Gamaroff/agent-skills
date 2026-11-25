@@ -447,17 +447,30 @@ function topLevelKey(line) {
 }
 
 /**
- * The file's top-level keys: every key row of the source at the first row's indent or under it. The parse
- * has fewer: it stops at a row it does not read (the text of a block scalar), and a near miss after it was
- * neither read nor refused (task 320). A lone CR ends a line here, as it does in YAML and not in the parse.
+ * The keys the file writes at its top level: every key row of the source at the first row's indent or under
+ * it. The parse has fewer: it stops at a row it does not read (the text of a block scalar), and what stood
+ * after it was neither read nor refused (task 320). A lone CR ends a line here, and an anchor, a tag or the
+ * `?` of an explicit key stands before one, as they do in YAML and not in the parse.
  */
-function topLevelKeys(text) {
+function writtenKeys(text) {
   const rows = significantLines(text.replace(/\r(?!\n)/g, "\n"));
   const indent = (l) => l.length - l.trimStart().length;
   return rows
     .filter((l) => indent(l) <= indent(rows[0]))
-    .map((l) => topLevelKey(l.trimStart()))
+    .map((l) =>
+      topLevelKey(
+        l
+          .trimStart()
+          .replace(/^\?\s+(.*)/, "$1:")
+          .replace(/^(?:[&!]\S*\s+)+/, ""),
+      ),
+    )
     .filter((k) => k !== null);
+}
+
+/** Every top-level key, as the parse reads the file and as the file writes it: near misses are looked for in both. */
+function topLevelKeys(text, parsed) {
+  return [...Object.keys(parsed), ...writtenKeys(text)];
 }
 
 /**
@@ -539,6 +552,13 @@ function assertBlockRows(text, parsed, key) {
       `${CONFIG_BASENAME} has ${rows} row(s) under ${key} but the parse accounts for ${consumed}: a row is mis-indented, duplicated or in a form the YAML subset does not read (a list goes one level deeper than its key); the rule will not guess which`,
     );
   }
+  // A block in a file that is indented whole, or after a lone CR, has no row at column 0 to count (T320-CR-502).
+  const written = writtenKeys(text).filter((k) => k === key).length;
+  if (written > (consumed > 0 ? 1 : 0)) {
+    throw new UsageError(
+      `${CONFIG_BASENAME} writes ${key} ${written} time(s) and the parse reads it ${consumed > 0 ? 1 : 0} time(s): write it once, at column 0, before any row the YAML subset does not read (a block scalar, for one)`,
+    );
+  }
 }
 
 /**
@@ -556,7 +576,7 @@ function parseConfig(rawText) {
   assertMapping(text, parsed);
   // The specific diagnostics (a block scalar, an unknown key) are produced first so they name the
   // cause; the completeness check below is the net under all of them.
-  const cfg = interpretConfig(parsed, topLevelKeys(text));
+  const cfg = interpretConfig(parsed, topLevelKeys(text, parsed));
   assertBlockRows(text, parsed, "ci");
   assertMarkerRow(text);
   return cfg;
@@ -628,7 +648,7 @@ function parsePipelineConfig(rawText) {
   const parsed = parseYamlSubset(text) || {};
   const cfg = { pushRecordCommits: "batched" };
   if (typeof parsed !== "object" || Array.isArray(parsed)) return cfg;
-  for (const k of topLevelKeys(text)) {
+  for (const k of topLevelKeys(text, parsed)) {
     if (k !== "pipeline" && normKey(k) === "pipeline") {
       throw new UsageError(
         `${k} looks like pipeline; the key is exactly "pipeline"`,

@@ -189,7 +189,9 @@ in prose, and a test for the watcher of a killed script): they are test ideas, n
 **What Changed**: a top-level key that decodes to `ci`, `pipeline` or `finalise` is refused where it
 was ignored. (An escaped key **under** one of them is refused today, as an unknown key.) After a block
 scalar (`note: |`), at which the parse stops, every near miss of these names was ignored (`CI` too); it
-is refused there as it is elsewhere.
+is refused there as it is elsewhere. So is the key in any spelling, the exact one included, where the
+parse does not read it: in a file indented whole, after a lone CR, or behind an anchor, a tag or the
+`?` of an explicit key.
 
 **Before**:
 
@@ -207,9 +209,10 @@ c\x69 looks like ci; the key is exactly "ci"
 
 **Impact**: a project that wrote an escape in one of these names. None is known. The block was never
 read, so nothing that worked stops working. A single-quoted `'c\x69'` is literal text in YAML and is
-refused too: the parse does not keep the quote.
+refused too: the parse does not keep the quote. No tracked YAML file in this repository parses
+differently.
 
-**Migration Path**: write the key plainly.
+**Migration Path**: write the key plainly, at column 0, once.
 
 ### Breaking Change 2: a marker with a control or format character at its edge is a usage error
 
@@ -523,27 +526,27 @@ Phase 1's file and is reverted first.
 
 ## QA Testing Results
 
-**QA Status**: PASS
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-25
-**Quality Score**: 100/100
-**Gate Decision**: PASS
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
 
-- **Full Report**: [task.320.qa.4.task-319-leftover-findings.md](./task.320.qa.4.task-319-leftover-findings.md)
-- **Gate File**: [task.320.gate.4.task-319-leftover-findings.yml](./task.320.gate.4.task-319-leftover-findings.yml)
+- **Full Report**: [task.320.qa.5.task-319-leftover-findings.md](./task.320.qa.5.task-319-leftover-findings.md)
+- **Gate File**: [task.320.gate.5.task-319-leftover-findings.yml](./task.320.gate.5.task-319-leftover-findings.yml)
 
 ### Test Coverage Summary
 
 - **Tests Executed**: 8897
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-Cycle 4: no high and no medium finding. Four low: T320-CR-401 to T320-CR-404.
+Cycle 5: the fixes of DoD gaps 1 and 2 close the recorded inputs. Two medium (T320-CR-501, T320-CR-502) and two low (T320-CR-503, T320-CR-504).
 
 ## Definition of Done - Gaps Identified
 
@@ -594,6 +597,8 @@ Cycle 4: no high and no medium finding. Four low: T320-CR-401 to T320-CR-404.
 | 2026-11-25 |  | PR review CONCERNS — 5 document findings fixed (breaking changes, risk 1, file lists, notes, the QA report's population count) | review-pr |
 | 2026-11-25 |  | DoD incomplete — 3 gaps identified | finalise |
 | 2026-11-25 |  | DoD gaps 1 and 2 fixed — near-miss keys read from the source, fence markers in comments | qa-fix |
+| 2026-11-25 |  | QA gate CONCERNS (90/100) — 4 findings | qa-task |
+| 2026-11-25 |  | QA cycle 5 fixes — T320-CR-501 to 504 | qa-fix |
 <!-- change-log-end -->
 
 ---

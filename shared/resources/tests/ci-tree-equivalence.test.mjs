@@ -1494,7 +1494,10 @@ test("CR3-3: a ci block that is not a mapping, or a near-miss spelling, is a usa
       /looks like ci/,
     ],
     ['"\\U00000063i":\n  skipMarker: x\n', /looks like ci/],
-    ["'c\\x69':\n  skipMarker: x\n", /looks like ci/], // literal in YAML; the parse keeps no quote    ['ci:\n  "docs\\x4fnly":\n    enabled: false\n', /docs\\x4fnly/],
+    ["'c\\x69':\n  skipMarker: x\n", /looks like ci/], // literal in YAML; the parse keeps no quote
+    ['ci:\n  "docs\\x4fnly":\n    enabled: false\n', /docs\\x4fnly/],
+    // the parse takes the CR with the colon; the rows of the source do not (T320-CR-503)
+    ["CI\r:\n  docsOnly:\n    enabled: false\n", /looks like ci/],
     // past a row at which the parse stops (task 320, DoD run 1)
     [
       'note: |\n  text\n"c\\x69":\n  docsOnly:\n    enabled: false\n',
@@ -1512,6 +1515,17 @@ test("CR3-3: a ci block that is not a mapping, or a near-miss spelling, is a usa
       '  note: |\n    text\n  "c\\x69":\n    docsOnly:\n      enabled: false\n',
       /looks like ci/,
     ],
+    ['a: 1\n&x "c\\x69":\n  docsOnly:\n    enabled: false\n', /looks like ci/],
+    ['a: 1\n? "c\\x69"\n: docsOnly:\n    enabled: false\n', /looks like ci/],
+    // and the exact key there (T320-CR-502)
+    ...[
+      "  note: |\n    text\n  ci:\n    docsOnly:\n      enabled: false\n",
+      "a: 1\nnote: x\rci:\n  docsOnly:\n    enabled: false\n",
+      "ci:\n  skipMarker: x\nnote: x\rci:\n  docsOnly:\n    enabled: false\n",
+      "a: 1\n&x ci:\n  docsOnly:\n    enabled: false\n",
+      "a: 1\n!!str ci:\n  docsOnly:\n    enabled: false\n",
+      "a: 1\n? ci\n: docsOnly:\n    enabled: false\n",
+    ].map((text) => [text, /writes ci [12] time/]),
     [
       "ci:\n  docsOnly: { enabled: false }\n",
       /ci\.docsOnly must be a block mapping/,

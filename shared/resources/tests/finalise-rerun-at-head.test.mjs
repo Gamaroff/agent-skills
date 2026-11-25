@@ -886,6 +886,14 @@ test("a list the parse ends early, or under a key spelt with an escape, is refus
       `${LIST("echo a")}note: |\n  text\n"finalis\\x65":\n  deferralApprover: x\n`,
     ],
     [
+      "the exact block key, in a file that is indented whole",
+      "  note: |\n    text\n  finalise:\n    deferralApprover: x\n",
+    ],
+    [
+      "the exact block key after a lone CR",
+      "a: 1\nnote: x\rfinalise:\n  deferralApprover: x\n",
+    ],
+    [
       "a near miss after a block scalar",
       "note: |\n  text\nFinalize:\n  deferralApprover: x\n",
     ],
@@ -1295,6 +1303,42 @@ test("a section with no criterion the reader can find is refused when a listed c
   // end within the time the run has (T320-CR-205)
   const many = read(`# T\n\n## Success Criteria\n\n${"<!--\n".repeat(400000)}`);
   assert.equal(many.reason, "none-named");
+});
+
+test("an opener that starts no comment block hides no fence, whatever closes it later (T320-CR-501)", (t) => {
+  const read = reader(t);
+  const doc = (opener, closer) =>
+    `# T\n\n## Success Criteria\n\n- x\n\n${opener}\n\n\`\`\`\n## y\n\`\`\`\n\n- \`echo a\` passes\n\n## Other\n\n${closer}\n`;
+  for (const [opener, closer] of [
+    ["Use <!-- here", "<!-- note -->"],
+    ["\\<!-- x", "<!-- note -->"],
+    ["A `span\n  <!-- x` here", "<!-- note -->"],
+    ["- item\n\n      ```\n      <!-- x\n      ```", "<!-- note -->"],
+    ["- item\n\n  <!-- x", "<!-- note -->"],
+    ["> <!-- x", "<!-- note -->"],
+    ["<!-- a --> Use <!-- here", "<!-- note -->"],
+    ["<!-- a\n-->\n\nUse <!-- here", "<!-- note -->"],
+    ["```html\n<!-- x\n```", "<!-- note -->"],
+    ["Use <!-- here", "```mermaid\na --> b\n```"],
+    ["Use <!-- here", "From a --> b."],
+    ["Use <!-- here", "Write `-->` last."],
+    ["<!-- x", "None."],
+    ["Use here", "<!-- note -->"],
+  ])
+    assert.equal(
+      read(doc(opener, closer)).reason,
+      "scan-broken",
+      `${opener} / ${closer}`,
+    );
+  // a block, from column 0 to the line that closes it, hides what it holds
+  for (const block of ["<!-- x\n```\n-->", "<!--\n~~~\na --> b"])
+    assert.equal(
+      read(
+        `# T\n\n## Success Criteria\n\n- x\n\n${block}\n\n## Other\n\n\`echo a\`\n`,
+      ).reason,
+      "none-named",
+      block,
+    );
 });
 
 test("a backtick with no partner hides a command of a criterion, and that is refused, unless it is escaped (T319-CR-1005)", (t) => {

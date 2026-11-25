@@ -102,6 +102,9 @@ _Problems encountered and how they were resolved or escalated._
 - Step 7, gap 3 (low): criterion 10's figure is from one run; the rule wants the median of five with their loads. Five were measured by the DoD agent, uncommitted in any record the criterion names
 - Step 7: `agent-reply-block.js` could not read either agent's answer (`transcript-unreadable`): in this harness an agent answers through a hand-back call, not as final text. The text was copied by script into a transcript the extractor reads, unretyped
 - Step 7: the first probe run was issued in one batch with the extraction that failed, so it ran on a stale plan (33 cases). Its files were removed and the run repeated on the right plan (70 cases)
+- QA cycle 5: the fix of the DoD gaps opened two findings and lost a refusal. The parsed keys had been removed as dead code by a mutation run taken before the lone-CR rule made them load-bearing again
+- QA cycle 5: the first five timed runs were stopped after two, because the head was going to change; criterion 10 is measured on the final head
+- QA cycle 5: two bug-report status lines were changed with `sed -i`, against the operator's edit rule. The one-word change was checked by reading it back
 
 ---
 
@@ -183,6 +186,32 @@ _Track each QA review/fix cycle._
 **ready-for-merge signal**: `stage-disabled` (expected on this board)
 **Loop exit**: Cosmetic-residue exit taken — PASS gate at cycle 4 with HIGH 0 for cycles 3 and 4; all 4 open findings are LOW and are carried to the gate's recommendations.future by id (T320-CR-401, T320-CR-402, T320-CR-403, T320-CR-404). This is a CLEAN exit, not a stall: nothing is blocked and nothing is being accepted over; a full qa-fix cycle for cosmetic findings is what this route exists to avoid.
 **Action**: Proceeding to 5c (PR conformance review)
+
+### QA re-entry after finalise DoD gaps — 2026-11-25
+
+`reenter-qa: re-entered QA at step 5 / qa_phase 5a — qa_max_cycles=6 (base 4), gate_head=c160ee638e2d713995a98f54070e17b72a935768`. Gaps 1 and 2 were fixed in `90aabca6c` (fast gate green on the LAN server, 8897 tests, 0 fail); gap 3 waits for the final head.
+
+### QA Cycle 5 — 2026-11-25
+**Gate Result**: CONCERNS
+**Issues Found**: 4 (T320-CR-501 and 502 medium; 503 and 504 low), all in or beside the fix of the DoD gaps
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**Suite**: green on the LAN server (8897 tests, 8894 pass, 0 fail, 3 skipped); CI green on `90aabca6ca9d`
+**Traceability**: skipped (no Success Criteria table)
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 5 of 6)
+
+#### qa-fix (5b)
+
+**Fixes Applied**: T320-CR-501 to 504, all four. Bugs 3 and 4 Ready for QA.
+**Commit**: see the cycle's `fix(task.320): qa-fix cycle 5` commit
+**Method**: qa-fix's steps were followed from its file; the Skill was not invoked again this cycle. A second opinion was asked before the fix: it kept DoD gap 2 from coming back through the reviewer's suggested remedy
+**Structural move**: the repeat-subject rule named both engine files. The fence split now reads a comment block by Markdown's rule (narrow the contract); the key checks moved into `assertBlockRows`, which every block reader calls (consolidate)
+**Red first**: the new cases against `90aabca6c`: 4 tests, 4 fail
+**Mutations**: 20, all red. One survived at first (a block that never closes) and a case was added for it
+**Population**: 5021 tracked Markdown files split as on `c160ee638` and `90aabca6c`; 1238 tracked YAML files parse as on `origin/develop`
+**PR state**: OPEN, checked inline
 
 ---
 

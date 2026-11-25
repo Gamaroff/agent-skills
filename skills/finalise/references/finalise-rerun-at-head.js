@@ -192,7 +192,7 @@ function parseRerunList(rawText) {
   const parsed = parseYamlSubset(text) || {};
   assertMapping(text, parsed);
   // A list under a key nobody reads is a list that is silently not run (T319-CR-208).
-  for (const k of topLevelKeys(text)) {
+  for (const k of topLevelKeys(text, parsed)) {
     if (k !== "finalise" && ["finalise", "finalize"].includes(normKey(k)))
       throw new UsageError(
         `${k} looks like finalise; the key is exactly "finalise"`,
@@ -290,16 +290,14 @@ function commentAt(line, at) {
 /**
  * A document without its HTML comments, line for line. One that is not closed runs to the end, and one that a
  * fence or a code span holds is text (T320-CR-305). A NUL stands where a comment was, so that what follows
- * it on the line does not begin the line: Markdown reads no heading or list item there. With `closedOnly`
- * one that no later line closes is text.
+ * it on the line does not begin the line: Markdown reads no heading or list item there.
  */
-function withoutComments(text, closedOnly = false) {
+function withoutComments(text) {
   const isFenceLine = makeFenceTracker();
-  const lines = text.split(/\r?\n/);
-  const last = lines.findLastIndex((line) => line.includes("-->"));
   let open = false;
-  return lines
-    .map((line, i) => {
+  return text
+    .split(/\r?\n/)
+    .map((line) => {
       if (!open && isFenceLine(line)) return line;
       let out = open ? "\0" : "";
       for (let at = 0; ;) {
@@ -310,8 +308,7 @@ function withoutComments(text, closedOnly = false) {
           at = end + 3;
         }
         const from = commentAt(line, at);
-        if (from === -1 || (closedOnly && i >= last))
-          return out + line.slice(at);
+        if (from === -1) return out + line.slice(at);
         out += `${line.slice(at, from)}\0`;
         open = true;
         at = from + 2; // `<!-->` is a whole comment
@@ -322,16 +319,22 @@ function withoutComments(text, closedOnly = false) {
 
 /**
  * A document's parts, each a list of lines: what stands before the first `## ` line, then from each on. A
- * fence marker in a comment opens no fence (task 320); after an opener that is never closed, it does.
+ * fence marker in a comment block opens no fence (task 320). Only an opener at column 0 that a later line
+ * closes starts such a block: any other may be text, and would hide the fences up to the next comment
+ * (T320-CR-501).
  */
 function partsOf(text) {
   const isFenceLine = makeFenceTracker();
-  const fenced = withoutComments(text, true)
-    .split("\n")
-    .map((line) => isFenceLine(line));
+  const lines = text.split(/\r?\n/);
+  const lastEnd = lines.findLastIndex((line) => line.includes("-->"));
   const parts = [[]];
-  for (const [i, line] of text.split(/\r?\n/).entries()) {
-    if (!fenced[i] && line.startsWith("## ")) parts.push([]);
+  let comment = false;
+  for (const [i, line] of lines.entries()) {
+    const fenced = !comment && isFenceLine(line);
+    if (comment) comment = !line.includes("-->");
+    else if (!fenced && line.startsWith("<!--"))
+      comment = i < lastEnd && !line.includes("-->");
+    if (!fenced && line.startsWith("## ")) parts.push([]);
     parts.at(-1).push(line);
   }
   return parts;
