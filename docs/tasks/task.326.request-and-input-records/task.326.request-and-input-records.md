@@ -11,9 +11,12 @@ risk_level: low
 created: 2026-11-25
 updated: 2026-11-25
 estimated_effort_hours: 3
+github_issue: 950
 ---
 
 # Technical Task: doc-id reads request and input records
+
+**GitHub Issue**: [#950](https://github.com/Gamaroff/agent-skills/issues/950)
 
 **Status:** Planned
 
