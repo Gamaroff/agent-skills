@@ -11,9 +11,12 @@ risk_level: low
 created: 2026-11-25
 updated: 2026-11-25
 estimated_effort_hours: 4
+github_issue: 947
 ---
 
 # Technical Task: The docs-only CI rule can exclude a path
+
+**GitHub Issue**: [#947](https://github.com/Gamaroff/agent-skills/issues/947)
 
 **Status:** Planned
 

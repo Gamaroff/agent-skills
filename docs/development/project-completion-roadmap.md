@@ -20,7 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. Phase 20 is open (opened 2026-11-09): T289 (accepted), T290 (merged with an owner waiver), T292 (accepted), T293 (accepted), T294 (accepted), B21 (fixed), T304 (accepted), T291 (accepted), T295 (accepted). Phase 21 is open (opened 2026-11-10): T301 (accepted), T303 (accepted), T302 (accepted), T296 (accepted). Phase 22 is open (opened 2026-11-10): T297 (accepted), T300 (accepted), T298 (accepted), T299. Phase 23 is open (opened 2026-11-15): T310.
+chain, a human gate. Phase 20 is open (opened 2026-11-09): T289 (accepted), T290 (merged with an owner waiver), T292 (accepted), T293 (accepted), T294 (accepted), B21 (fixed), T304 (accepted), T291 (accepted), T295 (accepted). Phase 21 is open (opened 2026-11-10): T301 (accepted), T303 (accepted), T302 (accepted), T296 (accepted). Phase 22 is open (opened 2026-11-10): T297 (accepted), T300 (accepted), T298 (accepted), T299. Phase 23 is open (opened 2026-11-15): T310. Phase 24 is open (opened 2026-11-25): T320, T325.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -139,6 +139,17 @@ It edits the block task 309 just changed, so it carries `deps: T309` (merged). *
 when T310 is accepted, and archive the phase at close.**
 
 - [x] **T310** The finalise 6c poll block guards its inputs · deps: T309 · touches: finalise~, test-harness~, bundles~ · /develop-task docs/tasks/task.310.finalise-6c-poll-block-guards-its-inputs/task.310.finalise-6c-poll-block-guards-its-inputs.md
+
+## PHASE 24 — the docs-only rule can exclude a path (opened 2026-11-25)
+
+An **override**: without it the registry fallback selects T321 first, ahead of these. The owner asked
+for T325 to be queued. It edits `ci-tree-equivalence.js`, which T320 edits first, so it carries
+`deps: T320`. T320 has a row here for that reason alone: a `deps:` entry that names no current row
+reads as already shipped, and T325 was selected at once without it. **Tick each row `[x]` when its
+task is accepted, and archive the phase at close.**
+
+- [ ] **T320** Task 319's leftover findings are closed · deps: none · touches: docs-config~, test-harness~, bundles~ · /develop-task docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md
+- [ ] **T325** The docs-only CI rule can exclude a path · deps: T320 · touches: docs-config~, docs-pipeline~, test-harness~, bundles~ · /develop-task docs/tasks/task.325.docs-only-rule-exclusions/task.325.docs-only-rule-exclusions.md
 
 ## Deferred / human-gated
 
@@ -322,3 +333,4 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-11-14 | **T307 accepted + merged — PR #902** (`b57bf050`); row ticked. The instrument-read guard now masks a single quote glued to a word or closing quote when a partner quote follows, and treats `&>`, `&>>`, `1>` and `1>>` as redirects; a status captured in `$( … )` stays flagged by choice and is named in the header, as is two apostrophes on one line pairing up. Four mutation proofs, each red on a named fixture; QA gate PASS 95, PR review APPROVE; remote `ci` gate 8469 pass, 0 fail. |
 | 2026-11-15 | **T310 added** as Phase 23 (task 310, filed from the task 309 5c review, finding CR-1): the `/finalise` 6c poll block reads `CI_HEAD_2` and `PR_NUMBER` without binding them. Low priority, `deps: T309` (merged), touches `skills/finalise/SKILL.md` and `finalise-publish-boundary.test.mjs`. |
 | 2026-11-15 | **T310 accepted + merged — PR #910** (`9658a797`); row ticked. The first `/finalise` 6c poll block now halts by name when `CI_HEAD_2` or `PR_NUMBER` is unbound, and a behaviour test runs the shipped guard line with each input unbound. Mutation proof: weakening the guard turned two tests red. QA gate PASS 95, PR review APPROVE; remote `ci` gate green. |
+| 2026-11-25 | **T320 and T325 added** as Phase 24. T325 (task 325, issue #947, cut from a CI adoption handoff): a `!` pattern in `ci.docsOnly.patterns` excludes a path. Queued on the owner's request, `deps: T320`. T320 (task 320, issue #938) was planned and had no row; it is here so that the dependency holds. |
