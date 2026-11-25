@@ -104,6 +104,9 @@ Push record-only commits with the next push that needs CI, add an opt-in skip ma
 - QA Cycle 7, qa-fix: findings read in-line from PR review 1 (`pr-review-current.js`: current); ingester and pre-fix map not dispatched, since the ten anchors were already read. Mutation proofs: none, no behaviour changed. Push: `qa-review-fix` → defer.
 - QA Cycle 8: gate 8 PASS (100), no open entry; route 1. Convergence check (from cycle 8): HIGH 0, not tripped. The reviewers ran on the staged tree before the commit; QA read the answers to the second one in-line. `qa-pre-5c`: push, `4005bbc73`.
 - QA Cycle 8, 5c: `/review-pr --effort medium --comment --no-code` → APPROVE, 1 low finding; `OPEN_COVERAGE=0`. Conformance lens 245 s. The finding is doc-only and fixed in the carry. Review comment on PR #937 updated in place. The loop ends.
+- QA re-entry after finalise DoD gaps: reenter-qa: re-entered QA at step 5 / qa_phase 5a — qa_max_cycles=10 (base 8), gate_head=5c0de1ea3fe528beb934aca1d023ff701059ca05. The owner said "Go ahead".
+- The marker refuses every format character (bidi overrides, zero-width), and not the C1 controls alone: DoD run 1 asked the owner whether "one printable line" allows them, and the stricter reading loses no plain-text marker (an emoji joined with a zero-width joiner is refused). The other spec question (an escaped `pipeline` key) is left to the owner.
+- QA Cycle 9: gate 9 PASS (100), no open entry; route 1. One read-only reviewer (222 s), four low points, each confirmed and fixed before the gate. `ci:fast` on the LAN server on `60e31933b`: 8887 passed, 0 failed.
 
 ---
 
@@ -329,6 +332,16 @@ _Track each QA review/fix cycle._
 **Traceability**: skipped (no Success Criteria table)
 **PR Review**: APPROVE — task.319.pr-review.2.ci-runs-only-where-needed.md; 1 low finding (a CHANGELOG sentence), fixed here as doc-only
 **Carried to 6a**: docs/tasks/task.319.ci-runs-only-where-needed/task.319.pr-review.2.ci-runs-only-where-needed.md CHANGELOG.md
+**Loop exit**: n/a — this exit not taken (route 1, a clean gate)
+**Action**: Proceeding to 5c (PR conformance review)
+
+### QA Cycle 9 — 2026-11-25
+**Gate Result**: PASS
+**Issues Found**: none open — the three gaps of DoD run 1 are closed; four low points of the diff review fixed before the gate
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**Traceability**: skipped (no Success Criteria table)
+**PR Review**: pending — 5c not yet run
 **Loop exit**: n/a — this exit not taken (route 1, a clean gate)
 **Action**: Proceeding to 5c (PR conformance review)
 
