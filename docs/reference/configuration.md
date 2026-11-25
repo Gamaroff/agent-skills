@@ -476,10 +476,10 @@ almost every step, and many of those commits hold only records. One script,
 [`push-policy.sh`](../../shared/resources/push-policy.sh), answers `push` or `defer` at every push a
 pipeline makes; its site table names, for each push, the step that reads the remote and so needs it.
 A deferred commit is not lost: it goes out with the next push, and the end of a run pushes: Step 8
-always, and a terminal HALT through `push-held.sh`. That push has at most 50 seconds. The commits stay
-local when the push fails or runs out of time, when it would do harm (a deleted branch, a CI reading in
-progress, a staged set the commits may link to), or when the remote or the run's lock does not allow it;
-the HALT prints which.
+always, and a terminal HALT through `push-held.sh`. That push is stopped after 50 seconds, and is not made
+where it would do harm (a deleted branch, a CI reading in progress, a staged set the commits may link to)
+or where the remote, the run's lock or the checkout cannot be read or does not match. The HALT prints
+whether the commits were pushed and, when they were not, why; a stopped push can still reach the remote.
 
 - **`pipeline.pushRecordCommits: batched`** (the default) changes what a running pipeline shows: a
   PreCompact pause commits its record and leaves the remote unmoved, a QA cycle pushes once when its

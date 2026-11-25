@@ -234,17 +234,22 @@ test("config: ci.skipMarker is one printable line: a control, format, surrogate 
       `U+${code.toString(16)}`,
     );
   // A line or paragraph separator is refused before the value is looked at.
-  for (const c of [" ", " "])
-    assert.throws(() => marker(`a${c}b`), /row\(s\) under ci/);
+  for (const code of [0x2028, 0x2029])
+    assert.throws(
+      () => marker(`a${String.fromCharCode(code)}b`),
+      /row\(s\) under ci/,
+    );
   // What is printable stays: punctuation, a space, letters outside ASCII, a character outside the BMP.
   for (const m of [
     "[skip ci]",
     "[überspringen]",
     "[跳过 ci]",
-    "a b",
+    `a${String.fromCharCode(0xa0)}b`,
     "[skip 🚫]",
+    "🚫".repeat(80), // the limit counts characters, not UTF-16 units
   ])
     assert.equal(marker(m), m);
+  assert.throws(() => marker("🚫".repeat(81)), /at most 80 characters/);
 });
 
 test("config: a ci block holding skipMarker does not exit 2 at the docs-only rule; an unknown key does", (t) => {

@@ -547,7 +547,7 @@ function skipMarkerOf(v) {
     throw new UsageError("ci.skipMarker must be a string (empty means off)");
   }
   const m = v.trim();
-  if (/[\p{Cc}\p{Cf}\p{Cs}]/u.test(m) || m.length > SKIP_MARKER_MAX) {
+  if (/[\p{Cc}\p{Cf}\p{Cs}]/u.test(m) || [...m].length > SKIP_MARKER_MAX) {
     throw new UsageError(
       `ci.skipMarker must be one printable line of at most ${SKIP_MARKER_MAX} characters`,
     );
