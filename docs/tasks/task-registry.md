@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-11-25
-**Next Available Task Number:** **325**
+**Next Available Task Number:** **326**
 
 ## How to use
 
@@ -366,6 +366,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 322 | [QA lists every new test, and reviewers end only their own processes](task.322.review-evidence-is-complete-and-clean/task.322.review-evidence-is-complete-and-clean.md) | planned | refactoring | Medium | 2026-11-25 | — | observations #176, #177: a red-first criterion is checked against the list of tests the branch adds; a reviewer ends a process by its recorded pid · four phases · independent |
 | 323 | [The QA loop's globs have a command, and a skill load leaves a record](task.323.pipeline-inputs-and-loads-have-a-check/task.323.pipeline-inputs-and-loads-have-a-check.md) | planned | refactoring | Medium | 2026-11-25 | — | observations #175, #179: `qa.testArtifactGlobs` through one reader that refuses a bad shape; `skill-resolution.js` records each load on the lock and a compaction clears it · four phases · independent |
 | 324 | [The CI skip template can exclude paths, and a guard holds its wiring](task.324.ci-skip-exclusions-and-guard/task.324.ci-skip-exclusions-and-guard.md) | planned | infrastructure | Medium | 2026-11-25 | — | `CODE_PATTERNS` in both classifier templates, scripts and test files on it by default; an optional dependency-free guard for GitHub Actions (gate, aggregate, trigger, never-docs, reader) · four phases · independent |
+| 325 | [The docs-only CI rule can exclude a path](task.325.docs-only-rule-exclusions/task.325.docs-only-rule-exclusions.md) | planned | infrastructure | Medium | 2026-11-25 | task.320 | a `!` pattern in `ci.docsOnly.patterns` excludes, inside `isDocsPath` only; tried, 222 tests green · three phases · edits the engine task 320 edits |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
@@ -443,5 +444,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 - **Tasks 315–316 were cut from task 286's QA gate 1 (`recommendations.future`, 2026-11-21)**. Two units, one shippable outcome each, in dependency order: 315 reads the Step 4 gitlink listing NUL-delimited so a quoted path is entered (a non-ASCII byte, double quote or backslash) and ships alone; 316 recurses into a gitlink nested in a gitlink and depends on 315, because both edit the same gitlink look and 316 recurses over 315's NUL-delimited read.
 
 - **Tasks 321–323 were cut from the 2026-11-25 observation review (#175–#179)**. One shippable unit each, split by outcome, and independent of each other: 321 is what `/finalise` reads and prints, 322 is QA and reviewer evidence, 323 is the pipelines' inputs and load records. 322 uses the fence-tracker export that task 320 adds, and adds it itself if 320 has not landed. Observation #170 was declined: the contract requires the marker order it reported.
+
+- **Tasks 324–325 were cut from one consumer's CI adoption lessons (2026-11-25)**, per axis: 324 is the optional CI template a consumer copies, 325 is the pipelines' own `ci.docsOnly` rule. Independent of each other. 325 waits for 320, which edits the same engine.
 
 - Filenames follow `task.[N].[kebab-case-name].md` per [AGENTS.md](../../AGENTS.md#file-naming).

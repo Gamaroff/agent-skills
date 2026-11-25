@@ -11,9 +11,12 @@ risk_level: medium
 created: 2026-11-25
 updated: 2026-11-25
 estimated_effort_hours: 8
+github_issue: 945
 ---
 
 # Technical Task: The CI skip template can exclude paths, and a guard holds its wiring
+
+**GitHub Issue**: [#945](https://github.com/Gamaroff/agent-skills/issues/945)
 
 **Status:** Planned
 
