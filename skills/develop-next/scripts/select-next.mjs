@@ -1632,6 +1632,15 @@ const SOURCE_FOR = { bug: "bug-registry", task: "task-registry" };
  * @param {object} [opts] {evaluateAll:boolean} — lint evaluates every row; selection stops at the first hit
  * @returns {{selected: object|null, passedOver: object[], candidates: number}}
  */
+/**
+ * The `PR #N merged` phrase a registry row's notes cell carries after a merge, or
+ * null. Pure; reads the row's raw line only.
+ */
+export function mergedPrNote(rawRow) {
+  const m = /\bPR #(\d+) merged\b/.exec(String(rawRow ?? ""));
+  return m ? `PR #${m[1]} merged` : null;
+}
+
 export function registryFrontier(registries, opts = {}) {
   const evaluateAll = opts.evaluateAll === true;
   const reg = registries || {};
@@ -1724,6 +1733,22 @@ export function registryFrontier(registries, opts = {}) {
         ...entry,
         eligible: false,
         reason: `document status ${docStatus} — outside the ${row.kind} eligibility floor (${[...ELIGIBLE_FOR[row.kind]].join(", ")})`,
+      });
+      continue;
+    }
+    // Merge evidence (obs #174). Frontmatter alone cannot see work a human closed
+    // outside the pipeline: T290 merged under an owner waiver with its document left
+    // `in-progress`, so the floor above admitted it and the fallback would have
+    // re-run a merged pipeline. A row whose notes cell records `PR #N merged` —
+    // written by `registry-tick.js --annotate` after a merge, or by hand for a
+    // waiver — is finished work whatever the document says. Offline by design: the
+    // registry row is the evidence, so no `gh` call is added to selection.
+    const merged = mergedPrNote(row.raw);
+    if (merged) {
+      passedOver.push({
+        ...entry,
+        eligible: false,
+        reason: `registry row records ${merged} — merged work is not re-selected; set the document to a terminal status to clear this`,
       });
       continue;
     }

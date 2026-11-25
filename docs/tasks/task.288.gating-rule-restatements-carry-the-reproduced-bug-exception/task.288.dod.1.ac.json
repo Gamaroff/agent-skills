@@ -1,0 +1,169 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "085c54e6ac2dda97df96a88c72db88dc01fd13c0",
+  "dirty_paths": [
+    "docs/tasks/task.288.gating-rule-restatements-carry-the-reproduced-bug-exception/task.288.gating-rule-restatements-carry-the-reproduced-bug-exception.md",
+    "docs/tasks/task.288.gating-rule-restatements-carry-the-reproduced-bug-exception/task.288.implementation.1.gating-rule-restatements-initial-run.md",
+    "docs/tasks/task.288.gating-rule-restatements-carry-the-reproduced-bug-exception/task.288.pr-review.1.gating-rule-restatements.md"
+  ],
+  "document": "docs/tasks/task.288.gating-rule-restatements-carry-the-reproduced-bug-exception/task.288.gating-rule-restatements-carry-the-reproduced-bug-exception.md",
+  "result": {
+    "bytes": 9740,
+    "sha256": "3049dcf69ad0ad244396845de89bce0acb2b48019d9cc19cda3200c928231eae",
+    "verified": true
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 8,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "fa9435cbbcbe3d1494882d195d31a7ef08407d184c614f8541f8107f31ede43a",
+      "status": "PASS",
+      "description": "code-review-prompt.md no longer says 'it will not gate' unqualified",
+      "code_citation": "shared/resources/code-review-prompt.md:96",
+      "test_citation": "evals/shared/tests/gating-rule-restatements.test.mjs:260",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Line 96 now reads 'confidence: low (it will not gate on the reviewer claim alone)'. The guard test keys 'will not gate' and fails when the exception is absent. The test file is under evals/shared/tests/*.test.mjs, which test:suite selects, and .github/workflows/test.yml runs npm test on pull_request. I ran it: 7 pass, 0 fail."
+    },
+    {
+      "id": "#2",
+      "text_hash": "0dddcbecff2d148031244e09f60cfd803138fb54be43aab11f96c6761931798c",
+      "status": "PASS",
+      "description": "No report-template line says 'advisory unless the doc opted in' without the run-level argument",
+      "code_citation": "skills/qa-task/SKILL.md:1633",
+      "test_citation": "evals/shared/tests/gating-rule-restatements.test.mjs:284",
+      "members": [
+        {
+          "member": "skills/qa-task/SKILL.md:1633",
+          "evidence": "evals/shared/tests/gating-rule-restatements.test.mjs:284",
+          "status": "PASS"
+        },
+        {
+          "member": "skills/qa-task/SKILL.md:1953",
+          "evidence": "evals/shared/tests/gating-rule-restatements.test.mjs:284",
+          "status": "PASS"
+        },
+        {
+          "member": "skills/qa-story/SKILL.md:1867",
+          "evidence": "evals/shared/tests/gating-rule-restatements.test.mjs:284",
+          "status": "PASS"
+        },
+        {
+          "member": "skills/qa-story/SKILL.md:2495",
+          "evidence": "evals/shared/tests/gating-rule-restatements.test.mjs:284",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "I read all four lines. Each says 'advisory unless blocking resolves to true (run-level arg or frontmatter) or QA reproduced the finding (5d)'. The test at :272 requires all four to be keyed, and the test at :284 asserts the run-level wording on every 'advisory unless' sentence."
+    },
+    {
+      "id": "#3",
+      "text_hash": "006f0e5a92c8905a259a7359aa8503182673a4ee946cc819f18c185cf2316922",
+      "status": "PASS",
+      "description": "New test passes on tree, fails on each of three § 8 mutations",
+      "code_citation": "docs/tasks/task.288.gating-rule-restatements-carry-the-reproduced-bug-exception/task.288.qa.3.gating-rule-restatements.md:73",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "(a) code-review-prompt.md:96 reverted to 'it will not gate'",
+          "evidence": "task.288.qa.3.gating-rule-restatements.md:73 (Closing Record table, row a: red = 'every restatement of the gating rule carries the reproduced-bug exception or points at it', baseline 7 pass 0 fail after restore). That test exists at gating-rule-restatements.test.mjs:260 and keys 'will not gate'.",
+          "status": "PASS"
+        },
+        {
+          "member": "(b) one report-template line reverted to 'advisory unless the doc opted in...'",
+          "evidence": "task.288.qa.3.gating-rule-restatements.md:74 (row b: red = the 'advisory unless' assertion T273-CR-6, also named in the cycle 1 and cycle 2 reports). That test exists at gating-rule-restatements.test.mjs:284.",
+          "status": "PASS"
+        },
+        {
+          "member": "(c) review-code/SKILL.md:319 exception clause removed",
+          "evidence": "task.288.qa.3.gating-rule-restatements.md:75 (row c: red = the main guard test, baseline 7 pass 0 fail). The clause is present now at skills/review-code/SKILL.md:319.",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "The Closing Record names each mutation's edit, the test that went red, the command and the restore check, so it records what the step found. The red tests it names exist. The tree-passes half I re-ran: 7 pass, 0 fail. I could not re-apply the mutations because this run is read-only. The line numbers I give for the Closing Record rows are approximate (the section starts near line 70)."
+    },
+    {
+      "id": "#4",
+      "text_hash": "018b6302052bec248cf255f222065373f4287af7cc06820484fc5a4e663dacde",
+      "status": "PASS",
+      "description": "New test runs under 2 s, median of five, uptime recorded, in QA report",
+      "code_citation": "docs/tasks/task.288.gating-rule-restatements-carry-the-reproduced-bug-exception/task.288.qa.3.gating-rule-restatements.md:80",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Bound: under 2 s. The record gives five runs (0.412, 0.428, 0.448, 0.511, 0.530) with a median of 0.448 s, which is correct. Load is 0.98 / 2.56 / 5.54, read before each run. The command is wall clock around node --test via process.hrtime. The figure was taken at 085c54e6a, which is tree-equivalent to head. Running finalise-delta.js docs-only --base 144f2a1dd --head HEAD returned reason tree-equivalent (exit 0), changing only task docs and the gate and QA files. The same check with --base 085c54e6a returned tree-equivalent, with only qa.3.md changed. So: measured on 085c54e6a, tree-equivalent to head. My own run showed duration_ms 605, also under the bound. Weak point: the load is stated once as identical across runs, not shown beside each run."
+    },
+    {
+      "id": "#5",
+      "text_hash": "f89223313d69df253a7b8dec88aa466f672dd8e45984bc333cc4d3203bc13b67",
+      "status": "PASS",
+      "description": "CI=true npm test and bundle --check pass; QA report records both",
+      "code_citation": "docs/tasks/task.288.gating-rule-restatements-carry-the-reproduced-bug-exception/task.288.qa.1.gating-rule-restatements.md:76",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "qa.1 line 76 records both: 8744 pass 0 fail, and bundle check with 0 problems. qa.3 records npm run test:remote at 8745 pass 0 fail after the cycle 2 changes. I re-ran npm run bundle -- --check just now: 129 skills, 0 problems, exit 0. The suite is the same test:suite that .github/workflows/test.yml runs per PR. The post-cycle-2 bundle check is not itself recorded in a QA report; I only confirmed it live."
+    },
+    {
+      "id": "#6",
+      "text_hash": "c69bac8bde10a99acc50ef37b2655aec6548ba608d50b4297610608c6ae0f889",
+      "status": "PASS",
+      "description": "Every test exemption has a reason and names an existing sentence, held by assertion",
+      "code_citation": "evals/shared/tests/gating-rule-restatements.test.mjs:176",
+      "test_citation": "evals/shared/tests/gating-rule-restatements.test.mjs:237",
+      "members": [
+        {
+          "member": "all six EXEMPT entries (lines 181, 187, 194, 201, 207, 213), each with a reason: field",
+          "evidence": "evals/shared/tests/gating-rule-restatements.test.mjs:237",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "The test at :237 loops over every EXEMPT entry. It asserts a non-empty reason and exactly one keyed-sentence hit (hits.length equal to 1), so a reasonless entry or a stale entry (0 hits) fails it by construction. I found no separate negative-case test that feeds it a bad exemption, which is only a gap in proof."
+    },
+    {
+      "id": "#7",
+      "text_hash": "36fdcb86f51302f4dcb74a0638251a823376da65cac25444a26e9ba3c6cad3ad",
+      "status": "PASS",
+      "description": "CHANGELOG.md cites (task 288)",
+      "code_citation": "CHANGELOG.md:19",
+      "test_citation": "shared/resources/tests/changelog-cites.test.mjs",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Line 19 reads 'Gating-rule restatements carry the reproduced-bug exception, and a test holds them (task 288).', so it cites the work item. changelog-cites.test.mjs is in the repo's changelog test directory; I located it and did not read what it asserts. It lives under shared/resources/tests/*.test.mjs, which test:suite selects."
+    },
+    {
+      "id": "#8",
+      "text_hash": "bb87a26521b2dd473100d02c4cb5aa0cc1439760d9bd7063b4c2586a95077d0b",
+      "status": "PASS",
+      "description": "Task 273 gate-6 entries for CR-5, CR-6, guard test marked done in QA report",
+      "code_citation": "docs/tasks/task.288.gating-rule-restatements-carry-the-reproduced-bug-exception/task.288.qa.3.gating-rule-restatements.md:84",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The Closing Record table marks all three gate-6 entries done (T273-CR-5, T273-CR-6, guard test), each with the file and line and the mutation or gate that shows it. Task 273's gate.6 yml carries T273-CR-5 and T273-CR-6 (lines 11 and 18, and actions at 64 and 66). The evidence matches the code: code-review-prompt.md:96 says 'on the reviewer claim alone'; the four template lines at qa-task 1633 and 1953 and qa-story 1867 and 2495 were read and carry the run-level wording; the guard test file exists with 7 tests and FLOOR=24. The text says 'floor 24, 29 measured', which matches the test comment. I did not open task 273's gate.6 yml in full to see its third recommendations.future entry. I used the Closing Record's wording for it, the guard-test entry, and the three entries it lists match the criterion."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#6",
+      "note": "No test feeds the exemption assertion a reasonless or stale exemption to prove it fails. The assertion is correct by inspection (gating-rule-restatements.test.mjs:237-252)."
+    },
+    {
+      "ac_id": "#4",
+      "note": "The record states the load as 'identical' for all five runs and does not list it beside each run, which is borderline against 'uptime beside each'."
+    },
+    {
+      "ac_id": "SC-3",
+      "note": "The mutation proofs are described in the Closing Record (written at finalise), not shown as before-and-after output. I could not re-run them read-only."
+    }
+  ]
+}

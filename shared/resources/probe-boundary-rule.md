@@ -169,13 +169,15 @@ Declining conditions, each reported with its reason:
 | `bad-entry` | The entry spec is not `path#exportName`. |
 | `outside-repo-root` | The resolved path escapes the containment root. |
 | `unknown-sink` | No corpus for that sink. `corpusFor` throws rather than returning `[]`, deliberately. |
-| `bad-cases` | A supplied case is not an object, its `direction` is not `hostile` or `legitimate`, or its `sink` is set and is not a known sink. A `null` sink counts as absent. The CLI refuses the same input with exit 2. |
+| `bad-cases` | A supplied case is not an object, its `direction` is not `hostile` or `legitimate`, or its `sink` is set and is not a known sink. A `null` sink counts as absent. Also an `eslint:` entry with no supplied cases: the corpus is not source text. The CLI refuses the same input with exit 2. |
 | `entry-not-probeable` | The module would not import, the export is absent, or it is not a function. An **absent** export is a module-private predicate: export it and re-run — never a reason for `boundary: false` (obs #156). For `fence:`: the heading is not in the doc, appears twice, or has no ```` ```bash ```` block under it. |
+| `entry-not-probeable`, the `eslint:` shape | The linted file is missing or ignored, no configuration that applies to it names the rule, or no plugin defines the rule it names (task.319). The detail says which. One input that does not parse is a declined case, not a declined entry. |
+| `eslint-unavailable` | An `eslint:` entry, and no `eslint` package is installed between the linted file's directory and the repo root. Install the repository's dependencies and re-run (task.319). |
 | `entry-not-probeable`, the uniform-failure shape | Every case failed before reaching the control (task 256). At least one hostile and one legitimate case ran, every hostile case read `accepted`, every legitimate case read `rejected`, and within each shell they share one non-zero exit (not 126 or 127) and one non-empty stderr, after removing the sandbox path, `fixture-XXXXXX` and `fence-N.sh`. The usual cause is a wrong entry form: a multi-flag script under `shell:`, which passes the fixture as one positional argument. Use `shell-argv:` with an `--argv` template. A run that reached `gh` stays `needs-fake-gh`. **Four shapes stay scored, and these are limits, not guarantees:** a usage error quoting the input, a corpus with hostile cases only, exit 126 or 127, and a failure with no stderr. |
 | `typescript-unavailable` | A `.ts`/`.mts`/`.cts`/`.tsx` module entry, and no `typescript` package is installed between the entry's directory and the repo root (one above the root is never borrowed). The detail names the directory and the repo root searched; install the repository's dependencies and re-run. Declined by the parent before any child is spawned, so nothing ran. |
 | `typescript-hook-unavailable` | A TypeScript module entry on a Node without the synchronous `module.registerHooks` (before 22.15.0). The detail names the running version. |
 | `case-errored` | One case timed out or its child never ran. |
-| `bad-args` | `--args-json` is not a JSON array, or was given with a `shell:` / `shell-fn:` / `cli:` / `shell-argv:` / `fence:` entry, which cannot append an argument to a call. |
+| `bad-args` | `--args-json` is not a JSON array, or was given with a `shell:` / `shell-fn:` / `cli:` / `shell-argv:` / `fence:` / `eslint:` entry, which cannot append an argument to a call. |
 | `bad-slot` | A `fence:` entry with no `--slot`, a `--slot` the block does not contain (a slot that substitutes nothing tests nothing), or a `--slot` given with any other form. |
 | `bad-fixture-setup` | A `--fixture-setup` given with any form but `cli:` and `shell-argv:`, or one outside the containment root, under `node_modules`, not a readable regular file, or (on `cli:`) naming `gh`. |
 | `bad-fixture-copy` | A `--fixture-copy` given with any form but `cli:`, `shell-argv:` and `fence:`, or one that is absolute, holds a `..`, leaves the containment root, is under `node_modules`, is a symbolic link, or is not a readable regular file (task.274). |
@@ -281,7 +283,7 @@ takes it.
   missing file under a symlinked root stays inside it. The residual is a symlink
   that appears between the containment check and the readable-file check, a race
   nothing here defends against.
-- **The engine reaches six entry forms, and "not importable" is not a decline.**
+- **The engine reaches seven entry forms, and "not importable" is not a decline.**
   `path#export` imports a JS module — **or a TypeScript one** (`.ts`, `.mts`,
   `.cts`, `.tsx`; task.314): the engine starts the child with a bundled loader
   hook that resolves and transpiles through the **target repository's own**
@@ -703,6 +705,33 @@ takes it.
   `cli:` it does not touch §2: the caller names one block, the engine chooses
   the command, and the sandbox, the per-case directory and the escape sentinel
   all apply unchanged.
+
+  **`eslint:<path>#<rule-id>` runs a lint rule as the repository configures it**
+  (task.319). Until this form existed a control delivered as a rule was declined
+  and needed an owner override. Each case's input is source text; the
+  repository's own ESLint, through its Node API, lints it **as** `<path>`, an
+  existing file, so that file's configuration, parser and severity apply. The
+  outcome is one reading: `<rule-id>` among the reported messages is `rejected`,
+  absent from them is `accepted`, and any other rule's report is ignored. A
+  `warn` counts as reported; a disable directive in the input suppresses the
+  report and reads `accepted`, which is what it does under the configuration
+  alone. **Flags of the repository's lint script are not reproduced**
+  (`--no-inline-config`, `--config`, `--rule`): a stated limit. State the
+  cases with `--cases-file`: the stock corpora are not source text. The package
+  is the nearest `node_modules/eslint` between the file and the repo root, never
+  one above it, and the child runs in the directory of the nearest ESLint
+  configuration. A run that never reached the rule is declined, not scored: an
+  ignored file, a rule no applicable configuration names (a misspelt id looks
+  the same as an absent control), a configured rule no plugin defines, or an
+  input that does not parse. **The directory is a guess when a repository has
+  more than one configuration between the file and its root**: the nearest one
+  is taken, and an ignore file or a relative pattern of an outer one, which the
+  repository's own command would read from its own directory, is not. Name a
+  file whose nearest configuration is the one the command uses. A rule the
+  configuration names at `off` **is** scored, and reads `absent`. The input is
+  text handed to ESLint and is never written to the repository; the child runs
+  outside the sandbox, so a write its configuration makes is not observed
+  (`outside-sandbox-write`).
 - **What is still declined, and recorded as declined:** a script or CLI that
   reads its input from stdin, anything that must open a socket; a live database sink; anything that needs
   the network (a CLI that consults `gh` included — `--fake-gh` is a shell-form

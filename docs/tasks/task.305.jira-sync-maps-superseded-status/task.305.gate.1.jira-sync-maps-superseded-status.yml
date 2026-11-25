@@ -1,0 +1,61 @@
+schema: 2
+task: 'task.305.jira-sync-maps-superseded-status'
+task_title: 'Jira sync maps the superseded status'
+gate: PASS
+status_reason: 'All three functional criteria are held by committed tests that go red under mutation. No correctness bug found in the diff. Two LOW reach items (the --probe-workflow status list and the lifecycle ALLOW snippet) are recorded as non-blocking follow-ups.'
+reviewer: 'QA Engineer'
+head: 'd8f914c75b83071cd02ff3cf0c1fb1e607eb00d8'
+updated: '2026-11-23T06:34:00Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 8
+  phases_verified: '5/5'
+  trace:
+    phases_covered: [1, 2, 3, '3b', 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    notes: 'No input gate added: the change adds one map key and two set members. The criteria carry no boundary signal (probe-boundary-signals.mjs printed an empty list), so boundary is false.'
+  performance:
+    status: PASS
+    notes: 'A test holds the transition-lookup count for accepted, cancelled and in-progress at the pre-change constants (10, 10, 8). superseded reuses the cancelled list, so it adds no lookups.'
+  reliability:
+    status: PASS
+    notes: 'A consumer jira.statusMap entry for superseded still overrides the default. The terminal fallback only fires when exactly one transition reaches the done category.'
+  maintainability:
+    status: PASS
+    notes: 'superseded points at the same CANCELLED_CANDIDATES list, not a copy. bundle:check is clean across 129 skills.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Add superseded to CANONICAL_LOCAL_STATUSES so --probe-workflow reports the transition it would choose for it (jira-sync.js:5221). Low value while superseded shares the cancelled list.'
+      refs: ['shared/resources/jira-sync.js']
+      remedy: unverified
+    - action: 'Add superseded to the ALLOW list in the lifecycle status-vocabulary snippet (document-status-lifecycle.md:201). Left over from PR #878, not introduced here.'
+      refs: ['shared/resources/document-status-lifecycle.md']
+      provenance: pre-existing
+      remedy: unverified
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

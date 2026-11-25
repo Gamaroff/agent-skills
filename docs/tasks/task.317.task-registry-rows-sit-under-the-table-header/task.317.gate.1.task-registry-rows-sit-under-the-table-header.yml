@@ -1,0 +1,70 @@
+schema: 2
+task: 'task.317.task-registry-rows-sit-under-the-table-header'
+task_title: 'Task registry rows sit under the table header'
+gate: CONCERNS
+status_reason: 'The change delivers all three deliverables and is mutation-proven, but the PR head has a red CI link-check (an unquoted ci@192.168.1.249 in the implementation report is read as a mailto link) and the new placement matcher misses a row written without a space after the pipe.'
+reviewer: 'QA Engineer'
+head: 'be6064420496b3136bcc92279f407adc87de2adb'
+updated: '2026-11-21T19:55:23Z'
+
+top_issues:
+  - id: 'T317-CI-1'
+    severity: medium
+    file: 'docs/tasks/task.317.task-registry-rows-sit-under-the-table-header/task.317.implementation.1.task-registry-rows-sit-under-the-table-header-initial-run.md'
+    finding: 'CI check link-check failed on be6064420496 (https://github.com/Gamaroff/agent-skills/actions/runs/44943358614/job/136965190437): the unquoted host ci@192.168.1.249 on line 68 is read as a mailto link and answers 400. The same check is green on develop (run 44912138602).'
+    suggested_action: 'Wrap the host in backticks on that line (or name the server without the user@ form) and re-run doc-links.js on the report.'
+    suggested_owner: dev
+    status: open
+  - id: 'T317-CR-1'
+    severity: low
+    file: 'evals/shared/tests/task-registry-drift.test.mjs'
+    finding: 'placementOf matches rows with /^\| (\d+)\s*\|/, which needs exactly one space after the leading pipe, so a stranded row written |318| below ## Notes is not counted and the placement test stays green. Reproduced in a scratch worktree; the select-next.mjs parser does read that row as task 318, and the control row | 318 | turns the test red. Reviewer rated it low severity, low confidence; origin: code-review, reproduced by QA.'
+    suggested_action: 'Loosen the matcher to /^\|\s*(\d+)\s*\|/ and add the |318| shape to the synthetic test.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 2
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    notes: 'No input boundary: the change moves documentation rows, adds a test helper that only reads the committed registry, and adds prose. placementOf is a test-side check, not a function whose false prevents an action.'
+  performance:
+    status: PASS
+    notes: 'No performance criterion applies; the drift test file runs in about 0.2 s.'
+  reliability:
+    status: PASS
+    notes: 'Rows moved byte for byte (sorted-line diff against origin/develop is empty); the selector picks the same item before and after.'
+  maintainability:
+    status: PASS
+    notes: 'The placement rule is stated once in the standard and once in create-task; the test holds it with a 317-row floor and a synthetic negative case.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Quote the LAN host in the implementation report so link-check passes.'
+      refs: ['docs/tasks/task.317.task-registry-rows-sit-under-the-table-header/task.317.implementation.1.task-registry-rows-sit-under-the-table-header-initial-run.md']
+  future: []
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CI link-check green on the PR head']

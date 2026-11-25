@@ -1,6 +1,6 @@
 ---
 name: develop-pipeline-step-5-6-qa-loop
-description: Steps 5–6 (QA loop) shared by develop-story and develop-task. Covers QA cycle counter setup, gate file location, qa-story/qa-task invocation (with lite mode directive), PASS/CONCERNS/FAIL branching, **Step 5c (the PR conformance review, `/review-pr`) as the loop's exit gate and its APPROVE/CONCERNS/REQUEST CHANGES verdict routing**, no-code-change HALT, qa-fix invocation, the convergence check (HIGH-count stall guard) and third-strike replace-don't-patch rule, the route classifier's Diminishing-returns (2) and Cosmetic-residue (2b) routes, the gate-counted budget (a fix runs only when a gate will read it, so the loop always ends on a gate), the lock's `qa_phase` field (current_step stays 5 for the whole loop), one-commit-one-push-per-cycle, escalation entry template, and the loop-limit / not-converging HALT messages. Story vs task variants called out where they differ (skill names, file patterns, gate sort field, commit message format, escalation text).
+description: Steps 5–6 (QA loop) shared by develop-story and develop-task. Covers QA cycle counter setup, gate file location, qa-story/qa-task invocation (with lite mode directive), PASS/CONCERNS/FAIL branching, **Step 5c (the PR conformance review, `/review-pr`) as the loop's exit gate and its APPROVE/CONCERNS/REQUEST CHANGES verdict routing**, no-code-change HALT, qa-fix invocation, the convergence check (HIGH-count stall guard) and third-strike replace-don't-patch rule, the route classifier's Diminishing-returns (2) and Cosmetic-residue (2b) routes, the gate-counted budget (a fix runs only when a gate will read it, so the loop always ends on a gate), the lock's `qa_phase` field (current_step stays 5 for the whole loop), at most one push per cycle (push-policy.sh decides it), escalation entry template, and the loop-limit / not-converging HALT messages. Story vs task variants called out where they differ (skill names, file patterns, gate sort field, commit message format, escalation text).
 ---
 
 # Develop Pipeline — Steps 5–6: QA Loop
@@ -247,7 +247,7 @@ Log the bypass reason in the Decisions Log (`Traceability mapper skipped: {reaso
 
 Invoke the `/qa-story` skill with the story file path. If the run's mode is `lite` or `fast`, or `--skip qa-depth` is in force (the lock's `answers.mode` / `answers.skips`, resolved in §0d), prefix the invocation with explicit context: "Use **direct tools only** for this review — skip parallel agents regardless of the adaptive strategy decision. This story is running in lite mode." When the lock carries a `waiver`, also prefix the waiver directive from the lite-mode contract (§"Directive Passed to the QA Skill").
 
-**Code-review-and-fix loop (pipeline default).** Always pass the run-level override `code_review_blocking=true`. This makes the diff code review qa-story already runs (Phase 1.6) gate the build on high-confidence correctness bugs, which then flow into this loop's qa-fix step (5b) and get fixed and re-reviewed each cycle. A story opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch) — the override never overrides an explicit `false`. See the **Opt-in to blocking** resolution matrix in `shared/resources/code-review-prompt.md`.
+**Code-review-and-fix loop (pipeline default).** Always pass the run-level override `code_review_blocking=true`. This makes the diff code review qa-story already runs (Phase 1.6) gate the build on high-confidence correctness bugs (and on any bug QA reproduces by execution, at any confidence: 5d), which then flow into this loop's qa-fix step (5b) and get fixed and re-reviewed each cycle. A story opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch) — the override never overrides an explicit `false`. See the **Opt-in to blocking** resolution matrix in `shared/resources/code-review-prompt.md`.
 
 Pass args as space-separated `key=value` tokens. When the traceability matrix was generated:
 
@@ -315,7 +315,7 @@ names, and never edits the criterion's wording.
 
 Invoke the `/qa-task` skill with the task file path. If the run's mode is `lite` or `fast`, or `--skip qa-depth` is in force (the lock's `answers.mode` / `answers.skips`, resolved in §0d), prefix the invocation with explicit context: "Use **direct tools only** for this review — skip parallel agents regardless of the adaptive strategy decision. This task is running in lite mode." When the lock carries a `waiver`, also prefix the waiver directive from the lite-mode contract (§"Directive Passed to the QA Skill").
 
-**Code-review-and-fix loop (pipeline default).** Always pass the run-level override `code_review_blocking=true`. This makes the diff code review qa-task already runs (Step 3b) gate the build on high-confidence correctness bugs, which then flow into this loop's qa-fix step (5b) and get fixed and re-reviewed each cycle. A task opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch) — the override never overrides an explicit `false`. See the **Opt-in to blocking** resolution matrix in `shared/resources/code-review-prompt.md`.
+**Code-review-and-fix loop (pipeline default).** Always pass the run-level override `code_review_blocking=true`. This makes the diff code review qa-task already runs (Step 3b) gate the build on high-confidence correctness bugs (and on any bug QA reproduces by execution, at any confidence: 5d), which then flow into this loop's qa-fix step (5b) and get fixed and re-reviewed each cycle. A task opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch) — the override never overrides an explicit `false`. See the **Opt-in to blocking** resolution matrix in `shared/resources/code-review-prompt.md`.
 
 Pass args as space-separated `key=value` tokens. When the traceability matrix was generated:
 
@@ -479,7 +479,7 @@ exit the loop`. Gate `N` and QA report `N` are committed with the escalation (Lo
 
 **On any gate that reaches 5c**, commit this cycle's gate `.yml` and QA report `.md` and push once
 before invoking `/review-pr` — there is no `fix(...)` commit on this path to carry them, and 5c reads
-the artifact trail off the branch. See **Where the gate and QA report get committed** in 5b.
+the artifact trail off the branch. The block (`push-policy.sh --site qa-pre-5c`) is under **Where the gate and QA report get committed** in 5b.
 
 **That commit is conditional on the QA skill's read-back** (Step 12b, `qa-read-back.js`, exit 0).
 If you re-run the read-back here, run it in the same fenced block as the commit, with its output in a
@@ -1160,7 +1160,7 @@ includes **patch** with a stated reason, and why nothing here constrains the fix
 table — `qa-narrowing-residue.test.mjs`, beside the engine's suite under `tests/` — is the spec this
 section is written from.
 
-#### Where the gate and QA report get committed (one commit, one push, per cycle)
+#### Where the gate and QA report get committed (one commit, at most one push, per cycle)
 
 **This cycle's gate `.yml` and QA report `.md` are evidence for this cycle's fix, and belong in the
 same `fix(...)` commit as the fix.** Only the *implementation report* defers to Step 8. Stage all
@@ -1173,11 +1173,21 @@ three together:
 | `…qa.{N}.{name}.md` (written by 5a)         | this cycle's `fix(...)` commit           |
 | `…implementation.{name}.md`                 | **deferred to Step 8** (`docs(...)`)     |
 
-**There is exactly one `git push origin HEAD` per cycle** — at step 3 below on a cycle that enters 5b
-from 5a, or **before 5c** on a cycle whose gate reached 5c from 5a (path 1 above — §5c routes 1, 2, 2b and 3), never both. Do not create a separate
-`docs(...): QA cycle {N} gate + report` commit, and do not push twice in a cycle. The rule is about
-the **push**, not the commit: a review-driven cycle legitimately makes two commits (the pre-5c
-gate+report, then 5b's `fix(...)`), and still pushes once.
+**At most one push per cycle, and `push-policy.sh` decides it** (task.319; the script's site table is
+the contract, and this table is how the loop's push points name themselves to it):
+
+| Push point | Site | Answer (batched, the default) |
+| --- | --- | --- |
+| Step 3 below, a cycle that entered 5b from 5a | `qa-cycle` | `push` when the unpushed commits change code; `defer` when they are records only |
+| Before 5c, a cycle whose gate reached 5c from 5a (§5c routes 1, 2, 2b and 3) | `qa-pre-5c` | `push`: 5c reads the trail on the remote |
+| Step 3 below, a cycle that entered 5b from a 5c verdict | `qa-review-fix` | `defer`: the cycle's push was spent before 5c |
+| Any HALT of the loop (no code change, PR MERGED / CLOSED, escalation) | `halt`, through `push-held.sh` in the terminal HALT block | `push`: the end of the run |
+
+Log each `defer` in the Decisions Log. Never push both
+at step 3 and before 5c in one cycle, and do not create a separate
+`docs(...): QA cycle {N} gate + report` commit. The rule is about the **push**, not the commit: a
+review-driven cycle legitimately makes two commits (the pre-5c gate+report, then 5b's `fix(...)`), and
+still pushes at most once.
 
 Left unstated, the gate and report fall into `/commit-changes`' default sweep and an orchestrator
 invents a second commit for them and pushes it separately — observed seven times on one PR. The
@@ -1215,7 +1225,16 @@ working tree, where a branch switch loses it and no reader of the PR ever sees i
 
 1. **Any gate that reaches 5c from 5a — §5c routes 1, 2, 2b and 3** — the cycle reaches 5c without entering
    5b, so no `fix(...)` commit exists. Commit the gate `.yml` and QA report `.md` **before invoking
-   `/review-pr` at 5c**, and push once. This is the single stated commit point for this path.
+   `/review-pr` at 5c**, and push once:
+
+   ```bash
+   bash .agents/skills/{develop-story|develop-task}/references/push-policy.sh --mark --site qa-pre-5c
+   if [ "$(bash .agents/skills/{develop-story|develop-task}/references/push-policy.sh --site qa-pre-5c)" != defer ]; then
+     git push origin HEAD
+   fi
+   ```
+
+   This is the single stated commit point for this path.
    Committing here rather than at the Step 7 transition is load-bearing twice over: 5c reads the
    artifact trail **off the branch**, so an uncommitted gate is invisible to the very review that
    audits it; and if 5c returns `REQUEST CHANGES`, the Step 7 transition never happens on this
@@ -1228,7 +1247,10 @@ working tree, where a branch switch loses it and no reader of the PR ever sees i
    > in-flight CI run. **Cycle N's push is spent here.** On the review-driven re-entry, 5b commits
    > **without pushing**; the push happens once, on the next transition that leaves 5b.
 2. **The no-code-change HALT** (step 0 below) — HALTs before any commit. Commit the gate `.yml` and
-   QA report `.md` before halting, same message shape, and push once.
+   QA report `.md` before halting, same message shape. The terminal HALT block (the orchestrator's Error
+   Recovery Principles) sends them out: its `push-held.sh --site halt` is the one push of every HALT, this
+   one and the PR MERGED / CLOSED one (step 5 below) included. A second push here would re-create a branch
+   the forge deleted at merge, which that script never does (T319-CR-703).
 
 Those two, plus the convergence-stall and loop-limit escalations, are the **only** places a standalone `docs(...)`
 commit for the gate and QA report is correct — each because there is no `fix(...)` commit in that
@@ -1245,7 +1267,7 @@ After fixes are applied:
      reads is the clean one. If the path was omitted, re-invoke once with it before treating this as
      a HALT, and log the re-invocation.
    - Log in Issues Log: "QA Cycle {N}: qa-fix made no code changes — issues may be unfixable with current approach"
-   - **Commit this cycle's gate `.yml` and QA report `.md` first**, then push once — per path 2 above. A HALT is a handover to a person: evidence left uncommitted is not on the PR they will read, and does not survive a branch switch. **Skip this when the cycle reached 5b via a 5c `REQUEST CHANGES` verdict** — it arrived through path 1, which already committed and pushed both files earlier in the same cycle, and repeating it produces an empty commit or a redundant push.
+   - **Commit this cycle's gate `.yml` and QA report `.md` first** — path 2 above; the terminal HALT block sends them out. A HALT is a handover to a person: evidence left uncommitted is not on the PR they will read, and does not survive a branch switch. **Skip this when the cycle reached 5b via a 5c `REQUEST CHANGES` verdict** — it arrived through path 1, which already committed and pushed both files earlier in the same cycle, and repeating it produces an empty commit or a redundant push.
    - HALT with: "qa-fix could not address the remaining issues. Human review required. See implementation report for details."
 
 0-stage. **Stage this cycle's evidence before the gate.** The fast gate's doc-links check reads the
@@ -1427,20 +1449,34 @@ After fixes are applied:
 
 2. Run `git log --oneline -1` to capture the fix commit hash.
 
-3. Push to the remote branch so the PR reflects the latest changes — **once per cycle**:
+3. Push to the remote branch when the push policy says so — **at most once per cycle**:
 
-   > **Skip this push when the cycle entered 5b from a 5c `REQUEST CHANGES` verdict.** Cycle N's
+   > **A cycle that entered 5b from a 5c `REQUEST CHANGES` verdict uses `--site qa-review-fix`**, which
+   > answers `defer`. Cycle N's
    > push was already spent on the pre-5c commit (path 1). The `fix(...)` commit rides to the remote
    > on the **next** push — the one taken by whichever cycle exits next, either at this step or
    > before that cycle's 5c. A second push here is the one this section exists to prevent: it
    > cancels the cycle's own in-flight CI run.
    >
-   > **Consequence for step 5's PR-state poll**, which runs after this step: on the skipped-push
-   > path the local branch is ahead of the remote, so poll the PR's *state* (open / merged / closed)
-   > as usual and do **not** treat an unchanged head SHA as a failure.
+   > **Consequence for step 5's PR-state poll**, which runs after this step: on a deferred push
+   > the local branch is ahead of the remote, so poll the PR's *state* (open / merged / closed)
+   > as usual and do **not** treat an unchanged head SHA as a failure. The next 5a's CI read
+   > (`qa-ci-read.sh`) answers `HEAD_MISMATCH` there, which decides nothing.
+
+   A cycle that entered 5b from 5a:
 
    ```bash
-   git push origin HEAD
+   if [ "$(bash .agents/skills/{develop-story|develop-task}/references/push-policy.sh --site qa-cycle)" != defer ]; then
+     git push origin HEAD
+   fi
+   ```
+
+   A cycle that entered 5b from a 5c verdict:
+
+   ```bash
+   if [ "$(bash .agents/skills/{develop-story|develop-task}/references/push-policy.sh --site qa-review-fix)" != defer ]; then
+     git push origin HEAD
+   fi
    ```
 
 4. Log what was fixed in the QA Cycle entry:
@@ -1459,7 +1495,7 @@ After fixes are applied:
 
    Branch on `result.pr.state`:
    - `"OPEN"` → continue QA loop normally.
-   - `"MERGED"` or `"CLOSED"` → HALT: "PR #{PR_NUMBER} was {state} mid-QA loop — pipeline cannot continue. Verify PR state and re-run if needed." Log in Issues Log.
+   - `"MERGED"` or `"CLOSED"` → HALT (its `push-held.sh --site halt` decides what may still go out): "PR #{PR_NUMBER} was {state} mid-QA loop — pipeline cannot continue. Verify PR state and re-run if needed." Log in Issues Log.
    - `null` / missing / empty (poller succeeded but state field absent) → log warning `"⚠️ PR state unknown after qa-fix push — re-polling once"`; re-invoke the poller once. If the second result is still null/missing, log `"⚠️ PR state could not be determined — proceeding optimistically (treating as OPEN)"` in Issues Log and continue. Do **not** HALT on null — flaky `gh pr view` is more common than mid-loop close.
    - `result.errors | length > 0` → log each error in Issues Log; treat `pr.state` per the rules above (the poller may still return a usable state alongside non-fatal errors).
 
@@ -1662,7 +1698,11 @@ acceptance, the commits that can run before 6a are path-limited for the same rea
 commits only its `touched` paths, and the PreCompact pause commit only the report. **A HALT in that
 window is the exception.** The Step 7 DoD-gaps halt, a terminal-HALT report commit, and `/qa-fix` after
 a re-entry at 5a all commit through `/commit-changes`. Each of them carries the staged set and pushes
-it. That is the behaviour before this change: the set is review evidence, and nothing is lost.
+it. That is the behaviour before this change: the set is review evidence, and nothing is lost. **A pause
+in that window is the second.** Its report commit links to the staged review report, so it is held and
+never pushed alone: Step 7's entry commits the staged set behind it and pushes the two together
+(`develop-pipeline-step-7-finalise.md`, its entry block). With nothing held, that entry pushes nothing and the set
+stays staged for 6a.
 
 **A finding is doc-only when the path in its `ref` matches `ci.docsOnly.patterns`** — task.172's
 set, read through its own reader (`readConfig` + `isDocsPath` in `ci-tree-equivalence.js`), so
@@ -2189,11 +2229,7 @@ Suggested commit message: `docs(story.{P}.{E}.{S}): implementation report — qa
 
 Suggested commit message: `docs(task.{id}): implementation report — qa loop escalation`
 
-Then push:
-
-```bash
-git push origin HEAD
-```
+The terminal HALT block sends it out, deferred record commits included (`push-held.sh --site halt`).
 
 #### develop-story HALT message
 

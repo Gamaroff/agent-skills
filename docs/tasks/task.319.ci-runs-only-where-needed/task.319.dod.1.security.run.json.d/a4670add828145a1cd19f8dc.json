@@ -1,0 +1,32 @@
+{
+  "sink": "shell-exec",
+  "entry": "cli:shared/resources/finalise-rerun-at-head.js",
+  "name": "rerun-at-head listed-command match",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 19,
+  "passed": 19,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "observation_limits": [
+    "effects-after-accept"
+  ],
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": [
+    "--doc",
+    "{input}",
+    "--out-dir",
+    ".claude/state/rerun"
+  ],
+  "args": null,
+  "slot": null,
+  "fixture_setup": "/home/gamaroff/Development/agent-skills/shared/resources/tests/fixtures/security-probe/setup-git-repo.sh",
+  "fixture_copy": null,
+  "ran_at": "2026-11-24T22:34:17.459Z"
+}

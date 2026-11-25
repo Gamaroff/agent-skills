@@ -95,10 +95,13 @@ test("cases_file: the numbered cases file is the source file byte for byte, not 
 test("cases_file: refused when absolute, climbing out, a symlink, not an array, hash-mismatched, or alongside cases", () =>
   withDir(async (dir, work) => {
     const good = '[{"id":"c1","input":"x","spec_ref":"d.md:1"}]';
-    writeFileSync(join(work, "ok.json"), good);
+    writeFileSync(join(work, "ok.dod.0.security.cases.json"), good);
     writeFileSync(join(dir, "outside.json"), good);
-    symlinkSync(join(dir, "outside.json"), join(work, "link.json"));
-    writeFileSync(join(work, "obj.json"), "{}");
+    symlinkSync(
+      join(dir, "outside.json"),
+      join(work, "link.dod.0.security.cases.json"),
+    );
+    writeFileSync(join(work, "obj.dod.0.security.cases.json"), "{}");
     const why = async (entry) => {
       const { out } = await run(dir, work, [{ argv: ENTRY, ...entry }]);
       return out.refusals.map((r) => r.reason);
@@ -109,24 +112,34 @@ test("cases_file: refused when absolute, climbing out, a symlink, not an array, 
     assert.deepEqual(await why({ cases_file: "../outside.json" }), [
       "plan-entry-cases-file-outside-work-dir",
     ]);
-    assert.deepEqual(await why({ cases_file: "link.json" }), [
-      "plan-entry-cases-file-symlink",
-    ]);
-    assert.deepEqual(await why({ cases_file: "obj.json" }), [
-      "plan-entry-cases-not-an-array",
-    ]);
-    assert.deepEqual(await why({ cases_file: "missing.json" }), [
-      "plan-entry-cases-file-missing",
-    ]);
     assert.deepEqual(
-      await why({ cases_file: "ok.json", cases_sha256: "0".repeat(64) }),
+      await why({ cases_file: "link.dod.0.security.cases.json" }),
+      ["plan-entry-cases-file-symlink"],
+    );
+    assert.deepEqual(
+      await why({ cases_file: "obj.dod.0.security.cases.json" }),
+      ["plan-entry-cases-not-an-array"],
+    );
+    assert.deepEqual(
+      await why({ cases_file: "missing.dod.0.security.cases.json" }),
+      ["plan-entry-cases-file-missing"],
+    );
+    assert.deepEqual(
+      await why({
+        cases_file: "ok.dod.0.security.cases.json",
+        cases_sha256: "0".repeat(64),
+      }),
       ["plan-entry-cases-file-hash-mismatch"],
     );
-    assert.deepEqual(await why({ cases_file: "ok.json", cases: [] }), [
-      "plan-entry-cases-and-cases-file",
-    ]);
+    assert.deepEqual(
+      await why({ cases_file: "ok.dod.0.security.cases.json", cases: [] }),
+      ["plan-entry-cases-and-cases-file"],
+    );
     // Control: the same file with no fault is run.
-    assert.deepEqual(await why({ cases_file: "ok.json" }), []);
+    assert.deepEqual(
+      await why({ cases_file: "ok.dod.0.security.cases.json" }),
+      [],
+    );
   }));
 
 test("entity: inline cases that came back escaped are refused; a literal < elsewhere, or the source file carrying the entity, accepts them", () =>
@@ -158,23 +171,23 @@ test("entity: a cases file whose payload is an entity on purpose, beside a liter
   withDir(async (dir, work) => {
     // Own-text evidence: one literal "<" in the file proves it was not escaped as a whole.
     writeFileSync(
-      join(work, "mixed.json"),
+      join(work, "mixed.dod.0.security.cases.json"),
       JSON.stringify([
         { id: "a", input: "&amp;lt;", spec_ref: "d.md:1" },
         { id: "b", input: "<script>", spec_ref: "d.md:1" },
       ]),
     );
     const mixed = await run(dir, work, [
-      { argv: ENTRY, cases_file: "mixed.json" },
+      { argv: ENTRY, cases_file: "mixed.dod.0.security.cases.json" },
     ]);
     assert.deepEqual(mixed.out.refusals, []);
     // Control: the same payload with no literal anywhere is the escaped-reply shape.
     writeFileSync(
-      join(work, "only.json"),
+      join(work, "only.dod.0.security.cases.json"),
       JSON.stringify([{ id: "a", input: "&amp;lt;", spec_ref: "d.md:1" }]),
     );
     const only = await run(dir, work, [
-      { argv: ENTRY, cases_file: "only.json" },
+      { argv: ENTRY, cases_file: "only.dod.0.security.cases.json" },
     ]);
     assert.deepEqual(
       only.out.refusals.map((r) => r.reason),
@@ -185,11 +198,11 @@ test("entity: a cases file whose payload is an entity on purpose, beside a liter
 test("entity: a cases file that came back escaped is refused too", () =>
   withDir(async (dir, work) => {
     writeFileSync(
-      join(work, "esc.json"),
+      join(work, "esc.dod.0.security.cases.json"),
       '[{"id":"c1","input":"a &amp; b","spec_ref":"d.md:1"}]',
     );
     const { out } = await run(dir, work, [
-      { argv: ENTRY, cases_file: "esc.json" },
+      { argv: ENTRY, cases_file: "esc.dod.0.security.cases.json" },
     ]);
     assert.deepEqual(
       out.refusals.map((r) => r.reason),
@@ -281,10 +294,16 @@ test("reuse: an unchanged plan is reusable; a changed cases byte, a changed engi
 
 test("casesFileAccepted: the probe engine executes hostile and legitimate names against it, and it engages", () =>
   withDir(async (dir, work) => {
-    writeFileSync(join(work, "ok.json"), "[]");
+    writeFileSync(join(work, "ok.dod.0.security.cases.json"), "[]");
     writeFileSync(join(dir, "outside.json"), "[]");
-    symlinkSync(join(dir, "outside.json"), join(work, "link.json"));
+    symlinkSync(
+      join(dir, "outside.json"),
+      join(work, "link.dod.0.security.cases.json"),
+    );
     mkdirSync(join(work, "sub"));
+    // A directory with an engine-shaped name: the name passes the shape check, so only the
+    // not-a-file refusal can stop it (a bare `sub` would be refused by the shape check instead).
+    mkdirSync(join(work, "dir.dod.0.security.cases.json"));
     const c = (id, input, correct, direction) => ({
       id,
       sink: "path",
@@ -297,11 +316,11 @@ test("casesFileAccepted: the probe engine executes hostile and legitimate names 
       c("climbs", "../outside.json", "reject", "hostile"),
       c("deep-climb", "sub/../../outside.json", "reject", "hostile"),
       c("absolute", join(dir, "outside.json"), "reject", "hostile"),
-      c("symlink", "link.json", "reject", "hostile"),
-      c("directory", "sub", "reject", "hostile"),
-      c("nul", "ok.json\u0000.txt", "reject", "hostile"),
+      c("symlink", "link.dod.0.security.cases.json", "reject", "hostile"),
+      c("directory", "dir.dod.0.security.cases.json", "reject", "hostile"),
+      c("nul", "ok.dod.0.security.cases.json\u0000.txt", "reject", "hostile"),
       c("empty", "", "reject", "hostile"),
-      c("plain", "ok.json", "accept", "legitimate"),
+      c("plain", "ok.dod.0.security.cases.json", "accept", "legitimate"),
     ];
     const casesFile = join(dir, "cases.json");
     writeFileSync(casesFile, JSON.stringify(cases));
@@ -329,6 +348,117 @@ test("casesFileAccepted: the probe engine executes hostile and legitimate names 
     assert.equal(out.verdict, "engages");
     assert.deepEqual(out.reproduced ?? [], []);
   }));
+
+// --- the name's shape: only a name the engine writes (task 287) -------------------------------------
+
+test("cases_file shape: both engine shapes are accepted, a dotted stem included", () =>
+  withDir(async (_dir, work) => {
+    for (const n of [
+      "x.dod.1.security.cases.json",
+      "x.dod.1.security.cases.2.json",
+      "task.9.dod.2.security.cases.json",
+    ]) {
+      writeFileSync(join(work, n), "[]");
+      assert.equal(resolveCasesFile(n, work).ok, true, n);
+    }
+  }));
+
+test("cases_file shape: a plain name and near misses are refused as bad-name-shape, though the file exists", () =>
+  withDir(async (_dir, work) => {
+    for (const n of [
+      "x.json",
+      "x.security.cases.json.bak",
+      "x.security.cases.a.json",
+      "security.cases.json",
+      "x.security.cases..json",
+    ]) {
+      writeFileSync(join(work, n), "[]");
+      assert.deepEqual(
+        resolveCasesFile(n, work),
+        { ok: false, why: "bad-name-shape" },
+        n,
+      );
+    }
+  }));
+
+test("cases_file shape: the check runs before lstat (a missing bad-shape name is bad-name-shape, a missing good-shape name is missing) and after confinement", () =>
+  withDir(async (dir, work) => {
+    assert.equal(resolveCasesFile("nope.json", work).why, "bad-name-shape");
+    assert.equal(
+      resolveCasesFile("nope.dod.1.security.cases.json", work).why,
+      "missing",
+    );
+    // An escaping name keeps answering outside-work-dir, whatever its shape.
+    assert.equal(
+      resolveCasesFile("../x.dod.1.security.cases.json", work).why,
+      "outside-work-dir",
+    );
+    assert.equal(resolveCasesFile("../x.json", work).why, "outside-work-dir");
+    assert.equal(
+      resolveCasesFile(join(dir, "x.dod.1.security.cases.json"), work).why,
+      "outside-work-dir",
+    );
+  }));
+
+test("cases_file shape: a plan entry and a reuse check name the refusal as plan-entry-cases-file-bad-name-shape and cases-file-bad-name-shape", () =>
+  withDir(async (dir, work) => {
+    writeFileSync(join(work, "x.json"), "[]");
+    const { out } = await run(dir, work, [
+      { argv: ENTRY, cases_file: "x.json" },
+    ]);
+    assert.deepEqual(
+      out.refusals.map((r) => r.reason),
+      ["plan-entry-cases-file-bad-name-shape"],
+    );
+    const prior = join(work, "prior.plan.json");
+    writeFileSync(
+      prior,
+      JSON.stringify([
+        { argv: ENTRY, cases_file: "x.json", cases_sha256: "0".repeat(64) },
+      ]),
+    );
+    assert.deepEqual(
+      reusePlan({
+        priorPlan: prior,
+        priorHead: "HEAD",
+        repoRoot: dir,
+        enginePaths: [],
+      }),
+      { reason: "not-reusable", why: "cases-file-bad-name-shape" },
+    );
+  }));
+
+test("cases_file shape: over the committed plans, only task.304's names a bad shape (the corpus control)", () => {
+  const root = join(HERE, "..", "..", "..");
+  const ls = spawnSync(
+    "git",
+    ["-C", root, "ls-files", "docs/**/*.security.plan.json"],
+    {
+      encoding: "utf8",
+    },
+  );
+  assert.equal(ls.status, 0, ls.stderr);
+  const plans = ls.stdout.split("\n").filter(Boolean);
+  // Non-vacuity floor: the corpus was 31 plans when this was written; a glob that matched
+  // nothing would otherwise pass over an empty list.
+  assert.ok(plans.length >= 20, `only ${plans.length} committed plans found`);
+  const refused = [];
+  let past = 0;
+  for (const p of plans) {
+    const r = reusePlan({
+      priorPlan: join(root, p),
+      priorHead: "HEAD",
+      repoRoot: root,
+      // Empty on purpose: a plan that gets past the cases-file stage stops at `no-engine-paths`,
+      // so this reads the shape verdict without a git call per plan.
+      enginePaths: [],
+    });
+    if (r.why === "cases-file-bad-name-shape") refused.push(p.split("/").pop());
+    if (r.why === "no-engine-paths") past += 1;
+  }
+  assert.ok(past >= 1, "no committed plan reached the engine-path stage");
+  assert.deepEqual(refused, ["task.304.dod.1.security.plan.json"]);
+});
 
 // --- --fixture-copy rides in a plan entry's argv (task.274, obs #52) --------------------------------
 
@@ -483,17 +613,23 @@ test("reuse block: an unsubstituted placeholder or a non-numeric DOD_N halts bef
 
 test("resolveCasesFile: a directory, an absolute name and a NUL are refused", () =>
   withDir(async (dir, work) => {
-    mkdirSync(join(work, "d"));
-    assert.equal(resolveCasesFile("d", work).why, "not-a-file");
+    mkdirSync(join(work, "d.dod.0.security.cases.json"));
+    assert.equal(
+      resolveCasesFile("d.dod.0.security.cases.json", work).why,
+      "not-a-file",
+    );
     assert.equal(resolveCasesFile("/etc/passwd", work).why, "outside-work-dir");
     // An absolute name that resolves INSIDE the directory is refused too: the name must be relative
     // to the work item directory, whatever it points at (task 269 DoD 1, the isAbsolute guard).
-    writeFileSync(join(work, "in.json"), "[]");
+    writeFileSync(join(work, "in.dod.0.security.cases.json"), "[]");
     assert.equal(
-      resolveCasesFile(join(work, "in.json"), work).why,
+      resolveCasesFile(join(work, "in.dod.0.security.cases.json"), work).why,
       "outside-work-dir",
     );
-    assert.equal(resolveCasesFile("in.json", work).ok, true);
+    assert.equal(
+      resolveCasesFile("in.dod.0.security.cases.json", work).ok,
+      true,
+    );
     assert.equal(resolveCasesFile("a\0b", work).why, "bad-name");
     assert.equal(resolveCasesFile("", work).why, "bad-name");
     assert.equal(resolveCasesFile(7, work).why, "bad-name");

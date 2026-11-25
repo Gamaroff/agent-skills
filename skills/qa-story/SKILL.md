@@ -87,7 +87,7 @@ When invoked by the `develop-story` orchestrator (pipeline-wide default), the ca
 Skill(qa-story, args="traceability_matrix=<path> code_review_blocking=true")
 ```
 
-Set `CODE_REVIEW_BLOCKING_ARG` from the `code_review_blocking=` token in `args` (default empty when absent). It feeds the canonical resolution in **Phase 1.6 step 6 (Gate mapping)** so high-confidence code-review bugs gate the build (and thus get fixed in the qa-fix loop) without needing per-story frontmatter. A story still opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch). Absent for standalone runs → code review stays advisory unless the story opts in via frontmatter, except a bug QA reproduces by execution (step 5d).
+Set `CODE_REVIEW_BLOCKING_ARG` from the `code_review_blocking=` token in `args` (default empty when absent). It feeds the canonical resolution in **Phase 1.6 step 6 (Gate mapping)** so high-confidence code-review bugs gate the build (and thus get fixed in the qa-fix loop) without needing per-story frontmatter; a bug QA reproduces by execution gates at any confidence (step 5d). A story still opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch). Absent for standalone runs → code review stays advisory unless the story opts in via frontmatter, except a bug QA reproduces by execution (step 5d).
 
 **File Discovery Logic:**
 
@@ -1250,7 +1250,10 @@ Adversarially review the story's change set **diff** for **correctness bugs** (l
    `fixture: {env, files}` supplies what else it reads, and every hostile case carries `expected` with the
    guard's own refusal output (a non-empty stdout or stderr) — or is declined (scoring order:
    `scoreFenceRun`); "it is prose,
-   not a script" is never a reason to record `boundary: false`.
+   not a script" is never a reason to record `boundary: false`. A **lint rule** takes the eslint form:
+   `--entry 'eslint:<a file the rule applies to>#<rule-id>' --cases-file <cases.json>` — each input is
+   source text linted as that file by the repository's own ESLint and configuration (task.319); "it is
+   a lint rule" is never a reason to record `boundary: false`.
    A predicate the engine cannot import because it is **not exported** — a module-private `const` —
    takes the same answer: export it (one word) and probe it. "It is not exported" is never a reason to
    record `boundary: false`; the engine's `entry-not-probeable` detail names the remedy. On task.139
@@ -1864,7 +1867,7 @@ Re-enumerated {the boundary's inputs, named} and tested each against the current
 
 ## Code Review
 
-[From Phase 1.6 — advisory unless the story opted in via `code_review_blocking: true` or QA reproduced the finding (5d). Omit if the diff had no reviewable code and no documentation claims to check; a docs-only change set takes the claim-check route, so its section is present.]
+[From Phase 1.6 — advisory unless blocking resolves to true (run-level arg or frontmatter) or QA reproduced the finding (5d). Omit if the diff had no reviewable code and no documentation claims to check; a docs-only change set takes the claim-check route, so its section is present.]
 
 **Correctness bugs ([count]):**
 [for each bug finding:]
@@ -2492,7 +2495,7 @@ a `$` or a backtick in a finding is safe. Then run the block after it, in a late
 
 ### 🔎 Code Review Findings
 
-[Top correctness bugs + notable cleanups from Phase 1.6, each `file:line — finding`. "None identified" if empty. Advisory unless the story opted in via code_review_blocking or QA reproduced the finding (5d).]
+[Top correctness bugs + notable cleanups from Phase 1.6, each `file:line — finding`. "None identified" if empty. Advisory unless blocking resolves to true (run-level arg or frontmatter) or QA reproduced the finding (5d).]
 
 ### 🎯 Critical Issues
 

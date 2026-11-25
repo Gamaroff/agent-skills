@@ -1,0 +1,114 @@
+[
+  {
+    "id": "legit-marker",
+    "input": "ci:\n  skipMarker: \"[skip ci]\"\n",
+    "direction": "legitimate",
+    "why": "the documented marker",
+    "correct": "accepted"
+  },
+  {
+    "id": "legit-non-ascii",
+    "input": "ci:\n  skipMarker: \"[\u00fcberspringen]\"\n",
+    "direction": "legitimate",
+    "why": "printable letters outside ASCII",
+    "correct": "accepted"
+  },
+  {
+    "id": "legit-max-length",
+    "input": "ci:\n  skipMarker: \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"\n",
+    "direction": "legitimate",
+    "why": "80 characters",
+    "correct": "accepted"
+  },
+  {
+    "id": "hostile-c1-first",
+    "input": "ci:\n  skipMarker: \"a\u0080b\"\n",
+    "direction": "hostile",
+    "why": "first C1 control",
+    "correct": "rejected"
+  },
+  {
+    "id": "hostile-c1-nel",
+    "input": "ci:\n  skipMarker: \"a\u0085b\"\n",
+    "direction": "hostile",
+    "why": "the case DoD run 1 reproduced",
+    "correct": "rejected"
+  },
+  {
+    "id": "hostile-c1-csi",
+    "input": "ci:\n  skipMarker: \"a\u009b31mb\"\n",
+    "direction": "hostile",
+    "why": "8-bit terminal control sequence",
+    "correct": "rejected"
+  },
+  {
+    "id": "hostile-c1-last",
+    "input": "ci:\n  skipMarker: \"a\u009fb\"\n",
+    "direction": "hostile",
+    "why": "last C1 control",
+    "correct": "rejected"
+  },
+  {
+    "id": "hostile-delete",
+    "input": "ci:\n  skipMarker: \"a\u007fb\"\n",
+    "direction": "hostile",
+    "why": "DEL",
+    "correct": "rejected"
+  },
+  {
+    "id": "hostile-bidi-override",
+    "input": "ci:\n  skipMarker: \"a\u202eb\"\n",
+    "direction": "hostile",
+    "why": "reorders how the subject is displayed",
+    "correct": "rejected"
+  },
+  {
+    "id": "hostile-bidi-isolate",
+    "input": "ci:\n  skipMarker: \"a\u2066b\"\n",
+    "direction": "hostile",
+    "why": "bidi isolate",
+    "correct": "rejected"
+  },
+  {
+    "id": "hostile-zero-width",
+    "input": "ci:\n  skipMarker: \"[skip\u200bci]\"\n",
+    "direction": "hostile",
+    "why": "a marker that looks like another",
+    "correct": "rejected"
+  },
+  {
+    "id": "hostile-bom-inside",
+    "input": "ci:\n  skipMarker: \"a\ufeffb\"\n",
+    "direction": "hostile",
+    "why": "BOM inside the value",
+    "correct": "rejected"
+  },
+  {
+    "id": "hostile-line-separator",
+    "input": "ci:\n  skipMarker: \"a\u2028b\"\n",
+    "direction": "hostile",
+    "why": "not one line",
+    "correct": "rejected"
+  },
+  {
+    "id": "hostile-paragraph-separator",
+    "input": "ci:\n  skipMarker: \"a\u2029b\"\n",
+    "direction": "hostile",
+    "why": "not one line",
+    "correct": "rejected"
+  },
+  {
+    "id": "hostile-tag-character",
+    "input": "ci:\n  skipMarker: \"a\udb40\udc41b\"\n",
+    "direction": "hostile",
+    "why": "an invisible tag character outside the BMP",
+    "correct": "rejected"
+  },
+  {
+    "id": "hostile-too-long",
+    "input": "ci:\n  skipMarker: \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"\n",
+    "direction": "hostile",
+    "why": "81 characters",
+    "correct": "rejected"
+  }
+]

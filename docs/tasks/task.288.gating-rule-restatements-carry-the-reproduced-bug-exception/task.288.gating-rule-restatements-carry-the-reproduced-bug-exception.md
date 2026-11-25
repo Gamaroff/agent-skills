@@ -5,18 +5,21 @@ type: task
 description: "Reword the two LOW residues task 273 left (T273-CR-5, T273-CR-6) and add a guard test so a restatement of the code-review gating rule cannot drop the reproduced-bug (5d) exception again."
 tags: [qa, code-review, guard-test]
 category: testing
-status: planned
+status: accepted
 priority: Low
 created: 2026-11-09
-updated: 2026-11-09
+updated: 2026-11-23
 assignee:
 estimated_effort_hours: 4
 github_issue: 862
+pr_number: 934
+completed_date: 2026-11-23
 ---
 
 # Technical Task: Gating-rule restatements carry the reproduced-bug exception
 
-**Status:** Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.288.review.1.gating-rule-restatements.md` implemented 2026-11-23
 **GitHub Issue**: [#862](https://github.com/Gamaroff/agent-skills/issues/862)
 
 ---
@@ -25,7 +28,7 @@ github_issue: 862
 
 Task 273 added an exception to the code-review gating rule: a `category: bug` finding that QA reproduces by execution gates at any reviewer confidence (step 5d). The rule is restated in prose in many files, and the QA loop needed five cycles to find the restatements that omitted the exception, one per cycle. Two LOW residues were left open when it was accepted. This task rewords them, fixes the other restatement that still omits the exception, and adds a test that reads the sources, so the next restatement that omits it turns a test red instead of costing a QA cycle.
 
-**Scope**: five lines of prose in four files (the carried items T273-CR-5 and T273-CR-6, plus the two restatements the probe in § 3 found), and one new test under `evals/shared/tests/`.
+**Scope**: five lines of prose in four files (the carried items T273-CR-5 and T273-CR-6, plus the two restatements the probe in § 3 found), and one new test under `evals/shared/tests/`. **As delivered** the guard test's population probe found nine more restatement sentences, so the prose edits span seven files (`qa-task`, `qa-story`, `review-code`, `code-review-prompt.md`, `develop-pipeline-step-5-6-qa-loop.md`, `pr-conformance-prompt.md`, `qa-runnable-prose-detection.md`) plus `qa-docs-only-review-prompt.md` from QA cycle 2. The widening is the guard doing its job (the population it enumerates is the task's own subject), not new behaviour; recorded in Change Log row 1.2.
 
 **Key deliverables**:
 
@@ -60,11 +63,12 @@ The rule lives once, in `shared/resources/code-review-prompt.md` § "Opt-in to b
 
 | Site | Verdict | Witness |
 | --- | --- | --- |
-| `shared/resources/code-review-prompt.md:92` | true positive: T273-CR-5 | the line reads `confidence: low (it will not gate)` |
-| `skills/qa-task/SKILL.md:1622`, `:1936`; `skills/qa-story/SKILL.md:1867`, `:2479` | true positive: T273-CR-6. The probe's marker accepts these because they name `5d`; the defect is the missing run-level argument, so the marker test alone does not hold CR-6 (see Phase 3) | the lines read "advisory unless the doc opted in via `code_review_blocking: true` or QA reproduced the finding (5d)" |
+| `shared/resources/code-review-prompt.md:96` | true positive: T273-CR-5 (re-measured at review: the anchor read `:92`, and the sentence has since moved to `:96`) | the line reads `confidence: low (it will not gate)` |
+| `skills/qa-task/SKILL.md:1633`, `:1953`; `skills/qa-story/SKILL.md:1867`, `:2495` (re-measured at review; the second line of each file opens with a capital "Advisory unless", so `git grep -i` finds all four and a case-sensitive grep finds two) | true positive: T273-CR-6. The probe's marker accepts these because they name `5d`; the defect is the missing run-level argument, so the marker test alone does not hold CR-6 (see Phase 3) | the lines read "advisory unless the doc opted in via `code_review_blocking: true` or QA reproduced the finding (5d)" |
 | `skills/review-code/SKILL.md:319` | true positive: "so high-confidence bugs gate the build" with no exception and no pointer | line text |
-| `skills/qa-task/SKILL.md:1050`, `shared/resources/qa-runnable-prose-detection.md:461` | decide in Phase 2: "eligible for `top_issues[]` under `code_review_blocking` exactly like any other `category: bug` finding" | the phrase |
-| `shared/resources/pr-conformance-prompt.md:191` | decide in Phase 2: it describes `code-review-prompt.md`'s mapping | the phrase |
+| `shared/resources/qa-runnable-prose-detection.md:683` and `skills/qa-task/SKILL.md:1050-1051` (the phrase wraps across two lines, so a per-line grep misses it and an earlier note here wrongly said the qa-task anchor held none; corrected at develop) | decide in Phase 2: "eligible for `top_issues[]` under `code_review_blocking` exactly like any other `category: bug` finding" | the phrase |
+| `shared/resources/pr-conformance-prompt.md:193` (the section heading is at `:191`) | decide in Phase 2: it describes `code-review-prompt.md`'s mapping |
+| `shared/resources/qa-docs-only-review-prompt.md:59` | decide in Phase 2: reads `confidence: low (it will not gate)` unqualified, and key (C) "will not gate" matches it. It is a lens prompt for claims, not bug reproductions, and writes no gate: the decision is an exemption in the test with that reason. (An earlier note here also listed `pr-conformance-prompt.md:113`; that line reads "it will not drive the verdict", which no key matches. Corrected at develop.) | the phrase |
 | `shared/resources/code-review-prompt.md:185` | false positive: the opening paragraph of the section whose matrix and exception follow at `:211` and `:229` | the section |
 | `shared/resources/code-review-prompt.md:144, 202, 220`; `shared/resources/pr-conformance-prompt.md:107, 130`; `shared/resources/qa-docs-only-review-prompt.md:56`; `skills/qa-story/SKILL.md:2470`; `skills/qa-task/SKILL.md:1928` | false positive: YAML, a shell fence, a table, a bullet list or a template line that holds no restatement | each is a fence, table or template body |
 | `shared/resources/tests/fixtures/report-lint/green/task.118.md`, `.119.md`, `.121.md`, `.123.md` | false positive: test fixtures, not canonical sources | path |
@@ -75,7 +79,7 @@ The rule lives once, in `shared/resources/code-review-prompt.md` § "Opt-in to b
 
 ### Target Architecture
 
-`evals/shared/tests/gating-rule-restatements.test.mjs` derives its population from `git ls-files`, splits each source into prose sentences (skipping fenced blocks, tables and the fixtures directory), and asserts every sentence that restates the gating rule carries the exception or points at the section that states it. Exemptions are listed in the test with a reason each, and the test asserts every exemption still names a real sentence.
+`evals/shared/tests/gating-rule-restatements.test.mjs` derives its population from `git ls-files`, splits each source into sentences (reading prose and the bodies of template fences, whose info string is `markdown`, `md`, `text` or none; skipping code fences, tables and the fixtures directory), and asserts every sentence that restates the gating rule carries the exception or points at the section that states it. Exemptions are listed in the test with a reason each, and the test asserts every exemption still names a real sentence.
 
 ### Important Clarifications
 
@@ -116,27 +120,27 @@ None. Prose rewordings and one new test; no interface changes.
 **Risk**: Low
 **Files**: `shared/resources/code-review-prompt.md`, `skills/qa-task/SKILL.md`, `skills/qa-story/SKILL.md`
 
-- [ ] `code-review-prompt.md:92`: "set confidence: low (it will not gate on the reviewer claim alone)".
-- [ ] The four report-template lines: "advisory unless blocking resolves to true (run-level arg or frontmatter) or QA reproduced the finding (5d)".
+- [x] `code-review-prompt.md:96` (find it with `git grep -n "it will not gate" -- shared/resources/code-review-prompt.md`): "set confidence: low (it will not gate on the reviewer claim alone)".
+- [x] The four report-template lines: "advisory unless blocking resolves to true (run-level arg or frontmatter) or QA reproduced the finding (5d)".
 
 ### Phase 2: Decide and reword the other restatements
 
 **Risk**: Low
 **Files**: `skills/review-code/SKILL.md`, `skills/qa-task/SKILL.md`, `shared/resources/qa-runnable-prose-detection.md`, `shared/resources/pr-conformance-prompt.md`
 
-- [ ] `review-code/SKILL.md:319`: add the exception or a pointer to § "Opt-in to blocking".
-- [ ] For `qa-task:1050`, `qa-runnable-prose-detection.md:461` and `pr-conformance-prompt.md:191`: reword to carry the exception, or exempt in the test with a one-line reason. Record each decision in the plan's decisions log.
+- [x] `review-code/SKILL.md:319`: add the exception or a pointer to § "Opt-in to blocking".
+- [x] For `qa-runnable-prose-detection.md:683`, `qa-task/SKILL.md:1050`, `pr-conformance-prompt.md:193`, and the unqualified `(it will not gate)` line at `qa-docs-only-review-prompt.md:59`: reword to carry the exception, or exempt in the test with a one-line reason. Record each decision in the plan's decisions log.
 
 ### Phase 3: The guard test
 
 **Risk**: Medium (a prose-keyed test can be noisy or blind)
 **Files**: `evals/shared/tests/gating-rule-restatements.test.mjs`
 
-- [ ] Population from `git ls-files`, sentence-level, outside fences and tables, fixtures excluded.
-- [ ] A restatement must carry the exception or a pointer; a second assertion holds CR-6's shape: a sentence that says "advisory unless" and names `code_review_blocking` must also mention the run-level argument.
-- [ ] A non-vacuity floor (the number of keyed sentences is at least the measured count minus slack), and every exemption names a sentence that still exists.
-- [ ] A control that the key does not match: a restatement worded without the flag name (for example "bugs above 80% confidence block the merge") and how the test sees it, stated in the plan.
-- [ ] `npm run bundle`, then `CI=true npm test`.
+- [x] Population from `git ls-files`, sentence-level, prose plus template fences (code fences and tables skipped), fixtures excluded.
+- [x] A restatement must carry the exception or a pointer; a second assertion holds CR-6's shape: a sentence that says "advisory unless" and names `code_review_blocking` must also mention the run-level argument.
+- [x] A non-vacuity floor (the number of keyed sentences is at least the measured count minus slack), and every exemption names a sentence that still exists.
+- [x] A control that the key does not match: a restatement worded without the flag name (for example "bugs above 80% confidence block the merge") and how the test sees it, stated in the plan.
+- [x] `npm run bundle`, then `CI=true npm test`.
 
 ---
 
@@ -145,7 +149,7 @@ None. Prose rewordings and one new test; no interface changes.
 ### Files to Modify (Core Implementation)
 
 1. ✅ `shared/resources/code-review-prompt.md` — CR-5.
-2. ✅ `skills/qa-task/SKILL.md` — CR-6 at two lines; `:1050` per Phase 2.
+2. ✅ `skills/qa-task/SKILL.md` — CR-6 at two lines.
 3. ✅ `skills/qa-story/SKILL.md` — CR-6 at two lines.
 4. ✅ `skills/review-code/SKILL.md` — `:319`.
 5. ⚠️ `shared/resources/qa-runnable-prose-detection.md`, `shared/resources/pr-conformance-prompt.md` — only if Phase 2 chooses to reword.
@@ -169,7 +173,7 @@ None. Prose rewordings and one new test; no interface changes.
 ### Unit Tests
 
 - The new test, run with `command node --test evals/shared/tests/gating-rule-restatements.test.mjs`.
-- **Mutation proof (obs on every fix):** (a) restore the unqualified wording at `code-review-prompt.md:92` in a scratch copy and confirm the test goes red; (b) remove "run-level arg" from one report-template line and confirm red; (c) delete the exception from `review-code/SKILL.md:319` and confirm red. A scratch copy is a `git worktree` under `$CLAUDE_JOB_DIR/tmp` or an env override of the source root, removed in a `finally`.
+- **Mutation proof (obs on every fix):** (a) restore the unqualified wording at `code-review-prompt.md:96` in a scratch copy and confirm the test goes red; (b) remove "run-level arg" from one report-template line and confirm red; (c) delete the exception from `review-code/SKILL.md:319` and confirm red. A scratch copy is a `git worktree` under `$CLAUDE_JOB_DIR/tmp` or an env override of the source root, removed in a `finally`.
 - **Control that the key does not match:** a restatement with neither the flag name nor "high-confidence" is invisible to the test. The plan states this limit; the test does not claim to find it.
 
 ### Regression
@@ -193,7 +197,7 @@ None. Prose rewordings and one new test; no interface changes.
 ### Code Quality
 
 - [ ] `CI=true npm test` and `npm run bundle -- --check` pass; the QA report records both.
-- [ ] Every exemption in the test carries a reason and names a sentence that still exists.
+- [ ] Every exemption in the test carries a reason and names a sentence that still exists, held by the test's own exemption assertion (a case with a reasonless or stale exemption must fail it).
 
 ### Migration
 
@@ -246,32 +250,85 @@ A false positive is fixed by an exemption with a reason, not by deleting the tes
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-23
+**Quality Score**: 95/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.288.qa.3.gating-rule-restatements.md](./task.288.qa.3.gating-rule-restatements.md)
+- **Gate File**: [task.288.gate.3.gating-rule-restatements.yml](./task.288.gate.3.gating-rule-restatements.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 8745
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+Both cycle-2 findings are closed. Two low cleanups on the guard test (C3-1, C3-2) are advisory.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.288.qa.3.gating-rule-restatements.md`
+**Gate File**: `task.288.gate.3.gating-rule-restatements.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** 8 of 8 met (the mutation proofs, timing and carried task 273 entries are recorded in the Closing Record of `task.288.qa.3`)
+✅ **PR Review:** PR #934, Step 5c review CONCERNS with two documentation findings, both fixed
+✅ **Documentation:** skill and shared-resource prose updated, bundled copies clean, CHANGELOG cites `(task 288)`
+✅ **Security Review:** PASS, no boundary deliverable
+⚠️ **Compliance Review:** not applicable
+✅ **CI:** SUCCESS on the acceptance decision head
+
+**Task marked as ACCEPTED on:** 2026-11-23
+
+**Detailed Verification Log:** See `task.288.dod.1.gating-rule-restatements-carry-the-reproduced-bug-exception.md` for complete verification evidence and timestamps.
+
+---
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
-
-| Date       | Version | Description   | Author      |
-| ---------- | ------- | ------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-09 | 1.0     | Initial draft | create-task |
-
+| 2026-11-23 | 1.1     | Review passed (8/10): re-measured drifted anchors (CR-5 `:92`→`:96`; template lines `:1622/:1936/:2479`→`:1633/:1953/:2495`; `qa-task:1050` dropped, the phrase lives at `qa-runnable-prose-detection.md:683`), required a case-insensitive grep for the four template lines, added two unqualified "will not gate" sites to Phase 2, and tied the exemption criterion to its test | review-task |
+| 2026-11-23 |         | Status → ready-for-development | review-task |
+| 2026-11-23 | 1.2     | Implemented inline: CR-5, CR-6 (four lines) and nine more restatement sentences reworded; guard test `gating-rule-restatements.test.mjs` added (template fences read, 7 reasoned exemptions, floor 24); bundled; CHANGELOG. Status → ready-for-review | develop-task |
+| 2026-11-23 |         | QA gate FAIL (80/100) — 1 finding (T288-CR-1, reproduced); status → in-progress | qa-task |
+| 2026-11-23 |         | QA findings fixed — T288-CR-1 closed (guard test keys "advisory unless"), 1 iteration | qa-fix |
+| 2026-11-23 |         | QA gate CONCERNS (90/100) — 2 findings (T288-C2-1, T288-C2-2) | qa-task |
+| 2026-11-23 |         | QA findings fixed — T288-C2-1 and T288-C2-2 closed (docs-only prompt reworded, false exemption removed, T273-CR-6 assertion checks every "advisory unless" sentence), 1 iteration | qa-fix |
+| 2026-11-23 |         | QA gate PASS (95/100) — 0 blocking findings, 2 advisory | qa-task |
+| 2026-11-23 | 1.3 | DoD passed — accepted (PR #934) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
 
 ### Phase 1: Reword the two carried residues
 
-- [ ] CR-5
-- [ ] CR-6 (four lines)
+- [x] CR-5
+- [x] CR-6 (four lines)
 
 ### Phase 2: Other restatements
 
-- [ ] `review-code/SKILL.md:319`
-- [ ] Decide `qa-task:1050`, `qa-runnable-prose-detection.md:461`, `pr-conformance-prompt.md:191`
+- [x] `review-code/SKILL.md:319`
+- [x] Decide `qa-runnable-prose-detection.md:683`, `qa-task/SKILL.md:1050`, `pr-conformance-prompt.md:193`, `qa-docs-only-review-prompt.md:59`
 
 ### Phase 3: Guard test
 
-- [ ] Test, floor, exemptions, mutation proof
-- [ ] Bundle, CHANGELOG
+- [x] Test, floor, exemptions, mutation proof
+- [x] Bundle, CHANGELOG
 
 ---
 

@@ -44,6 +44,7 @@ const { parseYamlSubset } = require("./yaml-subset.js");
 const agentReplyBlock = require("./agent-reply-block.js");
 const {
   criteriaSection,
+  readCriteriaEntries,
   RE_CHECKBOX,
   RE_NUMBERED,
 } = require("./criteria-section.js");
@@ -81,11 +82,18 @@ const CRITERION_REASONS = Object.freeze([
   "new-criterion",
   "criterion-changed",
   "ci-state", // a CI-state criterion: graded from each run's own CI reading, never carried
+  "rerun-at-head", // graded on a command run at one head (finalise-rerun-at-head.js), never carried
   "reported-gap",
   "evidence-changed",
   "evidence-unresolved",
   "unchanged",
 ]);
+
+// The answers of finalise-rerun-at-head.js that say what was run: every other one is a refusal.
+const RERUN_ANSWERED = Object.freeze(["ran", "none-named", "not-configured"]);
+
+// The test citation the AC prompt gives a criterion it graded on a re-run command.
+const RE_RERUN_CITATION = /^NOT_APPLICABLE: command re-run at the head\b/;
 
 // ── criteria ────────────────────────────────────────────────────────────────
 
@@ -301,6 +309,36 @@ function fullScope(reason, criteria, head, extra = {}) {
 }
 
 /**
+ * The texts of the criteria a finalise-rerun-at-head.js record lists, as readCriteria reads them. Its
+ * `criteria[].index` counts readCriteriaEntries from 1, so the line is looked up there and not by this
+ * engine's own position, which skips an empty criterion. Throws when the record names a criterion this
+ * document does not have, or has in other words: it is another document's, or another state of it.
+ */
+function rerunCriterionLines(rerun, docBody) {
+  const out = new Set();
+  if (!rerun) return out;
+  const entries = readCriteriaEntries(docBody) || [];
+  for (const r of Array.isArray(rerun.runs) ? rerun.runs : [])
+    for (const c of Array.isArray(r.criteria) ? r.criteria : []) {
+      const entry = entries[c.index - 1];
+      if (!entry)
+        throw new Error(
+          `the re-run record names criterion #${c.index}; the document has ${entries.length}`,
+        );
+      const text = [entry.line, ...entry.continuation]
+        .filter(Boolean)
+        .join(" ")
+        .trim();
+      if (c.text !== text)
+        throw new Error(
+          `the re-run record's criterion #${c.index} is not the document's; run the re-run block again`,
+        );
+      out.add(normaliseText(entry.line));
+    }
+  return out;
+}
+
+/**
  * Decide what this run re-judges.
  *
  * @param {object} input
@@ -308,6 +346,7 @@ function fullScope(reason, criteria, head, extra = {}) {
  * @param {string}      input.priorPath  the prior record's path, for messages
  * @param {string}      input.docBody    the document's text
  * @param {string}      input.head       the commit this run's agents read
+ * @param {object|null} input.rerun      this run's finalise-rerun-at-head.js record, or null
  * @param {object}      io               { isAncestor, changed, tracked } — gitIo(cwd) in the CLI
  */
 function scope(input, io) {
@@ -372,6 +411,7 @@ function scopeOf(input, io) {
   const priorById = new Map(prior.criteria.map((p) => [p.id, p]));
   const priorByHash = new Map(prior.criteria.map((p) => [p.text_hash, p]));
 
+  const rerunLines = rerunCriterionLines(input.rerun, input.docBody);
   const rejudge = [];
   const carry = [];
   const carriedPrior = {};
@@ -392,6 +432,19 @@ function scopeOf(input, io) {
     // grades; an unresolved one still reads DEFERRED-CI.
     if (p.status === DEFERRED_CI || p.ci_reading) {
       rejudge.push({ id: c.id, reason: "ci-state" });
+      continue;
+    }
+    // A criterion graded on a command's run is graded on ONE head's run, and its citation is the DoD
+    // file, which the evidence rule below would read as unchanged (task 319). It is judged whole
+    // whatever the prior verdict: a prior FAIL left to the member merge could be overturned by its
+    // members while the command still fails (T319-CR-2). Two signals, either of which is enough: this
+    // run's record lists the criterion (so a prior verdict reached another way is not carried past it,
+    // T319-CR-5), or the prior verdict cites a re-run.
+    if (
+      rerunLines.has(c.text) ||
+      RE_RERUN_CITATION.test(String(p.test_citation))
+    ) {
+      rejudge.push({ id: c.id, reason: "rerun-at-head" });
       continue;
     }
     if (p.status !== "PASS") {
@@ -943,7 +996,7 @@ function resolveDeferredCi(ac, ci) {
 
 const USAGE = [
   "usage:",
-  "  finalise-rerun-scope.js scope --doc <document> --head <rev> [--prior <record.ac.json>] [--json]",
+  "  finalise-rerun-scope.js scope --doc <document> --head <rev> [--prior <record.ac.json>] [--rerun-at-head <run.json|none>] [--json]",
   "  finalise-rerun-scope.js extract (--agent-id <id> | --transcript <file>) --out <path> [--block <info-string>] [--projects-root <dir>] [--json]",
   "  finalise-rerun-scope.js merge --scope <scope.json> --result <agent.yaml> [--sha256 <hex>] [--dod-n <N>] [--record-out <path>] [--json]",
   "  finalise-rerun-scope.js resolve-ci --merged <merged.json> --rollup <CI_ROLLUP> [--ci-head <sha>] [--tree-eq <sha>] [--record <record.ac.json>] [--json]",
@@ -971,6 +1024,7 @@ function parseArgs(argv) {
     "--out",
     "--projects-root",
     "--sha256",
+    "--rerun-at-head",
   ]);
   for (let i = 1; i < argv.length; i++) {
     const a = argv[i];
@@ -1030,10 +1084,60 @@ function main(argv) {
         priorText = null;
       }
     }
-    const s = scope(
-      { priorText, priorPath: opts.prior || null, docBody, head },
-      io,
-    );
+    // The record of THIS run, document and head, or nothing: another head's, another document's, one
+    // that cannot be read, or a refused run's (no runs, and not because nothing was named) would leave
+    // out criteria whose command ran or should have, so it is refused rather than ignored.
+    let rerun = null;
+    if (opts.rerunAtHead && opts.rerunAtHead !== "none") {
+      try {
+        rerun = JSON.parse(
+          fs.readFileSync(path.resolve(cwd, opts.rerunAtHead), "utf8"),
+        );
+      } catch {
+        return usage(
+          opts.json,
+          `--rerun-at-head is not a readable record: ${opts.rerunAtHead}`,
+        );
+      }
+      if (!rerun || rerun.head !== head || !Array.isArray(rerun.runs))
+        return usage(
+          opts.json,
+          `--rerun-at-head is not a record of ${head}: ${opts.rerunAtHead}`,
+        );
+      if (!RERUN_ANSWERED.includes(rerun.reason))
+        return usage(
+          opts.json,
+          `--rerun-at-head is a run that did not answer (${rerun.reason}): ${opts.rerunAtHead}`,
+        );
+      // `ran` names at least one criterion per run, and the other two answers have no run (T319-CR-411).
+      const named = rerun.runs.filter(
+        (r) => r && Array.isArray(r.criteria) && r.criteria.length > 0,
+      ).length;
+      if (
+        named !== rerun.runs.length ||
+        (rerun.reason === "ran") !== rerun.runs.length > 0
+      )
+        return usage(
+          opts.json,
+          `--rerun-at-head says ${rerun.reason} and holds ${rerun.runs.length} run(s), ${named} naming a criterion: ${opts.rerunAtHead}`,
+        );
+      if (rerun.document !== path.basename(opts.doc))
+        return usage(
+          opts.json,
+          `--rerun-at-head is a record of ${rerun.document}, not of ${path.basename(opts.doc)}: ${opts.rerunAtHead}`,
+        );
+    }
+    let s;
+    try {
+      s = scope(
+        { priorText, priorPath: opts.prior || null, docBody, head, rerun },
+        io,
+      );
+      rerunCriterionLines(rerun, docBody); // checked on a full run too
+    } catch (e) {
+      if (!rerun) throw e;
+      return usage(opts.json, e.message);
+    }
     s.document = opts.doc;
     s.scope_text = renderScopeText(s);
     return emit(opts.json, s);

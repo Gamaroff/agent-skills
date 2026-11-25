@@ -1,0 +1,146 @@
+schema: 2
+task: 'task.319.ci-runs-only-where-needed'
+task_title: 'Pipelines spend a CI run only where a run can answer something'
+gate: CONCERNS
+status_reason: 'The three high findings of cycle 3 are closed and the suites and CI are green. The unscoped safety re-probe found no high defect; seven medium and five low defects stand, each reproduced by QA with a control except one header line, which was read.'
+reviewer: 'QA Engineer'
+head: 'ff8e2ab33c60e8c5522269d3d5ffd236bfbe5e19'
+updated: '2026-11-24T15:41:51Z'
+
+top_issues:
+  - id: 'T319-CR-601'
+    severity: medium
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'A Node command that prints a lot in one write and then calls process.exit() loses its tail in the pipe, and the engine records ran, exit 0, output_capped false (origin: code-review, reproduced by QA: 2,000,000 bytes saved as 146,176 with the last line lost).'
+    suggested_action: 'Give the command a regular file for its output, hold the size bound by watching the file, and keep a copy of what is kept so a late writer cannot grow it.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-602'
+    severity: medium
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'A submodule checked out at another commit under a docs pattern is listed as uncommitted documentation and the commands run over it (origin: code-review, reproduced by QA: docs/theme answers ran, lib/theme dirty-tree).'
+    suggested_action: 'Never let a docs pattern accept a submodule entry or a path inside a submodule, as ci.docsOnly does not.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-603'
+    severity: medium
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'The implementation report of the work item is uncommitted at Step 3a by design, so a project whose docs patterns leave its work-item directory out is refused on every run (origin: code-review at medium confidence, reproduced by QA in the engine).'
+    suggested_action: 'Let the own implementation report through beside the work item, listed, as the DoD records are.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-701'
+    severity: medium
+    file: 'shared/resources/tick-pr.sh'
+    finding: 'open pushes a bare branch name, so under push.default=upstream with branch.autoSetupMerge always or inherit the ticked-unpushed route pushes the tick to the base branch, with no gate and no PR (origin: code-review, reproduced by QA; control with the defaults leaves the base alone).'
+    suggested_action: 'Push the explicit refspec of the tick branch, and cut it with --no-track.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-702'
+    severity: medium
+    file: 'shared/resources/tick-pr.sh'
+    finding: 'On resume the local tick branch wins over a remote one strictly ahead of it, so open is rejected on every re-run until the local branch is deleted by hand (origin: code-review, reproduced by QA; control with no local branch resumes at the newer commit).'
+    suggested_action: 'Fast-forward a local tick branch that is an ancestor of the remote one, and halt by name when the two have diverged.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-703'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-5-6-qa-loop.md'
+    finding: 'The MERGED or CLOSED arm, and the other HALT pushes (qa-halt, qa-escalation, finalise-gaps), push raw, so a branch deleted at merge is re-created (origin: code-review, reproduced by QA; push-held.sh in the same state keeps the commit local).'
+    suggested_action: 'Drop those pushes: the terminal HALT block that follows already pushes through push-held.sh.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-704'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-7-finalise.md'
+    finding: 'The entry push is bounded at 540 s, but neither block states a tool timeout, so under the 120 s default a slow pre-push hook is cut off with no answer line, and the table has no row for that (origin: code-review at medium confidence, reproduced by QA with a short limit).'
+    suggested_action: 'State the timeout the call needs in both blocks, and add the row for no answer.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-604'
+    severity: low
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'The header says that with neither --pr nor --destination every status of an ancestor counts; the engine answers unverifiable, and its detail does not name the missing destination (origin: code-review, read by QA; a committed test holds the answer).'
+    suggested_action: 'Correct the header, and name the missing destination in the detail.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-605'
+    severity: low
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'A listed command on an unindented continuation line of a criterion is not seen, and the engine answers none-named (origin: code-review, reproduced by QA).'
+    suggested_action: 'Refuse when a listed command appears in the criteria section outside every entry the reader returns.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-606'
+    severity: low
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'A work item saved with CRLF line endings answers scan-broken although its criteria are there (origin: code-review, reproduced by QA).'
+    suggested_action: 'Read the document with its line endings normalised.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-607'
+    severity: low
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'A tracked file whose name is not valid UTF-8 is read as missing, so a clean checkout answers dirty-tree (origin: code-review, reproduced by QA).'
+    suggested_action: 'Keep path names as bytes for the reads, and decode them for messages only.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-705'
+    severity: low
+    file: 'shared/resources/push-held.sh'
+    finding: 'A failed read of the lock (no jq, no file, malformed) reads as a lock with no PR, so the commits stay local and the message names the wrong reason (origin: code-review, reproduced by QA with jq failing; control pushed).'
+    suggested_action: 'Report a failed read as not pushed, with its reason.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 8869
+  phases_verified: '7/7'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5, 6]
+    phases_with_issues: [2, 4, 5]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 108
+    escaped: 0
+    boundary: true
+    boundary_signals: ["never"]
+    notes: 'parseRerunList engages, 38 of 38; push-policy --site, 48 of 48; push-held --site, 22 of 22. The tree comparison was probed by the cycle 3 reproductions: every form answers dirty-tree now.'
+  performance:
+    status: PASS
+    notes: 'pushes before (eager): 9; after (batched): 6, re-run at this head.'
+  reliability:
+    status: CONCERNS
+    notes: 'CR-601 loses output without saying so; CR-702 stalls the tick; CR-704 can end a block with no answer.'
+  maintainability:
+    status: PASS
+    notes: 'One decision helper, one site table, and one script for held commits.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix the seven medium and five low findings'
+      refs: ['shared/resources/finalise-rerun-at-head.js', 'shared/resources/tick-pr.sh', 'shared/resources/push-held.sh', 'shared/resources/develop-pipeline-step-5-6-qa-loop.md', 'shared/resources/develop-pipeline-step-7-finalise.md']
+  future: []
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  verification_method: 'bug 3: the three forms of its report and a clean checkout re-run at this head'
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['the seven medium findings fixed']

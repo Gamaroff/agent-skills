@@ -4,6 +4,95 @@ All notable changes to this project will be documented in this file. Format foll
 
 ## [Unreleased]
 
+## [v0.69.0] - 2026-11-25
+
+### Changed
+
+- **The develop pipelines push when a run can answer something, not after every commit (task 319).**
+  New `shared/resources/push-policy.sh` answers `push` or `defer` at every push a pipeline makes; its
+  table names the step that reads the remote for each one. **Default behaviour changes:** a PreCompact
+  pause no longer pushes, and a QA cycle whose commits hold only records waits for the next push. The
+  end of a run and any terminal HALT once a PR is open still push what is held (`push-held.sh`).
+  `pipeline.pushRecordCommits: eager` restores the old behaviour. A scan test fails on a push in the
+  pipeline docs or skills that does not ask the helper.
+
+### Added
+
+- **`ci.skipMarker` (task 319), off by default.** The pipelines append it to a commit they are about to
+  push when that push changes no code over a green, settled ancestor, and never otherwise. It needs
+  `developNext.mergeStrategy: merge` written in the file and no `ci.docsOnly.checkCommand`, so a merge
+  made that way does not put the marker on the base branch's head. Leave it empty when a person can merge
+  with another button or with a message that lists the commits (Bitbucket's default text), or when a
+  merge check needs a status on the head.
+- **`finalise.rerunAtHead` (task 319).** `/finalise` Step 3a runs a listed command again at the head
+  before it grades a criterion that names it as a code span, and records output and exit code in the
+  DoD. No prior verdict on such a criterion is carried over. A list the configuration reader would drop
+  is a usage error, and a run whose tree or head changed under it is refused. Engine:
+  `shared/resources/finalise-rerun-at-head.js`.
+- **The security probe reaches a lint rule (task 319).** `--entry eslint:<path>#<rule-id>` lints each
+  case as that file with the repository's own ESLint and configuration; a reported rule is `rejected`.
+  Such a control was declined `entry-not-probeable` before. It needs its own cases.
+- **`/finalise`'s CI reading 2 poll reads Bitbucket (task 319).** `finalise-ci-poll.sh` takes the
+  destination's status key (`prs:**:<destination>`) and every status that is not a pull-request
+  pipeline's, and writes the same result line as on GitHub. The docs-only rule reads an ancestor's
+  statuses by the same destination, given or read from the PR.
+- **`developNext.tickVia: pr` (task 319).** `develop-next` and `develop-batch` can land the tick through
+  a docs PR and the merge gate, for a base branch that refuses direct pushes. Default `push`. New
+  `shared/resources/tick-pr.sh`.
+
+- **`review-task` check 32: an allow-list that replaces a deny-list covers the whole set (task 312).**
+  The review now asks that the table list every member of the set it gates, or state the count and
+  the command that measured it, and probes each member left on today's behaviour for a write by
+  operand (`uniq in out` creates `out`, which no flag table lists). `review-story` carries the
+  sibling note. A wall-clock bound in `create-task` § 3.5 and `review-task` check 4 now names where
+  it is measured and how load is controlled, and on a shared host prefers a paired, interleaved
+  ratio or CPU time over a ratio of medians. Presence tests: `tests/review-allow-list-timing-checks.test.js`.
+
+### Fixed
+
+- **Gating-rule restatements carry the reproduced-bug exception, and a test holds them (task 288).**
+  Task 273 added the exception (a `category: bug` finding QA reproduces by execution gates at any
+  reviewer confidence, step 5d) and needed five QA cycles to find the restatements that dropped it.
+  The reviewer prompt's `(it will not gate)` now reads `(it will not gate on the reviewer claim
+  alone)`; the four report-template lines in `qa-task` and `qa-story` say `advisory unless blocking
+  resolves to true (run-level arg or frontmatter) or QA reproduced the finding (5d)` instead of
+  naming only the document's flag; and nine more restatement sentences (`review-code`, `qa-task`,
+  `qa-story`, `pr-conformance-prompt.md`, `qa-runnable-prose-detection.md`, the QA-loop step doc)
+  carry the exception or point at it. `evals/shared/tests/gating-rule-restatements.test.mjs` reads
+  the sources: it keys sentences that name the flag, `high-confidence`, `will not gate` or
+  `advisory unless` and fails on one that omits the exception. Known limit: a restatement that
+  avoids all four keys is not seen.
+
+- **The security probe plan's `cases_file` refuses a name the engine does not write (task 287).**
+  `resolveCasesFile` accepted any regular JSON-array file in the work-item directory. It now also
+  requires the basename to end `.security.cases.json` or `.security.cases.<n>.json`, and answers
+  `bad-name-shape` (surfacing as `plan-entry-cases-file-bad-name-shape` and
+  `cases-file-bad-name-shape`) before any file read. Breaking for a hand-authored plan naming a
+  hand-named file: rename the file to the engine shape or put the cases inline. One committed plan
+  is affected (`task.304.dod.1.security.plan.json`), and it was already not reusable because its
+  file is untracked; only the reason changes. The `/finalise` security prompt and `SKILL.md` state
+  the shape. Tests: `shared/resources/tests/security-probe-plan-cases-file.test.mjs`.
+- **Jira sync maps the `superseded` task status (task 305).** `superseded` had no key in the Jira
+  status map and sat in neither terminal set, so a superseded task looked for a Jira transition
+  literally named "Superseded" and could not use the done-category fallback. It now resolves to the
+  `cancelled` family as a negative terminal (a board that wants it elsewhere sets `jira.statusMap`),
+  `gh-stage --init-workflow` writes a `superseded:` line beside `cancelled:`, and the lifecycle and
+  configuration docs list it.
+- **The registry placement test reads rows like the registry parsers (task 318).** `placementOf` in
+  `task-registry-drift.test.mjs` now trims each line and skips fenced blocks, as `parseRegistry`
+  does, so an indented stranded row is flagged and a sample table in a fence is not mistaken for a
+  row or the header.
+- **Task registry rows sit under the table header (task 317).** Every row from task 286 on sat after
+  the `## Notes` section, so `registry-tick.js --annotate` found no table header above it and
+  answered `no-cell`; the rows are back in the one table, `task-registry-drift.test.mjs` fails on a
+  row outside it, and `/create-task` and the registry standard say a new row goes after the last
+  row of the table.
+- **`qa-fix` Step 4 guard looks beneath gitlinks (task 286).** A changed directory whose subtree
+  holds a gitlink with an untracked file read clean; the guard now lists the gitlinks at or beneath
+  each changed directory and refuses one that is not checked out or holds an untracked file, and
+  admits a clean one. A repository rooted at `/` no longer disables the inside test, and an absolute
+  path through an external symlink is documented as refused by git on purpose.
+
 ## [v0.68.0] - 2026-11-20
 
 ### Changed

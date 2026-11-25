@@ -460,6 +460,7 @@ test("readConfig: no file or no block gives the defaults", () => {
       checkCommand: "",
       checkTimeoutSeconds: eng.DEFAULT_CHECK_TIMEOUT_SECONDS,
       settleSeconds: eng.DEFAULT_SETTLE_SECONDS,
+      skipMarker: "",
     });
     writeFileSync(
       join(dir, "skills-config.yaml"),
@@ -483,6 +484,7 @@ test("readConfig: a block list, enabled and checkCommand are read", () => {
       checkCommand: "npm run ci:fast",
       checkTimeoutSeconds: eng.DEFAULT_CHECK_TIMEOUT_SECONDS,
       settleSeconds: eng.DEFAULT_SETTLE_SECONDS,
+      skipMarker: "",
     });
   } finally {
     cleanup(dir);
@@ -1528,7 +1530,7 @@ test("CR3-5: a Bitbucket next link is followed only on the Bitbucket API; the cr
   const { dir } = bbRepo();
   try {
     const urls = [];
-    const r = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+    const r = await runEngine(dir, BB_ASK, {
       env: bbEnv,
       fetchImpl: async (url) => {
         urls.push(url);
@@ -1546,7 +1548,7 @@ test("CR3-5: a Bitbucket next link is followed only on the Bitbucket API; the cr
     assert.equal(r.exitCode, 1);
     assert.equal(JSON.parse(r.stdout).reason, "unverifiable");
     const same = [];
-    const ok = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+    const ok = await runEngine(dir, BB_ASK, {
       env: bbEnv,
       fetchImpl: async (url) => {
         same.push(url);
@@ -1765,12 +1767,19 @@ function bbRepo() {
 }
 const bbEnv = { VCS: "bitbucket", BITBUCKET_ACCESS_TOKEN: "t" };
 const resp = (status, body) => ({ status, json: async () => body });
+const BB_ASK = [
+  "--head-rollup",
+  "PENDING",
+  "--json",
+  "--destination",
+  "develop",
+];
 
 test("Bitbucket: SUCCESSFUL statuses on the ancestor are tree-equivalent", async () => {
   const { dir, green } = bbRepo();
   try {
     const urls = [];
-    const r = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+    const r = await runEngine(dir, BB_ASK, {
       env: bbEnv,
       fetchImpl: async (url) => {
         urls.push(url);
@@ -1790,10 +1799,99 @@ test("Bitbucket: SUCCESSFUL statuses on the ancestor are tree-equivalent", async
   }
 });
 
+test("Bitbucket: an ancestor is read for the PR's own destination, given or read from the PR (T319-CR-306)", async () => {
+  const { dir, green } = bbRepo();
+  const st = (key, state) => ({ key, state, updated_on: LONG_AGO });
+  const ask = async (extra, values, prAnswer) => {
+    const urls = [];
+    const r = await runEngine(
+      dir,
+      ["--head-rollup", "PENDING", "--json", ...extra],
+      {
+        env: bbEnv,
+        fetchImpl: async (url) => {
+          urls.push(url);
+          return /\/pullrequests\/7$/.test(url)
+            ? prAnswer
+            : resp(200, { values });
+        },
+      },
+    );
+    return { ...JSON.parse(r.stdout), exit: r.exitCode, urls };
+  };
+  const pr = (name) => resp(200, { destination: { branch: { name } } });
+  try {
+    const other = [st("prs:**:main", "SUCCESSFUL"), st("sonar", "SUCCESSFUL")];
+    const own = [
+      st("prs:**:develop", "SUCCESSFUL"),
+      st("prs:**:main", "FAILED"),
+    ];
+    for (const [extra, answer] of [
+      [["--destination", "develop"], undefined],
+      [["--pr", "7"], pr("develop")],
+    ]) {
+      const no = await ask(extra, other, answer);
+      assert.equal(no.exit, 1, `${extra}: a green for another destination`);
+      const yes = await ask(extra, own, answer);
+      assert.equal(yes.exit, 0, `${extra}: ${yes.reason} ${yes.detail}`);
+      assert.equal(yes.greenSha, green);
+      assert.equal(
+        yes.urls.filter((u) => u.includes("/pullrequests/")).length,
+        answer ? 1 : 0,
+        "the PR is read once, and only when the destination was not given",
+      );
+    }
+    // a destination that cannot be read decides nothing, and neither does one nobody named (T319-CR-407)
+    for (const bad of [resp(403, {}), resp(200, {}), pr("")]) {
+      const r = await ask(["--pr", "7"], own, bad);
+      assert.equal(r.exit, 1);
+      assert.equal(r.reason, "unverifiable");
+    }
+    const unnamed = await ask([], own);
+    assert.equal(unnamed.exit, 1);
+    assert.equal(unnamed.reason, "unverifiable");
+    // and the answer says what was missing, where it was (T319-CR-604)
+    const missing = /destination branch is not known/;
+    assert.match(unnamed.detail, missing);
+    const red = await ask(BB_ASK.slice(3), [st("prs:**:develop", "FAILED")]);
+    assert.doesNotMatch(red.detail, missing);
+    // another destination's statuses do not age this one's green (T319-CR-409)
+    const fresh = { ...st("prs:**:main", "SUCCESSFUL"), updated_on: undefined };
+    const aged = await ask(BB_ASK.slice(3), [own[0], fresh]);
+    assert.equal(aged.exit, 0, `${aged.reason} ${aged.detail}`);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("a block whose key is quoted twice is refused, for every block that shares the row count (T319-CR-201)", () => {
+  for (const [read, first, second] of [
+    [
+      eng.parseConfig,
+      "ci:\n  docsOnly:\n    enabled: true\n",
+      '"ci":\n  docsOnly:\n    enabled: false\n',
+    ],
+    [
+      eng.parsePipelineConfig,
+      "pipeline:\n  pushRecordCommits: batched\n",
+      "'pipeline':\n  pushRecordCommits: eager\n",
+    ],
+  ]) {
+    assert.doesNotThrow(() => read(second), second);
+    assert.throws(() => read(first + second), /accounts for/, second);
+    assert.throws(() => read(second + first), /accounts for/, second);
+    // a row at column 0 that is no key row ends nothing (T319-CR-406); one that is a key row does
+    for (const row of ["- x\n", "- x: 1\n", "foo\n"])
+      assert.throws(() => read(first + row), /accounts for/, row);
+    for (const row of ["other:\n- x\n- y: 1\n", "my key: 1\n", "a/b: 1\n"])
+      assert.doesNotThrow(() => read(first + row), row);
+  }
+});
+
 test("Bitbucket: a 403 is unverifiable — never 'no CI'", async () => {
   const { dir } = bbRepo();
   try {
-    const r = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+    const r = await runEngine(dir, BB_ASK, {
       env: bbEnv,
       fetchImpl: async () => resp(403, {}),
     });
@@ -1807,7 +1905,7 @@ test("Bitbucket: a 403 is unverifiable — never 'no CI'", async () => {
 test("Bitbucket: an empty status list is NONE, so the walk ends no-green-ancestor", async () => {
   const { dir } = bbRepo();
   try {
-    const r = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+    const r = await runEngine(dir, BB_ASK, {
       env: bbEnv,
       fetchImpl: async () => resp(200, { values: [] }),
     });
@@ -1821,24 +1919,20 @@ test("Bitbucket: an empty status list is NONE, so the walk ends no-green-ancesto
 test("Bitbucket: no credential is unverifiable, and a partial page list is not decided on", async () => {
   const { dir } = bbRepo();
   try {
-    const none = await runEngine(dir, ["--head-rollup", "PENDING", "--json"], {
+    const none = await runEngine(dir, BB_ASK, {
       env: { VCS: "bitbucket" },
       fetchImpl: async () =>
         assert.fail("must not call out without a credential"),
     });
     assert.equal(JSON.parse(none.stdout).reason, "unverifiable");
-    const endless = await runEngine(
-      dir,
-      ["--head-rollup", "PENDING", "--json"],
-      {
-        env: bbEnv,
-        fetchImpl: async () =>
-          resp(200, {
-            values: [{ state: "SUCCESSFUL" }],
-            next: "https://api.bitbucket.org/next",
-          }),
-      },
-    );
+    const endless = await runEngine(dir, BB_ASK, {
+      env: bbEnv,
+      fetchImpl: async () =>
+        resp(200, {
+          values: [{ state: "SUCCESSFUL" }],
+          next: "https://api.bitbucket.org/next",
+        }),
+    });
     assert.equal(JSON.parse(endless.stdout).reason, "unverifiable");
   } finally {
     cleanup(dir);

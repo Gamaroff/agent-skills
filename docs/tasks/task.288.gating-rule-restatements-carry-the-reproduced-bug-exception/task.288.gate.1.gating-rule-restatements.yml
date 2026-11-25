@@ -1,0 +1,73 @@
+schema: 2
+task: 'task.288.gating-rule-restatements-carry-the-reproduced-bug-exception'
+task_title: 'Gating-rule restatements carry the reproduced-bug exception'
+gate: FAIL
+status_reason: 'One high finding, reproduced by QA: the four rewritten report-template lines contain no key the new guard test matches, so dropping their 5d clause leaves the test green. Everything else passes: 8744 tests green on the LAN server, bundle clean, validate clean, three develop-time mutations red.'
+reviewer: 'QA Engineer'
+head: '622621a967bdd2ecebdd66c5230190313b378102'
+updated: '2026-11-23T15:50:29Z'
+
+top_issues:
+  - id: 'T288-CR-1'
+    severity: high
+    file: 'evals/shared/tests/gating-rule-restatements.test.mjs'
+    finding: 'The four qa-task/qa-story report-template lines now read "advisory unless blocking resolves to true (run-level arg or frontmatter) or QA reproduced the finding (5d)". They name no flag, so none of keys A, B, C matches them; keyedSentences() omits them and the T273-CR-6 assertion can only fire on a regression to the old flag-naming wording. QA reproduced it: removing " or QA reproduced the finding (5d)" from the skills/qa-task/SKILL.md line leaves the test at 6 of 6 green (control: the old "advisory unless the doc opted in via code_review_blocking: true" wording does go red). origin: code-review, reproduced by QA. Reviewer confidence high.'
+    suggested_action: 'Add a key for the phrase "advisory unless" itself (flag or not) that requires the exception marker (5d, QA reproduced) on every such sentence, keep the T273-CR-6 shape assertion, and make it fail when it matches fewer than four sentences.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 8744
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: false
+    boundary_signals: []
+    notes: 'No boundary: the change rewords prose and adds a read-only test. The new test exports sentences, population and keyedSentences; none is a predicate whose false prevents an action. Criteria classifier found no boundary signal.'
+  performance:
+    status: PASS
+    notes: 'New test median 0.40 s over five runs at load 4.1-6.1 (target under 2 s).'
+  reliability:
+    status: PASS
+    notes: 'Test is source-reading with a non-vacuity floor (24; 29 measured). Reviewer notes a global floor and an unclosed-fence silent drop as advisory (CR-4).'
+  maintainability:
+    status: CONCERNS
+    notes: 'Guard test has three advisory weaknesses: an exemption reason that the docs-only prompt contradicts (CR-2), a follower rule that ignores block boundaries (CR-3), and splitter edge cases (CR-4).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T288-CR-1: key the "advisory unless" phrase in the guard test.'
+      refs: ['evals/shared/tests/gating-rule-restatements.test.mjs']
+  future:
+    - action: 'CR-2: qa-docs-only-review-prompt.md returns the same code_review findings and says the caller applies gate mapping unchanged, so its "(it will not gate)" is a restatement. Reword it to "will not gate on the reviewer claim alone" and drop the exemption, or correct the exemption reason.'
+      refs: ['shared/resources/qa-docs-only-review-prompt.md', 'evals/shared/tests/gating-rule-restatements.test.mjs']
+      remedy: unverified
+    - action: 'CR-3: let a keyed sentence take its carry marker from the next sentence only within the same block, and narrow "reproduc" to "reproduced by execution" or "step 5d".'
+      refs: ['evals/shared/tests/gating-rule-restatements.test.mjs']
+      remedy: unverified
+    - action: 'CR-4: assert no fence is left open at end of file, add a per-file minimum for known restating files, and test lowercase-start and "e.g." splits.'
+      refs: ['evals/shared/tests/gating-rule-restatements.test.mjs']
+      remedy: unverified
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T288-CR-1 fixed and re-reviewed']

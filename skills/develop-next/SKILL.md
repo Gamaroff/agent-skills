@@ -27,6 +27,7 @@ Read once per run from the consumer project's `skills-config.yaml` (`developNext
 | `developNext.baseBranch`         | `develop`                                        | Steps 0, 3, 4     |
 | `developNext.qualityGateCommand` | `npm run ci`                                     | Step 3 merge gate |
 | `developNext.mergeStrategy`      | `merge` (one of `merge` / `squash` / `rebase`)   | Step 3            |
+| `developNext.tickVia`            | `push` (or `pr`)                                 | Steps 0, 4        |
 
 `mergeStrategy` is always written in `gh` vocabulary regardless of host; Step 3 translates it for Bitbucket (`merge` → `merge_commit`, `rebase` → `fast_forward`). Do not put Bitbucket strategy names in `skills-config.yaml`.
 
@@ -189,7 +190,7 @@ reads on a resume — the work-item path alone cannot say which arm applies. Thi
      echo "$ROW: $ROW_TICKED"
      ```
 
-     `ticked` → set `ticked: true`. `ticked-unpushed` → push it (`git push origin <baseBranch>`, with Step 4's non-ff rule), then set `ticked: true` — never a second tick. `not-ticked` → leave it. `uncommitted` or `unknown` → **HALT** with that line: route nowhere until the operator has committed or discarded the edits, or the look succeeds.
+     `ticked` → set `ticked: true`. `ticked-unpushed` → push it (Step 4's tick push, `push-policy.sh --site tick` then `git push origin <baseBranch>`, with its non-ff rule; under `tickVia: pr` the base refuses that push, so cut the tick branch from the local base with `git branch --no-track -f docs/<roadmap>-tick-<item> <baseBranch>` and **run Step 4's `start` block here, before Step 4's re-sync**: it answers `resume` or `landed` and puts the local base back at `origin/<baseBranch>`. Re-synced first, a local base whose origin has moved on does not fast-forward and Step 4 halts. On `resume` the tick branch holds the commit: go to Step 4, whose re-sync fast-forwards and whose own `start` answers `resume` again. On `landed` the tick is on the base and its branch is gone: run no second `start`), then set `ticked: true` — never a second tick. `not-ticked` → leave it. `uncommitted` or `unknown` → **HALT** with that line: route nowhere until the operator has committed or discarded the edits, or the look succeeds.
 
    **c. Route on the reconciled flags:**
 
@@ -645,6 +646,62 @@ false`) has it without re-deriving anything — the roadmap and the registries a
 with different owners, and the step used to know only the first. Five registry-sourced runs each improvised the second (#30, #31,
 #34, #35) before this branch existed.
 
+### How the tick is pushed: `developNext.tickVia`
+
+The arms below are written for **`push`** (the default): the tick commit goes on `<baseBranch>`, and
+every push of it asks `references/push-policy.sh` (site `tick`) first. Under **`pr`**, for a base branch
+that refuses direct pushes, the edits and commits are the same and three things change. The tick
+branch is `docs/<roadmap>-tick-<id>`, where `<roadmap>` is the basename of the document being edited
+without its extension (`docs/task-registry-tick-<id>` for the registry arm):
+
+1. **Before the edit**, move to the tick branch. `new` → edit and commit as the arm says. `resume` → an
+   earlier run committed the tick: skip to 2. `landed` → an earlier run's tick is already on the base:
+   mark `ticked: true` and go to Step 5.
+   ```bash
+   # INPUTS, substituted into THIS block: every {…}.
+   BASE="{baseBranch}"; TICK_BRANCH="docs/{roadmap}-tick-{id}"
+   case "$BASE$TICK_BRANCH" in *'{'*) echo "HALT: BASE and TICK_BRANCH must be substituted into this block"; exit 1 ;; esac
+   bash .agents/skills/develop-next/references/tick-pr.sh start --base "$BASE" --branch "$TICK_BRANCH" \
+     || { echo "HALT: the tick branch could not be prepared"; exit 1; }
+   ```
+   **`new` with nothing to commit.** A resume after the tick's merge commit landed finds the row already
+   as the arm would write it (the roadmap row `[x]` with this PR; the registry arm's `already`, or any of
+   its no-commit reasons). Make no commit and do not run 2 or 3. Return to the base with the same block,
+   `start` replaced by `finish`; it prints `already-recorded`, or refuses when there is a commit or an
+   uncommitted edit after all. Then mark `ticked: true`.
+2. **In place of the arm's push**, open the PR. The line it prints is the PR number 3 takes:
+   ```bash
+   # INPUTS, substituted into THIS block: every {…}.
+   BASE="{baseBranch}"; TICK_BRANCH="docs/{roadmap}-tick-{id}"; TITLE="docs(roadmap): tick {id}"
+   case "$BASE$TICK_BRANCH$TITLE" in *'{'*) echo "HALT: BASE, TICK_BRANCH and TITLE must be substituted into this block"; exit 1 ;; esac
+   bash .agents/skills/develop-next/references/tick-pr.sh open --base "$BASE" --branch "$TICK_BRANCH" --title "$TITLE" \
+     || { echo "HALT: the tick PR could not be opened"; exit 1; }
+   ```
+3. **Merge it through Step 3's merge gate**, which the script applies and refuses on: the quality gate,
+   which it runs itself on the tick branch; the pinned head; green CI on that head; and the PR's state
+   after the merge. **First write the resolved `<qualityGateCommand>`, and nothing else, to
+   `.claude/state/tick-gate.txt` with the Write tool, in a call of its own.** It is read from a file and
+   never typed into the block: between double quotes the block's own shell expands a `$?`, a `$( )` or a
+   backtick in it before the gate runs, and a red gate reads green. Read the block's exit status on the
+   completion notification (the pipeline lock is gone by Step 4, so no wait is marked):
+   ```bash
+   # RUN BACKGROUNDED (run_in_background): it runs the quality gate and waits for CI.
+   # INPUTS, substituted into THIS block: every {…}; TICK_PR is the number 2 printed.
+   BASE="{baseBranch}"; TICK_BRANCH="docs/{roadmap}-tick-{id}"; TICK_PR="{tick-pr}"; STRATEGY="{mergeStrategy}"
+   case "$BASE$TICK_BRANCH$TICK_PR$STRATEGY" in *'{'*) echo "HALT: the inputs must be substituted into this block"; exit 1 ;; esac
+   GATE=$(cat .claude/state/tick-gate.txt) && [ -n "$GATE" ] \
+     || { echo "HALT: write the quality gate command to .claude/state/tick-gate.txt first"; exit 1; }
+   rm -f .claude/state/tick-gate.txt   # used once: a later tick writes its own
+   bash .agents/skills/develop-next/references/tick-pr.sh merge --base "$BASE" --branch "$TICK_BRANCH" \
+     --pr "$TICK_PR" --quality-gate "$GATE" --strategy "$STRATEGY"
+   ```
+   `merged` → mark `ticked: true`, whatever warnings came with it: the tick is on the base branch. Any
+   other outcome is a **HALT** with its `HALT:` line; the run state keeps `merged: true, ticked: false`,
+   and the next run's `start` answers `resume`, or `landed` when the merge went through after all.
+
+The non-ff retry in the arms is for `push` only, and so are the arms' unconditional pushes (the registry
+arm's `already`).
+
 ### `item.source` = `roadmap`
 
 1. Tick the item `[x]` and rewrite its row in the roadmap's own accepted-row convention — copy the format of an existing ✅ row; if none exists yet, use `✅ **accepted + merged** ([PR #N](url), QA PASS S/100)`.
@@ -654,7 +711,7 @@ with different owners, and the step used to know only the first. Five registry-s
    ```bash
    git add <roadmapPath>
    git commit -m "docs(roadmap): tick <id> [x] — <short summary>"
-   git push origin <baseBranch>
+   [ "$(bash .agents/skills/develop-next/references/push-policy.sh --site tick)" = defer ] || git push origin <baseBranch>
    ```
    If the push is rejected (non-ff): `git pull --rebase origin <baseBranch>` once and retry; if it is still rejected (e.g. branch protection): **HALT** with the git output — the run state preserves `merged: true, ticked: false` for manual recovery.
 5. Mark `ticked: true` in the run state.
@@ -701,11 +758,12 @@ and, when the run created a tracker issue, the `Issue` cell — and never a seco
        git commit -m "docs(registry): record <id> — PR #<n> merged"
      }
      ```
-     A clean tree means the earlier commit exists locally — not that it was pushed: a crash between
+     A clean tree means the earlier commit exists locally — not that it was pushed (site `tick`,
+     `push-policy.sh --site tick`): a crash between
      `git commit` and `git push` leaves it local-only. So push unconditionally (idempotent when
      nothing is ahead) before marking ticked:
      ```bash
-     git push origin <baseBranch>
+     [ "$(bash .agents/skills/develop-next/references/push-policy.sh --site tick)" = defer ] || git push origin <baseBranch>
      ```
      Then log `already` and mark `ticked: true`.
    - every other exit-0 reason — `no-row`, `row-malformed`, `no-registry`, `no-cell`, `not-accepted`, `not-a-task`,
@@ -716,7 +774,7 @@ and, when the run created a tracker issue, the `Issue` cell — and never a seco
 2. Commit and push (only on `annotated`):
    ```bash
    git commit -m "docs(registry): record <id> — PR #<n> merged"   # the row `--stage` staged; no git add
-   git push origin <baseBranch>
+   [ "$(bash .agents/skills/develop-next/references/push-policy.sh --site tick)" = defer ] || git push origin <baseBranch>
    ```
    Same non-ff rule as the roadmap arm.
 3. Mark `ticked: true` in the run state.

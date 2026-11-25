@@ -347,6 +347,188 @@ test("cancelled and in-flight rows do not trip the agreement check", () => {
   );
 });
 
+/**
+ * task.317 — every registry row sits inside the one table block.
+ *
+ * `registry-tick.js --annotate` finds a row's notes cell by walking UP from the row to
+ * its table header, over table lines only. A row that sits after the `## Notes`
+ * section has no header above it, so the writer answers `no-cell` and records nothing.
+ * That is how every row from task 286 on went unannotated: `/create-task` appended each new
+ * row at the end of the file, and nothing here asked WHERE a row sat — the tests above
+ * read the whole file for rows, and `select-next.mjs` read them from the stranded
+ * position without complaint. The cost fell on one merge step, weeks later.
+ *
+ * `placementOf` is a pure function over the registry's text, so the synthetic test below
+ * can hand it a stranded row and watch it flag one. A check that has only ever seen the
+ * committed (clean) file has not shown it can fail.
+ */
+const PLACEMENT_MIN_ROWS = 317;
+
+function placementOf(text) {
+  // Read a line the way `parseRegistry` (select-next.mjs) does (task.318): trim it before the
+  // row and header tests, and skip a fenced block whole. A fence delimiter and the lines inside
+  // are "fenced" and read as nothing, so a sample table in a fence is neither a row nor the
+  // header, and the fence line ends the table block like any other non-table line.
+  const raw = text.split("\n");
+  let inFence = false;
+  const lines = raw.map((l) => {
+    if (/^\s*(```|~~~)/.test(l)) {
+      inFence = !inFence;
+      return "";
+    }
+    return inFence ? "" : l.trim();
+  });
+  const header = lines.findIndex((l) => /^\|\s*#\s*\|/.test(l));
+  const sepOk = header !== -1 && /^\|[\s:|-]+\|$/.test(lines[header + 1] ?? "");
+  let blockEnd = -1; // index of the first non-table line after the separator
+  if (sepOk) {
+    blockEnd = header + 2;
+    while (blockEnd < lines.length && lines[blockEnd].startsWith("|")) {
+      blockEnd += 1;
+    }
+  }
+  const rows = [];
+  lines.forEach((l, i) => {
+    const m = /^\|\s*(\d+)\s*\|/.exec(l);
+    if (m) {
+      rows.push({
+        line: i + 1,
+        id: Number(m[1]),
+        inBlock: sepOk && i >= header + 2 && i < blockEnd,
+      });
+    }
+  });
+  return { sepOk, rows, stranded: rows.filter((r) => !r.inBlock) };
+}
+
+test("every registry row sits in the one table block under the header (task.317)", () => {
+  assert.ok(
+    existsSync(REGISTRY_ABS),
+    `task registry not found at ${REGISTRY_REL}`,
+  );
+  const { sepOk, rows, stranded } = placementOf(
+    readFileSync(REGISTRY_ABS, "utf8"),
+  );
+  assert.ok(
+    sepOk,
+    `${REGISTRY_REL} has no table header (a line starting \`| #\`) followed by a separator line — nothing can be placed under it`,
+  );
+  assert.ok(
+    rows.length >= PLACEMENT_MIN_ROWS,
+    `found only ${rows.length} registry rows, expected at least ${PLACEMENT_MIN_ROWS}: the registry only grows, so either rows were deleted or the row pattern stopped matching. Do NOT lower PLACEMENT_MIN_ROWS to make this pass.`,
+  );
+  assert.deepEqual(
+    stranded,
+    [],
+    `${stranded.length} registry row(s) sit outside the table block under the header; first: task ${stranded[0]?.id} at line ${stranded[0]?.line}. ` +
+      `Insert a new row directly after the last row of the table, never at the end of the file: registry-tick.js --annotate finds the notes cell through the row's table header, and a row below the Notes section has none.`,
+  );
+});
+
+test("the placement check flags a row stranded below the Notes section and a headerless table (task.317)", () => {
+  const head = "| #  | Title |\n|----|-------|\n";
+  const good = `${head}| 1  | a |\n| 2  | b |\n\n---\n\n## Notes\n\nprose\n`;
+  const stranded = `${head}| 1  | a |\n| 2  | b |\n\n---\n\n## Notes\n\nprose\n\n| 3  | c |\n`;
+  const headerless = "| 1  | a |\n| 2  | b |\n";
+  // The select-next.mjs parser reads a row with no space after the pipe as a row,
+  // so the placement check must see it too (QA cycle 1, T317-CR-1).
+  const tight = `${head}| 1  | a |\n\n## Notes\n\n|3| c |\n|  4 | d |\n`;
+
+  const t = placementOf(tight);
+  assert.deepEqual(
+    t.stranded.map((r) => r.id),
+    [3, 4],
+    "a stranded row is flagged whatever its spacing after the leading pipe",
+  );
+
+  const g = placementOf(good);
+  assert.equal(g.sepOk, true);
+  assert.equal(g.rows.length, 2, "non-vacuity: the helper saw both rows");
+  assert.deepEqual(g.stranded, []);
+
+  const s = placementOf(stranded);
+  assert.deepEqual(
+    s.stranded.map((r) => r.id),
+    [3],
+    "a row after the Notes section is the stranded one",
+  );
+
+  const h = placementOf(headerless);
+  assert.equal(h.sepOk, false, "a table with no header cannot hold a row");
+  assert.equal(
+    h.stranded.length,
+    2,
+    "every row of a headerless table is stranded",
+  );
+});
+
+test("the placement check reads rows the way parseRegistry does: trimmed lines, fences skipped (task.318)", async (t) => {
+  // A row needs a `[title](task.N.x/task.N.x.md)` link and at least five cells, or
+  // parseRegistry reports it malformed instead of reading it.
+  const head =
+    "| # | Title | Status | Category | Priority | Created | Depends on | Notes |\n" +
+    "|---|-------|--------|----------|----------|---------|------------|-------|\n";
+  const row = (n) =>
+    `| ${n} | [t](task.${n}.x/task.${n}.x.md) | planned | testing | Low | 2026-11-22 | — | n |`;
+  const parserIds = (text) =>
+    parseRegistry(text, "task", "docs/tasks/task-registry.md")
+      .rows.map((r) => r.n)
+      .sort((a, b) => a - b);
+  const placementIds = (text) =>
+    placementOf(text)
+      .rows.map((r) => r.id)
+      .sort((a, b) => a - b);
+
+  // The registry's own sample block is fenced, and a fence can hold a whole table.
+  const fenceBlock = (body) => `\`\`\`\n${body}\n\`\`\`\n`;
+  const cases = {
+    // `parseRegistry` trims each line, so an indented row below `## Notes` is a row it reads.
+    indented: {
+      text: `${head}${row(1)}\n\n## Notes\n\nprose\n\n  ${row(3)}\n`,
+      rows: [1, 3],
+      stranded: [3],
+    },
+    // A sample row inside a fence is an example: `parseRegistry` skips it.
+    fenced: {
+      text: `${head}${row(1)}\n\n## Notes\n\n${fenceBlock(row(4))}`,
+      rows: [1],
+      stranded: [],
+    },
+    fencedTilde: {
+      text: `${head}${row(1)}\n\n## Notes\n\n~~~\n${row(4)}\n~~~\n`,
+      rows: [1],
+      stranded: [],
+    },
+    // A fenced table above the real header must not be taken for the header.
+    fencedHeader: {
+      text: `${fenceBlock(`${head}${row(9)}`)}\n${head}${row(1)}\n`,
+      rows: [1],
+      stranded: [],
+    },
+  };
+
+  // One subtest per case, so a revert of the trim or of a fence skip names the case it breaks.
+  for (const [name, c] of Object.entries(cases)) {
+    await t.test(name, () => {
+      assert.deepEqual(
+        parserIds(c.text),
+        c.rows,
+        "the case is wrong if the parser it mirrors does not read these rows",
+      );
+      assert.deepEqual(
+        placementIds(c.text),
+        c.rows,
+        "placementOf must see the rows parseRegistry sees",
+      );
+      assert.deepEqual(
+        placementOf(c.text).stranded.map((r) => r.id),
+        c.stranded,
+        "stranded rows",
+      );
+    });
+  }
+});
+
 test("every declared dependency resolves to a registry row — the notes half of the cell is never a dependency (obs #74, task.127)", () => {
   // The `Depends on` cell is also the notes cell: `registry-tick.js --annotate`
   // appends ` · PR #N merged`, authors write `obs #83` and dates there. Before

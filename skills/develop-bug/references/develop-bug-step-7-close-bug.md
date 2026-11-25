@@ -13,6 +13,23 @@ Runs in full in **both lite and standard modes**.
 
 ## Part A — Finalise (DoD)
 
+### Push what the verify loop held
+
+`/finalise` takes CI reading 1 on the PR head while recording `HEAD`, so a commit still local would be
+accepted on a reading of another commit. Give the call a tool timeout of 600000 ms: the push
+waits up to 500 s for the project's own pre-push hook, and the default tool timeout ends the call before
+it answers:
+
+```bash
+bash .agents/skills/develop-bug/references/push-held.sh --site finalise-entry
+```
+
+`commit-staged`: a commit is held and something is staged that it may link to. Commit the staged set and
+nothing else through `/commit-changes` (`docs({bug-prefix}): records, ahead of finalise`), then run the
+block again. `not pushed` (exit 1): HALT with the line; `HEAD` is not known to
+be the PR head (where origin is ahead, pull first; where a push was stopped, ask origin again). No line at all: the call
+was cut off; run it again with that timeout, and HALT when it is cut off again. Any other line: go on.
+
 ### DO NOT inline this step
 
 Invoke the `/finalise` skill via the Skill tool **in bug mode** against the **bug file**:
@@ -27,7 +44,8 @@ Do NOT write a DoD file directly or set any accepted/closed status without runni
 
 After finalise returns, read its output:
 - DoD satisfied → continue to Part B.
-- DoD gaps found → do **not** advance the lock (it stays at 7, where `/finalise` held it — task 222); log each gap in the Issues Log, commit the report via `/commit-changes` (`docs({bug-prefix}): implementation report — finalise gaps identified`), push, and **HALT**:
+- DoD gaps found → do **not** advance the lock (it stays at 7, where `/finalise` held it — task 222); log each gap in the Issues Log, commit the report via `/commit-changes` (`docs({bug-prefix}): implementation report — finalise gaps identified`), and **HALT** (the terminal HALT block's `push-held.sh --site halt` sends it out, held commits included):
+
   ```
   ⚠️ Finalise identified Definition of Done gaps.
   Address the gaps in {report path} before re-running /develop-bug.

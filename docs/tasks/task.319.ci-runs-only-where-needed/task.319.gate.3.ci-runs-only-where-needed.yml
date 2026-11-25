@@ -1,0 +1,201 @@
+schema: 2
+task: 'task.319.ci-runs-only-where-needed'
+task_title: 'Pipelines spend a CI run only where a run can answer something'
+gate: FAIL
+status_reason: 'Three high defects, each reproduced by QA with a control: the re-run engine can answer ran over a working tree that is not the head. Nine medium and seven low defects beside them, most in the fixes of cycle 2.'
+reviewer: 'QA Engineer'
+head: '1d6aa8ef2fc0e9beef2f43cd4174df7a9d8d8a18'
+updated: '2026-11-24T14:02:07Z'
+
+top_issues:
+  - id: 'T319-CR-401'
+    severity: high
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'The flagged-file check reads the superproject index only, so a skip-worktree flag inside a submodule hides an edit and the engine answers ran on it (origin: code-review, reproduced by QA).'
+    suggested_action: 'Compare the working tree with the head tree itself, in every populated submodule too, instead of asking each index what it was told to ignore.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-402'
+    severity: high
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'A missing skip-worktree file is taken for a sparse checkout when core.sparseCheckout is unset, so a deleted file answers ran; the T319-CR-204 test asserts that answer (origin: code-review, reproduced by QA).'
+    suggested_action: 'Accept a missing file only under an active sparse checkout whose patterns leave it out, and correct the test.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-403'
+    severity: high
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'git status is trusted under local configuration that tells it not to look: submodule.<name>.ignore, core.fileMode=false and a core.fsmonitor hook each turn dirty-tree into ran (origin: code-review, reproduced by QA).'
+    suggested_action: 'Force the settings the comparison depends on, for every git call that decides whether the tree is the head.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-404'
+    severity: medium
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'A timeout kills one process group: coreutils timeout moves itself to its own group, and its child wrote a file after the run was recorded timed_out (reproduced by QA).'
+    suggested_action: 'Kill by session, or state the residual and test it.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-405'
+    severity: medium
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'A descendant in its own group keeps the output descriptor, so the saved file passed the bound after the engine returned: 1000 bytes bound, 20 MB on disk (reproduced by QA).'
+    suggested_action: 'Give the command pipes and let the engine copy at most the bound.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-406'
+    severity: medium
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'A column-0 row that is no plain key ends the counted block, so a list entry at column 0 is dropped without a refusal; a block key spelt with an escape reads as not configured (both reproduced by QA; probe cases hostile-escaped-block-alone and hostile-escaped-duplicate-block).'
+    suggested_action: 'Refuse a file holding a significant column-0 row that topLevelKey cannot read as a plain key.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-407'
+    severity: medium
+    file: 'shared/resources/push-policy.sh'
+    finding: 'push-policy.sh asks the engine with neither --pr nor --destination, so on Bitbucket the statuses of every destination count toward the answer that licenses the skip marker.'
+    suggested_action: 'Make an unknown destination unverifiable on Bitbucket and pass it from every caller.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-501'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-7-finalise.md'
+    finding: 'With no remote-tracking ref, or a detached HEAD, the entry block reads 0 held commits and prints nothing held, so the push is skipped (reproduced by QA; the develop-bug copy has the same line).'
+    suggested_action: 'Read nothing held only from a measured 0; push when the ref cannot be resolved.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-502'
+    severity: medium
+    file: 'shared/resources/develop-pipeline-step-7-finalise.md'
+    finding: 'The resume arm believes a head file that nothing removes when the poll ends, so a fix commit made after a red reading is held back while reading 1 is taken on the old head (reproduced by QA).'
+    suggested_action: 'Take the arm only while a poll is live or its result is unread, and remove the head file when the reading is consumed.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-503'
+    severity: medium
+    file: 'skills/develop-bug/references/develop-bug-step-7-close-bug.md'
+    finding: 'The --mark line is still applied to a commit whose hash the verify cycle has logged; CR-310 removed it at one site and nothing enumerates the others.'
+    suggested_action: 'Mark only a commit the block itself just made, and scan the --mark sites.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-504'
+    severity: medium
+    file: 'shared/resources/tick-pr.sh'
+    finding: 'Three Bitbucket requests in tick-pr.sh have no time limit (lines 180, 244, 248), so a stalled server holds the merge after the PR has merged.'
+    suggested_action: 'Give the three calls the same limit and enumerate the requests in a test.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-505'
+    severity: medium
+    file: 'skills/develop-task/SKILL.md'
+    finding: 'A push that hangs blocks the HALT: the tool timeout ends the block before --halt, with the lock present and no snapshot (origin: code-review at medium confidence, reproduced by QA; the story and bug copies are the same).'
+    suggested_action: 'Bound the push so that --halt always runs, and test a push that hangs.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-408'
+    severity: low
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'The DoD exemption is a bare name prefix, so code named like a record is exempt and its edit answers ran (reproduced by QA).'
+    suggested_action: 'Match the exact names /finalise writes, regular files only.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-409'
+    severity: low
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'settle() still reads the timestamps of other destinations, so another destination can withhold this PR green (fails closed).'
+    suggested_action: 'Pass settle the filtered statuses.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-410'
+    severity: low
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'The throwaway index has no stat data and the diff obeys user configuration, so an unedited flagged file can be refused.'
+    suggested_action: 'Start from a copy of the real index with the flags cleared, and force the settings.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-506'
+    severity: low
+    file: 'shared/resources/tick-pr.sh'
+    finding: 'A gate that is only spaces or only a comment passes the non-empty check, runs nothing, and the tick merges.'
+    suggested_action: 'Refuse a gate with no content other than blanks and comments.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-507'
+    severity: low
+    file: 'skills/develop-task/SKILL.md'
+    finding: 'The HALT flush tests that a PR URL was recorded, not that the PR is open, so it re-creates a merged PR branch that was deleted (reproduced by QA).'
+    suggested_action: 'Read the PR state first, or push only to a branch that exists on the remote.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-508'
+    severity: low
+    file: 'skills/develop-task/SKILL.md'
+    finding: 'The HALT flush has neither guard of the entry block: it pushes a report that links to a file only staged, and moves an acceptance head during the 6c wait (origin: code-review at medium confidence, reproduced by QA).'
+    suggested_action: 'Give it both guards and print what was left local.'
+    suggested_owner: dev
+    status: open
+  - id: 'T319-CR-509'
+    severity: low
+    file: 'skills/develop-next/SKILL.md'
+    finding: 'After landed, the first start deletes the local tick branch, so the second answers new, against the text.'
+    suggested_action: 'Route landed straight to ticked: true.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 8855
+  phases_verified: '7/7'
+  trace:
+    phases_covered: [0, 1, 2, 3, 4, 5, 6]
+    phases_with_issues: [2, 3, 4, 5]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 86
+    escaped: 0
+    boundary: true
+    boundary_signals: ["never"]
+    notes: 'push-policy --site engages, 48 of 48. parseRerunList is present-but-inert, 36 of 38: an escaped spelling of the block key reads as an empty list, or leaves a second copy uncounted (T319-CR-406).'
+  performance:
+    status: PASS
+    notes: 'pushes before (eager): 9; after (batched): 6, re-run at this head.'
+  reliability:
+    status: FAIL
+    notes: 'The re-run engine answers ran over a tree that is not the head (CR-401 to CR-403).'
+  maintainability:
+    status: PASS
+    notes: 'One decision helper and one site table.'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix the three high and nine medium findings; the highs share one cause and take one structural fix, a comparison of the working tree with the head tree'
+      refs: ['shared/resources/finalise-rerun-at-head.js', 'shared/resources/tests/finalise-rerun-at-head.test.mjs']
+  future:
+    - action: 'CR-411 and CR-412 (advisory bugs, not reproduced): the re-run record is not held to exactly these criteria; output_capped and the truncation use two size readings'
+      refs: ['shared/resources/finalise-rerun-scope.js', 'shared/resources/finalise-rerun-at-head.js']
+      remedy: unverified
+    - action: 'CR-413, CR-414 and CR-510 (cleanups): git status read twice, every tracked file hashed for one flagged file, and a CHANGELOG line that says every HALT pushes'
+      refs: ['shared/resources/finalise-rerun-at-head.js', 'CHANGELOG.md']
+      remedy: unverified
+
+bug_resolution:
+  bugs_fixed: 0
+  bugs_remaining: 1
+  verification_method: 'bug 3 filed this cycle; bugs 1 and 2 were closed in cycle 2'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['the three high and nine medium findings fixed']

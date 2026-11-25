@@ -20,6 +20,8 @@
 #   PR_READ_HEAD_BRANCH  the PR's source (head) branch name. Best-effort: empty when the forge's
 #                   answer omits it, and its absence alone never fails the read. finalise's PR
 #                   resolver compares it with the current branch to confirm a cited PR (task 175)
+#   PR_READ_REPO    workspace/repository on Bitbucket, for a caller that reads a second endpoint of the
+#                   same repository with the BB_CURL_AUTH this call resolved; empty on GitHub
 #   PR_READ_ERROR   on failure, which read failed and why — print it, do not paraphrase it
 #
 # Return status:
@@ -57,7 +59,7 @@ PR_READ_BB_API="${PR_READ_BB_API:-https://api.bitbucket.org/2.0}"
 
 # shellcheck disable=SC2034  # PR_READ_* are the output contract, set here and read by the sourcing caller (see header)
 pr_read() {
-  PR_READ_VCS="" PR_READ_NUMBER="" PR_READ_HEAD="" PR_READ_BASE="" PR_READ_HEAD_BRANCH="" PR_READ_ERROR=""
+  PR_READ_VCS="" PR_READ_NUMBER="" PR_READ_HEAD="" PR_READ_BASE="" PR_READ_HEAD_BRANCH="" PR_READ_REPO="" PR_READ_ERROR=""
   local pr="" remote="origin" branch=""
   while [ $# -gt 0 ]; do
     case "$1" in
@@ -103,6 +105,7 @@ pr_read() {
     PR_READ_ERROR="could not derive the Bitbucket workspace/repository from remote '${remote}' (${url:-no URL})"
     return 1
   fi
+  PR_READ_REPO="${ws}/${repo}"
 
   # shellcheck source=bitbucket-auth.sh
   if ! source "${_PR_READ_DIR}/bitbucket-auth.sh" 2>/dev/null; then
@@ -116,7 +119,7 @@ pr_read() {
   body=$(mktemp) || { PR_READ_ERROR="mktemp failed"; return 1; }
   if [ -n "$pr" ]; then
     what="PR #${pr} on Bitbucket"
-    http_status=$(curl -s -o "$body" -w '%{http_code}' "${BB_CURL_AUTH[@]}" \
+    http_status=$(curl -s --max-time 30 -o "$body" -w '%{http_code}' "${BB_CURL_AUTH[@]}" \
       "${PR_READ_BB_API}/repositories/${ws}/${repo}/pullrequests/${pr}" 2>/dev/null)
   else
     # symbolic-ref, not `rev-parse --abbrev-ref`: on a detached HEAD that prints the literal
@@ -128,7 +131,7 @@ pr_read() {
       return 1
     fi
     what="the open PR for branch '${branch}' on Bitbucket"
-    http_status=$(curl -s -G -o "$body" -w '%{http_code}' "${BB_CURL_AUTH[@]}" \
+    http_status=$(curl -s --max-time 30 -G -o "$body" -w '%{http_code}' "${BB_CURL_AUTH[@]}" \
       --data-urlencode "q=source.branch.name=\"${branch}\" AND state=\"OPEN\"" \
       "${PR_READ_BB_API}/repositories/${ws}/${repo}/pullrequests" 2>/dev/null)
   fi

@@ -18,8 +18,9 @@ Add `review-task` check 32 and extend the existing timing rule (obs #31) in `cre
 ### Phase 1: The allow-list check
 
 **Files to modify:**
-- `skills/review-task/SKILL.md` — new check after 31 (line 1269 onward): "32. **An allow-list replacing a deny-list covers the whole set** (obs #159)".
-- `skills/review-story/SKILL.md` — a sibling note in the same Step 3 list.
+- `skills/review-task/SKILL.md` — new check after 31 (line 1280 onward): "32. **An allow-list replacing a deny-list covers the whole set** (obs #159)", plus its three companions as task 298 did for 31: a bullet in "Common Hallucination Patterns to Detect", the clause in Step 3's "Issues to Flag", and rule 16 in the Anti-Hallucination Protocol.
+- `skills/review-story/SKILL.md` — a sibling note in its Step 4 (`### Step 4: Technical Accuracy and Anti-Hallucination Review`) list, not Step 3.
+- `tests/review-allow-list-timing-checks.test.js` — new. Do not place it under `skills/review-task/tests/`: `test:suite` has no glob for it.
 
 **Exact changes:**
 
@@ -28,8 +29,8 @@ Check 32 wording: when a plan replaces a deny-list with an allow-list, (a) the t
 ### Phase 2: The timing statistic
 
 **Files to modify:**
-- `skills/create-task/SKILL.md:569` — extend the obs #31 bullet.
-- `skills/review-task/SKILL.md` — check 22's wall-clock note (around 1472–1478).
+- `skills/create-task/SKILL.md:582` — extend the obs #31 bullet. `tests/create-task-authoring-evidence.test.js` reads this file: run it after the edit.
+- `skills/review-task/SKILL.md` — the wall-clock note in Step 6 check 4 (lines 1483–1487; `grep -n "wall-clock runtime" skills/review-task/SKILL.md`). `tests/review-task-measured-criterion.test.js` pins that check: run it after the edit.
 
 **Exact changes:** add to both: the criterion names where it is measured and how load is controlled, and on a shared host prefers a paired, interleaved ratio or CPU time (user + sys) over a ratio of medians. Task 306's ten runs: ratio of medians 1.22, paired-ratio median 1.07, CPU time 1.016.
 
@@ -40,4 +41,4 @@ Check 32 wording: when a plan replaces a deny-list with an allow-list, (a) the t
 
 ## Testing Approach
 
-A fixture task document with a partly tabled allow-list and one fully tabled control; a parity test that reads both skills' timing sentence. Temp directories get a `t.after` removal.
+Presence tests in `tests/review-allow-list-timing-checks.test.js`, in the style of `tests/review-run-and-parity-checks.test.js`: check 32's trigger, coverage rule, operand probe, `uniq in out` example and severity; a test that executes `uniq in out` in a temp directory and asserts the file appears; a parity test that reads both skills' timing sentence. Temp directories get a `t.after` removal.

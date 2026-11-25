@@ -34,7 +34,9 @@ Order matters: an escaping name must keep answering `outside-work-dir`, not `bad
 
 `shared/resources/tests/security-probe-plan-cases-file.test.mjs` uses `ok.json`, `mixed.json`, `only.json`, `esc.json`, `obj.json` as plan-entry names (around lines 95-195). Rename each fixture file and its `cases_file` to an engine-shaped name (`ok.dod.0.security.cases.json`). Keep the `missing.json` and `link.json` cases but give them engine-shaped names too, or the new check answers first and they stop testing what they test.
 
-Add: both accepted shapes; a plain `x.json`; `x.security.cases.json.bak`; `x.security.cases.a.json`; a dotted stem `task.9.dod.2.security.cases.json`; and the order test (an escaping engine-shaped name still answers `outside-work-dir`).
+The probe-engine test `casesFileAccepted: the probe engine executes hostile and legitimate names` (about lines 282-310) uses the same names (`ok.json`, `link.json`, `sub`, `ok.json\u0000.txt`). Re-point it as well: with the new check `link.json` and `sub` would be refused as `bad-name-shape`, so the hostile cases still pass but no longer test the symlink and not-a-file refusals. Give the symlink and the legitimate file engine-shaped names; for `sub`, use a directory named `sub.security.cases.json`.
+
+Add: both accepted shapes; a plain `x.json`; `x.security.cases.json.bak`; `x.security.cases.a.json`; a dotted stem `task.9.dod.2.security.cases.json`; the order test (an escaping engine-shaped name still answers `outside-work-dir`); a bad-shape name whose file does not exist answers `bad-name-shape`, not `missing`; and the corpus control (copy `task.304.dod.1.security.plan.json` and `task.269.dod.1.security.plan.json` with their referenced files into a temp directory, call `reusePlan`, and check `cases-file-bad-name-shape` for 304 and `reusable` for 269; remove the directory in a `finally`).
 
 ## Phase 3: Wording, bundle, changelog
 

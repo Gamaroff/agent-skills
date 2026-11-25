@@ -55,7 +55,7 @@ Run the bug-appropriate verification signals, in order. **All must pass** for a 
 
 > Standard vs lite: in lite mode (`Minor`/`Trivial` + `Low`/`Medium` only — see Phase 0c), run signals 1 + 2 and skip signal 3. `Blocker`/`Critical`/`Major` bugs always run all three.
 
-**No verify cycle waits on CI.** The PR's CI run is not a signal here: each fix cycle pushes, CI runs in the background as information, and a pending, cancelled or environmentally failing run neither blocks nor fails a cycle. **CI green is required exactly once, on the final commit, at `/finalise`** (`/finalise --bug`, Step 7 — CI readings 1 and 2). This is the same rule as the story/task QA loop's §"CI and the QA loop" in `shared/resources/develop-pipeline-step-5-6-qa-loop.md`; this file is skill-native, so it states the rule itself. The reason is cost: on a single shared runner a per-cycle wait turns into hours, and an environmental CI failure then blocks a loop with nothing to fix.
+**No verify cycle waits on CI.** The PR's CI run is not a signal here: each fix cycle pushes unless `push-policy.sh` answers `defer`, CI runs in the background as information, and a pending, cancelled or environmentally failing run neither blocks nor fails a cycle. **CI green is required exactly once, on the final commit, at `/finalise`** (`/finalise --bug`, Step 7 — CI readings 1 and 2). This is the same rule as the story/task QA loop's §"CI and the QA loop" in `shared/resources/develop-pipeline-step-5-6-qa-loop.md`; this file is skill-native, so it states the rule itself. The reason is cost: on a single shared runner a per-cycle wait turns into hours, and an environmental CI failure then blocks a loop with nothing to fix.
 
 Determine the verdict:
 
@@ -194,7 +194,9 @@ Exit the loop and proceed to Step 7.
    `qa-cycle-{N}` stage carries — so it states it. Pass the same `{N}` as the `qa-cycle-{N}` that
    triggered this fix; the two comments then read as one round.
 
-3. **Check for actual changes**: run `git diff --stat HEAD`. If qa-fix made **no code edits**, do NOT increment the counter — log in Issues Log and **HALT**: "qa-fix could not address the remaining failure. Human review required. See implementation report."
+3. **Check for actual changes**: run `git diff --stat HEAD`. If qa-fix made **no code edits**, do NOT increment the counter — log in Issues Log, and **HALT** (the terminal HALT block's `push-held.sh --site halt` sends out what the loop held):
+
+   "qa-fix could not address the remaining failure. Human review required. See implementation report."
 
 3a. **Run the fast gate before committing.** Only reached when step 3 found changes — there is
    nothing to gate otherwise, and step 3's no-change path HALTs before this point. Capture to a log
@@ -285,11 +287,17 @@ Exit the loop and proceed to Step 7.
    > `evals/shared/tests/ci-gate-parity.test.mjs` now asserts all three loop documents carry it, so
    > the next one cannot drift out silently.
 
-4. **Commit + push (exclude the report)** — Step 8 owns the sole report commit:
+4. **Commit, and push unless deferred (exclude the report)** — Step 8 owns the sole report commit:
    ```bash
    git reset HEAD -- '**/*.implementation.*.md' 2>/dev/null || true
    ```
-   Invoke `/commit-changes` with `exclude={bug-prefix}.implementation.*.md,{bug-prefix}.*.implementation.*.md` (both report shapes — TASK-125-BUG-17) and message `fix({bug-prefix}): fix cycle {N} — {brief summary}`. Then `git push origin HEAD`. Record the commit hash in the Verify Cycle entry.
+   Invoke `/commit-changes` with `exclude={bug-prefix}.implementation.*.md,{bug-prefix}.*.implementation.*.md` (both report shapes — TASK-125-BUG-17) and message `fix({bug-prefix}): fix cycle {N} — {brief summary}`. Record the commit hash in the Verify Cycle entry. Then push, as the push policy answers (source: `references/push-policy.sh`; a record-only fix waits for the next push, Step 7's acceptance push at the latest):
+
+   ```bash
+   if [ "$(bash .agents/skills/develop-bug/references/push-policy.sh --site qa-cycle)" != defer ]; then
+     git push origin HEAD
+   fi
+   ```
 
 5. Increment the counter and return to **5a**. No budget test here: it was made at 5a, before this 5b was entered, so a verify always follows.
 
@@ -317,7 +325,7 @@ the fix has an unaddressed dependency, or the repro is environment-specific}
 2. {specific action}
 ```
 
-Set the report's Final Status to `Escalated`, leave the bug `reopened` (do NOT close), commit the report via `/commit-changes` (`docs({bug-prefix}): implementation report — fix loop escalation`), push, then HALT:
+Set the report's Final Status to `Escalated`, leave the bug `reopened` (do NOT close), commit the report via `/commit-changes` (`docs({bug-prefix}): implementation report — fix loop escalation`), then HALT (the terminal HALT block's `push-held.sh --site halt` sends it out, held commits included):
 
 ```
 ⚠️ Bug Fix Paused — Fix Loop Limit Reached

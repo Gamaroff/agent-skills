@@ -1185,6 +1185,16 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
       very example cannot quote it). Review passed the plan at 9/10 and `ci:fast` failed on
       `no shipped line names the consumer` (2 hits), a full gate round trip after the code was done
     - Flag as **Important** a prescribed literal the guard matches
+20. **An allow-list replacing a deny-list covers the whole set it gates** (obs #159):
+    - Trigger: the story's Dev Notes or tasks replace a deny-list with an allow-list
+    - Coverage: the table lists every member of the set the list gates, or states the member count and
+      the command that measured it. A table that names some members and leaves the rest on "today's
+      behaviour" is a deny-list for the rest
+    - Probe each member left open for a write **by operand**, in a scratch directory: `uniq in.txt
+      out.txt` creates `out.txt`, a write a flag table cannot list. The full rule, with its worked
+      example, is `review-task` Step 3 check 32
+    - Flag as **Important** a member no row covers or that was not probed; put it to the author, never
+      auto-fix
 
 **Common Hallucination Patterns to Detect**:
 
@@ -1206,11 +1216,12 @@ Under `blocking`, the same finding is `[Critical]` and the closing sentence beco
 - ❌ A resume or reconstruction rule changed with no list of the states it must hold in (check 15)
 - ❌ A hand-written site list with no search recorded beside it (check 16)
 - ❌ A criterion that demands a record or measurement without naming where it is committed (check 18)
+- ❌ An allow-list that replaces a deny-list and tables only some members, with no write-by-operand probe for the rest (check 20)
 
 **Issues to Flag**:
 
 - **Critical**: Invented libraries/APIs, incorrect schema/endpoints, a falsified invariant (check 8)
-- **Important**: Missing source references, unverified technical claims, and the plan shapes of checks 11–16 (an unsearched removed literal, an unnamed writer in a replaced region, a pattern identity key, an unreached test file, unlisted reconstruction states, a site list without its search)
+- **Important**: Missing source references, unverified technical claims, and the plan shapes of checks 11–16 (an unsearched removed literal, an unnamed writer in a replaced region, a pattern identity key, an unreached test file, unlisted reconstruction states, a site list without its search), and of check 20 (an allow-list member no row covers, or one never probed for a write by operand)
 - **Optional**: Vague references, could be more specific
 
 **Output**: Technical accuracy report with hallucinations identified

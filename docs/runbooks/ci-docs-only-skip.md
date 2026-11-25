@@ -145,7 +145,9 @@ counts a skipped required check as passing, so a run cancelled by hand or stoppe
 `timeout-minutes` would satisfy branch protection with no tests run. A job cannot tell a superseded
 cancel from a manual one, so no condition inside `ci-ok` keeps both properties. Avoid the cost at
 its source instead: do not push commits that supersede a run you still need. agent-skills' own
-pipeline does this by holding the PreCompact pause-commit push at step 8 (task 303).
+pipelines do this by asking `push-policy.sh` at every push (task 319): a commit that holds only
+records waits for the next push that has to happen
+([rule](../reference/configuration.md#when-the-pipelines-push)).
 
 On the base branch the classifier asks for no evidence: a docs-only `before..after` push skips
 whether or not `before` went green. With `cancel-in-progress: true` on every event, a docs-only

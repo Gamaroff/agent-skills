@@ -1,0 +1,55 @@
+schema: 2
+task: 'task.312.allow-list-and-timing-criteria-name-what-they-need'
+task_title: 'Allow-list and timing criteria name what they need'
+gate: PASS
+status_reason: 'Check 32, its three companion edits, the review-story sibling and the timing sentence are present and held by 9 presence tests; both mutations went red then green; no correctness bugs in the diff.'
+reviewer: 'QA Engineer'
+head: 'aee26acd5d5b3d5747eb9a4d0b84003085003f4a'
+updated: '2026-11-23T11:13:06Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 16
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    boundary_signals: []
+    notes: 'Prose and a presence test only. The test runs `uniq in.txt out.txt` in a mkdtemp directory it removes; no boundary function is added (boundary: false, no predicate-shaped function in the diff).'
+  performance:
+    status: PASS
+    notes: 'No runtime path changes.'
+  reliability:
+    status: PASS
+    notes: 'Both mutations (coverage rule, timing parity) turn a committed test red and the revert is byte-identical.'
+  maintainability:
+    status: PASS
+    notes: 'Check 32 has its three companion edits, as check 31 does. The timing sentence is one long unwrapped line in two files (cosmetic, LOW).'
+
+criteria_drift:
+  reason: clean
+  base: reviewed-blob
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Optionally wrap the timing sentence in review-task Step 6 check 4 to match the surrounding 100-column prose.'
+      refs: ['skills/review-task/SKILL.md']
+      remedy: unverified
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

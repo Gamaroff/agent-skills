@@ -1,0 +1,62 @@
+schema: 2
+task: 'task.287.cases-file-accepts-only-engine-shaped-names'
+task_title: 'cases_file accepts only engine-shaped names'
+gate: PASS
+status_reason: 'All three phases delivered and verified: the shape check refuses bad-name-shape after confinement and before lstat; 16/16 tests pass, 4 of the 5 new tests go red under the mutant; the fast gate was green (8741 tests, 0 fail); the security probe engaged with 8 executed and 0 reproduced.'
+reviewer: 'QA Engineer'
+head: '62d5eb096d6d4342bb69f20f11a3787ebe74e28a'
+updated: '2026-11-23T13:07:37Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 16
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 8
+    escaped: 0
+    boundary: true
+    boundary_signals: ['never', 'are refused']
+    notes: 'resolveCasesFile is a boundary (casesFileAccepted is its probe entry). Executed 8 candidates against it: 6 hostile refused (plain name, non-numeric index, trailing extension, trailing newline, engine-shaped climb, engine-shaped absolute), 2 legitimate engine-shaped names accepted; 0 reproduced, 0 escaped. Record: task.287.qa.1.security.run.json. The stock path-sink corpus alone reads unverifiable (rejects-every-input) because its legitimate names are not engine-shaped; see recommendations.future.'
+  performance:
+    status: PASS
+    notes: 'One regex test on a basename, before any filesystem call. Slowest test over five runs 568-853 ms with loadavg 5.4-5.6 (includes suite wrapper); no new test over one second.'
+  reliability:
+    status: PASS
+    notes: 'The new refusal reason surfaces through the existing plan-entry and reuse paths with no caller change; the shape check runs before lstat, so a refused name never touches the filesystem.'
+  maintainability:
+    status: PASS
+    notes: 'One named constant beside resolveCasesFile; bundled copies regenerated, bundle --check reports 0 problems.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR-1 (advisory): the pattern also accepts the bare name `.security.cases.json` (empty stem) and zero-padded indices such as `x.security.cases.01.json`, which the engine never writes. Tighten to require a non-empty stem and an index starting 1-9, or state the looser shape in the comment. Matches the task document''s stated shape (`*.security.cases.json`, `*.security.cases.<n>.json`), and confinement plus the regular-file check still apply, so no unsafe input is admitted.'
+      refs: ['shared/resources/security-probe-plan.mjs']
+      remedy: unverified
+    - action: 'A DoD security probe of casesFileAccepted with the stock `path` sink now reads unverifiable (rejects-every-input), because the sink''s legitimate names are not engine-shaped. Supply a --cases-file with engine-shaped legitimate cases, as task.269 did and this QA did. Worth a line in the probe-plan guidance when finalise next touches it.'
+      refs: ['shared/resources/finalise-dod-security-prompt.md']
+      remedy: verified
+      verified_by: 'security-probe.mjs --sink path --entry security-probe-plan.mjs#casesFileAccepted with --cases-file task.287.qa.1.security.cases.json: verdict engages, 8 executed, 0 reproduced'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

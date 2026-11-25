@@ -61,7 +61,9 @@ function makeFenceTracker() {
 }
 
 function extractSection(body, name) {
-  const lines = String(body ?? "").split("\n");
+  // A CRLF document is the same document: every reader of the section gets it without the "\r"
+  // (T319-CR-606).
+  const lines = String(body ?? "").split(/\r?\n/);
   const heading = new RegExp(`^## (?:\\d+[.)]\\s*)?${escapeRe(name)}[ \\t]*$`);
   const isFenceLine = makeFenceTracker();
   let start = -1;

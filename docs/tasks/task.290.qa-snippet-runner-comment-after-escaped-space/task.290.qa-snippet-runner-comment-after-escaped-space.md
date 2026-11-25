@@ -5,16 +5,17 @@ type: task
 description: "Make every comment scan in the snippet classifier agree with bash on where a comment starts, and make closingParen fail closed on deep nesting instead of throwing."
 tags: [qa-task, security, follow-up-289]
 category: refactoring
-status: in-progress
+status: accepted
 priority: Medium
 created: 2026-11-09
-updated: 2026-11-09
+updated: 2026-11-23
+completed_date: 2026-11-10
 estimated_effort_hours: 4
 ---
 
 # Task 290: QA snippet runner reads a # after an escaped space as a comment
 
-**Status:** In Progress
+**Status:** Accepted
 
 ---
 
@@ -228,6 +229,7 @@ One HIGH finding: the comment-start rule treats CR, form feed, vertical tab and 
 | 2026-11-09 |         | QA gate FAIL (80/100) — 1 finding                                | qa-task     |
 | 2026-11-09 |         | QA findings fixed — cycle 2, 1 finding                           | qa-fix      |
 | 2026-11-09 |         | QA gate FAIL (80/100) — 1 finding                                | qa-task     |
+| 2026-11-23 | 1.2     | Status → accepted: merged in PR #867 under an owner waiver of T290-QA-3 (2026-11-10), closed by task 292; set by hand so the registry fallback stops re-selecting it | Claude      |
 <!-- change-log-end -->
 
 ---
@@ -256,6 +258,6 @@ Both findings are identical on `develop`; task.289 neither introduced nor fixed 
 
 ---
 
-**Status:** In Progress
+**Status:** Accepted
 
-**Next Steps**: run `/develop-task` on this task.
+**Next Steps**: none. Merged in PR #867 under an owner waiver; the waived finding was closed by task 292.

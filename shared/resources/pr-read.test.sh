@@ -22,10 +22,15 @@ trap 'rm -rf "$TMPROOT"' EXIT
 FAKEBIN="$TMPROOT/fakebin"; mkdir -p "$FAKEBIN"
 cat > "$FAKEBIN/curl" <<'SH'
 #!/usr/bin/env bash
-out=""
+out=""; limit=""
 while [ $# -gt 0 ]; do
-  case "$1" in -o) out="$2"; shift 2 ;; *) printf '%s\n' "$1" >> "$FAKE_CURL_LOG"; shift ;; esac
+  case "$1" in
+    -o) out="$2"; shift 2 ;;
+    --max-time) limit="$2"; shift 2 ;;
+    *) printf '%s\n' "$1" >> "$FAKE_CURL_LOG"; shift ;;
+  esac
 done
+case "$limit" in "" | 0 | *[!0-9]*) echo unbounded >> "$FAKE_CURL_LOG" ;; esac
 [ -n "$out" ] && cat "$FAKE_CURL_BODY" > "$out"
 printf '%s' "$FAKE_CURL_STATUS"
 SH
@@ -96,6 +101,19 @@ if [ "$OUT" = "0|601|abcdef123456|release/1.2|" ] && grep -q '/pullrequests/601$
 else
   fail "Bitbucket, --pr: base read from .destination.branch.name" "got $OUT"
 fi
+
+# ── 5b. Both reads carry a time limit, so a stalled server cannot hold the caller (T319-CR-311) ──
+for args in "" "--pr 601"; do
+  body=$(pr_json 601 develop)
+  [ -n "$args" ] || body="{\"values\": [$body]}"
+  # shellcheck disable=SC2086 # two words on purpose
+  OUT=$(read_pr "$TMPROOT/bb.yaml" 200 "$body" $args)
+  if [ "${OUT%%|*}" = 0 ] && grep -q '/pullrequests' "$TMPROOT/curl.log" && ! grep -qx unbounded "$TMPROOT/curl.log"; then
+    pass "Bitbucket, ${args:-no --pr}: the request carries a time limit"
+  else
+    fail "Bitbucket, ${args:-no --pr}: the request carries a time limit" "got $OUT / $(cat "$TMPROOT/curl.log")"
+  fi
+done
 
 # ── 6. A 200 whose body is not a PR is a parse failure, not an empty success ──
 OUT=$(read_pr "$TMPROOT/bb.yaml" 200 '<html>login</html>' --pr 601)

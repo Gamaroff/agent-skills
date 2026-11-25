@@ -1,0 +1,250 @@
+[
+  {
+    "id": "legit-list",
+    "input": "finalise:\n  rerunAtHead:\n    - npm run audit:links\n",
+    "direction": "legitimate",
+    "why": "the documented form",
+    "correct": "a block list of commands",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "legit-quoted",
+    "input": "finalise:\n  rerunAtHead:\n    - \"npm run ci:fast\"\n    - 'npm test'\n",
+    "direction": "legitimate",
+    "why": "quoted entries",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "legit-sibling",
+    "input": "finalise:\n  deferralApprover: Pat Owner\n  rerunAtHead:\n    - npm test\ntracker: github\n",
+    "direction": "legitimate",
+    "why": "the documented sibling key",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:106"
+  },
+  {
+    "id": "legit-absent",
+    "input": "tracker: github\n",
+    "direction": "legitimate",
+    "why": "the key is optional",
+    "correct": "nothing is re-run",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "legit-crlf",
+    "input": "finalise:\r\n  rerunAtHead:\r\n    - npm test\r\n",
+    "direction": "legitimate",
+    "why": "CRLF file",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "legit-comments",
+    "input": "finalise: # c\n  # c\n  rerunAtHead:\n    - npm test # fast\n",
+    "direction": "legitimate",
+    "why": "trailing comments",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-same-indent",
+    "input": "finalise:\n  rerunAtHead:\n  - npm test\n",
+    "direction": "hostile",
+    "why": "the subset reads this list as empty",
+    "correct": "REJECT a list the subset would drop",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-null",
+    "input": "finalise:\n  rerunAtHead:\n",
+    "direction": "hostile",
+    "why": "no value",
+    "correct": "REJECT a key with no value",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-null-block",
+    "input": "finalise:\n",
+    "direction": "hostile",
+    "why": "no value",
+    "correct": "REJECT a key with no value",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-tilde",
+    "input": "finalise:\n  rerunAtHead: ~\n",
+    "direction": "hostile",
+    "why": "YAML null",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-scalar",
+    "input": "finalise:\n  rerunAtHead: npm test\n",
+    "direction": "hostile",
+    "why": "not a list",
+    "correct": "REJECT: a block list is required",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-flow-list",
+    "input": "finalise:\n  rerunAtHead: [npm test]\n",
+    "direction": "hostile",
+    "why": "a flow list",
+    "correct": "REJECT: a block list is required",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-flow-map",
+    "input": "finalise: {rerunAtHead: [npm test]}\n",
+    "direction": "hostile",
+    "why": "a flow mapping is a string to the subset",
+    "correct": "REJECT a list the subset would drop",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-duplicate-block",
+    "input": "finalise:\n  rerunAtHead:\n    - npm test\nfinalise:\n  deferralApprover: x\n",
+    "direction": "hostile",
+    "why": "second block",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-duplicate-quoted",
+    "input": "finalise:\n  rerunAtHead:\n    - npm test\n\"finalise\":\n  rerunAtHead: []\n",
+    "direction": "hostile",
+    "why": "second block, quoted",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-duplicate-spaced",
+    "input": "finalise:\n  rerunAtHead:\n    - npm test\nfinalise :\n  rerunAtHead: []\n",
+    "direction": "hostile",
+    "why": "second block, space before the colon",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-duplicate-escaped",
+    "input": "finalise:\n  rerunAtHead:\n    - npm test\n\"finalis\\u0065\":\n  rerunAtHead: []\n",
+    "direction": "hostile",
+    "why": "second block, escaped",
+    "correct": "REJECT a second block in any spelling",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-second-document",
+    "input": "finalise:\n  rerunAtHead:\n    - npm test\n---\nfinalise:\n  rerunAtHead: []\n",
+    "direction": "hostile",
+    "why": "second block in a second YAML document",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-explicit-key",
+    "input": "finalise:\n  ? rerunAtHead\n  :\n    - npm test\n",
+    "direction": "hostile",
+    "why": "explicit key form",
+    "correct": "REJECT a list the subset would drop",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-anchor-block",
+    "input": "finalise: &f\n  rerunAtHead:\n    - npm test\n",
+    "direction": "hostile",
+    "why": "anchored block",
+    "correct": "REJECT a list the subset would drop",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-tag-list",
+    "input": "finalise:\n  rerunAtHead: !!seq\n    - npm test\n",
+    "direction": "hostile",
+    "why": "tagged list",
+    "correct": "REJECT a list the subset would drop",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-continuation",
+    "input": "finalise:\n  rerunAtHead:\n    - npm test\n      --silent\n",
+    "direction": "hostile",
+    "why": "a multi-line scalar is read as its first line",
+    "correct": "REJECT an entry cut short",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-hash",
+    "input": "finalise:\n  rerunAtHead:\n    - run --sel=#foo\n",
+    "direction": "hostile",
+    "why": "the subset cuts an unquoted #",
+    "correct": "REJECT an entry cut short",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-block-scalar",
+    "input": "finalise:\n  rerunAtHead:\n    - |\n      npm test\n",
+    "direction": "hostile",
+    "why": "the subset reads the marker as the value",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-column-0-row",
+    "input": "finalise:\n  rerunAtHead:\n    - npm test\n- npm run b\n",
+    "direction": "hostile",
+    "why": "a row at column 0 ends the parse",
+    "correct": "REJECT an unaccounted row",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-misindented",
+    "input": "finalise:\n  rerunAtHead:\n    - a\n   - b\n",
+    "direction": "hostile",
+    "why": "a mis-indented row is dropped",
+    "correct": "REJECT an unaccounted row",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-merge-key",
+    "input": "base: &b\n  rerunAtHead:\n    - npm test\nfinalise:\n  <<: *b\n",
+    "direction": "hostile",
+    "why": "the list arrives by a merge key",
+    "correct": "REJECT an unaccounted row",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-unknown-key",
+    "input": "finalise:\n  other: 1\n  rerunAtHead:\n    - npm test\n",
+    "direction": "hostile",
+    "why": "unknown sibling",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-near-miss",
+    "input": "finalise:\n  rerun-at-head:\n    - npm test\n",
+    "direction": "hostile",
+    "why": "near-miss key",
+    "correct": "REJECT an unknown key inside finalise",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-finalize",
+    "input": "finalize:\n  rerunAtHead:\n    - npm test\n",
+    "direction": "hostile",
+    "why": "American spelling",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-top-level",
+    "input": "rerunAtHead:\n  - npm test\n",
+    "direction": "hostile",
+    "why": "outside its block",
+    "correct": "REJECT rerunAtHead at the top level",
+    "spec_ref": "docs/reference/configuration.md:314"
+  }
+]

@@ -1,0 +1,12 @@
+[
+  { "id": "legit-list", "input": "finalise:\n  rerunAtHead:\n    - npm test\n", "direction": "legitimate", "correct": "a block list of commands", "spec_ref": "shared/resources/finalise-rerun-at-head.js:73" },
+  { "id": "legit-absent", "input": "tracker: github\n", "direction": "legitimate", "correct": "no key: an empty list", "spec_ref": "shared/resources/finalise-rerun-at-head.js:73" },
+  { "id": "legit-quoted", "input": "finalise:\n  rerunAtHead:\n    - \"npm run ci:fast\"\n    - 'npm test'\n", "direction": "legitimate", "correct": "quoted entries", "spec_ref": "shared/resources/finalise-rerun-at-head.js:73" },
+  { "id": "hostile-scalar", "input": "finalise:\n  rerunAtHead: npm test\n", "direction": "hostile", "correct": "REJECT a scalar where a list is required", "spec_ref": "shared/resources/finalise-rerun-at-head.js:73" },
+  { "id": "hostile-miscased-key", "input": "finalise:\n  rerunathead:\n    - npm test\n", "direction": "hostile", "correct": "REJECT a near-miss key instead of reading it as not configured", "spec_ref": "shared/resources/finalise-rerun-at-head.js:73" },
+  { "id": "hostile-miscased-block", "input": "Finalise:\n  rerunAtHead:\n    - npm test\n", "direction": "hostile", "correct": "REJECT a near-miss block", "spec_ref": "shared/resources/finalise-rerun-at-head.js:73" },
+  { "id": "hostile-number", "input": "finalise:\n  rerunAtHead:\n    - 3\n", "direction": "hostile", "correct": "REJECT a non-string entry", "spec_ref": "shared/resources/finalise-rerun-at-head.js:73" },
+  { "id": "hostile-empty-entry", "input": "finalise:\n  rerunAtHead:\n    - \"\"\n", "direction": "hostile", "correct": "REJECT an empty command", "spec_ref": "shared/resources/finalise-rerun-at-head.js:73" },
+  { "id": "hostile-map", "input": "finalise:\n  rerunAtHead:\n    cmd: npm test\n", "direction": "hostile", "correct": "REJECT a mapping", "spec_ref": "shared/resources/finalise-rerun-at-head.js:73" },
+  { "id": "hostile-block-scalar", "input": "finalise: npm test\n", "direction": "hostile", "correct": "REJECT a scalar block", "spec_ref": "shared/resources/finalise-rerun-at-head.js:73" }
+]

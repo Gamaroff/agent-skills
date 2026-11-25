@@ -114,7 +114,7 @@ find {story-directory} -maxdepth 1 -name "story.{P}.{E}.{S}.implementation.*.md"
 
 This complements the post-compaction recovery above. **Pre**-compaction graceful pause requires the `PreCompact` hook to be installed (see Setup section at the top of this file). When the hook fires:
 
-1. The hook itself appends a "Pipeline Paused" entry to the implementation report, commits, pushes, and posts a PR/issue comment — all best-effort, all done before compaction proceeds.
+1. The hook itself appends a "Pipeline Paused" entry to the implementation report, commits it (pushed only under `pipeline.pushRecordCommits: eager`), and posts a PR/issue comment — all best-effort, all done before compaction proceeds.
 2. The hook emits `🛑 PIPELINE-PAUSE-SIGNAL` as `additionalContext` to you, which appears as a `<system-reminder>` in your next turn.
 3. The hook **keeps** the lock file and marks it `paused` (2026-11); the `Stop` hook allows the halt below while the mark is set. A second compaction before any lock write records nothing new.
 
@@ -246,7 +246,7 @@ See `references/develop-pipeline-step-4-create-pr.md` for the full Step 4 protoc
 
 ### Step 5–6: QA Review / Fix Loop
 
-See `references/develop-pipeline-step-5-6-qa-loop.md` for the full Steps 5–6 protocol: QA cycle counter setup, gate file location, QA skill invocation (with lite mode directive), PASS/CONCERNS/FAIL branching, no-code-change HALT, qa-fix invocation, commit/push per cycle, escalation entry, and loop limit HALT message.
+See `references/develop-pipeline-step-5-6-qa-loop.md` for the full Steps 5–6 protocol: QA cycle counter setup, gate file location, QA skill invocation (with lite mode directive), PASS/CONCERNS/FAIL branching, no-code-change HALT, qa-fix invocation, at most one push per cycle (`push-policy.sh` decides it), escalation entry, and loop limit HALT message.
 
 **The loop's exit gate is Step 5c — `/review-pr`, not the QA gate.** A gate that reads `PASS` or
 `WAIVED` hands to 5c, which runs `/review-pr --effort {medium|low} --comment --no-code` over the open PR —
@@ -328,13 +328,14 @@ If a situation arises that is not in the shared defaults table and the stakes ar
 - **Never silently continue past a failed step.** Every failure is logged and surfaced to the user.
 - **Always use `/commit-changes` to commit** — never raw `git commit`. This ensures consistent commit quality, conventional messages, and proper staging.
 - **Commit the report before any halt.** Invoke `/commit-changes` for the report before surfacing any HALT so the audit trail is in git even when the pipeline doesn't complete — and **lint it first** (call site (2) of four): `command node .agents/skills/develop-story/references/report-lint.js --file "{implementation-report-path}" --json; rc=$?; case $rc in 0) ;; 1) echo "⚠️ report failed lint — HALT commit skipped; repair {implementation-report-path} by hand" ;; 2) echo "⚠️ report-lint usage error (rc 2) — the call site is wrong, not the report; causes: develop-pipeline-step-8-commit.md § report-lint usage error; HALT commit skipped" ;; *) echo "⚠️ report-lint.js not runnable (rc $rc) — HALT commit skipped" ;; esac`. A report that fails the linter is **not committed** by this rule, and the HALT **still proceeds** to the snapshot and lock removal below — the same decision the PreCompact hook makes, because the snapshot and the lock removal are what resume depends on and a lint failure must not strand the lock (task.124 QA cycle 2, CR-5). The corruption stays in the working tree, named, for a human to repair before the next commit. The HALT commit is the one most likely to carry a half-written report, because it is written under the pressure that caused the halt (task.117, obs #115).
-- **Push after every commit during the QA loop.** The PR must stay current with the local branch (`git push origin HEAD`).
+- **Every push asks `push-policy.sh` first.** A commit with code is pushed at once; a record-only commit (a gate, a report, a pause entry) rides the next push, unless a step that reads the remote runs first or the run ends. The script's site table is the contract; no step decides for itself, and a `defer` is logged in the Decisions Log with the site that deferred. `pipeline.pushRecordCommits: eager` restores a push after every commit. The script: `references/push-policy.sh`.
 - **The implementation report is the primary recovery tool.** Always include its path in halt messages.
-- **Snapshot then remove the lock file before every terminal HALT.** After committing the report (per the rule above), copy the active lock to a halt snapshot and then remove the active lock + transient logs:
+- **Push what the run held, then snapshot and remove the lock file, before every terminal HALT.** After committing the report (per the rule above), push the record commits the run was holding (a person reads the PR next), copy the active lock to a halt snapshot and then remove the active lock + transient logs:
 
-  Run **one call** — it writes the snapshot, removes the lock and the transient test logs, and is idempotent. Run it **before** the HALT message, never after (a HALT that only printed its message left the lock in place with no snapshot on three runs, obs #49). `--step` defaults to the lock's `current_step`; a non-zero exit means nothing was halted:
+  Run **this one block** — once a PR is open it pushes what is held, whichever step halts (repeat a `halt: kept local` or `halt: not pushed` line in the HALT message); then it writes the snapshot, removes the lock and the transient test logs, and is idempotent. Run it **before** the HALT message, never after (a HALT that only printed its message left the lock in place with no snapshot on three runs, obs #49). `--step` defaults to the lock's `current_step`; a non-zero exit means nothing was halted:
 
   ```bash
+  bash .agents/skills/develop-story/references/push-held.sh --site halt
   bash .agents/skills/develop-story/references/advance-pipeline-lock.sh --halt --reason "{halt_reason}" --step {halt_step} {story-directory}
   ```
 

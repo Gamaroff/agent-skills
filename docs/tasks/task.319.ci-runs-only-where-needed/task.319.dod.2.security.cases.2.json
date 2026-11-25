@@ -1,0 +1,108 @@
+[
+  {
+    "id": "legit-halt",
+    "input": "halt",
+    "direction": "legitimate",
+    "why": "one of the two sites",
+    "correct": "an answer, exit 0: no pipeline lock is here",
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:327"
+  },
+  {
+    "id": "legit-finalise-entry",
+    "input": "finalise-entry",
+    "direction": "legitimate",
+    "why": "the other site",
+    "correct": "taken as a site, then not pushed (exit 1): nothing can be asked here",
+    "expected": {
+      "exit": 1
+    },
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:327"
+  },
+  {
+    "id": "hostile-space",
+    "input": " ",
+    "direction": "hostile",
+    "why": "blank",
+    "correct": "usage error",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    },
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:327"
+  },
+  {
+    "id": "hostile-empty",
+    "input": "",
+    "direction": "hostile",
+    "why": "empty",
+    "correct": "usage error",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    },
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:327"
+  },
+  {
+    "id": "hostile-other-site",
+    "input": "qa-cycle",
+    "direction": "hostile",
+    "why": "a push-policy site that is not this script's",
+    "correct": "usage error",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    },
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:327"
+  },
+  {
+    "id": "hostile-case",
+    "input": "HALT",
+    "direction": "hostile",
+    "why": "case variant",
+    "correct": "usage error",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    },
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:327"
+  },
+  {
+    "id": "hostile-trailing-newline",
+    "input": "halt\n",
+    "direction": "hostile",
+    "why": "trailing newline",
+    "correct": "usage error",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    },
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:327"
+  },
+  {
+    "id": "hostile-class",
+    "input": "hal[t]",
+    "direction": "hostile",
+    "why": "a pattern",
+    "correct": "usage error",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    },
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:327"
+  },
+  {
+    "id": "hostile-substitution",
+    "input": "$(touch owned)",
+    "direction": "hostile",
+    "why": "command substitution",
+    "correct": "usage error, and nothing runs",
+    "expected": {
+      "stdout": "",
+      "exit": 2,
+      "absent": [
+        "owned"
+      ]
+    },
+    "spec_ref": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:327"
+  }
+]

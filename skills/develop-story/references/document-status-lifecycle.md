@@ -177,7 +177,7 @@ Default mapping (vanilla Jira workflow):
 | `in-progress`                               | `In Progress`       |
 | `ready-for-review`                          | `In Review`         |
 | `accepted`                                  | `Done`              |
-| `cancelled`                                 | `Cancelled`         |
+| `cancelled`, `superseded`                   | `Cancelled`         |
 
 > **Pipeline stages are a different vocabulary.** The statuses above are the words a _document_
 > uses. The develop pipeline also signals **stages** — `work-started`, `in-review`, `in-qa`,

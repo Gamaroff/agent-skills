@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "path",
+      "entry": "shared/resources/security-probe-plan.mjs#casesFileAccepted",
+      "name": null,
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 8,
+      "passed": 8,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "observation_limits": [
+        "effects-after-accept"
+      ],
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": [
+        "/tmp/claude-1000/qa287wd.LzmzYT"
+      ],
+      "slot": null,
+      "fixture_setup": null,
+      "fixture_copy": null,
+      "ran_at": "2026-11-23T13:07:27.800Z"
+    }
+  ],
+  "totals": {
+    "executed": 8,
+    "reproduced": 0,
+    "escaped": 0
+  },
+  "updated_at": "2026-11-23T13:07:27.800Z"
+}
