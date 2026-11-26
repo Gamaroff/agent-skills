@@ -1,0 +1,230 @@
+[
+  {
+    "id": "other-tool-read",
+    "direction": "hostile",
+    "input": "t.jsonl",
+    "why": "a tool_use of another name carrying a message-shaped input",
+    "correct": "not read: transcript-unreadable, no ac.yaml",
+    "expected": {
+      "exit": 0,
+      "stdout": "transcript-unreadable: the transcript holds no final assistant text and no SubagentHandback message\n",
+      "absent": [
+        "ac.yaml"
+      ]
+    },
+    "fixture": {
+      "files": {
+        "t.jsonl": "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"thinking\",\"thinking\":\"x\"}]}}\n{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"t1\",\"name\":\"Read\",\"input\":{\"message\":\"```finalise-ac-yaml\\nok: true\\n```\"}}]}}\n{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"t1\",\"content\":\"ok\"}]}}\n"
+      }
+    },
+    "spec_ref": "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md:244"
+  },
+  {
+    "id": "tool-name-case",
+    "direction": "hostile",
+    "input": "t.jsonl",
+    "why": "near-miss spelling of the tool name",
+    "correct": "not read: transcript-unreadable, no ac.yaml",
+    "expected": {
+      "exit": 0,
+      "stdout": "transcript-unreadable: the transcript holds no final assistant text and no SubagentHandback message\n",
+      "absent": [
+        "ac.yaml"
+      ]
+    },
+    "fixture": {
+      "files": {
+        "t.jsonl": "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"thinking\",\"thinking\":\"x\"}]}}\n{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"t1\",\"name\":\"subagenthandback\",\"input\":{\"message\":\"```finalise-ac-yaml\\nok: true\\n```\"}}]}}\n{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"t1\",\"content\":\"ok\"}]}}\n"
+      }
+    },
+    "spec_ref": "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md:244"
+  },
+  {
+    "id": "tool-name-padded",
+    "direction": "hostile",
+    "input": "t.jsonl",
+    "why": "tool name with a trailing space",
+    "correct": "not read: transcript-unreadable, no ac.yaml",
+    "expected": {
+      "exit": 0,
+      "stdout": "transcript-unreadable: the transcript holds no final assistant text and no SubagentHandback message\n",
+      "absent": [
+        "ac.yaml"
+      ]
+    },
+    "fixture": {
+      "files": {
+        "t.jsonl": "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"thinking\",\"thinking\":\"x\"}]}}\n{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"t1\",\"name\":\"SubagentHandback \",\"input\":{\"message\":\"```finalise-ac-yaml\\nok: true\\n```\"}}]}}\n{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"t1\",\"content\":\"ok\"}]}}\n"
+      }
+    },
+    "spec_ref": "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md:244"
+  },
+  {
+    "id": "handback-message-array",
+    "direction": "hostile",
+    "input": "t.jsonl",
+    "why": "non-string message",
+    "correct": "transcript-unreadable, no ac.yaml",
+    "expected": {
+      "exit": 0,
+      "stdout": "transcript-unreadable: the transcript holds no final assistant text and no SubagentHandback message\n",
+      "absent": [
+        "ac.yaml"
+      ]
+    },
+    "fixture": {
+      "files": {
+        "t.jsonl": "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"thinking\",\"thinking\":\"x\"}]}}\n{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"t1\",\"name\":\"SubagentHandback\",\"input\":{\"message\":[\"```finalise-ac-yaml\\nok: true\\n```\"]}}]}}\n{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"t1\",\"content\":\"ok\"}]}}\n"
+      }
+    },
+    "spec_ref": "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md:244"
+  },
+  {
+    "id": "handback-message-empty",
+    "direction": "hostile",
+    "input": "t.jsonl",
+    "why": "empty message",
+    "correct": "transcript-unreadable, no ac.yaml",
+    "expected": {
+      "exit": 0,
+      "stdout": "transcript-unreadable: the transcript holds no final assistant text and no SubagentHandback message\n",
+      "absent": [
+        "ac.yaml"
+      ]
+    },
+    "fixture": {
+      "files": {
+        "t.jsonl": "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"thinking\",\"thinking\":\"x\"}]}}\n{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"t1\",\"name\":\"SubagentHandback\",\"input\":{\"message\":\"\"}}]}}\n{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"t1\",\"content\":\"ok\"}]}}\n"
+      }
+    },
+    "spec_ref": "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md:244"
+  },
+  {
+    "id": "earlier-handback-then-text",
+    "direction": "hostile",
+    "input": "t.jsonl",
+    "why": "block only in an earlier hand-back; the later text reply lacks it",
+    "correct": "no-block, no ac.yaml",
+    "expected": {
+      "exit": 0,
+      "stdout": "no-block: the reply has no fenced block with the info string \"finalise-ac-yaml\"\n",
+      "absent": [
+        "ac.yaml"
+      ]
+    },
+    "fixture": {
+      "files": {
+        "t.jsonl": "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"t1\",\"name\":\"SubagentHandback\",\"input\":{\"message\":\"```finalise-ac-yaml\\nok: true\\n```\"}}]}}\n{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"t1\",\"content\":\"ok\"}]}}\n{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"done, no block\"}]}}\n"
+      }
+    },
+    "spec_ref": "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md:243"
+  },
+  {
+    "id": "earlier-text-then-handback",
+    "direction": "hostile",
+    "input": "t.jsonl",
+    "why": "block only in earlier text; the later hand-back lacks it",
+    "correct": "no-block, no ac.yaml",
+    "expected": {
+      "exit": 0,
+      "stdout": "no-block: the reply has no fenced block with the info string \"finalise-ac-yaml\"\n",
+      "absent": [
+        "ac.yaml"
+      ]
+    },
+    "fixture": {
+      "files": {
+        "t.jsonl": "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"```finalise-ac-yaml\\nok: true\\n```\"}]}}\n{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"t1\",\"name\":\"SubagentHandback\",\"input\":{\"message\":\"no block here\"}}]}}\n{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"t1\",\"content\":\"ok\"}]}}\n"
+      }
+    },
+    "spec_ref": "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md:242"
+  },
+  {
+    "id": "handback-then-new-prompt",
+    "direction": "hostile",
+    "input": "t.jsonl",
+    "why": "a hand-back from a turn before a new prompt",
+    "correct": "not the reply: transcript-unreadable, no ac.yaml",
+    "expected": {
+      "exit": 0,
+      "stdout": "transcript-unreadable: the transcript holds no final assistant text and no SubagentHandback message\n",
+      "absent": [
+        "ac.yaml"
+      ]
+    },
+    "fixture": {
+      "files": {
+        "t.jsonl": "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"t1\",\"name\":\"SubagentHandback\",\"input\":{\"message\":\"```finalise-ac-yaml\\nok: true\\n```\"}}]}}\n{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"t1\",\"content\":\"ok\"}]}}\n{\"type\":\"user\",\"message\":{\"content\":\"resume\"}}\n"
+      }
+    },
+    "spec_ref": "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md:243"
+  },
+  {
+    "id": "handback-host-shape",
+    "direction": "legitimate",
+    "input": "t.jsonl",
+    "why": "the measured host shape",
+    "correct": "extracted, exit 0",
+    "expected": {
+      "exit": 0,
+      "stdout": "extracted 9 bytes sha256=e4959e64276da4756978788e4a473eb17435c52f6dc936fe551cbb310e2e00d0 -> ac.yaml\n"
+    },
+    "fixture": {
+      "files": {
+        "t.jsonl": "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"thinking\",\"thinking\":\"x\"}]}}\n{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"t1\",\"name\":\"SubagentHandback\",\"input\":{\"message\":\"```finalise-ac-yaml\\nok: true\\n```\"}}]}}\n{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"t1\",\"content\":\"ok\"}]}}\n{\"type\":\"attachment\"}\n"
+      }
+    },
+    "spec_ref": "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md:240"
+  },
+  {
+    "id": "text-reply-control",
+    "direction": "legitimate",
+    "input": "t.jsonl",
+    "why": "the pre-existing text reply",
+    "correct": "extracted, exit 0",
+    "expected": {
+      "exit": 0,
+      "stdout": "extracted 9 bytes sha256=e4959e64276da4756978788e4a473eb17435c52f6dc936fe551cbb310e2e00d0 -> ac.yaml\n"
+    },
+    "fixture": {
+      "files": {
+        "t.jsonl": "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"```finalise-ac-yaml\\nok: true\\n```\"}]}}\n"
+      }
+    },
+    "spec_ref": "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md:241"
+  },
+  {
+    "id": "text-then-handback-with-block",
+    "direction": "legitimate",
+    "input": "t.jsonl",
+    "why": "later hand-back holds the block",
+    "correct": "extracted, exit 0",
+    "expected": {
+      "exit": 0,
+      "stdout": "extracted 9 bytes sha256=e4959e64276da4756978788e4a473eb17435c52f6dc936fe551cbb310e2e00d0 -> ac.yaml\n"
+    },
+    "fixture": {
+      "files": {
+        "t.jsonl": "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"thinking aloud\"}]}}\n{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"t1\",\"name\":\"SubagentHandback\",\"input\":{\"message\":\"```finalise-ac-yaml\\nok: true\\n```\"}}]}}\n{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"t1\",\"content\":\"ok\"}]}}\n{\"type\":\"attachment\"}\n"
+      }
+    },
+    "spec_ref": "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md:242"
+  },
+  {
+    "id": "handback-then-text-with-block",
+    "direction": "legitimate",
+    "input": "t.jsonl",
+    "why": "later text holds the block",
+    "correct": "extracted, exit 0",
+    "expected": {
+      "exit": 0,
+      "stdout": "extracted 9 bytes sha256=e4959e64276da4756978788e4a473eb17435c52f6dc936fe551cbb310e2e00d0 -> ac.yaml\n"
+    },
+    "fixture": {
+      "files": {
+        "t.jsonl": "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"t1\",\"name\":\"SubagentHandback\",\"input\":{\"message\":\"no block\"}}]}}\n{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"t1\",\"content\":\"ok\"}]}}\n{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"```finalise-ac-yaml\\nok: true\\n```\"}]}}\n"
+      }
+    },
+    "spec_ref": "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md:242"
+  }
+]

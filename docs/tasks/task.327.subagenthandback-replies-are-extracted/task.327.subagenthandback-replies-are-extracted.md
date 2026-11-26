@@ -12,6 +12,7 @@ created: 2026-11-26
 updated: 2026-11-26
 estimated_effort_hours: 8
 github_issue: 952
+pr_number: 959
 ---
 
 # Technical Task: SubagentHandback replies are extracted, not hand-copied
@@ -301,11 +302,36 @@ agent's block, or a text-reply transcript answers differently from before. Steps
 ### Key Findings
 All six findings across cycles 1-2 are fixed and mutation-held. The real host hand-back transcript still extracts byte-identically. Three advisory cleanups are recorded in gate 3.
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**Gate File**: `task.327.gate.3.subagenthandback-replies-are-extracted.yml`
+**Gate Status**: ✅ PASS (92/100). PR review: ✅ APPROVE. CI reading 1: SUCCESS @ `fdcf01da1672`. Security: 23 probed, 0 reproduced.
+
+### Missing Criteria:
+
+- [ ] #6: add stale-`--out` tests for `transcript-ambiguous`, `empty-block` and `entity-escaped`. The code is right; only 3 of the 6 non-extracted reasons are tested with a stale file in place.
+- [ ] #10: three new tests (`agent-reply-block.test.mjs:351`, `:427`, `:436`) guard rules that already held, so they could never be red before the change. This needs an owner decision: amend the criterion (for example, accept mutation-red evidence for guards of pre-existing rules) or accept it as is.
+
+### Next Steps:
+
+- Decide #10 (owner).
+- Add the #6 test cases, then run QA cycle 4 (a code change re-enters QA).
+- Re-run `/finalise`.
+
+**Estimated Effort:** Small
+
+**Gap Report Generated:** 2026-11-26
+
+**Detailed Verification Log:** See `task.327.dod.1.subagenthandback-replies-are-extracted.md` for the complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
 | Date | Version | Description | Author |
-| --- | --- | --- | --- |
+|------|---------|-------------|--------|
 | 2026-11-26 | 1.0 | Initial draft — cut from observation #185 | create-task |
 | 2026-11-26 | 1.1 | Review passed (9/10) — added the `--out` = `--transcript` refusal, its fixture and criterion; corrected two SKILL.md anchors | review-task |
 | 2026-11-26 |  | Status → ready-for-development | review-task |
@@ -315,6 +341,7 @@ All six findings across cycles 1-2 are fixed and mutation-held. The real host ha
 | 2026-11-26 |  | QA gate FAIL (70/100) — 2 findings | qa-task |
 | 2026-11-26 |  | QA findings fixed (2 of 2) — gate 2 FAIL, 2 iterations | qa-fix |
 | 2026-11-26 |  | QA gate PASS (92/100) — 0 findings | qa-task |
+| 2026-11-26 |  | DoD incomplete — 2 gaps identified | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking

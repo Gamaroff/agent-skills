@@ -1,0 +1,44 @@
+[
+  {
+    "argv": [
+      "--sink",
+      "path",
+      "--entry",
+      "cli:shared/resources/agent-reply-block.js",
+      "--argv",
+      "[\"extract\",\"--transcript\",\"t.jsonl\",\"--block\",\"finalise-ac-yaml\",\"--out\",\"{input}\"]",
+      "--name",
+      "agent-reply-block extract --out identity guard (--transcript)"
+    ],
+    "cases_file": "task.327.dod.1.security.cases.1.json",
+    "cases_sha256": "3abe52fc72992079235562ef97ab5a4168cf4eab887f805d127ad0150d2eef10"
+  },
+  {
+    "argv": [
+      "--sink",
+      "path",
+      "--entry",
+      "cli:shared/resources/agent-reply-block.js",
+      "--argv",
+      "[\"extract\",\"--transcript\",\"{input}\",\"--block\",\"finalise-ac-yaml\",\"--out\",\"ac.yaml\"]",
+      "--name",
+      "agent-reply-block extract reply selection"
+    ],
+    "cases_file": "task.327.dod.1.security.cases.2.json",
+    "cases_sha256": "4958e9fc1eb69c02bfd070100e903eb31e11c06ba6a0555c1006ee2447d8925c"
+  },
+  {
+    "argv": [
+      "--sink",
+      "path",
+      "--entry",
+      "cli:shared/resources/agent-reply-block.js",
+      "--argv",
+      "[\"extract\",\"--agent-id\",\"abc\",\"--projects-root\",\"{fixture}\",\"--block\",\"finalise-ac-yaml\",\"--out\",\"{input}\"]",
+      "--name",
+      "agent-reply-block extract --out identity guard (--agent-id)"
+    ],
+    "cases_file": "task.327.dod.1.security.cases.3.json",
+    "cases_sha256": "4cdf898a320f4934c0794ad771ccab4ec0556e8a11ad073c57c5b654c34295ec"
+  }
+]

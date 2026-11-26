@@ -36,8 +36,8 @@ Teach the shared agent-reply reader to take a `SubagentHandback` message as the 
 | 2. review-task             | ✅ Done    | `task.327.review.{N}.{name}.md` exists (or skip logged)                | review.1 — 9/10 READY; Planned → Ready for Development | —                    | 2026-11-26T20:12Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; 4/4 phases; ci:fast 8919/0 | —                    | 2026-11-26T20:32Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #959: https://github.com/Gamaroff/agent-skills/pull/959 | —                    | 2026-11-26T20:34Z |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.327.qa.{N}.*.md`; `task.327.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.327.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.327.qa.{N}.*.md`; `task.327.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 3 gates (CONCERNS → FAIL → PASS 92), 2 fix cycles; review-pr APPROVE | —                    | 2026-11-26T21:19Z |
+| 7. finalise                | ❌ Halted  | `task.327.dod.{N}.*.md`; task `status: accepted`                       | dod.1 — GAPS (#6, #10); lock held at 7 | —                    | 2026-11-26T21:30Z |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -93,6 +93,11 @@ Teach the shared agent-reply reader to take a `SubagentHandback` message as the 
 
 _Problems encountered and how they were resolved or escalated._
 
+- **Step 7 — finalise DoD gaps (HALT).** `task.327.dod.1` reads ❌ GAPS IDENTIFIED: AC 12/14, with security (23 probed, 0 reproduced), docs, the PR review and CI reading 1 (SUCCESS @ `fdcf01da1672`) all green. Fix-and-recheck was closed: both findings are medium.
+  - **#6** (medium): no stale-`--out` test for `transcript-ambiguous`, `empty-block` or `entity-escaped`. The code is correct (`clearOut` runs before every branch). Fixing it is a code change, so it re-enters QA at 5a.
+  - **#10** (medium, needs an owner decision): tests `:351`, `:427` and `:436` guard rules that already held before the change, so they could never be red before it. qa.1:67 recorded 7 of 10 and the QA loop graded the criterion PASS anyway, through three gates. The criterion's wording is not edited to fit the evidence.
+- Probe plan and AC YAML were both extracted from the agents' transcripts with `reply: handback`. That is this task's own feature, used for real for the first time.
+
 ---
 
 ## QA Iteration History
@@ -147,9 +152,10 @@ _Track each QA review/fix cycle._
 **HIGH findings**: 0
 **MEDIUM findings**: 0
 **Traceability**: skipped (not re-run — cycle 3)
-**PR Review**: pending — Step 5c next
-**Loop exit**: gate PASS → Step 5c
-**Action**: Running review-pr (Step 5c)
+**PR Review**: APPROVE — task.327.pr-review.1 (conformance lens only, `--no-code`); PC-1 low (no `pr_number:`) fixed by doc carry: `pr_number: 959` added to the task frontmatter
+**Loop exit**: route 1 — gate PASS, no open finding
+**Action**: Proceeding to 5c → Step 7
+- Push note: push-policy deferred the gate 3 commit (docs only), but it was pushed before 5c so the PR head the review read carries gate 3. Deviation logged.
 
 ---
 
