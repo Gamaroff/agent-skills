@@ -1,0 +1,302 @@
+[
+  {
+    "argv": [
+      "--sink",
+      "template-render",
+      "--entry",
+      "shared/resources/ci-tree-equivalence.js#parseConfig",
+      "--name",
+      "ci key spellings"
+    ],
+    "cases_file": "task.320.dod.2.security.cases.1.json",
+    "cases_sha256": "0cf45d2fb33980ecf61c2a88e7ee08a9d3999fbef64dff808193cc3874659b9b"
+  },
+  {
+    "argv": [
+      "--sink",
+      "template-render",
+      "--entry",
+      "shared/resources/ci-tree-equivalence.js#parseConfig",
+      "--name",
+      "ci.skipMarker row"
+    ],
+    "cases_file": "task.320.dod.2.security.cases.2.json",
+    "cases_sha256": "fc65b9141bcb16ad61ce152e1be609c083eac7386a83e2b21e3f7b0b7c292ade"
+  },
+  {
+    "argv": [
+      "--sink",
+      "template-render",
+      "--entry",
+      "shared/resources/ci-tree-equivalence.js#parsePipelineConfig",
+      "--name",
+      "pipeline key spellings"
+    ],
+    "cases_file": "task.320.dod.2.security.cases.3.json",
+    "cases_sha256": "eeef4b2f94914373ebce8a10f82273223649e55e36c24d3402cd8ab6fd209302"
+  },
+  {
+    "argv": [
+      "--sink",
+      "template-render",
+      "--entry",
+      "shared/resources/finalise-rerun-at-head.js#parseRerunList",
+      "--name",
+      "finalise key spellings"
+    ],
+    "cases_file": "task.320.dod.2.security.cases.4.json",
+    "cases_sha256": "13aa3f71c243eae885a3959d7b38db31ca676d9400e4dbbb3523123796d8661c"
+  },
+  {
+    "argv": [
+      "--sink",
+      "shell-exec",
+      "--entry",
+      "cli:shared/resources/finalise-rerun-at-head.js",
+      "--argv",
+      "[\"--doc\",\"{input}\",\"--out-dir\",\".claude/state/rerun\"]",
+      "--fixture-setup",
+      "shared/resources/tests/fixtures/security-probe/setup-git-repo.sh",
+      "--name",
+      "rerun criteria search"
+    ],
+    "cases_file": "task.320.dod.2.security.cases.5.json",
+    "cases_sha256": "3079e1959ef3e47fd244a38f5a28d5d8d09e0849aeea319f1003cc608667f8ac"
+  },
+  {
+    "argv": [
+      "--sink",
+      "shell-exec",
+      "--entry",
+      "shell-argv:shared/resources/push-held.sh",
+      "--argv",
+      "[\"--site\",\"{input}\"]",
+      "--name",
+      "push-held --site"
+    ],
+    "cases_file": "task.320.dod.2.security.cases.6.json",
+    "cases_sha256": "81a2963720fbe8bca015b13419fdba3b453b838fffb5f2860500e2fa0cd53331"
+  },
+  {
+    "argv": [
+      "--sink",
+      "shell-exec",
+      "--entry",
+      "shell-argv:shared/resources/tick-pr.sh",
+      "--argv",
+      "[\"merge\",\"--base\",\"develop\",\"--branch\",\"docs/roadmap-tick-1\",\"--pr\",\"1\",\"--quality-gate\",\"{input}\"]",
+      "--fixture-setup",
+      "shared/resources/tests/fixtures/security-probe/setup-git-repo.sh",
+      "--fake-gh",
+      "tests/fixtures/fake-gh",
+      "--name",
+      "tick-pr merge --quality-gate"
+    ],
+    "cases_file": "task.320.dod.2.security.cases.7.json",
+    "cases_sha256": "af14f7fb4d261b07c8e508b8fd6d3533b5a1b43656a9c51abe11834ed7e22fce"
+  },
+  {
+    "argv": [
+      "--sink",
+      "template-render",
+      "--entry",
+      "shared/resources/ci-tree-equivalence.js#parseConfig",
+      "--name",
+      "config qa.1"
+    ],
+    "cases_file": "task.320.dod.2.security.cases.8.json",
+    "cases_sha256": "9bb35a835fa5ec32b5b85e93b526a2ab50c7a85dce0dcaaa949ca14d79cfc2d8"
+  },
+  {
+    "argv": [
+      "--sink",
+      "template-render",
+      "--entry",
+      "shared/resources/ci-tree-equivalence.js#parsePipelineConfig",
+      "--name",
+      "pipeline qa.1"
+    ],
+    "cases_file": "task.320.dod.2.security.cases.9.json",
+    "cases_sha256": "aa5c35f5148772afb006292d0720340d61a04fe5c412c96e76feab018aa5155e"
+  },
+  {
+    "argv": [
+      "--sink",
+      "shell-exec",
+      "--entry",
+      "cli:shared/resources/finalise-rerun-at-head.js",
+      "--argv",
+      "[\"--doc\",\"{input}\",\"--out-dir\",\".claude/state/rerun\"]",
+      "--fixture-setup",
+      "shared/resources/tests/fixtures/security-probe/setup-git-repo.sh",
+      "--name",
+      "rerun qa.1"
+    ],
+    "cases_file": "task.320.dod.2.security.cases.10.json",
+    "cases_sha256": "9331ecaa869a3e73a1502254315b7721814ff40879d5a278a230fed342ebc67c"
+  },
+  {
+    "argv": [
+      "--sink",
+      "template-render",
+      "--entry",
+      "shared/resources/ci-tree-equivalence.js#parseConfig",
+      "--name",
+      "config qa.2"
+    ],
+    "cases_file": "task.320.dod.2.security.cases.11.json",
+    "cases_sha256": "1ba9888a7ac65c2d6ee21fed3c5492f9f29917e4f2fb1c79b85797f068d80f94"
+  },
+  {
+    "argv": [
+      "--sink",
+      "shell-exec",
+      "--entry",
+      "cli:shared/resources/finalise-rerun-at-head.js",
+      "--argv",
+      "[\"--doc\",\"{input}\",\"--out-dir\",\".claude/state/rerun\"]",
+      "--fixture-setup",
+      "shared/resources/tests/fixtures/security-probe/setup-git-repo.sh",
+      "--name",
+      "rerun qa.2"
+    ],
+    "cases_file": "task.320.dod.2.security.cases.12.json",
+    "cases_sha256": "38550d20c0047057243d6ded20977eda27610f57ead533a048aa175db30a3c2c"
+  },
+  {
+    "argv": [
+      "--sink",
+      "template-render",
+      "--entry",
+      "shared/resources/ci-tree-equivalence.js#parseConfig",
+      "--name",
+      "config qa.3"
+    ],
+    "cases_file": "task.320.dod.2.security.cases.13.json",
+    "cases_sha256": "2b3d1480dc41d1815b488d31495cd6c61da8f846feca7c02e235697b690171d3"
+  },
+  {
+    "argv": [
+      "--sink",
+      "shell-exec",
+      "--entry",
+      "cli:shared/resources/finalise-rerun-at-head.js",
+      "--argv",
+      "[\"--doc\",\"{input}\",\"--out-dir\",\".claude/state/rerun\"]",
+      "--fixture-setup",
+      "shared/resources/tests/fixtures/security-probe/setup-git-repo.sh",
+      "--name",
+      "rerun qa.3"
+    ],
+    "cases_file": "task.320.dod.2.security.cases.14.json",
+    "cases_sha256": "29a75a47db777df81f4ef390c2ed489ecb3c19f9bc002d2a34e36967cc838aab"
+  },
+  {
+    "argv": [
+      "--sink",
+      "template-render",
+      "--entry",
+      "shared/resources/ci-tree-equivalence.js#parseConfig",
+      "--name",
+      "config qa.4"
+    ],
+    "cases_file": "task.320.dod.2.security.cases.15.json",
+    "cases_sha256": "e9dae822c79d262f5726ba6d0dd527930e7287fa7d48b323cff92b9bdb49d449"
+  },
+  {
+    "argv": [
+      "--sink",
+      "shell-exec",
+      "--entry",
+      "cli:shared/resources/finalise-rerun-at-head.js",
+      "--argv",
+      "[\"--doc\",\"{input}\",\"--out-dir\",\".claude/state/rerun\"]",
+      "--fixture-setup",
+      "shared/resources/tests/fixtures/security-probe/setup-git-repo.sh",
+      "--name",
+      "rerun qa.4"
+    ],
+    "cases_file": "task.320.dod.2.security.cases.16.json",
+    "cases_sha256": "4001ac8b6d30f55c107086b7bc7ad59973ac94f3efbc70897a0c1c688efc5509"
+  },
+  {
+    "argv": [
+      "--sink",
+      "template-render",
+      "--entry",
+      "shared/resources/ci-tree-equivalence.js#parseConfig",
+      "--name",
+      "config qa.5"
+    ],
+    "cases_file": "task.320.dod.2.security.cases.17.json",
+    "cases_sha256": "6d15549575a3cb971ededf39c2a0b20fcaa2055569e3d465ff86dcaf2bd54b79"
+  },
+  {
+    "argv": [
+      "--sink",
+      "template-render",
+      "--entry",
+      "shared/resources/ci-tree-equivalence.js#parsePipelineConfig",
+      "--name",
+      "pipeline qa.5"
+    ],
+    "cases_file": "task.320.dod.2.security.cases.18.json",
+    "cases_sha256": "c58fda9d2d20c80950e424ce5c1be45f5b8108b5b5e04e830553f618b61f096c"
+  },
+  {
+    "argv": [
+      "--sink",
+      "shell-exec",
+      "--entry",
+      "cli:shared/resources/finalise-rerun-at-head.js",
+      "--argv",
+      "[\"--doc\",\"{input}\",\"--out-dir\",\".claude/state/rerun\"]",
+      "--fixture-setup",
+      "shared/resources/tests/fixtures/security-probe/setup-git-repo.sh",
+      "--name",
+      "rerun qa.5"
+    ],
+    "cases_file": "task.320.dod.2.security.cases.19.json",
+    "cases_sha256": "80ffaed7a20fac809896febca2bf53d2b5f8b24cf16b191b1f6ecedb25b3d333"
+  },
+  {
+    "argv": [
+      "--sink",
+      "template-render",
+      "--entry",
+      "shared/resources/ci-tree-equivalence.js#parseConfig",
+      "--name",
+      "config qa.6"
+    ],
+    "cases_file": "task.320.dod.2.security.cases.20.json",
+    "cases_sha256": "649ebe90b7c210a407cecc4cdfc7c2a2818d610673285d8656b25659b53d0392"
+  },
+  {
+    "argv": [
+      "--sink",
+      "template-render",
+      "--entry",
+      "shared/resources/ci-tree-equivalence.js#parsePipelineConfig",
+      "--name",
+      "pipeline qa.6"
+    ],
+    "cases_file": "task.320.dod.2.security.cases.21.json",
+    "cases_sha256": "f4c3c813149abcf9fd45885b8f7f20531f464977d07bf2df337a2468e944f0e3"
+  },
+  {
+    "argv": [
+      "--sink",
+      "shell-exec",
+      "--entry",
+      "cli:shared/resources/finalise-rerun-at-head.js",
+      "--argv",
+      "[\"--doc\",\"{input}\",\"--out-dir\",\".claude/state/rerun\"]",
+      "--fixture-setup",
+      "shared/resources/tests/fixtures/security-probe/setup-git-repo.sh",
+      "--name",
+      "rerun qa.6"
+    ],
+    "cases_file": "task.320.dod.2.security.cases.22.json",
+    "cases_sha256": "15ac9d4d79c6fbd80bdf4494983c44ded8b2137bb8e6b02b9bb3e9e12acbb99c"
+  }
+]

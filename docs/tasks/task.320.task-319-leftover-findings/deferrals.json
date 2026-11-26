@@ -1,0 +1,8 @@
+{ "deferrals": [
+  { "case": "hostile-explicit-key-with-a-comment", "deferred_to": "task.326", "approved_by": "Lorien Gamaroff", "approved_on": "2026-11-26" },
+  { "case": "hostile-alias-key", "deferred_to": "task.326", "approved_by": "Lorien Gamaroff", "approved_on": "2026-11-26" },
+  { "case": "hostile-opener-inside-a-details-block", "deferred_to": "task.326", "approved_by": "Lorien Gamaroff", "approved_on": "2026-11-26" },
+  { "case": "hostile-opener-inside-a-div-block", "deferred_to": "task.326", "approved_by": "Lorien Gamaroff", "approved_on": "2026-11-26" },
+  { "case": "legit-indented-closed-comment-with-a-fence-marker", "deferred_to": "task.326", "approved_by": "Lorien Gamaroff", "approved_on": "2026-11-26" },
+  { "case": "legit-closed-comment-in-a-list-item", "deferred_to": "task.326", "approved_by": "Lorien Gamaroff", "approved_on": "2026-11-26" }
+] }

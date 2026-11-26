@@ -131,11 +131,11 @@ esac
     git(wt, "config", "remote.origin.pushurl", up);
     git(wt, "config", `url.${up}.insteadOf`, "git@bitbucket.org:ws/app.git");
   }
-  const tick = (...args) => {
+  const tickIn = (where, ...args) => {
     let r;
     for (let i = 0; i <= BUDGET.retries; i += 1) {
       r = spawnSync("bash", [SCRIPT, ...args], {
-        cwd: wt,
+        cwd: join(wt, where),
         env,
         encoding: "utf8",
         timeout: BUDGET.timeoutMs,
@@ -144,13 +144,14 @@ esac
     }
     return { code: r.status, out: r.stdout.trim(), err: r.stderr.trim() };
   };
+  const tick = (...args) => tickIn(".", ...args);
   const at = ["--base", "develop", "--branch", TICK];
   return {
     dir,
     up,
     wt,
     st,
-    start: () => tick("start", ...at),
+    start: (where = ".") => tickIn(where, "start", ...at),
     finish: () => tick("finish", ...at),
     open: () => tick("open", ...at, "--title", "docs(roadmap): tick 17.4"),
     merge: (gate, ...more) =>
@@ -641,6 +642,37 @@ test("a landed tick is recognised when the base changed the row beside it since,
   const added = { tick: { ...landed, [OTHER]: "ticked 2\n" } };
   assert.equal(start([added.tick, beside], added), "landed");
   assert.equal(start([beside], added), "resume");
+});
+
+test("start answers the same from a subdirectory as from the top (T319-CR-1304)", (t) => {
+  const MAP = "docs/roadmap.md";
+  const at = (wt, branch, text) => {
+    git(wt, "checkout", "-q", branch);
+    writeFileSync(join(wt, MAP), text);
+    git(wt, "commit", "-q", "-am", `${branch}: ${text}`);
+  };
+  for (const [after, want] of [
+    [["- [ ] 1\n- [x] 2\n- [ ] 3\n", "- [ ] 1\n- [x] 2\n- [x] 3\n"], "landed"],
+    [["- [ ] 1\n- [~] 2\n- [ ] 3\n"], "resume"],
+  ])
+    for (const where of [".", "docs", "docs/deep er"]) {
+      const f = fixture(t);
+      git(f.wt, "checkout", "-q", "develop");
+      writeFileSync(join(f.wt, MAP), "- [ ] 1\n- [ ] 2\n- [ ] 3\n");
+      mkdirSync(join(f.wt, "docs/deep er"));
+      writeFileSync(join(f.wt, "docs/deep er/a.md"), "a\n");
+      git(f.wt, "add", "-A");
+      git(f.wt, "commit", "-q", "-m", "rows");
+      git(f.wt, "push", "-q", "origin", "develop");
+      assert.equal(f.start().out, "new");
+      at(f.wt, TICK, "- [ ] 1\n- [x] 2\n- [ ] 3\n");
+      git(f.wt, "push", "-q", "origin", TICK);
+      for (const text of after) at(f.wt, "develop", text);
+      git(f.wt, "push", "-q", "origin", "develop");
+      git(f.wt, "fetch", "-q", "origin");
+      const r = f.start(where);
+      assert.equal(r.out, want, `${where}: ${r.err}`);
+    }
 });
 
 test("a read that fails is never a landed tick: the branch with it would be deleted (T319-CR-902)", (t) => {

@@ -71,3 +71,9 @@ changelog: # /finalise's CHANGELOG checks — schema: docs/reference/configurati
   # (task N) (docs/contributing/releases.md), and /finalise 6d HALTs when it is not. Off by
   # default for consumers, so their own CHANGELOG.md is never read (task.241).
   enforce: true
+
+finalise: # /finalise's deferral check — schema: docs/reference/configuration.md
+  # The repository owner, whose recorded approval in a deferrals.json lets a reproduced security
+  # probe read as deferred to a named task instead of FAIL (Step 3b.1 item 5a). Set 2026-11-26 for
+  # task 320's residual, deferred to task 326.
+  deferralApprover: Lorien Gamaroff

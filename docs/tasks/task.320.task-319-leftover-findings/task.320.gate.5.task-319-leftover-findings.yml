@@ -1,0 +1,109 @@
+schema: 2
+task: 'task.320.task-319-leftover-findings'
+task_title: "Task 319's leftover findings are closed"
+gate: CONCERNS
+status_reason: 'Two medium and two low findings in the fix of the DoD gaps, each reproduced with its control. Criterion 10 waits for the final head.'
+reviewer: 'QA Engineer'
+head: '90aabca6ca9d60ebcc37f14d1cd3f34e8c106574'
+updated: '2026-11-25T21:55:26Z'
+
+top_issues:
+  - id: 'T320-CR-501'
+    severity: medium
+    file: 'shared/resources/finalise-rerun-at-head.js'
+    finding: 'Line 312: an opener counts as closed when any later line of the document holds -->, so an opener that is only text hides the fences between, and a heading in one ends the criteria section: none-named (scan-broken on c160ee638; reproduced, with two controls).'
+    suggested_action: 'Let only an opener that starts a Markdown comment block hide a fence.'
+    suggested_owner: dev
+    status: open
+  - id: 'T320-CR-502'
+    severity: medium
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'Line 694: the exact key ci, pipeline or finalise is read as absent past the row at which the parse stops, in a file indented whole and after a lone CR (reproduced; control: the unindented form is refused). The same on c160ee638 and on origin/develop. Kept here because DoD gap 1 is the same class and the reference says every row is accounted for.'
+    suggested_action: 'Refuse a block whose key the source has and the parse does not.'
+    suggested_owner: dev
+    status: open
+  - id: 'T320-CR-503'
+    severity: low
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'Line 454: the source keys alone lose a refusal: CI, a CR, then the colon is a key the parse reads, and is accepted (refused on c160ee638; reproduced).'
+    suggested_action: 'Check the union of the parsed keys and the source keys.'
+    suggested_owner: dev
+    status: open
+  - id: 'T320-CR-504'
+    severity: low
+    file: 'shared/resources/tests/ci-tree-equivalence.test.mjs'
+    finding: 'Line 1497: two lines were joined, and the case of an escaped docsOnly key is now part of a comment. The engine still refuses it.'
+    suggested_action: 'Put the case back on its own line.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 8897
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 3]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 117
+    escaped: 0
+    boundary: true
+    boundary_signals: ["refused","refuses"]
+    notes: '6 of 117 reproduced: T320-CR-501 (1), T320-CR-502 (4), T320-CR-503 (1). Every case of the earlier cycles and of DoD run 1 holds.'
+  performance:
+    status: PASS
+    notes: 'The slowest test is the SIGSTOP case. The five timed runs of criterion 10 are taken on the final head.'
+  reliability:
+    status: PASS
+    notes: 'Full suite green on the server and CI green on this head.'
+  maintainability:
+    status: PASS
+    notes: 'One helper reads the top-level keys for the three readers.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'T320-CR-501 to T320-CR-504'
+      refs: ['shared/resources/finalise-rerun-at-head.js', 'shared/resources/ci-tree-equivalence.js']
+  future:
+    - action: 'T320-CR-401: prose paragraphs that start with Given or When and with Then count as criteria. Tie the Then line to the block of the Given or When line.'
+      refs: ['shared/resources/finalise-rerun-at-head.js']
+      carried_from: top_issues (route 2b, cycle 4)
+      remedy: unverified
+    - action: "T320-CR-402: with a quote that has no partner, the row check and the parse disagree on where the comment of a skipMarker row starts. Use the parser's own comment rule."
+      refs: ['shared/resources/ci-tree-equivalence.js', 'shared/resources/yaml-subset.js']
+      carried_from: top_issues (route 2b, cycle 4)
+      remedy: unverified
+    - action: 'T320-CR-403: the reference, the finalise table and a comment say an AC heading places the criteria of a document with neither criteria section; it is always searched whole. State that.'
+      refs: ['docs/reference/configuration.md', 'skills/finalise/SKILL.md', 'shared/resources/finalise-rerun-at-head.js']
+      carried_from: top_issues (route 2b, cycle 4)
+      remedy: unverified
+    - action: 'T320-CR-404: an unclosed comment opener in an indented code block removes the criteria after it, and the document is refused. State the limit beside the function.'
+      refs: ['shared/resources/finalise-rerun-at-head.js']
+      carried_from: top_issues (route 2b, cycle 4)
+      remedy: unverified
+    - action: 'SEC-1b waits one second for a killed process to be gone, and failed once on a loaded server (gate 3). Wait longer, or mark it load-sensitive.'
+      refs: ['shared/resources/tests/ci-tree-equivalence.test.mjs']
+      provenance: pre-existing
+      remedy: unverified
+    - action: 'lockctl.sh takes its lock with mkdir, which uutils coreutils (the ubuntu-26.04 runner image) does not make atomic; see gate 1. CI was green on this head.'
+      refs: ['scripts/remote-test/lockctl.sh', 'tests/test-remote-runner.test.js']
+      provenance: pre-existing
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T320-CR-501 and T320-CR-502 fixed']

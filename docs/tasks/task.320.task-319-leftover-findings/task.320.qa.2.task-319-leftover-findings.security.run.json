@@ -1,0 +1,189 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "template-render",
+      "entry": "shared/resources/ci-tree-equivalence.js#parseConfig",
+      "name": "config 2",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 10,
+      "passed": 10,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "observation_limits": [
+        "effects-after-accept"
+      ],
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "fixture_copy": null,
+      "ran_at": "2026-11-25T18:07:26.188Z"
+    },
+    {
+      "sink": "template-render",
+      "entry": "shared/resources/ci-tree-equivalence.js#parseConfig",
+      "name": "config 1",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 19,
+      "passed": 19,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "observation_limits": [
+        "effects-after-accept"
+      ],
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "fixture_copy": null,
+      "ran_at": "2026-11-25T18:07:24.856Z"
+    },
+    {
+      "sink": "shell-exec",
+      "entry": "cli:shared/resources/finalise-rerun-at-head.js",
+      "name": "rerun 1",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 10,
+      "passed": 10,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "observation_limits": [
+        "effects-after-accept"
+      ],
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "--doc",
+        "{input}",
+        "--out-dir",
+        ".claude/state/rerun"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": "/home/gamaroff/Development/agent-skills/shared/resources/tests/fixtures/security-probe/setup-git-repo.sh",
+      "fixture_copy": null,
+      "ran_at": "2026-11-25T18:07:28.286Z"
+    },
+    {
+      "sink": "shell-exec",
+      "entry": "shell-argv:shared/resources/push-held.sh",
+      "name": "push-held --site",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 18,
+      "passed": 18,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "observation_limits": [
+        "effects-after-accept"
+      ],
+      "shells": [
+        "bash",
+        "zsh"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "--site",
+        "{input}"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "fixture_copy": null,
+      "ran_at": "2026-11-25T18:07:30.591Z"
+    },
+    {
+      "sink": "shell-exec",
+      "entry": "cli:shared/resources/finalise-rerun-at-head.js",
+      "name": "rerun 2",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 3,
+      "passed": 3,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "observation_limits": [
+        "effects-after-accept"
+      ],
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "--doc",
+        "{input}",
+        "--out-dir",
+        ".claude/state/rerun"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": "/home/gamaroff/Development/agent-skills/shared/resources/tests/fixtures/security-probe/setup-git-repo.sh",
+      "fixture_copy": null,
+      "ran_at": "2026-11-25T18:07:28.769Z"
+    },
+    {
+      "sink": "template-render",
+      "entry": "shared/resources/ci-tree-equivalence.js#parsePipelineConfig",
+      "name": "pipeline",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 9,
+      "passed": 9,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "observation_limits": [
+        "effects-after-accept"
+      ],
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": null,
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "fixture_copy": null,
+      "ran_at": "2026-11-25T18:07:29.904Z"
+    }
+  ],
+  "totals": {
+    "executed": 69,
+    "reproduced": 0,
+    "escaped": 0
+  },
+  "updated_at": "2026-11-25T18:07:30.591Z"
+}

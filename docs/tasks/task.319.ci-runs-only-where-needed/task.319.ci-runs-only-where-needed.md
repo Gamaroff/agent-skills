@@ -480,13 +480,13 @@ The three gaps of Definition of Done run 1 are closed. No finding is open. The s
 
 ## Deferred Work
 
-- **T319-CR-1201** (LOW) — carried to gate 7 `recommendations.future` (route 2b, cycle 7): with no criterion read, a fenced `## ` line or another heading that contains "criteri" narrows the search for a listed command
-- **T319-CR-1202** (LOW) — carried to gate 7 `recommendations.future` (route 2b, cycle 7): a stray backtick and an unindented line in one criterion together hide a listed command
-- **T319-CR-1203** (LOW) — carried to gate 7 `recommendations.future` (route 2b, cycle 7): an untracked `SUB/x.js` beside a submodule `sub` under `core.ignorecase=true` on a case-sensitive disk
-- **T319-CR-1301** (LOW) — carried to gate 7 `recommendations.future` (route 2b, cycle 7): a tick resolved on the forge, squashed and its remote branch deleted reads `resume`
-- **T319-CR-1302** (LOW) — carried to gate 7 `recommendations.future` (route 2b, cycle 7): a fetch that brought the commit and failed at something else reads as not fetched
-- **T319-CR-1303** (LOW) — carried to gate 7 `recommendations.future` (route 2b, cycle 7): a script stopped past its bound answers that a push failed which reached the server
-- **T319-CR-1304** (LOW) — carried to gate 7 `recommendations.future` (route 2b, cycle 7): a tick started in a subdirectory reads `resume`
+- **T319-CR-1201** (LOW) — carried to gate 7 `recommendations.future` (route 2b, cycle 7): with no criterion read, a fenced `## ` line or another heading that contains "criteri" narrows the search for a listed command. Closed by task 320
+- **T319-CR-1202** (LOW) — carried to gate 7 `recommendations.future` (route 2b, cycle 7): a stray backtick and an unindented line in one criterion together hide a listed command. Closed by task 320
+- **T319-CR-1203** (LOW) — carried to gate 7 `recommendations.future` (route 2b, cycle 7): an untracked `SUB/x.js` beside a submodule `sub` under `core.ignorecase=true` on a case-sensitive disk. Closed by task 320
+- **T319-CR-1301** (LOW) — carried to gate 7 `recommendations.future` (route 2b, cycle 7): a tick resolved on the forge, squashed and its remote branch deleted reads `resume`. Closed by task 320 as a stated limit: the answer stays `resume`
+- **T319-CR-1302** (LOW) — carried to gate 7 `recommendations.future` (route 2b, cycle 7): a fetch that brought the commit and failed at something else reads as not fetched. Closed by task 320
+- **T319-CR-1303** (LOW) — carried to gate 7 `recommendations.future` (route 2b, cycle 7): a script stopped past its bound answers that a push failed which reached the server. Closed by task 320
+- **T319-CR-1304** (LOW) — carried to gate 7 `recommendations.future` (route 2b, cycle 7): a tick started in a subdirectory reads `resume`. Closed by task 320
 
 ## Definition of Done - PASSED ✅
 
@@ -534,6 +534,7 @@ Run 1 found three gaps: criterion 10's red runs were not in a QA report, `ci.ski
 | 2026-11-25 |  | DoD incomplete — 3 gaps identified | finalise |
 | 2026-11-25 |  | QA gate PASS (100/100) — no open finding; the three gaps of DoD run 1 are closed | qa-task |
 | 2026-11-25 | 1.3 | DoD passed — accepted (PR #937) | finalise |
+| 2026-11-25 |  | Deferred Work: the seven carried findings name task 320, which closes them | develop |
 <!-- change-log-end -->
 
 ## Progress Tracking

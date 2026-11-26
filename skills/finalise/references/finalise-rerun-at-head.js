@@ -72,8 +72,9 @@
  *   none-named      0  the list is set and no criterion names an entry of it, or there is no criterion
  *   not-configured  0  finalise.rerunAtHead is absent or an empty list
  *   dirty-tree      1  the working tree is not the head, or stopped being it; no record is kept
- *   scan-broken     1  the document could not be read, or a listed command stands in a criteria section of
- *                      which the reader returns no criterion at all, or on an unindented line of one, or
+ *   scan-broken     1  the document could not be read; or the reader returns no criterion at all and a listed
+ *                      command stands under a criteria heading, or anywhere when nothing says where the
+ *                      criteria are (holdsCriteria); or one stands on an unindented line of a criterion, or
  *                      after a backtick that has no partner
  *   failed          1  the engine itself failed (a file it could not write, git); no record is kept
  *   usage           2  bad arguments, or a configuration that cannot be read as a list of commands
@@ -86,9 +87,12 @@ const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const { parseYamlSubset } = require("./yaml-subset.js");
 const {
+  CRITERIA_HEADINGS,
   RE_CHECKBOX,
   RE_NUMBERED,
   criteriaSection,
+  extractSection,
+  makeFenceTracker,
   readCriteriaEntries,
 } = require("./criteria-section.js");
 const {
@@ -102,6 +106,8 @@ const {
   parseConfig,
   spawnCheck,
   topLevelKey,
+  topLevelKeys,
+  unescaped,
 } = require("./ci-tree-equivalence.js");
 const docId = require("./doc-id.js");
 
@@ -125,12 +131,7 @@ const FINALISE_KEYS = ["deferralApprover", "rerunAtHead"];
  * beside a plain block as a second copy nobody counted (T319-CR-406).
  */
 function listKeyRows(text) {
-  const plain = text.replace(
-    /\\(?:x([0-9a-fA-F]{2})|u([0-9a-fA-F]{4})|U([0-9a-fA-F]{8}))/g,
-    (_, x, u, U) =>
-      String.fromCodePoint(Math.min(parseInt(x ?? u ?? U, 16), 0xfffd)),
-  );
-  return plain
+  return unescaped(text)
     .split(/\r?\n/)
     .filter((l) =>
       /^\s*(?:[-?:]\s+)*[{\s]*["']?rerun[-_]?at[-_]?head["']?\s*(?::|$)/i.test(
@@ -191,7 +192,7 @@ function parseRerunList(rawText) {
   const parsed = parseYamlSubset(text) || {};
   assertMapping(text, parsed);
   // A list under a key nobody reads is a list that is silently not run (T319-CR-208).
-  for (const k of Object.keys(parsed)) {
+  for (const k of topLevelKeys(text, parsed)) {
     if (k !== "finalise" && ["finalise", "finalize"].includes(normKey(k)))
       throw new UsageError(
         `${k} looks like finalise; the key is exactly "finalise"`,
@@ -266,6 +267,106 @@ function shows(text, command) {
   );
 }
 
+const RE_AC_HEADING = /^#{2,6} +(?:\d+[.)] *)?AC[ -]?\d/i;
+
+/** Where the next HTML comment opens in a line, past its code spans, or -1. */
+function commentAt(line, at) {
+  const mark = /\\[\\`]|`+|<!--/g;
+  mark.lastIndex = at;
+  for (let m; (m = mark.exec(line));) {
+    if (m[0] === "<!--") return m.index;
+    if (m[0].startsWith("\\")) continue;
+    const run = /`+/g;
+    run.lastIndex = mark.lastIndex;
+    for (let r; (r = run.exec(line));)
+      if (r[0].length === m[0].length) {
+        mark.lastIndex = run.lastIndex;
+        break;
+      }
+  }
+  return -1;
+}
+
+/**
+ * A document without its HTML comments, line for line. One that is not closed runs to the end, and one that a
+ * fence or a code span holds is text (T320-CR-305). A NUL stands where a comment was, so that what follows
+ * it on the line does not begin the line: Markdown reads no heading or list item there.
+ */
+function withoutComments(text) {
+  const isFenceLine = makeFenceTracker();
+  let open = false;
+  return text
+    .split(/\r?\n/)
+    .map((line) => {
+      if (!open && isFenceLine(line)) return line;
+      let out = open ? "\0" : "";
+      for (let at = 0; ;) {
+        if (open) {
+          const end = line.indexOf("-->", at);
+          if (end === -1) return out;
+          open = false;
+          at = end + 3;
+        }
+        const from = commentAt(line, at);
+        if (from === -1) return out + line.slice(at);
+        out += `${line.slice(at, from)}\0`;
+        open = true;
+        at = from + 2; // `<!-->` is a whole comment
+      }
+    })
+    .join("\n");
+}
+
+/**
+ * A document's parts, each a list of lines: what stands before the first `## ` line, then from each on. A
+ * fence marker in a comment block opens no fence (task 320). Only an opener at column 0 that a later line
+ * closes starts such a block: any other may be text, and would hide the fences up to the next comment
+ * (T320-CR-501).
+ */
+function partsOf(text) {
+  const isFenceLine = makeFenceTracker();
+  const lines = text.split(/\r?\n/);
+  const lastEnd = lines.findLastIndex((line) => line.includes("-->"));
+  const parts = [[]];
+  let comment = false;
+  for (const [i, line] of lines.entries()) {
+    const fenced = !comment && isFenceLine(line);
+    if (comment) comment = !line.includes("-->");
+    else if (!fenced && line.startsWith("<!--"))
+      comment = i < lastEnd && !line.includes("-->");
+    if (!fenced && line.startsWith("## ")) parts.push([]);
+    parts.at(-1).push(line);
+  }
+  return parts;
+}
+
+/**
+ * Does a criteria section hold criteria in a shape the reader does not read: a list item, a table row, a
+ * Given or When line with a Then line after it, a line of text under an AC heading? These shapes are the
+ * whole list. What is none of them (an introduction, a placeholder, an empty fence) does not say that the
+ * criteria stand here (T320-CR-101, T320-CR-202 to 204, T320-CR-304).
+ */
+function holdsCriteria(section) {
+  let underAc = false;
+  let given = false;
+  return section.split("\n").some((l) => {
+    if (/^ {0,3}#{1,6}(?:\s|$)/.test(l)) {
+      underAc = RE_AC_HEADING.test(l);
+      given = false;
+      return false;
+    }
+    given = given || /^\s*[*_]{0,2}(?:Given|When)\b/.test(l);
+    return (
+      (underAc && /^\s*[*_"'(]{0,3}[\p{L}\p{N}]/u.test(l)) ||
+      (given && /^\s*[*_]{0,2}Then\b/.test(l)) ||
+      /^\s*\|.*[\p{L}\p{N}]/u.test(l) ||
+      /^\s*(?:[-*+]|\d{1,9}[.)])\s+(?=\S)(?!\[[ xX]\][\s\0]*$).*[\p{L}\p{N}]/u.test(
+        l,
+      )
+    );
+  });
+}
+
 /** [{ command, criteria: [{ index, text }] }] in list order, only for commands a criterion names. */
 function namedCommands(list, criteria) {
   return list
@@ -302,11 +403,11 @@ const RE_BLOCK_START = new RegExp(
 );
 
 /**
- * The first criterion that names a listed command only by way of a lazy continuation: an unindented line
- * directly under it, which Markdown renders as part of it and the criteria reader ends it at. `null` when
- * there is none. Read past, the command would not be run and nothing would say so (T319-CR-605).
+ * The text of each criterion, in the reader's order, with its lazy continuation: an unindented line directly
+ * under it, which Markdown renders as part of it and the criteria reader ends it at. Its line breaks are
+ * kept: `shows` reads a text line by line too (T320-CR-103).
  */
-function lazilyNamed(list, body, texts) {
+function lazyTexts(body) {
   let inItem = false; // an indented line belongs to the last criterion
   let open = false; // and so does an unindented one: no blank line stands between
   const whole = [];
@@ -316,20 +417,30 @@ function lazilyNamed(list, body, texts) {
       whole.push(m[1]);
       inItem = true;
       open = true;
-    } else if (line.trim() === "") open = false;
-    else if (/^\s/.test(line) ? inItem : open && !RE_BLOCK_START.test(line)) {
-      whole.push(`${whole.pop()} ${line.trim()}`);
+    } else if (line.trim() === "") {
+      open = false;
+      if (inItem) whole.push(`${whole.pop()}\n`);
+    } else if (/^\s/.test(line) ? inItem : open && !RE_BLOCK_START.test(line)) {
+      whole.push(`${whole.pop()}\n${line.trim()}`);
       open = true;
     } else {
       inItem = false;
       open = false;
     }
   }
+  return whole;
+}
+
+/**
+ * The first criterion that names a listed command only by way of a lazy continuation, or `null`. Read past,
+ * the command would not be run and nothing would say so (T319-CR-605).
+ */
+function lazilyNamed(list, whole, texts) {
   const count = (text, command) =>
     codeSpans(text).filter((s) => s === command).length;
   for (const [i, text] of whole.entries())
     for (const command of list)
-      if (count(text, command) > count(texts[i], command))
+      if (count(text.replace(/\n+/g, " "), command) > count(texts[i], command))
         return { index: i + 1, command };
   return null;
 }
@@ -550,6 +661,21 @@ const gitLine = (cwd, ...args) =>
     .toString("utf8")
     .replace(/\r?\n$/, "");
 const bytes = (f) => Buffer.from(f, "latin1");
+
+/** Which of these paths the repository at `cwd` ignores. An answer that cannot be had is none of them. */
+function ignoredOf(cwd, files) {
+  if (files.length === 0) return new Set();
+  try {
+    const out = gitIn(
+      cwd,
+      ["check-ignore", "-z", "--stdin"],
+      bytes(files.map((f) => `${f}\0`).join("")),
+    );
+    return new Set(out.toString("latin1").split("\0").filter(Boolean));
+  } catch {
+    return new Set(); // exit 1: none is ignored
+  }
+}
 const shown = (f) => bytes(f).toString("utf8");
 // As git folds a name under core.ignorecase: ASCII only.
 const folded = (f) => f.replace(/[A-Z]/g, (c) => c.toLowerCase());
@@ -621,7 +747,28 @@ function differing(dir, commit, prefix = "") {
   // (T319-CR-801). It is a file of its own unless the disk folds names too and both name one file
   // (T319-CR-1002); a second hard link is not one name.
   const byFold = new Map([...tree.keys()].map((f) => [folded(f), f]));
-  for (const f of gitRows(dir, "-c", "core.ignorecase=false", ...listed)) {
+  // And one more: what stands in a directory SUB beside a submodule `sub` is taken for the submodule's own
+  // and listed nowhere (T319-CR-1203). It is the checkout's, unless both names are one directory.
+  const subs = new Map();
+  for (const [f, { mode }] of tree)
+    if (mode === "160000") subs.set(folded(f), f);
+  const besideSub = (f) => {
+    const parts = f.split("/");
+    for (let i = 1; i < parts.length; i++) {
+      const d = parts.slice(0, i).join("/");
+      const sub = subs.get(folded(d));
+      if (sub === undefined || sub === d) continue;
+      const [own, known] = [lstat(d), lstat(sub)];
+      if (!known || own?.ino !== known.ino || own.dev !== known.dev)
+        return true;
+    }
+    return false;
+  };
+  const exact = gitRows(dir, "-c", "core.ignorecase=false", ...listed);
+  const beside = exact.filter(besideSub);
+  const ignored = ignoredOf(dir, beside); // by the repository's own case rule (T320-CR-105)
+  for (const f of beside) if (!ignored.has(f)) bad.add(f);
+  for (const f of exact) {
     if (!byFold.has(folded(f))) continue;
     const [own, known] = [lstat(f), lstat(byFold.get(folded(f)))];
     if (
@@ -837,13 +984,25 @@ async function run(argv) {
     if (entries === null || entries.length === 0) {
       // Criteria the reader cannot see, or none at all: only the first can hide a command (T319-CR-805).
       // Under every heading that speaks of criteria, and in the whole document when nothing stands there
-      // (T319-CR-1003).
-      const under = body
-        .split(/^(?=## )/m)
-        .filter((part) => /^## .*(?:criteri|\bAC[ -]?\d)/i.test(part))
-        .map((part) => part.replace(/^.*/, ""))
+      // (T319-CR-1003). A line in a fence is no heading. Only a section the reader knows that holds criteria,
+      // or an AC heading, says where they are: a heading that contains the word (`## Rollback criteria`)
+      // does not (T319-CR-1201), and neither does one in a comment (T320-CR-301). The command is searched for
+      // under the headings with the comments and without them: one in a comment ends no section.
+      const visible = withoutComments(body);
+      const parts = partsOf(visible);
+      const placed =
+        CRITERIA_HEADINGS.some((name) =>
+          holdsCriteria(extractSection(visible, name) ?? ""),
+        ) ||
+        parts.some(
+          (part) =>
+            RE_AC_HEADING.test(part[0]) && holdsCriteria(part.join("\n")),
+        );
+      const under = [...parts, ...partsOf(body)]
+        .filter((part) => /^## .*(?:criteri|\bAC[ -]?\d)/i.test(part[0]))
+        .map((part) => part.slice(1).join("\n"))
         .join("\n");
-      const where = under.trim() === "" ? body : under;
+      const where = entries === null || !placed ? body : under;
       const hidden = list.find((command) => shows(where, command));
       if (hidden === undefined)
         return { reason: "none-named", exitCode: 0, ...base };
@@ -857,7 +1016,8 @@ async function run(argv) {
     const texts = entries.map((e) =>
       [e.line, ...e.continuation].filter(Boolean).join(" ").trim(),
     );
-    const lazy = lazilyNamed(list, body, texts);
+    const joined = lazyTexts(body);
+    const lazy = lazilyNamed(list, joined, texts);
     if (lazy)
       return {
         reason: "scan-broken",
@@ -866,11 +1026,13 @@ async function run(argv) {
         ...base,
       };
     // A backtick without a partner takes the one that opens a later span, and the span is gone
-    // (T319-CR-1005).
+    // (T319-CR-1005), on an unindented line as well (T319-CR-1202).
     for (const [i, e] of entries.entries()) {
       const raw = [e.line, ...e.continuation].join("\n");
       const whole = codeSpans(texts[i]);
-      const lost = list.find((c) => !whole.includes(c) && shows(raw, c));
+      const lost = list.find(
+        (c) => !whole.includes(c) && (shows(raw, c) || shows(joined[i], c)),
+      );
       if (lost)
         return {
           reason: "scan-broken",

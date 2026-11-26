@@ -106,6 +106,8 @@ const CI_KEYS = Object.freeze(["docsOnly", "skipMarker"]);
 const PIPELINE_KEYS = Object.freeze(["pushRecordCommits"]);
 const PUSH_RECORD_COMMITS = Object.freeze(["batched", "eager"]);
 const SKIP_MARKER_MAX = 80;
+const UNPRINTABLE = /[\p{Cc}\p{Cf}\p{Cs}]/u;
+const MARKER_RULE = `ci.skipMarker must be one printable line of at most ${SKIP_MARKER_MAX} characters, with nothing but plain spaces at its ends`;
 
 const USAGE =
   "usage: ci-tree-equivalence.js --head-rollup <PENDING|NONE|...> [--head <sha>] [--pr <n>] " +
@@ -395,7 +397,18 @@ class UsageError extends Error {}
  * defaults, because a typo'd `patterns` that quietly widened to the default is a rule applied to
  * files its owner did not choose.
  */
-const normKey = (k) => String(k).toLowerCase().replace(/[-_]/g, "");
+const normKey = (k) => unescaped(k).toLowerCase().replace(/[-_]/g, "");
+
+/**
+ * Text with YAML's character escapes read. The YAML subset keeps one in a quoted key as text, so a block
+ * under `"c\x69"` was neither read nor refused (task 320).
+ */
+const unescaped = (s) =>
+  String(s).replace(
+    /\\(?:x([0-9a-fA-F]{2})|u([0-9a-fA-F]{4})|U([0-9a-fA-F]{8}))/g,
+    (_, x, u, U) =>
+      String.fromCodePoint(Math.min(parseInt(x ?? u ?? U, 16), 0xfffd)),
+  );
 
 function defaultConfig() {
   return {
@@ -430,6 +443,33 @@ function significantLines(text) {
 function topLevelKey(line) {
   const m = /^(?:"([^"]+)"|'([^']+)'|([\w.-]+))\s*:/.exec(line);
   return m ? (m[1] ?? m[2] ?? m[3]) : null;
+}
+
+/**
+ * The keys the file writes at its top level: every key row of the source at the first row's indent or under
+ * it. The parse has fewer: it stops at a row it does not read (the text of a block scalar), and what stood
+ * after it was neither read nor refused (task 320). A lone CR ends a line here, and an anchor, a tag or the
+ * `?` of an explicit key stands before one, as they do in YAML and not in the parse.
+ */
+function writtenKeys(text) {
+  const rows = significantLines(text.replace(/\r(?!\n)/g, "\n"));
+  const indent = (l) => l.length - l.trimStart().length;
+  return rows
+    .filter((l) => indent(l) <= indent(rows[0]))
+    .map((l) =>
+      topLevelKey(
+        l
+          .trimStart()
+          .replace(/^\?\s+(.*)/, "$1:")
+          .replace(/^(?:[&!]\S*\s+)+/, ""),
+      ),
+    )
+    .filter((k) => k !== null);
+}
+
+/** Every top-level key, as the parse reads the file and as the file writes it: near misses are looked for in both. */
+function topLevelKeys(text, parsed) {
+  return [...Object.keys(parsed), ...writtenKeys(text)];
 }
 
 /**
@@ -511,6 +551,13 @@ function assertBlockRows(text, parsed, key) {
       `${CONFIG_BASENAME} has ${rows} row(s) under ${key} but the parse accounts for ${consumed}: a row is mis-indented, duplicated or in a form the YAML subset does not read (a list goes one level deeper than its key); the rule will not guess which`,
     );
   }
+  // A block in a file that is indented whole, or after a lone CR, has no row at column 0 to count (T320-CR-502).
+  const written = writtenKeys(text).filter((k) => k === key).length;
+  if (written > (consumed > 0 ? 1 : 0)) {
+    throw new UsageError(
+      `${CONFIG_BASENAME} writes ${key} ${written} time(s) and the parse reads it ${consumed > 0 ? 1 : 0} time(s): write it once, at column 0, before any row the YAML subset does not read (a block scalar, for one)`,
+    );
+  }
 }
 
 /**
@@ -528,9 +575,34 @@ function parseConfig(rawText) {
   assertMapping(text, parsed);
   // The specific diagnostics (a block scalar, an unknown key) are produced first so they name the
   // cause; the completeness check below is the net under all of them.
-  const cfg = interpretConfig(parsed);
+  const cfg = interpretConfig(parsed, topLevelKeys(text, parsed));
   assertBlockRows(text, parsed, "ci");
+  assertMarkerRow(text);
   return cfg;
+}
+
+/**
+ * Refuse a `skipMarker` row with a control or format character anywhere in it, its comment included, or
+ * with a space other than U+0020 at the value's ends: the parse trims both outside the quotes, so
+ * `skipMarkerOf` never sees them (T320-CR-104, T320-CR-206). A tab there parts the value from what stands
+ * beside it.
+ */
+function assertMarkerRow(text) {
+  let block = null;
+  for (const l of text.split(/\r?\n|\r$/)) {
+    block = topLevelKey(l) ?? block;
+    const row = /^\s+["']?skipMarker["']?\s*:(.*)/s.exec(l);
+    if (block !== "ci" || !row) continue;
+    // What is inside the quotes is skipMarkerOf's to judge, and a space in the comment is no one's.
+    const outside = row[1]
+      .replace(/^(\s*)(?:"[^"]*"|'[^']*')/, '$1""')
+      .replace(/(^|\s)#.*$/s, "$1");
+    if (
+      UNPRINTABLE.test(l.replace(/\t/g, "")) ||
+      /^[ \t]*[^\S \t]|[^\S \t][ \t]*$/.test(outside)
+    )
+      throw new UsageError(MARKER_RULE);
+  }
 }
 
 /**
@@ -546,10 +618,15 @@ function skipMarkerOf(v) {
     throw new UsageError("ci.skipMarker must be a string (empty means off)");
   }
   const m = v.trim();
-  if (/[\p{Cc}\p{Cf}\p{Cs}]/u.test(m) || [...m].length > SKIP_MARKER_MAX) {
-    throw new UsageError(
-      `ci.skipMarker must be one printable line of at most ${SKIP_MARKER_MAX} characters`,
-    );
+  // trim() drops a tab, a BOM and every kind of space; only U+0020 is dropped in silence (task 320)
+  const dropped =
+    v.slice(0, v.length - v.trimStart().length) + v.slice(v.trimEnd().length);
+  if (
+    UNPRINTABLE.test(m) ||
+    /[^ ]/.test(dropped) ||
+    [...m].length > SKIP_MARKER_MAX
+  ) {
+    throw new UsageError(MARKER_RULE);
   }
   if (/^[>|][+\-0-9]*$/.test(m)) {
     throw new UsageError(
@@ -570,7 +647,7 @@ function parsePipelineConfig(rawText) {
   const parsed = parseYamlSubset(text) || {};
   const cfg = { pushRecordCommits: "batched" };
   if (typeof parsed !== "object" || Array.isArray(parsed)) return cfg;
-  for (const k of Object.keys(parsed)) {
+  for (const k of topLevelKeys(text, parsed)) {
     if (k !== "pipeline" && normKey(k) === "pipeline") {
       throw new UsageError(
         `${k} looks like pipeline; the key is exactly "pipeline"`,
@@ -625,10 +702,10 @@ function statedMergeStrategy(rawText) {
   return typeof v === "string" && v !== "" ? v : null;
 }
 
-/** Interpret a parsed top-level mapping as the ci.docsOnly configuration. */
-function interpretConfig(parsed) {
+/** Interpret a parsed top-level mapping, and the file's top-level keys, as the ci.docsOnly configuration. */
+function interpretConfig(parsed, keys) {
   const cfg = defaultConfig();
-  for (const k of Object.keys(parsed)) {
+  for (const k of keys) {
     if (k !== "ci" && normKey(k) === "ci") {
       throw new UsageError(`${k} looks like ci; the key is exactly "ci"`);
     }
@@ -1530,9 +1607,11 @@ module.exports = {
   // The bounded runner and the block reader's refusals, for finalise-rerun-at-head.js (task.319).
   UsageError,
   normKey,
+  unescaped,
   assertMapping,
   assertBlockRows,
   topLevelKey,
+  topLevelKeys,
   spawnCheck,
   killProcessGroup,
   settle,

@@ -1,0 +1,90 @@
+[
+  {
+    "id": "legit-plain",
+    "input": "ci:\n  docsOnly:\n    enabled: false\n",
+    "direction": "legitimate",
+    "why": "the plain key",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:466"
+  },
+  {
+    "id": "legit-other-escape",
+    "input": "\"p\\x72oject\": x\nci:\n  skipMarker: skip\n",
+    "direction": "legitimate",
+    "why": "an escaped key that is not ours",
+    "correct": "accepted",
+    "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:181"
+  },
+  {
+    "id": "legit-escape-out-of-range",
+    "input": "\"x\\UFFFFFFFF\": 1\nci:\n  skipMarker: skip\n",
+    "direction": "legitimate",
+    "why": "an escape past the last code point, in a key that is not ours",
+    "correct": "accepted",
+    "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:181"
+  },
+  {
+    "id": "hostile-all-escaped",
+    "input": "\"\\x63\\x69\":\n  docsOnly:\n    enabled: false\n",
+    "direction": "hostile",
+    "why": "every letter escaped",
+    "correct": "refused",
+    "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:427"
+  },
+  {
+    "id": "hostile-mixed-forms",
+    "input": "\"\\u0043\\U00000049\":\n  skipMarker: x\n",
+    "direction": "hostile",
+    "why": "two escape forms, capitals",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:466"
+  },
+  {
+    "id": "hostile-underscore",
+    "input": "\"c\\x5Fi\":\n  skipMarker: x\n",
+    "direction": "hostile",
+    "why": "an escaped underscore, capital hex",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:466"
+  },
+  {
+    "id": "hostile-single-quoted",
+    "input": "'c\\x69':\n  skipMarker: x\n",
+    "direction": "hostile",
+    "why": "single quotes",
+    "correct": "refused",
+    "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:207"
+  },
+  {
+    "id": "hostile-after-own-indent-list",
+    "input": "list:\n- a\n\"c\\x69\":\n  docsOnly:\n    enabled: false\n",
+    "direction": "hostile",
+    "why": "after a list at its own indent",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:466"
+  },
+  {
+    "id": "hostile-inner-key",
+    "input": "ci:\n  \"skip\\x4darker\": x\n",
+    "direction": "hostile",
+    "why": "an escaped key inside ci",
+    "correct": "refused",
+    "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:190"
+  },
+  {
+    "id": "hostile-after-block-scalar",
+    "input": "note: |\n  text\n\"c\\x69\":\n  docsOnly:\n    enabled: false\n",
+    "direction": "hostile",
+    "why": "valid YAML: the subset stops at the block scalar, so the escaped key after it is never reached",
+    "correct": "refused",
+    "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:427"
+  },
+  {
+    "id": "hostile-beside-after-block-scalar",
+    "input": "ci:\n  skipMarker: skip\nnote: |\n  text\n\"c\\x69\":\n  docsOnly:\n    enabled: false\n",
+    "direction": "hostile",
+    "why": "the same beside the plain key",
+    "correct": "refused",
+    "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:427"
+  }
+]

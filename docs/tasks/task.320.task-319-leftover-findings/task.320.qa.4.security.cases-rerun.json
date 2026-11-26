@@ -1,0 +1,62 @@
+[
+  {
+    "id": "legit-opener-in-a-fence",
+    "input": "docs/t.md",
+    "direction": "legitimate",
+    "why": "T320-CR-305: an opener in a fence removes no criterion",
+    "correct": "none-named",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "finalise:\n  rerunAtHead:\n    - touch .claude/state/ran\n",
+        "docs/t.md": "# T\n\n## Success Criteria\n\n```html\n<!-- x\n```\n\n- crit\n\n## Other\n\n`touch .claude/state/ran`\n"
+      }
+    },
+    "expected": { "stdout": "none-named\n", "exit": 0, "absent": [".claude/state/ran"] },
+    "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:392"
+  },
+  {
+    "id": "hostile-commented-ac",
+    "input": "docs/t.md",
+    "direction": "hostile",
+    "why": "T320-CR-301: a commented-out AC heading",
+    "correct": "scan-broken, nothing runs",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "finalise:\n  rerunAtHead:\n    - touch .claude/state/ran\n",
+        "docs/t.md": "# T\n\n## Success Criteria\n\n<!--\n## AC1\n\n- x\n-->\n\n## Done when\n\n- [ ] `touch .claude/state/ran` exits 0\n"
+      }
+    },
+    "expected": { "stdout": "scan-broken: the document names `touch .claude/state/ran` and has no criteria the reader can find\n", "exit": 1, "absent": [".claude/state/ran"] },
+    "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:392"
+  },
+  {
+    "id": "hostile-comment-starts-a-line",
+    "input": "docs/t.md",
+    "direction": "hostile",
+    "why": "T320-CR-301: text after a comment does not begin its line",
+    "correct": "scan-broken, nothing runs",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "finalise:\n  rerunAtHead:\n    - touch .claude/state/ran\n",
+        "docs/t.md": "# T\n\n## Success Criteria\n\n<!-- a -->## AC1\n\n<!--\n-->- x\n\n## Done when\n\n- [ ] `touch .claude/state/ran` exits 0\n"
+      }
+    },
+    "expected": { "stdout": "scan-broken: the document names `touch .claude/state/ran` and has no criteria the reader can find\n", "exit": 1, "absent": [".claude/state/ran"] },
+    "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:392"
+  },
+  {
+    "id": "hostile-when-prose",
+    "input": "docs/t.md",
+    "direction": "hostile",
+    "why": "T320-CR-304: an introduction that starts with When",
+    "correct": "scan-broken, nothing runs",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "finalise:\n  rerunAtHead:\n    - touch .claude/state/ran\n",
+        "docs/t.md": "# T\n\n## Success Criteria\n\nWhen the list below passes, this is done.\n\n## Done when\n\n- [ ] `touch .claude/state/ran` exits 0\n"
+      }
+    },
+    "expected": { "stdout": "scan-broken: the document names `touch .claude/state/ran` and has no criteria the reader can find\n", "exit": 1, "absent": [".claude/state/ran"] },
+    "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:392"
+  }
+]

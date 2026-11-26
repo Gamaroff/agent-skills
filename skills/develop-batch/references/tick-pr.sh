@@ -99,6 +99,12 @@ tidy() {
 
 # True when merging $1 into origin/<base> would change nothing: its content is already there. A squash or
 # rebase merge leaves the branch's own commits off the base, so ancestry cannot say it.
+#
+# A LIMIT (T319-CR-1301): a tick whose conflict was resolved on the forge, and whose PR was then squashed
+# and its branch deleted there, is on the base in the forge's words and in nothing this can compare with.
+# `start` answers `resume` for it, and nothing is deleted; the PR that `open` then makes conflicts. A tick
+# that never landed can do the same, so the owner decides: `developNext.tickVia` in the configuration
+# reference (T320-CR-201).
 landed() {
   local base="refs/remotes/origin/$BASE" from at
   holds "$base" "$1"
@@ -110,8 +116,9 @@ landed() {
     # here, so the same words on another row are not the tick (T319-CR-1102).
     3)
       from=$(git merge-base "$base" "$1") || return 1
-      # only the commits that changed a file the branch changed
-      for at in $(git diff-tree -r -z --no-renames --name-only "$from" "$1" \
+      # only the commits that changed a file the branch changed; from the top, because those names are
+      # relative to it and rev-list reads a path from where it is (T319-CR-1304)
+      for at in $(cd "$(git rev-parse --show-toplevel)" && git diff-tree -r -z --no-renames --name-only "$from" "$1" \
         | GIT_LITERAL_PATHSPECS=1 xargs -0 git rev-list --first-parent "$from..$base" --); do
         ! holds "$at" "$1" || return 0
       done

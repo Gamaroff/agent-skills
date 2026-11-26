@@ -1,0 +1,414 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "7f00b91ffbbefa701cf30eb70311aea6581c8163",
+  "dirty_paths": [
+    "docs/tasks/task.320.task-319-leftover-findings/task.320.implementation.1.task-319-leftover-findings-initial-run.md",
+    "docs/tasks/task.320.task-319-leftover-findings/task.320.pr-review.1.task-319-leftover-findings.md",
+    "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.4.task-319-leftover-findings.md",
+    "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md"
+  ],
+  "document": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md",
+  "result": {
+    "bytes": 18117,
+    "sha256": "7d907d39f404e92bf92b7ef9e9732643b13c9d8d528482e85abb9def00f66022",
+    "verified": true
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 17,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "885c82658f6011563b98816667329816bd29048c6529f73659ec88c805d1aacc",
+      "status": "PASS",
+      "description": "Listed command past a fenced heading or beside a criteria-like heading is refused (T319-CR-1201)",
+      "code_citation": "shared/resources/finalise-rerun-at-head.js:991",
+      "test_citation": "shared/resources/tests/finalise-rerun-at-head.test.mjs:1208",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Both recorded inputs and controls are in the test. Lane: npm test, .github/workflows/test.yml, every pull request. I reverted the fence-aware split and the whole-document rule in a scratch clone: each turned this test red; it is red at eb0226de6. T320-CR-401 (low, Deferred Work) is a criteria section written as Given and Then prose: the base answers it the same, and it is outside the two recorded inputs."
+    },
+    {
+      "id": "#2",
+      "text_hash": "e5b9da3445e93ba82f46f6f1a7e39ae09eb2a943a3bed09ad2ffdc1354ac111a",
+      "status": "PASS",
+      "description": "Command hidden by a stray backtick and an unindented line is refused (T319-CR-1202)",
+      "code_citation": "shared/resources/finalise-rerun-at-head.js:1020",
+      "test_citation": "shared/resources/tests/finalise-rerun-at-head.test.mjs:1282",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Removing shows(joined[i], c) turns the test red (run by me); red at eb0226de6."
+    },
+    {
+      "id": "#3",
+      "text_hash": "9297081a05910c03752be6443e1b4d97451d87b54697969822d7c90880eca448",
+      "status": "PASS",
+      "description": "Untracked file beside a submodule, differing only in case, answers dirty-tree (T319-CR-1203)",
+      "code_citation": "shared/resources/finalise-rerun-at-head.js:756",
+      "test_citation": "shared/resources/tests/finalise-rerun-at-head.test.mjs:1320",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The remedy reverted turns the test red (run by me); the inode comparison reverted turns line 1372 red. The per-PR runner (ubuntu-latest) has a case-sensitive disk, so the rows run there; on a disk that folds names the test returns early."
+    },
+    {
+      "id": "#4",
+      "text_hash": "9403aab883d170f8afa8d39795c131fd6de4c782ce05c6b79b4b227ff3534ce9",
+      "status": "PASS",
+      "description": "push-held.sh says could not be fetched only when the commit is absent (T319-CR-1302)",
+      "code_citation": "shared/resources/push-held.sh:162",
+      "test_citation": "shared/resources/tests/push-policy.test.mjs:1405",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The refusal kept when the commit is absent is held by push-policy.test.mjs:1474. Three mutations run by me (presence check, refuse at all, no-recurse-submodules): each red."
+    },
+    {
+      "id": "#5",
+      "text_hash": "d72a77ef4de2b8ab63eb58ee73cee9849f21e7e6e10fc8b0f8f3bfb7d68109d1",
+      "status": "PASS",
+      "description": "push-held.sh stopped past its bound answers pushed; killed inside it, failed (T319-CR-1303)",
+      "code_citation": "shared/resources/push-held.sh:101",
+      "test_citation": "shared/resources/tests/push-policy.test.mjs:1298",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Both halves asserted in one test; removing the line, and removing only its bound condition, each turn it red (run by me)."
+    },
+    {
+      "id": "#6",
+      "text_hash": "e772f1567f898365c2c8b192bf1e0d889cddb231f19f70a71c4af776f16aa37a",
+      "status": "PASS",
+      "description": "tick-pr.sh start answers the same from a subdirectory (T319-CR-1304)",
+      "code_citation": "shared/resources/tick-pr.sh:120",
+      "test_citation": "shared/resources/tests/tick-pr.test.mjs:647",
+      "members": [],
+      "non_member_fail": null,
+      "note": "landed and resume each compared from the top, docs, and a directory with a space. The cd reverted: red (run by me)."
+    },
+    {
+      "id": "#7",
+      "text_hash": "801c33a750ab181b5ef09dd7d3386c29dcc41c4cf5122b33908736f587c5a02c",
+      "status": "PASS",
+      "description": "Limit of T319-CR-1301 stated in tick-pr.sh, develop-next SKILL.md and configuration.md",
+      "code_citation": "shared/resources/tick-pr.sh:102",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [
+        {
+          "member": "shared/resources/tick-pr.sh",
+          "evidence": "shared/resources/tick-pr.sh:102",
+          "status": "PASS"
+        },
+        {
+          "member": "skills/develop-next/SKILL.md",
+          "evidence": "skills/develop-next/SKILL.md:659",
+          "status": "PASS"
+        },
+        {
+          "member": "docs/reference/configuration.md",
+          "evidence": "docs/reference/configuration.md:320",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Each text says that a tick resolved on the forge, squashed and its branch deleted reads resume, and that the second PR conflicts."
+    },
+    {
+      "id": "#8",
+      "text_hash": "f96abeb81e164dc0d738c26e279c140d7370818f7e8d9fa1a40d3feb00447130",
+      "status": "PASS",
+      "description": "Escaped top-level ci, pipeline or finalise key is refused, alone and beside plain",
+      "code_citation": "shared/resources/ci-tree-equivalence.js:400",
+      "test_citation": "shared/resources/tests/ci-tree-equivalence.test.mjs:1479",
+      "members": [
+        {
+          "member": "ci, alone and beside the plain key",
+          "evidence": "shared/resources/tests/ci-tree-equivalence.test.mjs:1479",
+          "status": "PASS"
+        },
+        {
+          "member": "pipeline, alone and beside the plain key",
+          "evidence": "shared/resources/tests/push-policy.test.mjs:395",
+          "status": "PASS"
+        },
+        {
+          "member": "finalise, alone and beside the plain key",
+          "evidence": "shared/resources/tests/finalise-rerun-at-head.test.mjs:847",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "My probe of 28 documents (seven escaped spellings, alone and after a plain block) was refused by the reader of that block every time. Decoding removed from normKey: all three tests red."
+    },
+    {
+      "id": "#9",
+      "text_hash": "96acedce2a3669819632ed5067127b0d148f319e295c4dc972612c513062a52b",
+      "status": "PASS",
+      "description": "skipMarker edge control or format character refused; spaces and CRLF accepted",
+      "code_citation": "shared/resources/ci-tree-equivalence.js:592",
+      "test_citation": "shared/resources/tests/push-policy.test.mjs:214",
+      "members": [],
+      "non_member_fail": null,
+      "note": "My probe put every Cc and Cf character at both edges, quoted, unquoted and outside the quotes, with LF and CRLF (3290 documents): only a tab outside the quotes and line breaks were not refused, and those are separators, as documented. T320-CR-402 concerns a no-break space, which is neither class."
+    },
+    {
+      "id": "#10",
+      "text_hash": "cd5386e3874b340d7cd5940622906cf308e4456c92c9c19d95ac7f98c416e06c",
+      "status": "FAIL",
+      "description": "No new test in the four suites waits longer than 30 s",
+      "code_citation": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.4.task-319-leftover-findings.md:106",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": "re-measure: QA report 4 records one run at c160ee638e2d; the measured-criterion rule grades a wall-clock bound on the median of at least five runs, each with its load recorded",
+      "note": "re-measure. The bound is met in every reading. QA report 4: longest new test 13.6 s of 30 s, command npm run test:remote -- --timeout-min 60 --run test, load 0.38 before and 0.43 after, measured on c160ee638e2d, tree-equivalent to head (finalise-delta.js docs-only, exit 0), but a single run. The missing figures, from five runs by me on head 7f00b91ff with CI=true command node --test over the four suites (234 tests, 0 fail in each): load average at start 1.89, 1.02, 1.46, 2.72, 1.94 (runs 3 and 4 overlapped). Medians in seconds: SIGSTOP case T319-CR-1303 13.5 (13.5, 12.5, 13.5, 13.6, 13.6); T319-CR-805 refused 8.6 (8.6, 8.9, 5.9, 8.8, 8.0); T319-CR-805 read past 3.3 (3.3, 4.4, 2.6, 3.1, 4.3); T319-CR-1005 2.8 (3.6, 2.1, 1.9, 3.3, 2.8); T319-CR-1203 beside 3.5 (3.5, 4.2, 2.5, 3.8, 3.5); T319-CR-1203 second spelling 0.5 (0.7, 0.4, 0.5, 0.7, 0.3); T319-CR-1302 4.7 to 4.8 (4.7, 4.8, 4.6, 4.8, 5.0); T319-CR-1304 2.4 (2.4, 2.3, 3.0, 3.2, 2.3). Recording five runs with their loads in QA report 4 closes it."
+    },
+    {
+      "id": "#11",
+      "text_hash": "0f667512e4eb11df737d304608c157f0f91574e21c93e04301c0d5b45c62a2ab",
+      "status": "PASS",
+      "description": "Every new test was red before its change; red runs in the QA report",
+      "code_citation": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:103",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "CR3-3, escaped ci (extended)",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:107",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-406, escaped finalise (extended)",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:108",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-805, refused",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:109",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-805, read past",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.4.task-319-leftover-findings.md:138",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1005 with the T319-CR-1202 cases",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:109",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1203, a file beside a submodule",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:110",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1203, a second spelling is the submodule (control)",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:127",
+          "status": "PASS"
+        },
+        {
+          "member": "ci.skipMarker is one printable line (extended)",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:111",
+          "status": "PASS"
+        },
+        {
+          "member": "the pipeline block refuses (extended)",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:112",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1303",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:113",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1302",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:114",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1304",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:115",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "I ran the head's four suites against the sources at eb0226de6: 234 tests, 10 fail, exactly the ten members above other than read past and the control. The control is green at the base (QA report 1 line 117 says so); its red run is the one with the inode comparison removed (line 127), which I reproduced. That reads red-before-its-change for a control as red against the remedy without the part it holds, as task 319's accepted DoD did for its green-at-base tests."
+    },
+    {
+      "id": "#12",
+      "text_hash": "53156fb905a4d1612728d6e37cc4842b56bfd3e7340e019ed2872ce23cb1b34a",
+      "status": "PASS",
+      "description": "Reverting any one remedy turns a named test red; table in QA report",
+      "code_citation": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:123",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "T319-CR-1201",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:125",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1202",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:126",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1203",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:127",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1302",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:129",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1303",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:130",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1304",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:131",
+          "status": "PASS"
+        },
+        {
+          "member": "escapes in normKey",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:132",
+          "status": "PASS"
+        },
+        {
+          "member": "escapes in listKeyRows",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:133",
+          "status": "PASS"
+        },
+        {
+          "member": "marker edge",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:134",
+          "status": "PASS"
+        },
+        {
+          "member": "fixes of QA cycle 1",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.2.task-319-leftover-findings.md:118",
+          "status": "PASS"
+        },
+        {
+          "member": "fixes of QA cycle 2",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.3.task-319-leftover-findings.md:143",
+          "status": "PASS"
+        },
+        {
+          "member": "fixes of QA cycle 3",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.4.task-319-leftover-findings.md:145",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "I ran 15 reverts in a scratch clone of 7f00b91ff, covering every remedy of section 3 and the marker row check: 15 of 15 red, each in the test the table names. The one green row, sub === d, is an equivalent shortcut and not a remedy."
+    },
+    {
+      "id": "#13",
+      "text_hash": "e37c3c73f046c53e0038bd159f2188d8777e87237688f2b8bcaee933df622b24",
+      "status": "PASS",
+      "description": "npm test passes under CI=true; npm run bundle leaves no diff",
+      "code_citation": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.4.task-319-leftover-findings.md:102",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "npm test under CI=true",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.4.task-319-leftover-findings.md:102",
+          "status": "PASS"
+        },
+        {
+          "member": "npm run bundle leaves no diff",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.4.task-319-leftover-findings.md:230",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Suite: 8897 tests, 0 fail, exit 0 at c160ee638e2d, tree-equivalent to head; the PR's test job (npm test, with CI set by the runner) is also SUCCESS on 7f00b91ff. Bundle: bundle:check 0 problems (validate.yml:128 runs it too); I ran npm run bundle in a scratch clone of the head and git status was empty. The full suite was not run by me."
+    },
+    {
+      "id": "#14",
+      "text_hash": "416246872aceb5aeb5c9decd4d07391977cc981580270a7eb610f343fcd49135",
+      "status": "PASS",
+      "description": "npm run validate for skills/develop-next/ passes",
+      "code_citation": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.4.task-319-leftover-findings.md:228",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Recorded ok in QA report 4; I ran it at the head: develop-next ok, exit 0. The validate job is SUCCESS on 7f00b91ff."
+    },
+    {
+      "id": "#15",
+      "text_hash": "ad2d88f3751f44a2166e5ec8791103f7b2dee5a1b512ee0f270393dab52311de",
+      "status": "PASS",
+      "description": "CHANGELOG Unreleased cites (task 320) and names the two new refusals",
+      "code_citation": "CHANGELOG.md:16",
+      "test_citation": "evals/shared/tests/changelog-entry-drift.test.mjs:304",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Lines 16 to 21 cite (task 320) and name the escaped ci, pipeline or finalise key, and the control or format character at either end of ci.skipMarker. changelog-cites.sh task.320 answers cites. The corpus guard checks the citation post-merge, once the task is accepted."
+    },
+    {
+      "id": "#16",
+      "text_hash": "2e9baf0322810c9de45dc937ee035daf99d8ccf50152e929b6a002f12d5b0d1f",
+      "status": "PASS",
+      "description": "Configuration reference says what ci.skipMarker drops and refuses",
+      "code_citation": "docs/reference/configuration.md:312",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The row says plain spaces at the ends and a tab outside the quotes are dropped; any other space at the ends, and a control or format character in the value or anywhere on the row, is refused. My probe agrees for control and format characters."
+    },
+    {
+      "id": "#17",
+      "text_hash": "fe353eaeb638201dba61374b425caa7adc5587e6c61dcebf059762e42dd12175",
+      "status": "PASS",
+      "description": "Each Deferred Work entry of task 319 names task 320",
+      "code_citation": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:483",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [
+        {
+          "member": "T319-CR-1201",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:483",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1202",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:484",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1203",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:485",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1301",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:486",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1302",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:487",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1303",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:488",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1304",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:489",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "All seven entries end with Closed by task 320; T319-CR-1301 as a stated limit."
+    }
+  ],
+  "advisories": []
+}

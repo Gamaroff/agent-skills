@@ -1,0 +1,26 @@
+[
+  {
+    "id": "hostile-explicit-key-with-a-comment",
+    "input": "tracker: github\n? ci # c\n: docsOnly:\n    enabled: false\n",
+    "direction": "hostile",
+    "why": "T320-CR-602: YAML reads ci.docsOnly.enabled = false; the parse does not read the key",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:466"
+  },
+  {
+    "id": "hostile-alias-key",
+    "input": "a: &k ci\n*k :\n  docsOnly:\n    enabled: false\n",
+    "direction": "hostile",
+    "why": "T320-CR-602: an alias key YAML reads as ci",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:466"
+  },
+  {
+    "id": "legit-plain-ci-block",
+    "input": "tracker: github\nci:\n  docsOnly:\n    enabled: false\n",
+    "direction": "legitimate",
+    "why": "control: the key written plainly",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:466"
+  }
+]

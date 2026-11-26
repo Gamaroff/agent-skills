@@ -116,7 +116,7 @@ goes red. A `cd` at the top of the script is wrong too: the quality gate would r
 
 T319-CR-1301, one paragraph in the header comment, near `landed`: a tick whose conflict was resolved on
 the forge, and which was squashed with its branch deleted, reads `resume`. Nothing is deleted. Close the
-second PR by hand, and delete the local tick branch.
+second PR by hand, and delete the tick branch here and on the remote (`open` pushed it).
 
 ### Phase 3: The configuration
 
@@ -134,7 +134,12 @@ const normKey = (k) => unescaped(k).toLowerCase().replace(/[-_]/g, "");
 ```
 
 Export `unescaped` and use it in `listKeyRows`, whose own copy goes. An escaped `docsOnly` is refused
-today as an unknown key of `ci`; after this its message names the near miss instead.
+today as an unknown key of `ci`; after this its message names the near miss instead. No test pins the
+old message (checked at review 1).
+
+`listKeyRows`' use of the helper needs a case of its own: `notes:` holding `"rerun\x41tHead":` is
+refused today, and is accepted when only that use is reverted. Every case of the T319-CR-406 test is
+refused by `normKey` first.
 
 In `skipMarkerOf`, the character test reads `v`, and the length still reads the trimmed `m`:
 
@@ -163,4 +168,5 @@ if (/[\p{Cc}\p{Cf}\p{Cs}]/u.test(v) || [...m].length > SKIP_MARKER_MAX) {
 ## Testing Approach
 
 Four suites on the laptop are about two minutes. The rest runs on the LAN server: `npm run test:remote`.
+Also `npm run lint:shell` and `npm run lint:secrets`, which `ci:fast` does not run and the merge gate does.
 Mutations: revert each snippet above alone, and name the test that goes red.

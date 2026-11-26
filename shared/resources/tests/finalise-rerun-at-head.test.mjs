@@ -865,6 +865,38 @@ test("a list the parse ends early, or under a key spelt with an escape, is refus
     ],
     ["a tagged key", `!!str finalise:\n${list}`],
     ["another block's", `notes:\n${list}`],
+    // the block key is plain here, so nothing but the list key's own escape says it (task 320)
+    [
+      "another block's, with an escape",
+      'notes:\n  "rerun\\x41tHead":\n    - echo a\n',
+    ],
+    [
+      "another block's, with an escape, beside a plain one",
+      `${LIST("echo a")}notes:\n  "rerun\\x41tHead":\n    - echo b\n`,
+    ],
+    ["an escaped block key with no list", '"finalis\\x65":\n  other: 1\n'],
+    ["an escaped block key with nothing", 'finalise:\n"finalis\\u0065":\n'],
+    // past a row at which the parse stops (task 320, DoD run 1)
+    [
+      "an escaped block key after a block scalar",
+      'note: |\n  text\n"finalis\\x65":\n  deferralApprover: x\n',
+    ],
+    [
+      "an escaped block key after a block scalar, beside a plain one",
+      `${LIST("echo a")}note: |\n  text\n"finalis\\x65":\n  deferralApprover: x\n`,
+    ],
+    [
+      "the exact block key, in a file that is indented whole",
+      "  note: |\n    text\n  finalise:\n    deferralApprover: x\n",
+    ],
+    [
+      "the exact block key after a lone CR",
+      "a: 1\nnote: x\rfinalise:\n  deferralApprover: x\n",
+    ],
+    [
+      "a near miss after a block scalar",
+      "note: |\n  text\nFinalize:\n  deferralApprover: x\n",
+    ],
   ])
     assert.throws(
       () => eng.parseRerunList(config),
@@ -876,6 +908,7 @@ test("a list the parse ends early, or under a key spelt with an escape, is refus
     "workflows:\n- name: x\n- y\n",
     `workflows:\n- name: x\n${LIST("echo a")}my key: 1\n`,
     '"acc\\x65ss":\n  tracker: full\n',
+    'note: |\n  "finalis\\x65":\n    x: 1\n',
   ])
     assert.doesNotThrow(() => eng.parseRerunList(config), config);
 });
@@ -1144,21 +1177,61 @@ test("a listed command on an unindented line of a criterion is refused, not read
     assert.equal(read(section).reason, "ran", section);
 });
 
-test("a section with no criterion the reader can find is refused only when it names a listed command (T319-CR-805)", (t) => {
-  const read = (text) => {
-    const { dir, run } = fixture(t, {
-      config: LIST("echo a"),
-      criteria: ["`echo a` passes"],
-    });
+// One repository, with `echo a` on the list, and the document rewritten for each reading.
+function reader(t) {
+  const { dir, run } = fixture(t, {
+    config: LIST("echo a"),
+    criteria: ["`echo a` passes"],
+  });
+  return (text) => {
     writeFileSync(join(dir, DOC), text);
     return run().rec;
   };
+}
+
+test("a section with no criterion the reader can find is read past when it names no listed command (T319-CR-805)", (t) => {
+  const read = reader(t);
   for (const text of [
-    "# T\n\n## Acceptance Criteria\n\n### AC1\n\nGiven x\n\n## Other\n\n`echo a`\n",
     "# T\n\nno criteria\n",
     "# T\n\n## Success Criteria\n\necho a, and `echo a b`\n",
+    // a line in a fence ends no section, and outside one it does (T319-CR-1201)
+    "# T\n\n## Success Criteria\n\nGiven x\nThen y\n\n```\n## x\n```\n\n## Other\n\n`echo a`\n",
+    // the criteria stand in the section, in a shape the reader does not read (T320-CR-101)
+    ...[
+      "### AC1\n\nText.\n",
+      "### 1. AC-2: a title\n\n**Text**.\n",
+      "## AC1\n\nText.\n",
+      "| AC | Text |\n| -- | ---- |\n",
+      "Given x\nThen y\n",
+      "**When** x\n**Then** y\n",
+      "- Then x\n",
+      "* x\n",
+      "  - [ ] x\n",
+      "  1. x\n",
+      "- [x] \n\n- x\n",
+      "```gherkin\nGiven x\nThen y\n```\n",
+      "<!-- a -->\n\n- x\n\n<!-- b -->\n",
+      "<!---->\n- x\n",
+      "<!-->\n- x\n",
+      // an opener in a fence or in a code span opens nothing (T320-CR-305)
+      "```html\n<!-- x\n```\n\n- crit\n",
+      "Write `<!--` or ``a ` <!--`` first.\n\n- crit\n",
+      "A ``` and `<!--` too.\n\n- crit\n",
+      "A \\\\`<!--` too.\n\n- crit\n",
+      // a fence marker in a comment opens no fence (task 320, DoD run 1)
+      "<!--\n```\n-->\n\n- crit\n",
+      "- crit\n\n<!-- a\n~~~\n-->\n",
+    ].map(
+      (criteria) =>
+        `# T\n\n## Acceptance Criteria\n\n${criteria}\n## Other\n\n\`echo a\`\n`,
+    ),
+    "# T\n\n## Success Criteria\n\n## Acceptance Criteria\n\n- x\n\n## Other\n\n`echo a`\n",
   ])
     assert.equal(read(text).reason, "none-named", text);
+});
+
+test("a section with no criterion the reader can find is refused when a listed command is named (T319-CR-805)", (t) => {
+  const read = reader(t);
   for (const text of [
     "# T\n\n## Acceptance Criteria\n\n### AC1\n\nThen `echo a` passes\n",
     "# T\n\n## Criteria for success\n\n- [ ] `echo a` passes\n",
@@ -1170,12 +1243,106 @@ test("a section with no criterion the reader can find is refused only when it na
     "# T\n\n## Acceptance Criteria\n\n## AC1\n\nThen `echo a` passes\n",
     "# T\n\n## Acceptance Criteria\n\nBelow.\n\n## AC1\n\nThen `echo a` passes\n",
     "# T\n\n## Acceptance Criteria\n\n### AC1\n\nPress the ` key, then `echo a` passes\n",
+    // past a line in a fence, and beside a heading that only contains the word (T319-CR-1201)
+    "# T\n\n## Success Criteria\n\n```\n## x\n```\n\nThen `echo a` passes\n",
+    "# T\n\n## Success Criteria\r\n\r\n~~~\r\n## x\r\n~~~\r\n\r\nThen `echo a` passes\r\n",
+    "# T\n\n## Success Criteria\n\n```\n# x\n```\n\nThen `echo a` passes\n",
+    "# T\n\n## Done when\n\n- [ ] `echo a` passes\n\n## Rollback criteria\n\nNone.\n",
+    "# T\n\n## Done when\n\n- [ ] `echo a` passes\n\n## Rollback\n\nNone.\n",
+    // with AC headings, and no section the reader knows
+    "# T\n\n## AC1\n\nGiven x\n\n## Done when\n\n- [ ] `echo a` passes\n",
+    // beside one that holds none (T320-CR-101, T320-CR-202 to T320-CR-204)
+    ...[
+      "",
+      "Below.\n\n",
+      "### Functional\n\n",
+      "Functional\n----------\n\n",
+      "---\n\n",
+      "* * *\n\n",
+      "- [x]\n\n",
+      "| | |\n|--|--|\n\n",
+      "### AC1\n\n",
+      "### AC1\n\n### Notes\n\nText.\n\n",
+      "## AC1\n\n",
+      '### AC1\n\n<a id="ac"></a>\n\n```js\n```\n\n',
+      "<!-- to be written -->\n\n",
+      "<!--\n- x\n-->\n\n",
+      "<!--\n- x\n## old\n-->\n\n",
+      "```gherkin\n```\n\n",
+      '<a id="ac"></a>\n\n',
+      "## Notes on AC-1\n\n- x\n\n",
+      // a heading in a comment is none, and a comment starts no line anew (T320-CR-301)
+      "<!--\n## AC1\n\n- x\n-->\n\n",
+      "<!--\n## Acceptance Criteria\n\n- x\n-->\n\n",
+      "<!--\n```\n-->\n\n<!--\n- x\n-->\n\n<!--\n```\n-->\n\n",
+      "<!-- a -->## AC1\n\n<!--\n-->- x\n\n",
+      "<!-- a -->| x |\n\n",
+      "+ [x] <!-- a -->\n\n",
+      "\\`<!-- \\`\n- x\n-->\n\n",
+      "### A\n\nWhen this is done.\n\n### B\n\nThen go on.\n\n",
+      // an introduction is no criterion, whatever its first word (T320-CR-304)
+      "When the list below passes, this is done.\n\n",
+      "Then this is done.\n\nGiven that, go on.\n\n",
+    ].map(
+      (none) =>
+        `# T\n\n## Success Criteria\n\n${none}## Done when\n\n- [ ] \`echo a\` passes\n\n## Rollback criteria\n\nNone.\n`,
+    ),
+    "# T\n\n## Success Criteria\n\n## Acceptance Criteria\n\n## Done when\n\n- [ ] `echo a` passes\n\n## Rollback criteria\n\nNone.\n",
+    "# T\n\n<!--\n## Acceptance Criteria\n\n- x\n-->\n\n## Success Criteria\n\n## Done when\n\n- [ ] `echo a` passes\n",
+    // an opener that is never closed hides no command, and a line in a fence ends no section there either
+    "# T\r\n\r\n## Success Criteria\r\n\r\n- x\r\n\r\nUse <!-- here\r\n\r\n```\r\n## y\r\n```\r\n\r\n- `echo a` passes\r\n\r\n## Other\r\n\r\nNone.\r\n",
+    "# T\n\n## Success Criteria\n\n- x\n\n<!-- a --> Use <!-- here\n\n```\n## y\n```\n\n- `echo a` passes\n\n## Other\n\nNone.\n",
+    // and neither does a heading in a comment end the section it stands in (T320-CR-301)
+    "# T\n\n## Success Criteria\n\n- x\n\n<!--\n## old\n-->\n\n- `echo a` passes\n\n## Other\n\nNone.\n",
   ]) {
     const r = read(text);
     assert.equal(r.reason, "scan-broken", text);
     assert.match(r.message, /names `echo a` and has no criteria/);
   }
-  // a backtick with no partner hides a command of a criterion, unless it is escaped (T319-CR-1005)
+  // a comment that is not closed is read once, however many there are: read once for each, these do not
+  // end within the time the run has (T320-CR-205)
+  const many = read(`# T\n\n## Success Criteria\n\n${"<!--\n".repeat(400000)}`);
+  assert.equal(many.reason, "none-named");
+});
+
+test("an opener that starts no comment block hides no fence, whatever closes it later (T320-CR-501)", (t) => {
+  const read = reader(t);
+  const doc = (opener, closer) =>
+    `# T\n\n## Success Criteria\n\n- x\n\n${opener}\n\n\`\`\`\n## y\n\`\`\`\n\n- \`echo a\` passes\n\n## Other\n\n${closer}\n`;
+  for (const [opener, closer] of [
+    ["Use <!-- here", "<!-- note -->"],
+    ["\\<!-- x", "<!-- note -->"],
+    ["A `span\n  <!-- x` here", "<!-- note -->"],
+    ["- item\n\n      ```\n      <!-- x\n      ```", "<!-- note -->"],
+    ["- item\n\n  <!-- x", "<!-- note -->"],
+    ["> <!-- x", "<!-- note -->"],
+    ["<!-- a --> Use <!-- here", "<!-- note -->"],
+    ["<!-- a\n-->\n\nUse <!-- here", "<!-- note -->"],
+    ["```html\n<!-- x\n```", "<!-- note -->"],
+    ["Use <!-- here", "```mermaid\na --> b\n```"],
+    ["Use <!-- here", "From a --> b."],
+    ["Use <!-- here", "Write `-->` last."],
+    ["<!-- x", "None."],
+    ["Use here", "<!-- note -->"],
+  ])
+    assert.equal(
+      read(doc(opener, closer)).reason,
+      "scan-broken",
+      `${opener} / ${closer}`,
+    );
+  // a block, from column 0 to the line that closes it, hides what it holds
+  for (const block of ["<!-- x\n```\n-->", "<!--\n~~~\na --> b"])
+    assert.equal(
+      read(
+        `# T\n\n## Success Criteria\n\n- x\n\n${block}\n\n## Other\n\n\`echo a\`\n`,
+      ).reason,
+      "none-named",
+      block,
+    );
+});
+
+test("a backtick with no partner hides a command of a criterion, and that is refused, unless it is escaped (T319-CR-1005)", (t) => {
+  const read = reader(t);
   for (const [criterion, reason] of [
     ["Press the ` key\n\n  Then `echo a` passes", "scan-broken"],
     ["Press the ` key\n  - then `echo a` passes", "scan-broken"],
@@ -1184,12 +1351,110 @@ test("a section with no criterion the reader can find is refused only when it na
     ["Press \\` then `echo a` passes", "ran"],
     ["In C:\\\\`echo a` passes", "ran"],
     ["``Press the ` key``\n\n  Then `echo a` passes", "ran"],
+    // and on an unindented line, which is read as part of it here alone (T319-CR-1202)
+    ["Press the ` key\nthen `echo a` passes", "scan-broken"],
+    ["Press the ` key, and\nthen `echo a` passes\n- [ ] other", "scan-broken"],
+    ["Press the ` key\n\nThen `echo a` passes", "none-named"],
+    // in a span with a space inside it, or two backticks (T320-CR-103)
+    ["Press the ` key, and\nthen ` echo a ` passes", "scan-broken"],
+    ["Press the `` key, and\nthen ``echo a`` passes", "scan-broken"],
+    ["Press the ` key\n\n  Then `echo\na` passes", "scan-broken"],
+    ["Press the ` key, and\nthen ` echo a b ` passes", "none-named"],
   ]) {
     const r = read(`# T\n\n## Success Criteria\n\n- [ ] ${criterion}\n`);
     assert.equal(r.reason, reason, criterion);
-    if (reason !== "ran")
+    if (reason === "scan-broken")
       assert.match(r.message, /#1 names `echo a` after a backtick/);
   }
+  // without the stray backtick the unindented line is the one that is named
+  for (const criterion of [
+    "Press the key\nthen `echo a` passes",
+    "Press the key\nthen `echo\na` passes",
+  ]) {
+    const lazy = read(`# T\n\n## Success Criteria\n\n- [ ] ${criterion}\n`);
+    assert.equal(lazy.reason, "scan-broken");
+    assert.match(lazy.message, /#1 names `echo a` on an unindented line/);
+  }
+});
+
+// git takes an untracked SUB/x.js for a file inside the submodule `sub` under core.ignorecase, and lists it
+// nowhere (T319-CR-1203). A commit records the submodule; nothing needs to be cloned into it.
+test("a file beside a submodule, in a directory that differs from it only in case, is not the submodule's (T319-CR-1203)", (t) => {
+  for (const [what, file, reason, sub = "sub"] of [
+    ["beside it", "SUB/x.js", "dirty-tree"],
+    ["deeper beside it", "SUB/in/x.js", "dirty-tree"],
+    ["beside one that is deeper", "lib/SUB/x.js", "dirty-tree", "lib/sub"],
+    ["under another name", "SUB2/x.js", "dirty-tree"],
+    ["a repository beside it", "SUB/.git/x", "dirty-tree"],
+    ["nothing beside it", null, "ran"],
+    // what the repository ignores is not compared, by its own rule for case (T320-CR-105)
+    ["an ignored one beside it", "SUB/x.log", "ran"],
+    ["ignored by its directory", "SUB/out/x.js", "ran"],
+    ["ignored, with a newline in its name", "SUB/a\nb.log", "ran"],
+    ["not the ignored one", "SUB/x.logs", "dirty-tree"],
+  ]) {
+    const { dir, run } = fixture(t, {
+      config: LIST("echo a"),
+      criteria: ["`echo a` passes"],
+    });
+    const at = join(dir, sub);
+    mkdirSync(at, { recursive: true });
+    git(at, "init", "-q", ".");
+    writeFileSync(join(at, "in.js"), "in\n");
+    git(at, "add", "-A");
+    git(at, "commit", "-q", "-m", "sub");
+    git(
+      dir,
+      "update-index",
+      "--add",
+      "--cacheinfo",
+      `160000,${git(at, "rev-parse", "HEAD")},${sub}`,
+    );
+    writeFileSync(join(dir, ".gitignore"), ".claude/\n/sub/*.log\n/sub/out/\n");
+    git(dir, "add", ".gitignore");
+    git(dir, "commit", "-q", "-m", "sub");
+    git(dir, "config", "core.ignorecase", "true");
+    if (existsSync(join(dir, "SUB"))) return; // a disk that folds names: SUB is sub
+    if (file) {
+      mkdirSync(dirname(join(dir, file)), { recursive: true });
+      if (file.includes(".git/")) {
+        git(join(dir, "SUB"), "init", "-q", ".");
+        git(join(dir, "SUB"), "commit", "-q", "--allow-empty", "-m", "own");
+      } else writeFileSync(join(dir, file), "x\n");
+    }
+    const { rec } = run();
+    assert.equal(rec.reason, reason, `${what}: ${rec.message}`);
+    if (reason === "dirty-tree")
+      assert.ok(rec.message.includes(file.split("/")[0]), rec.message);
+  }
+});
+
+// Where the disk folds names, both spellings are one directory. As for T319-CR-1002, a link above it stands
+// in for that disk, and git's listing is added to.
+test("a second spelling of a submodule's directory is the submodule (T319-CR-1203)", (t) => {
+  const { dir, run } = fixture(t, {
+    config: LIST("echo a"),
+    criteria: ["`echo a` passes"],
+  });
+  const at = join(dir, "a/sub");
+  mkdirSync(at, { recursive: true });
+  git(at, "init", "-q", ".");
+  writeFileSync(join(at, "in.js"), "in\n");
+  git(at, "add", "-A");
+  git(at, "commit", "-q", "-m", "sub");
+  writeFileSync(join(dir, ".gitignore"), ".claude/\n/A\n");
+  git(dir, "add", ".gitignore");
+  git(
+    dir,
+    "update-index",
+    "--add",
+    "--cacheinfo",
+    `160000,${git(at, "rev-parse", "HEAD")},a/sub`,
+  );
+  git(dir, "commit", "-q", "-m", "sub");
+  if (existsSync(join(dir, "A"))) return; // a disk that folds names
+  symlinkSync("a", join(dir, "A"));
+  assert.equal(withListed(t, "A/sub/in.js", run).rec.reason, "ran");
 });
 
 test("what the repository ignores in any case is not compared, and what it does not ignore is (T319-CR-801)", (t) => {
@@ -1236,6 +1501,27 @@ test("what git status shows as untracked is never left out by case (T319-CR-1001
   }
 });
 
+/** `run()` where git's case-sensitive listing of what is untracked names `file` too. */
+function withListed(t, file, run) {
+  const bin = mkdtempSync(join(tmpdir(), "rerun-at-head-bin-"));
+  t.after(() => rmSync(bin, { recursive: true, force: true }));
+  const real = execFileSync("sh", ["-c", "command -v git"], {
+    encoding: "utf8",
+  }).trim();
+  writeFileSync(
+    join(bin, "git"),
+    `#!/bin/sh\n"${real}" "$@" || exit $?\ncase "$*" in *ignorecase=false*--others*) printf '${file}\\0' ;; esac\n`,
+  );
+  chmodSync(join(bin, "git"), 0o755);
+  const path = process.env.PATH;
+  ENV.PATH = `${bin}:${path}`;
+  try {
+    return run();
+  } finally {
+    ENV.PATH = path;
+  }
+}
+
 // What a disk that folds names gives the engine: the case-sensitive listing names a tracked file again, and
 // both names are one file. Here one directory of the second name is a link to the first, and git's listing
 // is added to, because this disk does not fold.
@@ -1271,24 +1557,7 @@ test("a second spelling of a tracked file is not a file of its own, and a second
     if (existsSync(join(dir, "SRC"))) return; // a disk that folds names cannot hold the other two
     make(dir);
     assert.equal(git(dir, "status", "--porcelain"), "", what);
-    const bin = mkdtempSync(join(tmpdir(), "rerun-at-head-bin-"));
-    t.after(() => rmSync(bin, { recursive: true, force: true }));
-    const real = execFileSync("sh", ["-c", "command -v git"], {
-      encoding: "utf8",
-    }).trim();
-    writeFileSync(
-      join(bin, "git"),
-      `#!/bin/sh\n"${real}" "$@" || exit $?\ncase "$*" in *ignorecase=false*--others*) printf 'SRC/a.js\\0' ;; esac\n`,
-    );
-    chmodSync(join(bin, "git"), 0o755);
-    const path = process.env.PATH;
-    ENV.PATH = `${bin}:${path}`;
-    let rec;
-    try {
-      rec = run().rec;
-    } finally {
-      ENV.PATH = path;
-    }
+    const { rec } = withListed(t, "SRC/a.js", run);
     assert.equal(rec.reason, reason, `${what}: ${rec.message}`);
   }
 });

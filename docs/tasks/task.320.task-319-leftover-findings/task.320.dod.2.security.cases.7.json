@@ -1,0 +1,101 @@
+[
+  {
+    "id": "legit-command",
+    "input": "npm test",
+    "direction": "legitimate",
+    "why": "a command",
+    "correct": "taken as a gate; then refused (exit 1) because HEAD is not the tick branch",
+    "expected": {
+      "stdout": "",
+      "exit": 1
+    },
+    "spec_ref": "docs/reference/configuration.md:320"
+  },
+  {
+    "id": "legit-comment-then-command",
+    "input": "# c\nnpm test",
+    "direction": "legitimate",
+    "why": "a command after a comment",
+    "correct": "taken as a gate, then exit 1",
+    "expected": {
+      "stdout": "",
+      "exit": 1
+    },
+    "spec_ref": "docs/reference/configuration.md:320"
+  },
+  {
+    "id": "hostile-empty",
+    "input": "",
+    "direction": "hostile",
+    "why": "no gate",
+    "correct": "usage error: the merge needs its quality gate",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    },
+    "spec_ref": "docs/reference/configuration.md:320"
+  },
+  {
+    "id": "hostile-space",
+    "input": " ",
+    "direction": "hostile",
+    "why": "runs nothing and exits 0",
+    "correct": "usage error",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    },
+    "spec_ref": "docs/reference/configuration.md:320"
+  },
+  {
+    "id": "hostile-blank-lines",
+    "input": "\n\t\n",
+    "direction": "hostile",
+    "why": "runs nothing and exits 0",
+    "correct": "usage error",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    },
+    "spec_ref": "docs/reference/configuration.md:320"
+  },
+  {
+    "id": "hostile-comment",
+    "input": "# npm test",
+    "direction": "hostile",
+    "why": "runs nothing and exits 0",
+    "correct": "usage error",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    },
+    "spec_ref": "docs/reference/configuration.md:320"
+  },
+  {
+    "id": "hostile-comments",
+    "input": "  # a\n# b",
+    "direction": "hostile",
+    "why": "runs nothing and exits 0",
+    "correct": "usage error",
+    "expected": {
+      "stdout": "",
+      "exit": 2
+    },
+    "spec_ref": "docs/reference/configuration.md:320"
+  },
+  {
+    "id": "hostile-off-branch",
+    "input": "touch owned",
+    "direction": "hostile",
+    "why": "the gate must run on the tick branch only",
+    "correct": "refused before the gate runs",
+    "expected": {
+      "stdout": "",
+      "exit": 1,
+      "absent": [
+        "owned"
+      ]
+    },
+    "spec_ref": "docs/reference/configuration.md:320"
+  }
+]

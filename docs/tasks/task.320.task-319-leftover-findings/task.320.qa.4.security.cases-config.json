@@ -1,0 +1,66 @@
+[
+  {
+    "id": "hostile-ls-after-unquoted",
+    "input": "ci:\n  skipMarker: [x \n",
+    "direction": "hostile",
+    "why": "T320-CR-302: a line separator at the row's end",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-ps-before-quoted",
+    "input": "ci:\n  skipMarker:  \"[x]\"\n",
+    "direction": "hostile",
+    "why": "T320-CR-302: a paragraph separator at the row's start",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-ls-before-comment",
+    "input": "ci:\n  skipMarker: \"[x]\"  # why\n",
+    "direction": "hostile",
+    "why": "T320-CR-302: a line separator between the value and the comment",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-apostrophes",
+    "input": "ci:\n  skipMarker: it's  # don't\n",
+    "direction": "hostile",
+    "why": "apostrophes around the space are no quotes",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-control-in-comment",
+    "input": "ci:\n  skipMarker: \"[x]\" # a\u0007b\n",
+    "direction": "hostile",
+    "why": "a control character is refused anywhere in the row",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "legit-nbsp-comment-end",
+    "input": "ci:\n  skipMarker: \"[x]\" # why \n",
+    "direction": "legitimate",
+    "why": "T320-CR-303: a space in the comment",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "legit-nbsp-before-hash",
+    "input": "ci:\n  skipMarker: [x # see #12\n",
+    "direction": "legitimate",
+    "why": "T320-CR-303: a space before a hash in the comment",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "legit-hash-in-quotes",
+    "input": "ci:\n  skipMarker: '[a #b]'\n",
+    "direction": "legitimate",
+    "why": "a hash in the quotes starts no comment",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:312"
+  }
+]

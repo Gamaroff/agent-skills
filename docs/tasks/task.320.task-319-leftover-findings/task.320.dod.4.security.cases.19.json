@@ -1,0 +1,86 @@
+[
+  {
+    "id": "hostile-escaped-finalise-after-scalar",
+    "input": "docs/t.md",
+    "direction": "hostile",
+    "why": "DoD 1: the list is under an escaped key the parse did not reach",
+    "correct": "a usage error, nothing runs",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "note: |\n  text\n\"finalis\\x65\":\n  rerunAtHead:\n    - touch .claude/state/ran\n",
+        "docs/t.md": "# T\n\n## Success Criteria\n\n- [ ] `touch .claude/state/ran` exits 0\n"
+      }
+    },
+    "expected": {
+      "stdout": "usage: finalis\\x65 looks like finalise; the key is exactly \"finalise\"\n",
+      "exit": 2,
+      "absent": [
+        ".claude/state/ran"
+      ]
+    },
+    "spec_ref": "docs/reference/configuration.md:314"
+  },
+  {
+    "id": "hostile-fence-in-an-open-comment",
+    "input": "docs/t.md",
+    "direction": "hostile",
+    "why": "an opener nothing closes is text: the fence after it is a fence, and its heading ends no section",
+    "correct": "scan-broken, nothing runs",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "finalise:\n  rerunAtHead:\n    - touch .claude/state/ran\n",
+        "docs/t.md": "# T\n\n## Success Criteria\n\n- x\n\n<!-- a --> Use <!-- here\n\n```\n## y\n```\n\n- `touch .claude/state/ran` passes\n\n## Other\n\nNone.\n"
+      }
+    },
+    "expected": {
+      "stdout": "scan-broken: the document names `touch .claude/state/ran` and has no criteria the reader can find\n",
+      "exit": 1,
+      "absent": [
+        ".claude/state/ran"
+      ]
+    },
+    "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:426"
+  },
+  {
+    "id": "hostile-opener-as-text-before-a-later-comment",
+    "input": "docs/t.md",
+    "direction": "hostile",
+    "why": "T320-CR-501: an opener inside a sentence starts no comment block; the fence after it is a fence",
+    "correct": "scan-broken, nothing runs",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "finalise:\n  rerunAtHead:\n    - touch .claude/state/ran\n",
+        "docs/t.md": "# T\n\n## Success Criteria\n\n- x\n\nUse <!-- here\n\n```\n## y\n```\n\n- `touch .claude/state/ran` passes\n\n## Other\n\n<!-- note -->\n"
+      }
+    },
+    "expected": {
+      "stdout": "scan-broken: the document names `touch .claude/state/ran` and has no criteria the reader can find\n",
+      "exit": 1,
+      "absent": [
+        ".claude/state/ran"
+      ]
+    },
+    "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:426"
+  },
+  {
+    "id": "legit-fence-marker-in-a-comment",
+    "input": "docs/t.md",
+    "direction": "legitimate",
+    "why": "DoD 1: a fence marker inside a closed comment opens no fence",
+    "correct": "none-named",
+    "fixture": {
+      "files": {
+        "skills-config.yaml": "finalise:\n  rerunAtHead:\n    - touch .claude/state/ran\n",
+        "docs/t.md": "# T\n\n## Success Criteria\n\n- crit\n\n<!--\n~~~\n-->\n\n## Other\n\n`touch .claude/state/ran`\n"
+      }
+    },
+    "expected": {
+      "stdout": "none-named\n",
+      "exit": 0,
+      "absent": [
+        ".claude/state/ran"
+      ]
+    },
+    "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:426"
+  }
+]
