@@ -77,7 +77,7 @@ What this prompt adds is the *subject*: the corpus says what to send, this says 
 ### Choosing the sink
 
 `SINKS` (`references/security-input-corpus.mjs`) are `url-authority`, `sql-orm`, `shell-exec`,
-`path`, `template-render`, `filename`, `markdown-structure`. Pick by what the control *decides*, not by
+`path`, `git-name`, `template-render`, `filename`, `markdown-structure`. Pick by what the control *decides*, not by
 what the module is called:
 
 | The control decides… | Sink |
@@ -86,9 +86,14 @@ what the module is called:
 | what reaches a database query | `sql-orm` |
 | what reaches a shell or a spawned process | `shell-exec` |
 | what filesystem location is read or written | `path` |
+| which class a repository-relative name belongs to (docs, config, generated), compared against patterns and never opened | `git-name` |
 | what is interpolated into rendered output | `template-render` |
 | which directory entry counts, and what value a name yields (a script run against a directory) | `filename` |
 | whether an implementation report is whole — a validator of the pipeline's report document | `markdown-structure` |
+
+A name passed to a filesystem call is `path`; a name only compared against patterns is `git-name`.
+git never decodes `%2f` and a name classifier never resolves a symlink, so `path`'s decoding and
+symlink cases are not defects of a classifier.
 
 No sink fits → report `unverifiable` for that control and say which inputs would have been needed.
 Do not force a control into the nearest sink; a probe run with the wrong corpus produces a confident

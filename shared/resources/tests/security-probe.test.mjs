@@ -4655,6 +4655,153 @@ test("task.131: lintReport through the markdown-structure sink engages — every
   assert.deepEqual(r.declined, []);
 });
 
+// ── task.329: the git-name sink, proved against isDocsPath ─────────────────
+// HEAD must hold on every case. Then each refusal line is removed in a scratch
+// copy, and exactly the hostile cases that line is the only defence against
+// must reproduce. A hostile case no mutation reaches would be a case nothing
+// proves bites, so the table must cover every hostile id.
+
+const GIT_NAME_ENTRY = "shared/resources/ci-tree-equivalence.js#isDocsPath";
+const GIT_NAME_ARGS = [["**"]];
+// Each refusal has two spellings: inline in isDocsPath, as on develop, and in a
+// hasPathFormDefect helper, which the unmerged task-325 branch adds. Exactly one spelling must occur, exactly
+// once, so the test holds on both sides of that refactor and fails on a third.
+const IS_DOCS_LINES = Object.freeze({
+  control: [
+    "  if (/[\\u0000-\\u001f\\u007f]/.test(file)) return false;",
+    "  if (/[\\u0000-\\u001f\\u007f]/.test(p)) return true;",
+  ],
+  segment: [
+    '  if (file.split("/").some((seg) => seg === "" || seg === "." || seg === ".."))\n    return false;',
+    '  if (p.split("/").some((seg) => seg === "" || seg === "." || seg === ".."))\n    return true;',
+  ],
+  dotGit: ['  if (file.split("/").some(isDotGitSegment)) return false;'],
+  config: ['  if (file.split("/").pop() === CONFIG_BASENAME) return false;'],
+  normalise: [
+    "  if (normalisePath(file) !== file) return false;",
+    "  return normalisePath(p) !== p;",
+  ],
+});
+const isDocsAnchor = (src, name) => {
+  const hits = IS_DOCS_LINES[name].filter((l) => src.split(l).length === 2);
+  const absent = IS_DOCS_LINES[name].every((l) => !src.includes(l));
+  assert.ok(
+    hits.length === 1 &&
+      IS_DOCS_LINES[name].filter((l) => src.includes(l)).length === 1,
+    `anchor "${name}" must occur exactly once, in exactly one spelling` +
+      (absent
+        ? " (none found: isDocsPath was rewritten, so update IS_DOCS_LINES)"
+        : ""),
+  );
+  return hits[0];
+};
+const GIT_NAME_MUTATIONS = Object.freeze([
+  { removed: ["control"], reproduces: ["control-char", "tab", "nul"] },
+  {
+    removed: ["segment"],
+    reproduces: ["dot-dot-segment", "empty-segment", "trailing-slash"],
+  },
+  {
+    removed: ["dotGit"],
+    reproduces: [
+      "dot-git-root",
+      "dot-git-bare",
+      "dot-git-nested",
+      "dot-git-case",
+    ],
+  },
+  { removed: ["config"], reproduces: ["config-root", "config-nested"] },
+  {
+    removed: ["segment", "normalise"],
+    reproduces: [
+      "dot-dot-segment",
+      "empty-segment",
+      "trailing-slash",
+      "leading-slash",
+      "dot-slash",
+    ],
+  },
+]);
+
+test("task.329: isDocsPath through the git-name sink engages at HEAD — every hostile refused, every legitimate accepted", () => {
+  const cases = corpusFor("git-name");
+  const r = runProbeSpec({
+    sink: "git-name",
+    entry: GIT_NAME_ENTRY,
+    args: GIT_NAME_ARGS,
+  });
+  assert.equal(r.verdict, "engages", JSON.stringify(r.cases));
+  assert.equal(r.executed, cases.length);
+  assert.deepEqual(r.reproduced, []);
+  assert.deepEqual(r.overblocked, []);
+  assert.deepEqual(r.declined, []);
+});
+
+test("task.329: every git-name hostile case is reached by a mutation of isDocsPath", () => {
+  const hostile = corpusFor("git-name")
+    .filter((c) => c.direction === "hostile")
+    .map((c) => c.id.replace("git-name.", ""));
+  const covered = new Set(GIT_NAME_MUTATIONS.flatMap((m) => m.reproduces));
+  assert.deepEqual(
+    hostile.filter((id) => !covered.has(id)),
+    [],
+    "a hostile case no mutation reproduces is a case nothing proves bites",
+  );
+});
+
+test("task.329: each isDocsPath refusal removed reproduces exactly its git-name cases", () => {
+  const files = [
+    "ci-tree-equivalence.js",
+    "glob-match.js",
+    "yaml-subset.js",
+    "bb-auth.js",
+  ];
+  const src = readFileSync(
+    join(REPO_ROOT, "shared/resources/ci-tree-equivalence.js"),
+    "utf8",
+  );
+  // A moved or reworded line must FAIL here: removing nothing would make every
+  // mutation read "nothing reproduced", which is a pass on a broken test.
+  const anchor = Object.fromEntries(
+    Object.keys(IS_DOCS_LINES).map((name) => [name, isDocsAnchor(src, name)]),
+  );
+  const root = mkdtempSync(join(tmpdir(), "probe-gitname-"));
+  try {
+    const dir = join(root, "shared/resources");
+    mkdirSync(dir, { recursive: true });
+    for (const f of files) {
+      writeFileSync(
+        join(dir, f),
+        readFileSync(join(REPO_ROOT, "shared/resources", f), "utf8"),
+      );
+    }
+    for (const m of GIT_NAME_MUTATIONS) {
+      let mutant = src;
+      for (const name of m.removed)
+        mutant = mutant.split(anchor[name]).join("");
+      writeFileSync(join(dir, "ci-tree-equivalence.js"), mutant);
+      const r = runProbeSpec({
+        sink: "git-name",
+        entry: GIT_NAME_ENTRY,
+        args: GIT_NAME_ARGS,
+        repoRoot: root,
+      });
+      assert.deepEqual(
+        [...r.reproduced].sort(),
+        m.reproduces.map((id) => `git-name.${id}`).sort(),
+        `removed ${m.removed.join(" + ")}`,
+      );
+      assert.deepEqual(
+        r.overblocked,
+        [],
+        `removed ${m.removed.join(" + ")}: nothing legitimate refused`,
+      );
+    }
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("task.131: each markdown-structure hostile case trips exactly the code(s) it is named for", () => {
   // The isolation property is what makes the mutant below catchable: a case
   // tripping several codes still refuses when one check is dropped.

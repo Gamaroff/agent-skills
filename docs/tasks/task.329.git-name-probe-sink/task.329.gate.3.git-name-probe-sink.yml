@@ -1,0 +1,75 @@
+schema: 2
+task: 'task.329.git-name-probe-sink'
+task_title: 'A git-name sink for classifiers of repository names'
+gate: PASS
+status_reason: 'Every gate-2 finding is fixed: QA ran isDocsPath on each reworded claim and each holds. The scoped review found two LOW cleanups in comment and case prose; no correctness or product defect remains.'
+reviewer: 'QA Engineer'
+head: 'eed003c379bd7c38fc89ae4869542a856c11a93c'
+updated: '2026-11-26T14:35:27Z'
+
+top_issues:
+  - id: 'T329-QA-9'
+    severity: low
+    file: 'shared/resources/security-input-corpus.mjs'
+    finding: 'git-name.plus-signs why: the glob-compiling clause is not exercised by this sink, which probes with the glob `**`; `**` has no literal parts, so an unescaping glob compiler still accepts docs/c++.md. Only the name-as-pattern clause is tested. (origin: code-review CR-1, confirmed)'
+    suggested_action: 'Drop the glob-compiling clause, or add a case whose glob carries `+`'
+    suggested_owner: dev
+    status: open
+  - id: 'T329-QA-10'
+    severity: low
+    file: 'shared/resources/tests/security-probe.test.mjs'
+    finding: 'The IS_DOCS_LINES comment says each refusal has two spellings; dotGit and config list one each (only control, segment and normalise move to hasPathFormDefect on the task-325 branch). (origin: code-review CR-2, confirmed against IS_DOCS_LINES)'
+    suggested_action: 'Say the three path-form refusals have two spellings and dotGit and config one'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 96
+
+evidence:
+  tests_reviewed: 4
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: false
+    boundary_signals: []
+    notes: 'Unchanged: the change set adds no boundary to shipped code. The isDocsPath gaps on gate 2 recommendations.future stand.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Unchanged.'
+  maintainability:
+    status: PASS
+    notes: 'The two MEDIUM misstatements are fixed; two LOW prose cleanups remain.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'T329-QA-9 and T329-QA-10 (LOW prose cleanups), carried by the cosmetic-residue exit; fold into the isDocsPath follow-up'
+      refs: ['shared/resources/security-input-corpus.mjs', 'shared/resources/tests/security-probe.test.mjs']
+    - action: 'isDocsPath admits the NTFS alternate-stream spelling of .git and the C1 control U+0085 (from gate 2). Identical on develop; a follow-up task'
+      refs: ['shared/resources/ci-tree-equivalence.js']
+      provenance: pre-existing
+      remedy: unverified
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []
