@@ -394,6 +394,28 @@ A case's wording or direction.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-26
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.329.qa.1.git-name-probe-sink.md](./task.329.qa.1.git-name-probe-sink.md)
+- **Gate File**: [task.329.gate.1.git-name-probe-sink.yml](./task.329.gate.1.git-name-probe-sink.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 4 task tests, plus the full fast gate (8898 pass, 1 push-policy load flake)
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues. Seven mutations proved the tests: each turned its predicted test red. Three LOW
+wording errors in the new corpus prose are open (T329-QA-1, T329-QA-2, T329-QA-3).
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -403,6 +425,8 @@ A case's wording or direction.
 | 2026-11-26 | 1.1     | Review passed (8/10) — `path` criterion given a test; SINKS-enumerating tests named | review-task |
 | 2026-11-26 |         | Status → ready-for-development                               | review-task |
 | 2026-11-26 |         | Implemented — 10 source files (+14 bundled copies), 4 tests  | develop     |
+| 2026-11-26 |         | QA gate PASS (100/100) — 3 LOW findings open                 | qa-task     |
+| 2026-11-26 |         | QA findings fixed — 3 LOW wording errors in the corpus prose, 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

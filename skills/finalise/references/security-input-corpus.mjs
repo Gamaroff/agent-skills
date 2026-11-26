@@ -741,7 +741,7 @@ const GIT_NAME = sinkCases("git-name", [
     id: "control-char",
     direction: "hostile",
     input: "docs/a\u0001.md",
-    why: "git quotes a name with a control character unless `core.quotePath` is off, so one arriving raw has been decoded or forged on the way.",
+    why: "git always quotes a name that holds a control character, whatever `core.quotePath` says. Only `-z` output carries one raw, so a raw one anywhere else has been decoded or forged on the way.",
     correct: "Refuse any character below U+0020, and U+007F.",
   },
   {
@@ -783,7 +783,7 @@ const GIT_NAME = sinkCases("git-name", [
     id: "encoded-traversal-literal",
     direction: "legitimate",
     input: "..%2f..%2fetc%2fpasswd",
-    why: "The same input is hostile under `path`, where a later decode re-introduces the traversal. In a git name nothing decodes it: it is one segment with no `..` in it.",
+    why: "The same input is hostile under `path`, where a later decode re-introduces the traversal. In a git name nothing decodes it: it is one segment, and that segment is not `..`.",
     correct: "Accept: the name is literal, and decoding it is the defect.",
   },
   {
@@ -819,7 +819,8 @@ const GIT_NAME = sinkCases("git-name", [
     direction: "legitimate",
     input: "docs/.gitkeep",
     why: "It begins with `.git` and is not `.git`. A prefix check written to stop the repository's internals takes it with them.",
-    correct: "Accept: only a segment equal to `.git` is internal.",
+    correct:
+      "Accept: only a spelling of `.git` is internal (any case, trailing dots or spaces, ignorable code points, `git~1`). A name that merely begins with `.git` is not.",
   },
   {
     id: "dots-in-name",
