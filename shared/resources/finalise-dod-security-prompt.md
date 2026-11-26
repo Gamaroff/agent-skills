@@ -94,6 +94,7 @@ row's** — `<any-dir>/report-lint.js#lintReport`, from the source tree or a bun
 | Entry | Sink that fits |
 | --- | --- |
 | `report-lint.js#lintReport` | `markdown-structure` |
+| `ci-tree-equivalence.js#isDocsPath` | `git-name` |
 
 `internal` is a recorded
 decision, not a skipped question — it exists so the task.124 shape (a Markdown validator with no sink,
@@ -156,10 +157,14 @@ its caller, and not the code that acts on the verdict.
 down once, in [`shared/resources/security-input-corpus.md`](security-input-corpus.md) and its
 machine-readable peer `shared/resources/security-input-corpus.mjs`. You do not import them yourself:
 the engine `/finalise` runs from your plan (step 3) calls `corpusFor(sink)` for the sink you name, so choosing the sink **is**
-choosing the candidates. Sinks: `url-authority` | `sql-orm` | `shell-exec` | `path` |
+choosing the candidates. Sinks: `url-authority` | `sql-orm` | `shell-exec` | `path` | `git-name` |
 `template-render` | `filename` | `markdown-structure` — pick by what the boundary *decides* (where a
-connection goes, what reaches a query, what reaches a shell, what location is read or written, what is
-interpolated into output, which directory entry counts, whether an implementation report is whole).
+connection goes, what reaches a query, what reaches a shell, what location is read or written, which
+class a repository name belongs to, what is interpolated into output, which directory entry counts,
+whether an implementation report is whole). A name passed to a filesystem call is `path`; a name only
+compared against patterns, never opened or decoded (a classifier of `git diff --name-only` output), is
+`git-name`. Probed under `path`, such a classifier "reproduces" the decoding and symlink cases, which
+describe a call it never makes (task.325.dod.1).
 
 Each case carries the input, **why** it is dangerous, and **what a correct implementation does to
 it** — so the corpus says what a pass looks like, not merely what to try. Between them the cases

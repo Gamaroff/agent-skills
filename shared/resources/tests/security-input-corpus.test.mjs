@@ -58,6 +58,9 @@ const FLOORS = Object.freeze({
   "sql-orm": { hostile: 6, legitimate: 3 },
   "shell-exec": { hostile: 27, legitimate: 4 },
   path: { hostile: 7, legitimate: 3 },
+  // task.329: the names isDocsPath refuses, each caught by a broken copy, and
+  // the literal names a filesystem-minded check would wrongly refuse.
+  "git-name": { hostile: 14, legitimate: 8 },
   "template-render": { hostile: 5, legitimate: 3 },
   // task.128: the names that defeated qa-cycle.sh, plus the shapes a shell
   // re-reads (substitution, separators, options, globs) and the limits the
@@ -221,6 +224,27 @@ test("per-sink case counts meet their floors", () => {
 // ---------------------------------------------------------------------------
 // Materialised sinks — a case written to disk needs a pass condition and a fixture
 // ---------------------------------------------------------------------------
+
+// task.329 kept `path` as it was: git-name sits beside it, it does not narrow it.
+// The ids and directions are pinned, so a case moved between the two sinks is red.
+test("the path corpus is unchanged by the git-name sink (task.329)", () => {
+  assert.deepEqual(
+    corpusFor("path").map((c) => `${c.id}:${c.direction}`),
+    [
+      "path.dot-dot-relative:hostile",
+      "path.dot-dot-deep:hostile",
+      "path.absolute:hostile",
+      "path.encoded-traversal:hostile",
+      "path.symlink-escape:hostile",
+      "path.null-byte:hostile",
+      "path.prefix-not-boundary:hostile",
+      "path.empty:hostile",
+      "path.nested-relative:legitimate",
+      "path.dots-in-name:legitimate",
+      "path.leading-dot:legitimate",
+    ],
+  );
+});
 
 test("every materialised sink's cases carry `expected`, and no other sink's do", () => {
   for (const sink of SINKS) {
