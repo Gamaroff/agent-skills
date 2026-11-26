@@ -353,21 +353,21 @@ Wording of the message or the reference.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-26
-**Quality Score**: 88/100
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.325.qa.3.docs-only-rule-exclusions.md](./task.325.qa.3.docs-only-rule-exclusions.md)
-- **Gate File**: [task.325.gate.3.docs-only-rule-exclusions.yml](./task.325.gate.3.docs-only-rule-exclusions.yml)
+- **Full Report**: [task.325.qa.4.docs-only-rule-exclusions.md](./task.325.qa.4.docs-only-rule-exclusions.md)
+- **Gate File**: [task.325.gate.4.docs-only-rule-exclusions.yml](./task.325.gate.4.docs-only-rule-exclusions.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: ci:fast 8905 (0 failed) at 1beeadf88
+- **Tests Executed**: ci:fast 8905 (0 failed) at 3cffeb926
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-T325-CR-201 and T325-CR-202 closed. T325-CR-301 (medium, reproduced): `!docs/generated/`, `!docs//x.md` and `!docs/./x.md` are accepted but exclude nothing, because the exclusion check copies only part of isDocsPath's path-form refusals. T325-CR-302 (low): `!!x.md` is wrongly refused.
+T325-CR-301/302 are closed. T325-CR-401 (medium, reproduced): a brace or class exclusion is accepted and excludes nothing, because glob-match's only wildcards are `*`, `**` and `?`, and the grammar is not documented.
 
 <!-- change-log-start -->
 ## Change Log
@@ -384,6 +384,8 @@ T325-CR-201 and T325-CR-202 closed. T325-CR-301 (medium, reproduced): `!docs/gen
 | 2026-11-26 |         | QA findings fixed — cycle 2, 2 findings                | qa-fix      |
 | 2026-11-26 |         | QA gate CONCERNS (88/100) — 1 medium, 1 low (cycle 3)  | qa-task     |
 | 2026-11-26 |         | QA findings fixed — cycle 3, 2 findings                | qa-fix      |
+| 2026-11-26 |         | QA gate CONCERNS (90/100) — 1 medium (cycle 4)          | qa-task     |
+| 2026-11-26 |         | QA findings fixed — cycle 4, 1 finding                 | qa-fix      |
 <!-- change-log-end -->
 
 ---

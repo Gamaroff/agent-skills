@@ -199,9 +199,12 @@ DOCS_PATTERNS: "docs/tasks/* docs/prd/* docs/bugs/*"
   is on, and as wide as this one
   ([The docs-only CI rule](../reference/configuration.md#the-docs-only-ci-rule)). That list **can**
   exclude: `- "!docs/catalogue.md"` beside `- "docs/**"` keeps the one file as code, in any order, so
-  the pipelines wait for CI when it changes. A list of exclusions only, a bare `!`, and an exclusion
-  that could never match (`! docs/x.md`, `!./docs/x.md`, `!/docs/x.md`, `!docs/dir/`, a leading
-  space) are refused. Write a directory as `!docs/dir/**`.
+  the pipelines wait for CI when it changes. Only `*`, `**` and `?` are wildcards there; every
+  other character matches itself. A list of exclusions only, a bare `!`, an exclusion whose path is
+  not in git's form (`! docs/x.md`, `!./docs/x.md`, `!/docs/x.md`, `!docs/dir/`, a leading space)
+  and an exclusion with braces, a character class or extglob (`!docs/{a,b}.md`, `!@(x)`, a `|`)
+  are refused. Write a directory
+  as `!docs/dir/**`, and list several files one exclusion each.
 
 Look again when a test starts to read a new file. Nothing in this template notices that for you.
 

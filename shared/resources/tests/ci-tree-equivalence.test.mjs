@@ -642,6 +642,10 @@ test("task.325: readConfig refuses an exclusion that can never match, and keeps 
     ["!secret/**", "secret/a.md"],
     // T325-CR-302: a second `!` names a file whose name starts with `!`; it does match one.
     ["!!x.md", "!x.md"],
+    // `?` is one of the three wildcards, and characters doc names really hold are literal.
+    ["!docs/?.md", "docs/a.md"],
+    ["!docs/notes (draft).md", "docs/notes (draft).md"],
+    ["!docs/c++.md", "docs/c++.md"],
   ]) {
     const dir = mkRepo({ config: cfgOf(entry) });
     try {
@@ -652,6 +656,54 @@ test("task.325: readConfig refuses an exclusion that can never match, and keeps 
       cleanup(dir);
     }
   }
+});
+
+test("task.325: readConfig refuses brace and class syntax in an exclusion, which this matcher reads literally", () => {
+  // glob-match's only wildcards are `*`, `**` and `?`. A gitignore or minimatch user's
+  // `!docs/{a,b}.md` matches neither docs/a.md nor docs/b.md here, so it would exclude nothing
+  // (QA cycle 4, T325-CR-401). Not "can never match": a file literally named with the braces exists.
+  const cfgOf = (entry) =>
+    `ci:\n  docsOnly:\n    patterns:\n      - "docs/**"\n      - ${JSON.stringify(entry)}\n`;
+  for (const entry of [
+    "!docs/{catalogue,index}.md",
+    "!docs/[ab].md",
+    "!docs/*.{md,txt}",
+    "!docs/a]b.md",
+    "!@(docs/a.md)",
+    "!docs/!(x).md",
+    "!docs/+(a).md",
+    "!docs/a.md|docs/b.md",
+  ]) {
+    const dir = mkRepo({ config: cfgOf(entry) });
+    try {
+      assert.throws(
+        () => eng.readConfig(dir),
+        (e) =>
+          e instanceof eng.UsageError &&
+          e.message.includes(JSON.stringify(entry)) &&
+          /not supported/.test(e.message),
+        entry,
+      );
+    } finally {
+      cleanup(dir);
+    }
+  }
+  // An inclusion with braces fails closed (it matches less), so it is left alone.
+  const incl = mkRepo({
+    config: 'ci:\n  docsOnly:\n    patterns:\n      - "docs/{a,b}.md"\n',
+  });
+  try {
+    assert.deepEqual(eng.readConfig(incl).patterns, ["docs/{a,b}.md"]);
+  } finally {
+    cleanup(incl);
+  }
+  // The premise, pinned: if glob-match ever learns braces or classes, this goes red and the
+  // refusal above should be revisited.
+  const { matchesAnyGlob } = require(join(__dirname, "..", "glob-match.js"));
+  assert.equal(matchesAnyGlob("docs/a.md", ["docs/{a,b}.md"]), false);
+  assert.equal(matchesAnyGlob("docs/a.md", ["docs/[ab].md"]), false);
+  assert.equal(matchesAnyGlob("docs/{a,b}.md", ["docs/{a,b}.md"]), true);
+  assert.equal(matchesAnyGlob("docs/a.md", ["docs/?.md"]), true);
 });
 
 test("task.325: glob-match itself has no negation — qa.testArtifactGlobs keeps its meaning", () => {

@@ -815,6 +815,18 @@ function interpretConfig(parsed, keys) {
             '(`- "!docs/x.md"`; a directory is `- "!docs/dir/**"`)',
         );
       }
+      // glob-match's only wildcards are `*`, `**` and `?`; every other character is literal. A
+      // brace list, character class, extglob group (`@(`, `!(`, `+(`) or `|` alternative written in
+      // another dialect's habit would exclude nothing (QA cycle 4, T325-CR-401). A bare `(` stays
+      // legal: doc names hold one (`notes (draft).md`). An inclusion so written fails closed, so it
+      // is left alone.
+      if (excl && /[{}[\]|]|[@!+]\(/.test(g.slice(1))) {
+        throw new UsageError(
+          `ci.docsOnly.patterns holds ${JSON.stringify(g)}: braces, character classes and extglob are not supported ` +
+            "(only *, ** and ? are wildcards; every other character matches itself). " +
+            'List each path as its own exclusion (`- "!docs/a.md"`, `- "!docs/b.md"`), or use * or ?',
+        );
+      }
     }
     if (p.length > 0 && p.every((g) => g.startsWith("!"))) {
       throw new UsageError(

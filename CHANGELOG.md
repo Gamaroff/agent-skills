@@ -14,10 +14,11 @@ All notable changes to this project will be documented in this file. Format foll
 
 - **A `ci.docsOnly.patterns` list of exclusions only is refused (task 325).** Such a list, and an entry
   that is `!` alone, is a usage error naming the key (exit 2). Before, it read as "nothing is
-  documentation". Write `ci.docsOnly.enabled: false`, which says the same. An exclusion that could
-  never match is refused too: one whose path is not in git's form (a space after the `!` or before
-  it, `!./`, `!/`, a trailing `/`, an empty, `.` or `..` segment). Write a directory as `!docs/dir/**`.
-  Before, such an entry was accepted and silently excluded nothing.
+  documentation". Write `ci.docsOnly.enabled: false`, which says the same. Two kinds of
+  exclusion that would silently exclude nothing are refused too: one whose path is not in git's
+  form (a space after the `!` or before it, `!./`, `!/`, a trailing `/`, an empty, `.` or `..`
+  segment; write a directory as `!docs/dir/**`), and one holding braces, a character class, extglob
+  or a `|`, which this matcher reads literally (only `*`, `**` and `?` are wildcards; list each path instead).
 
 - **The docs-only CI skip runbook covers one run per push, unsafe docs sets and adoption.**
   [`ci-docs-only-skip.md`](./docs/runbooks/ci-docs-only-skip.md) now says how to remove a duplicate
