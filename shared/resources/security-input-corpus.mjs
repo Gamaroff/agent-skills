@@ -31,6 +31,7 @@ export const SINKS = Object.freeze([
   "sql-orm",
   "shell-exec",
   "path",
+  "git-name",
   "template-render",
   "filename",
   "markdown-structure",
@@ -663,6 +664,176 @@ const PATH = sinkCases("path", [
 ]);
 
 // ---------------------------------------------------------------------------
+// git-name — a classifier deciding which class a repository name belongs to
+// ---------------------------------------------------------------------------
+// task.329: `isDocsPath` was probed under `path` and two cases "reproduced" that
+// are not defects for a name classifier: git prints `%2f` literally, and a name
+// is never opened, so a symlink in the worktree decides nothing. Each hostile
+// case below is one a broken copy of `isDocsPath` admits. Most need one refusal
+// line removed; `leading-slash` and `dot-slash` have two defences (the segment
+// check and the normalise check) and need both removed. The probe test proves
+// each, line by line.
+
+const GIT_NAME = sinkCases("git-name", [
+  {
+    id: "dot-git-root",
+    direction: "hostile",
+    input: ".git/config",
+    why: "The repository's own internals. git never lists them as a change, so a name inside `.git` reaching the classifier is forged or misparsed, and no class may admit it.",
+    correct: "Refuse: never in a permissive class, whatever the patterns.",
+  },
+  {
+    id: "dot-git-bare",
+    direction: "hostile",
+    input: ".git",
+    why: "The directory itself, as one segment. A check written as `startsWith('.git/')` misses it.",
+    correct: "Refuse: compare whole segments, not a prefix.",
+  },
+  {
+    id: "dot-git-nested",
+    direction: "hostile",
+    input: "docs/.git/x.md",
+    why: "A `.git` segment below the root is a nested repository's internals. A check on the first segment alone lets it through under `docs/**`.",
+    correct: "Refuse: test every segment, not only the first.",
+  },
+  {
+    id: "dot-git-case",
+    direction: "hostile",
+    input: "docs/.GIT/x.md",
+    why: "On a case-insensitive filesystem `.GIT` is the repository's directory, so a case-sensitive check is defeated by a spelling.",
+    correct: "Refuse: compare `.git` segments case-insensitively.",
+  },
+  {
+    id: "dot-dot-segment",
+    direction: "hostile",
+    input: "docs/../x.md",
+    why: "git never prints a `..` segment. The name matches `docs/**` lexically and names a file outside `docs/`.",
+    correct: "Refuse any `..` segment: the name is not in git's form.",
+  },
+  {
+    id: "leading-slash",
+    direction: "hostile",
+    input: "/docs/a.md",
+    why: "git's names are repository-relative. A leading `/` is an absolute path from somewhere else, and `**` matches it if the matcher ignores the empty first segment.",
+    correct: "Refuse: a name git printed never starts with `/`.",
+  },
+  {
+    id: "dot-slash",
+    direction: "hostile",
+    input: "./docs/a.md",
+    why: "Not git's spelling. A `.` segment means a check and a matcher can disagree about what the name is.",
+    correct: "Refuse a `.` segment, or any name that normalising would change.",
+  },
+  {
+    id: "empty-segment",
+    direction: "hostile",
+    input: "docs//a.md",
+    why: "git never prints `//`. A matcher that collapses it and a check that does not can read two different names.",
+    correct: "Refuse an empty segment.",
+  },
+  {
+    id: "trailing-slash",
+    direction: "hostile",
+    input: "docs/guides/",
+    why: "A directory, not a file git lists as changed. Under `docs/**` it matches the whole subtree.",
+    correct: "Refuse: a trailing `/` is an empty last segment.",
+  },
+  {
+    id: "control-char",
+    direction: "hostile",
+    input: "docs/a\u0001.md",
+    why: "git always quotes a name that holds a control character, whatever `core.quotePath` says. Only `-z` output carries one raw, so a raw one anywhere else has been decoded or forged on the way.",
+    correct: "Refuse any character below U+0020, and U+007F.",
+  },
+  {
+    id: "tab",
+    direction: "hostile",
+    input: "docs/a\tb.md",
+    why: "A tab splits a field in tab-separated git output (`--name-status`, `ls-tree`), so a name that holds one is read as two fields by the next consumer.",
+    correct: "Refuse: a tab is a control character.",
+  },
+  {
+    id: "nul",
+    direction: "hostile",
+    input: "docs/a\u0000.md",
+    why: "NUL is git's record separator under `-z`. A name that holds one has crossed a record boundary, and the halves name different files.",
+    correct: "Refuse: never strip it and continue.",
+  },
+  {
+    id: "config-root",
+    direction: "hostile",
+    input: "skills-config.yaml",
+    why: "This repository's pipeline config. A change to it changes how the pipeline behaves, so it is never documentation, even under `**`.",
+    correct: "Refuse: the config basename is never in a permissive class.",
+  },
+  {
+    id: "config-nested",
+    direction: "hostile",
+    input: "docs/skills-config.yaml",
+    why: "The same basename below the root. A check that compares the whole name with `skills-config.yaml` misses it.",
+    correct: "Refuse by basename, not by the whole name.",
+  },
+  {
+    id: "encoded-slash-literal",
+    direction: "legitimate",
+    input: "docs/a%2fb.md",
+    why: "git does not decode names, so `%2f` is three literal characters in one segment. A classifier that decodes first invents a slash the repository does not contain.",
+    correct: "Accept: the name is literal.",
+  },
+  {
+    id: "encoded-traversal-literal",
+    direction: "legitimate",
+    input: "..%2f..%2fetc%2fpasswd",
+    why: "The same input is hostile under `path`, where a later decode re-introduces the traversal. In a git name nothing decodes it: it is one segment, and that segment is not `..`.",
+    correct: "Accept: the name is literal, and decoding it is the defect.",
+  },
+  {
+    id: "symlink-shaped-name",
+    direction: "legitimate",
+    input: "uploads/link-to-etc/passwd",
+    why: "A name classifier never opens the file, so whether `link-to-etc` is a symlink in some worktree decides nothing. `path.symlink-escape` is about the kernel, and no kernel is involved here.",
+    correct: "Accept under `**`: decide on the name.",
+  },
+  {
+    id: "space-and-parens",
+    direction: "legitimate",
+    input: "docs/notes (draft).md",
+    why: "Spaces and parentheses are ordinary in names. A check written for a shell word refuses a real document.",
+    correct: "Accept.",
+  },
+  {
+    id: "plus-signs",
+    direction: "legitimate",
+    input: "docs/c++.md",
+    why: "`+` is a regex quantifier. A matcher that treats the name as a pattern, or compiles a glob to a regex without escaping its literal parts, refuses or mismatches a real file.",
+    correct: "Accept: match the name literally.",
+  },
+  {
+    id: "non-ascii",
+    direction: "legitimate",
+    input: "docs/café.md",
+    why: "Non-ASCII names are legal, and git prints them raw with `core.quotePath=false`. A check that refuses every byte above 0x7F refuses them.",
+    correct:
+      "Accept: a character above 0x7F is not refused for being non-ASCII.",
+  },
+  {
+    id: "dotfile",
+    direction: "legitimate",
+    input: "docs/.gitkeep",
+    why: "It begins with `.git` and is not `.git`. A prefix check written to stop the repository's internals takes it with them.",
+    correct:
+      "Accept: a name that merely begins with `.git` is not the repository's internals. What counts as `.git` itself (case, trailing dots, `git~1`) is a separate question that this case does not settle.",
+  },
+  {
+    id: "dots-in-name",
+    direction: "legitimate",
+    input: "docs/archive..2026.md",
+    why: "`..` inside a segment is not traversal. A substring check refuses a real name.",
+    correct: "Accept: only a whole `..` segment is refused.",
+  },
+]);
+
+// ---------------------------------------------------------------------------
 // template-render — a renderer deciding what markup a value becomes
 // ---------------------------------------------------------------------------
 
@@ -1083,6 +1254,7 @@ const CORPUS = Object.freeze({
   "sql-orm": SQL_ORM,
   "shell-exec": SHELL_EXEC,
   path: PATH,
+  "git-name": GIT_NAME,
   "template-render": TEMPLATE_RENDER,
   filename: FILENAME,
   "markdown-structure": MARKDOWN_STRUCTURE,
@@ -1136,6 +1308,7 @@ const CONTROL = Object.freeze({
   "\r": "␍",
   "\t": "␉",
   "\0": "␀",
+  "\u0001": "␁", // task.329's git-name control-char case
 });
 
 /**
@@ -1179,6 +1352,8 @@ const SINK_BLURB = Object.freeze({
   "shell-exec":
     "A shell deciding **what command to run**. The 27 hostile cases are measured, not invented: 14 from `task.67.bug.3` and 13 from `bug.6`, replayed verbatim in `evals/shared/tests/snippet-classifier-fail-open-replay.test.mjs`. Every one got past a classifier that looked correct on inspection. The common shape: the string a scanner reads is not the command the shell runs.",
   path: "A filesystem API deciding **which file to open**. Note how many of the hostile cases defeat a check that is lexically correct — the disagreement is between the string and the kernel.",
+  "git-name":
+    "A classifier deciding **which class a repository-relative name belongs to**, such as documentation, generated output or config, from the name git prints, without opening the file. Choose it over `path` when the name is only compared against patterns: git never decodes `%2f` and a name is never resolved, so `path`'s decoding and symlink cases describe a filesystem call such a classifier never makes. The hostile cases are names no class may admit, whatever the patterns: the repository's internals, names not in git's canonical form, control characters, and the pipeline's own config file. The legitimate cases are literal names that a filesystem-minded check would refuse. Probe with the classifier's widest patterns, e.g. `ci-tree-equivalence.js#isDocsPath` with `--args-json '[[\"**\"]]'`, so a refusal is the classifier's own and not a pattern miss.",
   "template-render":
     "A renderer deciding **what markup a value becomes**. The escaping is not one function: element text, attribute value, URL and script context are four different ones, and choosing by position is the control.",
   filename:

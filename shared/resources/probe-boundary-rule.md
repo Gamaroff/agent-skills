@@ -203,7 +203,10 @@ models**: `markdown-structure` models the implementation report, so
 other document is not disqualified by that sink — probing it there would score
 the sink's legitimate reports `overblocked` for being the wrong document, which
 says nothing about the validator. A validator of **external** input is never
-`internal`.
+`internal`. `git-name` models git-form names, so a classifier of
+`git diff --name-only` output (`ci-tree-equivalence.js#isDocsPath`) is probed
+there, not under `path`, whose decoding and symlink cases describe a filesystem
+call it never makes (task.325.dod.1).
 
 The class exists because the zero-guard had two outcomes and met a third shape:
 on task.124 the finalise agent classed `lintReport` a boundary, found no sink and

@@ -1,0 +1,76 @@
+schema: 2
+task: 'task.329.git-name-probe-sink'
+task_title: 'A git-name sink for classifiers of repository names'
+gate: PASS
+status_reason: 'All three phases are verified. Every isDocsPath mutation turns the HEAD probe test red with exactly its cases, and the fast gate is green apart from one push-policy load flake that passes alone. Three LOW wording errors in the new corpus prose were verified against the source and are left open for the fix loop.'
+reviewer: 'QA Engineer'
+head: 'd38fa3a277703b2dc2311071af05d896a27ed763'
+updated: '2026-11-26T14:18:01Z'
+
+top_issues:
+  - id: 'T329-QA-1'
+    severity: low
+    file: 'shared/resources/security-input-corpus.mjs'
+    finding: 'git-name.control-char why: says git quotes a control character "unless core.quotePath is off". git escapes control characters whatever core.quotePath says; only -z output carries them raw. (origin: code-review CR-1, checked by QA against the git documentation)'
+    suggested_action: 'Say git always quotes a name holding a control character except under -z, so a raw one has been decoded or forged on the way; regenerate the .md table'
+    suggested_owner: dev
+    status: open
+  - id: 'T329-QA-2'
+    severity: low
+    file: 'shared/resources/security-input-corpus.mjs'
+    finding: 'git-name.encoded-traversal-literal why: says the input has "no .. in it". The input contains ".." twice as a substring; what isDocsPath refuses is a whole ".." segment. (origin: code-review CR-2, confirmed by QA reading the input)'
+    suggested_action: 'Say it is one segment, and that segment is not ".."; regenerate the .md table'
+    suggested_owner: dev
+    status: open
+  - id: 'T329-QA-3'
+    severity: low
+    file: 'shared/resources/security-input-corpus.mjs'
+    finding: 'git-name.dotfile correct: says "only a segment equal to .git is internal". isDotGitSegment (ci-tree-equivalence.js:135) also refuses case variants, trailing dots or spaces, ignorable code points and git~1. (origin: code-review CR-3, confirmed by QA reading isDotGitSegment)'
+    suggested_action: 'Say only a spelling of .git is internal (any case, trailing dots or spaces, ignorable code points, git~1), and that a .git prefix such as .gitkeep is not; regenerate the .md table'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 4
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: false
+    boundary_signals: []
+    notes: 'The change set adds no accept/reject function to shipped code. It adds corpus data, prose and tests. isDocsAnchor is a test-side assertion, not a boundary. The committed probe tests execute all 22 git-name cases against isDocsPath in-suite, and five mutations confirm they bite; those runs are test evidence, not a probe of a new boundary.'
+  performance:
+    status: PASS
+    notes: 'The mutation test spawns 5 probe runs, about 9 s locally. No shipped hot path changed.'
+  reliability:
+    status: PASS
+    notes: 'The anchors fail loudly when isDocsPath is rewritten (calibrated), and the scratch root is removed in finally.'
+  maintainability:
+    status: PASS
+    notes: 'One corpus definition with its generated .md peer under a parity test. The routing rule is stated in the three places that choose sinks.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future: []
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []
