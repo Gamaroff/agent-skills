@@ -5,11 +5,11 @@ type: task
 description: "Let ci.docsOnly.patterns hold an exclusion (a glob that starts with an exclamation mark), so a project can keep one tested document out of the rule that lets the pipelines stop waiting for CI."
 tags: [ci, docs-only-rule, skills-config]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: Medium
 risk_level: low
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-26
 estimated_effort_hours: 4
 github_issue: 947
 ---
@@ -18,7 +18,9 @@ github_issue: 947
 
 **GitHub Issue**: [#947](https://github.com/Gamaroff/agent-skills/issues/947)
 
-**Status:** Planned
+**Status:** Ready for Review
+
+**Review**: ✅ All review recommendations from `task.325.review.1.docs-only-rule-exclusions.md` implemented 2026-11-26
 
 ---
 
@@ -65,13 +67,14 @@ Every result below was run on 2026-11-25 at `17a112e6d`.
 
 ### Current Architecture
 
-- **The predicate.** `shared/resources/ci-tree-equivalence.js:165` *(`function isDocsPath`)* ends in
+- **The predicate.** `shared/resources/ci-tree-equivalence.js:167` *(`function isDocsPath`)* ends in
   `matchesAnyGlob(file, globs)`. `glob-match.js` has no negation.
-- **The configuration check.** The same file, `:674` *(`"patterns" in block`)*: a block list of
+- **The configuration check.** The same file, `:751` *(`"patterns" in block`)*: a block list of
   non-empty strings. A quoted and an unquoted `!docs/b.md` both parse to the string.
-- **Every reader goes through the predicate.** `git grep -nE 'isDocsPath' -- shared/resources` finds:
-  the ancestor walk (`:258`), `fixPathTarget` (`:197`), `dirtyNonDocsPaths` (`:1140`), the push policy
-  (`:1374`, `:1389`), `finalise-delta.js:324`, `finalise-rerun-at-head.js:782`,
+- **Every reader goes through the predicate.** `git grep -nE 'isDocsPath' -- shared/resources` finds
+  (line numbers re-measured at `684b2db38`, after task 320 landed):
+  the ancestor walk (`:260`), `fixPathTarget` (`:199`), `dirtyNonDocsPaths` (`:1217`), the push policy
+  (`:1451`, `:1466`), `finalise-delta.js:324`, `finalise-rerun-at-head.js:929`,
   `reenter-qa-after-finalise.sh:241`, and the 5c classify block
   (`develop-pipeline-step-5-6-qa-loop.md:1779`). None calls `matchesAnyGlob` with the patterns itself.
 - `qa-diminishing-returns.js` also calls `matchesAnyGlob`, for `qa.testArtifactGlobs`. So the negation
@@ -102,7 +105,13 @@ The four suites that drive it (`ci-tree-equivalence`, `finalise-rerun-at-head`, 
 
 - **Not last-match-wins.** `.gitignore` order rules would let a later inclusion undo an exclusion. Here
   an exclusion always wins, which is the answer that waits.
-- **A path that itself starts with `!`** is code today and stays code.
+- **A path whose name starts with `!`** is matched as a name, like any other, today and after:
+  `isDocsPath("!x.md", ["**/*.md", "docs/**"])` returns `true` (run on 2026-11-26 at `684b2db38`).
+  Only a **pattern** that starts with `!` changes meaning. A project that wrote `!x.md` to match a
+  file literally named `!x.md` now excludes `x.md` instead (Breaking Change 1).
+- **An empty list is not "a list with no inclusion".** `patterns: []` keeps its present answer
+  (nothing is documentation). The usage error is for a **non-empty** list in which every entry is an
+  exclusion; `Array.prototype.every` is `true` on `[]`, so the check must test the length first.
 
 ---
 
@@ -135,7 +144,8 @@ rule on, and narrowing it makes them wait.
 
 ### Breaking Change 2: a list with only exclusions is a usage error
 
-**What Changed**: such a list is refused. Before, it read as "nothing is documentation".
+**What Changed**: a non-empty list whose every entry starts with `!`, and an entry that is `!` alone,
+are refused. An empty list is not affected. Before, it read as "nothing is documentation".
 
 **Migration**: write `enabled: false`, which says the same.
 
@@ -154,8 +164,8 @@ rule on, and narrowing it makes them wait.
 - `shared/resources/tests/ci-tree-equivalence.test.mjs`
 
 **Changes**:
-- [ ] Write the failing cases first (§ 8)
-- [ ] Add the exclusion to `isDocsPath`
+- [x] Write the failing cases first (§ 8)
+- [x] Add the exclusion to `isDocsPath`
 
 **Dependencies**: task 320, which edits the same file
 
@@ -167,7 +177,7 @@ rule on, and narrowing it makes them wait.
 - the same two
 
 **Changes**:
-- [ ] Refuse a list with no inclusion, and a bare `!`, each by name
+- [x] Refuse a list with no inclusion, and a bare `!`, each by name
 
 **Dependencies**: Phase 1
 
@@ -182,9 +192,9 @@ rule on, and narrowing it makes them wait.
 - Generated copies under `skills/*/references/`
 
 **Changes**:
-- [ ] Document the exclusion, and that it wins in any order
-- [ ] Write the CHANGELOG entry
-- [ ] Run `npm run bundle`, then `npm run bundle:check`
+- [x] Document the exclusion, and that it wins in any order
+- [x] Write the CHANGELOG entry
+- [x] Run `npm run bundle`, then `npm run bundle:check`
 
 **Dependencies**: Phases 1 and 2
 
@@ -203,7 +213,8 @@ None.
 ### Files to Modify (Tests)
 
 2. ✅ `shared/resources/tests/ci-tree-equivalence.test.mjs`
-3. ✅ `shared/resources/reenter-qa-after-finalise.test.sh` - one case through a real reader
+3. ✅ `shared/resources/reenter-qa-after-finalise.test.sh` - one case through a real reader, and its sibling control
+3a. ✅ `shared/resources/tests/push-policy.test.mjs` - the § 8 push-policy row (added at develop: § 8 names the case, this list did not name its file)
 
 ### Files to Modify (Documentation)
 
@@ -213,7 +224,8 @@ None.
 
 ### Generated
 
-7. ✅ `skills/*/references/` copies of 1, by `npm run bundle`
+7. ✅ `skills/*/references/` copies of 1, by `npm run bundle`: `develop-batch`, `develop-bug`,
+   `develop-next`, `develop-story`, `develop-task`, `finalise`
 
 ### Files to Delete
 
@@ -232,10 +244,11 @@ None.
 | the push policy on a commit that changes an excluded path | `defer` | `push` |
 | `patterns: ["!docs/b.md"]` | accepted | usage error naming `ci.docsOnly.patterns` |
 | `patterns: ["docs/**", "!"]` | accepted | usage error |
+| `patterns: []` | accepted, nothing is docs | unchanged |
 | no `!` in the list | unchanged | unchanged |
-| `qa.testArtifactGlobs` with a `!` entry | matches nothing | matches nothing |
+| `qa.testArtifactGlobs` with a `!` entry | matches only a path literally named with the `!` | unchanged |
 
-**Command**: `command node --test shared/resources/tests/ci-tree-equivalence.test.mjs shared/resources/tests/push-policy.test.mjs`, and `bash shared/resources/reenter-qa-after-finalise.test.sh`
+**Command**: `command node --test shared/resources/tests/ci-tree-equivalence.test.mjs shared/resources/tests/push-policy.test.mjs`, and `bash shared/resources/reenter-qa-after-finalise.test.sh`; `npm run lint:shell` after editing the `.test.sh`
 
 ### Mutation Tests
 
@@ -256,22 +269,22 @@ Not applicable.
 
 ### Functional
 
-- [ ] Every row of the § 8 table holds in a test
-- [ ] `git grep -nE 'matchesAnyGlob' -- shared/resources` shows no new caller
+- [x] Every row of the § 8 table holds in a test
+- [x] `git grep -nE 'matchesAnyGlob' -- shared/resources` shows no new caller
 
 ### Performance
 
-- [ ] Not applicable: no bound is claimed
+- [x] Not applicable: no bound is claimed
 
 ### Code Quality
 
 - [ ] Every mutation in § 8 is recorded in the QA report with the test it turned red
-- [ ] `npm run test:remote` and `npm run bundle:check` pass
+- [x] `npm run test:remote` and `npm run bundle:check` pass
 
 ### Migration
 
-- [ ] The reference states the syntax, that an exclusion wins in any order, and the usage error
-- [ ] `CHANGELOG.md` `[Unreleased]` names both changes of § 5
+- [x] The reference states the syntax, that an exclusion wins in any order, and the usage error
+- [x] `CHANGELOG.md` `[Unreleased]` names both changes of § 5
 
 ---
 
@@ -337,6 +350,9 @@ Wording of the message or the reference.
 | Date       | Version | Description                                           | Author      |
 | ---------- | ------- | ----------------------------------------------------- | ----------- |
 | 2026-11-25 | 1.0     | Initial draft — split from a CI adoption handoff      | create-task |
+| 2026-11-26 | 1.1     | Review passed (8/10) — fixed a false `!`-path clarification, scoped the usage error to non-empty lists, refreshed line anchors | review-task |
+| 2026-11-26 |         | Status → ready-for-development                        | review-task |
+| 2026-11-26 |         | Implemented — 15 files (6 generated), 7 tests          | develop     |
 <!-- change-log-end -->
 
 ---
@@ -345,18 +361,44 @@ Wording of the message or the reference.
 
 ### Phase 1: The predicate
 
-- [ ] Failing cases
-- [ ] Exclusion
+- [x] Failing cases
+- [x] Exclusion
 
 ### Phase 2: The configuration check
 
-- [ ] Usage errors
+- [x] Usage errors
 
 ### Phase 3: Records and bundle
 
-- [ ] Reference and runbook
-- [ ] CHANGELOG
-- [ ] Bundle
+- [x] Reference and runbook
+- [x] CHANGELOG
+- [x] Bundle
+
+---
+
+## Implementation Summary
+
+**Completion Date**: 2026-11-26
+
+**Approach**: the plan's predicate lines, tests first. `isDocsPath` sets aside every pattern that
+starts with `!`; a path any of them matches (read without the `!`) is code, whatever the rest say and
+in any order; the rest then decide as before. `readConfig`'s `patterns` check refuses a bare `!` and a
+non-empty list of exclusions only, each naming `ci.docsOnly.patterns`. `glob-match.js` is unchanged.
+
+Beyond the plan: a `push-policy.test.mjs` case for § 8's push-policy row (its file was not in § 7), and
+a sibling control beside the `reenter-qa-after-finalise.test.sh` case. The `p.length > 0` guard cannot
+be reached from YAML: an empty `patterns:` is already refused by the block-list check.
+
+**Testing Results**: `npm run test:remote` (`ci:fast` on the LAN server): 8904 tests, 8901 pass, 0 fail,
+3 skipped. The four engine suites: 235 of 235. `reenter-qa-after-finalise.test.sh`: 85 of 85.
+`bundle:check` 0 problems; `lint:shell` clean. Red before the change: 4 of the 6 new cases; the 2 green
+are the "unchanged" controls. Mutations, each alone and restored: exclusion removed, order-dependent
+(last-match-wins), usage errors removed (and the bare-`!` refusal alone), negation moved into
+`glob-match.js` — each turned a named test red (listed in the implementation report; QA records them).
+
+## Deferred Work
+
+None.
 
 ---
 
