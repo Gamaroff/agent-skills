@@ -5,7 +5,7 @@ type: task
 description: "Add a git-name sink to the security input corpus, and route a classifier of git-form repository names (isDocsPath) to it instead of the filesystem path sink, whose decoding and symlink cases cannot apply to a name."
 tags: [security-probe, corpus, finalise]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: High
 risk_level: low
 created: 2026-11-26
@@ -18,7 +18,8 @@ github_issue: 955
 
 **GitHub Issue**: [#955](https://github.com/Gamaroff/agent-skills/issues/955)
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.329.review.1.git-name-probe-sink.md` implemented 2026-11-26
 
 ---
 
@@ -121,7 +122,7 @@ Each refusal line removed from a scratch copy of `ci-tree-equivalence.js`, with 
 | Line removed | Hostile cases that then reproduce |
 | :-- | :-- |
 | control characters | `docs/a␁.md`, `docs/a␀.md` |
-| empty/`.`/`..` segment | `docs/../x.md`, `docs//a.md`, `docs/` |
+| empty/`.`/`..` segment | `docs/../x.md`, `docs//a.md`, `docs/` (the corpus uses `docs/guides/`, which reproduces the same way: `docs/` is restated in the DoD prompt, which the prompt-contract test refuses) |
 | `.git` segment | `.git/config`, `docs/.git/x.md`, `docs/.GIT/x.md` |
 | config basename | `skills-config.yaml`, `docs/skills-config.yaml` |
 | segment **and** `normalisePath` | adds `/docs/a.md`, `./docs/a.md` |
@@ -194,9 +195,9 @@ None. A sink is added. An existing plan that names `--sink path` still runs.
 - `shared/resources/tests/security-input-corpus.test.mjs`
 
 **Changes**:
-- [ ] Pin the new counts in the test first, and see it fail
-- [ ] Add `git-name` to `SINKS` after `path`, add its cases, `CORPUS` entry and `SINK_BLURB`
-- [ ] Regenerate `## The cases`, and correct the "six sinks" line
+- [x] Pin the new counts in the test first, and see it fail
+- [x] Add `git-name` to `SINKS` after `path`, add its cases, `CORPUS` entry and `SINK_BLURB`
+- [x] Regenerate `## The cases`, and correct the "six sinks" line
 
 **Dependencies**: none
 
@@ -210,9 +211,9 @@ None. A sink is added. An existing plan that names `--sink path` still runs.
 - `shared/resources/probe-boundary-rule.md`
 
 **Changes**:
-- [ ] Name the sink in both enumerations and the review prompt's table
-- [ ] State the rule that separates `git-name` from `path`
-- [ ] Add the `isDocsPath` row to the disqualified table
+- [x] Name the sink in both enumerations and the review prompt's table
+- [x] State the rule that separates `git-name` from `path`
+- [x] Add the `isDocsPath` row to the disqualified table
 
 **Dependencies**: Phase 1
 
@@ -226,9 +227,9 @@ None. A sink is added. An existing plan that names `--sink path` still runs.
 - generated copies under `skills/*/references/`
 
 **Changes**:
-- [ ] Probe `isDocsPath` through the sink at HEAD and under each mutation of § 3
-- [ ] Write the CHANGELOG entry
-- [ ] `npm run bundle`, then `npm run bundle:check`
+- [x] Probe `isDocsPath` through the sink at HEAD and under each mutation of § 3
+- [x] Write the CHANGELOG entry
+- [x] `npm run bundle`, then `npm run bundle:check`
 
 **Dependencies**: Phases 1 and 2
 
@@ -284,6 +285,13 @@ The cases are the measured ones. Hostile: the 12 names in § 3's table, plus `do
 
 The temp copy lives in a `mkdtemp` directory removed in a `finally`.
 
+**Tests that enumerate `SINKS` and react to the new member** (`git grep -n "SINKS" -- '*.test.*'`):
+`security-input-corpus.test.mjs` (the `FLOORS` table, the both-directions check, the prompt enumeration
+check at `:580`, and the `.md` parity check), and `security-probe.test.mjs:7289`
+*(`every case of every sink's corpus passes`)*, which runs `validateCases` over every sink's cases.
+`skills/review-security/tests/review-security.test.js:117` only checks that a fixture's sink is in
+`SINKS`, and needs nothing.
+
 **Command**: `command node --test shared/resources/tests/security-input-corpus.test.mjs shared/resources/tests/security-probe.test.mjs`
 
 ### Mutation Tests
@@ -314,7 +322,7 @@ Not applicable.
 ### Functional
 
 - [ ] Every row of the § 8 table holds in a test
-- [ ] `corpusFor("path")` is unchanged: `git diff develop -- shared/resources/security-input-corpus.mjs` touches no line of `const PATH`
+- [ ] `corpusFor("path")` is unchanged, held by a test in `security-input-corpus.test.mjs` that pins the `path` ids and directions as they stand at `684b2db38`
 
 ### Performance
 
@@ -392,6 +400,9 @@ A case's wording or direction.
 | Date       | Version | Description                                                  | Author      |
 | ---------- | ------- | ------------------------------------------------------------ | ----------- |
 | 2026-11-26 | 1.0     | Initial draft — from task 325's finalise probe gaps          | create-task |
+| 2026-11-26 | 1.1     | Review passed (8/10) — `path` criterion given a test; SINKS-enumerating tests named | review-task |
+| 2026-11-26 |         | Status → ready-for-development                               | review-task |
+| 2026-11-26 |         | Implemented — 10 source files (+14 bundled copies), 4 tests  | develop     |
 <!-- change-log-end -->
 
 ---
@@ -400,19 +411,19 @@ A case's wording or direction.
 
 ### Phase 1: The sink
 
-- [ ] Counts first
-- [ ] Sink and cases
-- [ ] Tables regenerated
+- [x] Counts first
+- [x] Sink and cases
+- [x] Tables regenerated
 
 ### Phase 2: The routing
 
-- [ ] Prompts and rule
+- [x] Prompts and rule
 
 ### Phase 3: The proof and records
 
-- [ ] Probe test
-- [ ] CHANGELOG
-- [ ] Bundle
+- [x] Probe test
+- [x] CHANGELOG
+- [x] Bundle
 
 ---
 

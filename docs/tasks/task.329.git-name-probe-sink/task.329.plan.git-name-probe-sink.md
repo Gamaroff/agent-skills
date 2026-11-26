@@ -28,6 +28,9 @@ hostile cases bite with a test that probes broken copies of `isDocsPath`.
 
 Run it. It must fail, because `corpusFor("git-name")` throws.
 
+In the same file, add a test that pins `corpusFor("path")` as it stands: the eleven ids in order with
+their directions. This holds the criterion that `path` is unchanged.
+
 **`shared/resources/security-input-corpus.mjs`.**
 
 - `SINKS` (`:29`): insert `"git-name"` directly after `"path"`. The `.md` peer and the rendered tables
@@ -45,7 +48,7 @@ Run it. It must fail, because `corpusFor("git-name")` throws.
 | `leading-slash` | hostile | `/docs/a.md` |
 | `dot-slash` | hostile | `./docs/a.md` |
 | `empty-segment` | hostile | `docs//a.md` |
-| `trailing-slash` | hostile | `docs/` |
+| `trailing-slash` | hostile | `docs/guides/` (not `docs/`: that literal is in the DoD prompt, and `finalise-dod-prompt-contract.test.mjs` refuses a corpus input the prompt restates) |
 | `control-char` | hostile | `docs/a\u0001.md` |
 | `tab` | hostile | `docs/a\tb.md` |
 | `nul` | hostile | `docs/a\u0000.md` |
