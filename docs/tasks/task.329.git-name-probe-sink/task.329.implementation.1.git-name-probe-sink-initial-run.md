@@ -3,7 +3,7 @@
 **Task**: `task.329.git-name-probe-sink.md`
 **Run Number**: 1
 **Started**: 2026-11-26 13:36
-**Status**: In Progress
+**Status**: Completed
 **Report format**: 2
 
 ---
@@ -35,11 +35,11 @@ Add a `git-name` corpus sink and route name classifiers (`isDocsPath`) to it, so
 | -------------------------- | ---------- | ---------------------------------------------------------------------- | ----- | -------------------- | --------------- |
 | 1. create-branch           | ✅ Done    | Branch `feature/task.329.*` exists in git                              | Branch created at `ad2b2fde1`; pushed | —                    | 2026-11-26T13:38Z |
 | 2. review-task             | ✅ Done    | `task.329.review.{N}.{name}.md` exists (or skip logged)                | review.1: READY TO IMPLEMENT 8/10; 2 Important fixed; Planned → Ready for Development | —                    | 2026-11-26T13:40Z |
-| 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; 3 phases; 4 tests; gate 8898/1 (load flake, passes alone) | —                    | 2026-11-26T14:20Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.329.qa.{N}.*.md`; `task.329.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.329.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; 3 phases; 4 tests; gate 8898/1 (load flake, passes alone) | —                    | (not measured) |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | [#956](https://github.com/Gamaroff/agent-skills/pull/956); in-review comment posted; body written inline (no summariser agent, the diff was fully known) | —                    | 2026-11-26T14:13Z |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.329.qa.{N}.*.md`; `task.329.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 3 QA cycles, 2 fix cycles; gate 3 PASS 96/100 (cosmetic-residue exit, 2 LOW deferred); 5c CONCERNS, no open coverage | —                    | 2026-11-26T14:39Z |
+| 7. finalise                | ✅ Done    | `task.329.dod.{N}.*.md`; task `status: accepted`                       | dod.1 ACCEPTED, 7/7; one Step 8a fix (`d71760925`, M12); acceptance commit `77ffe8890` | —                    | 2026-11-26T17:53Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | this report committed and pushed | —                    | 2026-11-26T17:53Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -85,6 +85,17 @@ Add a `git-name` corpus sink and route name classifiers (`isDocsPath`) to it, so
 - Status: Ready for Development → Ready for Review
 - Mutation proof (in the test itself): at HEAD 22/22 cases hold. With each refusal line removed, exactly the listed hostile cases reproduce and nothing legitimate is refused. Every hostile id is reached by some mutation
 
+### Step 7 — finalise
+
+- DoD run 1: `task.329.dod.1.git-name-probe-sink.md` — ✅ ACCEPTED, 7/7 criteria; security PASS (`boundary: false`), compliance N/A, docs PASS
+- First AC pass failed #4: three of § 8's four mutations had never been run. M8–M11 were run and recorded in qa.3 (`f43ad031c`)
+- M12 (`git-name` dropped from the review prompt's list) survived. Step 8a fix-and-recheck, once: `d71760925` ends the review prompt's enumeration extract at "Pick by". Mutation-proved (M12 and M10 both red); evaluator exit 0 on all five preconditions
+- Fast gate at `d71760925`: `npm run test:remote --timeout-min 60` 8902 tests, 0 fail. The first attempt timed out at 30 min (exit 124), masked as 0 by a trailing `echo`; caught from the output
+- A stale `.claude/state/finalise-ac-result-1.yaml` from task 325 was nearly merged under task 329's ids; deleted and replaced with task 329's own YAML (recorded in the DoD)
+- CI reading 1: SUCCESS @ d71760925 (6 checks); CI reading 2: SUCCESS (tree-equivalent to d71760925f0c) @ f0ac104af
+- Acceptance commit `77ffe8890` (registry ticked; the 5c review and qa.3 mutation records carried). A one-line pr-review.1 correction followed as `f0ac104af`, before CI reading 2
+- PR canonical comment posted; tracker `done` comment posted; issue #955 closed; board `done`: already
+
 ---
 
 ## Issues Log
@@ -101,14 +112,63 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-11-26
+**Gate Result**: PASS
+**Issues Found**: 3 LOW. Each is a wording error in the new corpus prose that QA confirmed against the source: T329-QA-1 (core.quotePath), T329-QA-2 ("no `..`"), T329-QA-3 (`.git` spellings)
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**Traceability**: skipped (mapper not dispatched — the Success Criteria are six rows, each mapped by hand in the QA report)
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+
+#### qa-fix (5b)
+- Ingester subagent not dispatched: the gate was written in this session, and its 3 entries were already in hand
+- T329-QA-1, T329-QA-2, T329-QA-3: reworded in `security-input-corpus.mjs`; the three `.md` rows updated from `renderCorpusTables()`; bundle regenerated (`bundle:check` 0 problems)
+- Probe: the population command for `core.quotePath`, `with no \`..\` in it` and `only a segment equal to`. The corpus `.mjs` and `.md` were updated. The plan's `dotfile` line was updated. The other `core.quotePath` hits (`develop-pipeline-step-5-6-qa-loop.md`, `qa-re-review-scope.md`, finalise, qa-story and qa-task SKILL.md) are unaffected: each passes `-c core.quotePath=false` and makes no claim about control characters. Population: 2 for each phrase. Move: patch — three distinct wording errors in the deliverable itself
+- mutation-proven: one `.md` row reverted → "the prose peer contains the generated tables verbatim" red → covered
+- Tests: `security-input-corpus.test.mjs` 24/24, `finalise-dod-prompt-contract.test.mjs` green, task.329 probe tests 3/3. Full fast gate not re-run for a string-only change; CI runs it on push
+- changes-requested stage: stage-disabled
+
+### QA Cycle 2 — 2026-11-26
+**Gate Result**: CONCERNS
+**Issues Found**: 2 MEDIUM, 3 LOW. All are corpus or comment texts that misstate `isDocsPath`. QA ran `isDocsPath` on each: T329-QA-4 (the `.git` spelling list is claimed complete, but `.git:` stream forms pass), T329-QA-5 ("only control characters are refused" is false both ways), T329-QA-6 (the "one refusal line" header), T329-QA-7 (the "since task.325" comment), T329-QA-8 (the regex-from-name rationale)
+**HIGH findings**: 0
+**MEDIUM findings**: 2
+**Traceability**: skipped (unchanged from cycle 1; no criterion moved, criteria_drift clean)
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+
+#### qa-fix (5b)
+- Ingester subagent not dispatched: the gate was written in this session, and its 5 entries were already in hand
+- Narrowing residue: `shared/resources/security-input-corpus.mjs` (repeat subject: `repeat-subject.mjs` named it, and fix commit 6709861a4 changed it)
+- Move: scope the claim. Both cycles found texts that claim more about `isDocsPath` than the case tests. Each text now states only the property its own input checks, and claims no complete list
+- T329-QA-4: `dotfile` correct now settles only "a `.git` prefix is not internal". T329-QA-5: `non-ascii` correct now says a character above 0x7F is not refused for being non-ASCII. T329-QA-6: the header names the two cases that have two defences. T329-QA-7: the comment says the second spelling is on the unmerged task-325 branch. T329-QA-8: `plus-signs` names a name-as-pattern matcher or an unescaped glob compile
+- Probe: the population command, run after the edit for each old phrase (`only control characters are refused`, `one refusal line removed`, `builds a regex from the name`, `since task.325`, `only a spelling of`), returned 0 hits. It was calibrated on the new phrase `not refused for being non-ASCII`, which returns the corpus `.mjs` and `.md`. Pre-edit sites: the corpus `.mjs` and `.md` (updated) and the plan's `dotfile` line (updated). CHANGELOG.md:14 and task doc § "Measured" say "each refusal line removed"; both are unaffected, since they describe the test, which also has a two-line row. Population: 2 to 3 per phrase
+- mutation-proven: the `non-ascii` `.md` row reverted → "the prose peer contains the generated tables verbatim" red → covered
+- Tests: `security-input-corpus.test.mjs` 24/24, `finalise-dod-prompt-contract.test.mjs` green, task.329 probe tests 3/3, `bundle:check` 0 problems, prettier clean
+- Follow-up (not this PR): `isDocsPath` admits `.git:` NTFS stream spellings and U+0085. Identical on develop, so it is gate.2 `recommendations.future`
+- changes-requested stage: stage-disabled
+
+### QA Cycle 3 — 2026-11-26
+**Gate Result**: PASS
+**Issues Found**: 2 LOW prose cleanups: T329-QA-9 (`plus-signs` glob clause not exercised under `**`), T329-QA-10 (`IS_DOCS_LINES` comment overstates the two spellings). QA ran `isDocsPath` on 9 inputs, and every reworded claim holds
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**Traceability**: skipped (unchanged since cycle 1; criteria_drift clean)
+**PR Review**: CONCERNS — [task.329.pr-review.1.git-name-probe-sink.md](./task.329.pr-review.1.git-name-probe-sink.md) (conformance lens only, `--no-code`). PC-1 MEDIUM (pr_number missing; fixed in 5c), PC-2 LOW (criteria unticked; /finalise ticks them). No coverage finding
+**Loop exit**: Cosmetic-residue exit (route 2b): HIGH 0 on gates 2 and 3, and this PASS gate's only open entries are LOW. T329-QA-9 and T329-QA-10 go to `## Deferred Work`
+**Action**: Proceeding to 5c (PR conformance review). 5c returned CONCERNS with no open coverage finding, so the run exits to Step 7
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-11-26T17:53Z
+**Final Status**: Completed
 **Branch**: feature/task.329.git-name-probe-sink
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**PR**: [#956](https://github.com/Gamaroff/agent-skills/pull/956)
+**QA Iterations**: 3 QA cycles, 2 fix cycles, plus one finalise Step 8a fix
+**DoD Summary**: [task.329.dod.1.git-name-probe-sink.md](./task.329.dod.1.git-name-probe-sink.md)
+**Tracker debt**: none
