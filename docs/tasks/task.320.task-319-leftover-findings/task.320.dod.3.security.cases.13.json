@@ -1,0 +1,66 @@
+[
+  {
+    "id": "legit-plain-spaces",
+    "input": "ci:\n  skipMarker: \"  [skip ci]  \"  # why\n",
+    "direction": "legitimate",
+    "why": "plain spaces at the ends are dropped",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "legit-inner-nbsp",
+    "input": "ci:\n  skipMarker: \"[a #b]\"\n",
+    "direction": "legitimate",
+    "why": "a no-break space inside the quotes is a character like any other",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-quoted-nbsp-after",
+    "input": "ci:\n  skipMarker: \"[x] \"\n",
+    "direction": "hostile",
+    "why": "a no-break space at the end of a quoted value",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-quoted-nbsp-before",
+    "input": "ci:\n  skipMarker: ' [x]'\n",
+    "direction": "hostile",
+    "why": "the same at the start, in single quotes",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-ideographic-space",
+    "input": "ci:\n  skipMarker: \" [x] 　 \"\n",
+    "direction": "hostile",
+    "why": "an ideographic space among plain ones",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-unquoted-nbsp",
+    "input": "ci:\r\n  skipMarker: [x \r\n",
+    "direction": "hostile",
+    "why": "unquoted, in a CRLF file",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-nbsp-before-comment",
+    "input": "ci:\n  skipMarker: \"[x]\"  # why\n",
+    "direction": "hostile",
+    "why": "outside the quotes, before the comment",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-inner-tab",
+    "input": "ci:\n  skipMarker: \"[a\tb]\"\n",
+    "direction": "hostile",
+    "why": "a tab inside the value",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  }
+]

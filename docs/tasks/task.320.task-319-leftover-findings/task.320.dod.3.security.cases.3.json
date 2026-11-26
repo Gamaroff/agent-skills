@@ -1,0 +1,50 @@
+[
+  {
+    "id": "legit-eager",
+    "input": "pipeline:\n  pushRecordCommits: eager\n",
+    "direction": "legitimate",
+    "why": "a documented value",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:313"
+  },
+  {
+    "id": "legit-escaped-other",
+    "input": "\"pipelin\\x65s\": x\npipeline:\n  pushRecordCommits: batched\n",
+    "direction": "legitimate",
+    "why": "decodes to pipelines, which is another key",
+    "correct": "accepted",
+    "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:182"
+  },
+  {
+    "id": "hostile-mixed-forms",
+    "input": "\"\\x50IPE\\x2dLIN\\u0045\":\n  pushRecordCommits: eager\n",
+    "direction": "hostile",
+    "why": "capitals and an escaped hyphen",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:313"
+  },
+  {
+    "id": "hostile-single-quoted",
+    "input": "'pipelin\\x65':\n  pushRecordCommits: eager\n",
+    "direction": "hostile",
+    "why": "single quotes",
+    "correct": "refused",
+    "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:212"
+  },
+  {
+    "id": "hostile-after-own-indent-list",
+    "input": "list:\n- a\n\"pipelin\\x65\":\n  pushRecordCommits: eager\n",
+    "direction": "hostile",
+    "why": "after a list at its own indent",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:313"
+  },
+  {
+    "id": "hostile-after-block-scalar",
+    "input": "note: |\n  text\n\"pipelin\\x65\":\n  pushRecordCommits: eager\n",
+    "direction": "hostile",
+    "why": "valid YAML: the subset stops at the block scalar",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:313"
+  }
+]

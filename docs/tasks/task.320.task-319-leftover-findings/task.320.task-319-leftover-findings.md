@@ -581,7 +581,7 @@ Cycle 7 (re-entry after DoD run 2): the `finalise.deferralApprover` key is accep
 
 **Detailed Verification Log:** See `task.320.dod.1.task-319-leftover-findings.md`.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 2 (historical, superseded)
 
 **Status:** IN PROGRESS
 
@@ -611,6 +611,32 @@ Cycle 7 (re-entry after DoD run 2): the `finalise.deferralApprover` key is accep
 **Gap Report Generated:** 2026-11-26
 
 **Detailed Verification Log:** See `task.320.dod.2.task-319-leftover-findings.md`.
+
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.320.qa.7.task-319-leftover-findings.md`
+**Gate File**: `task.320.gate.7.task-319-leftover-findings.yml`
+**Gate Status**: CONCERNS (90/100). `top_issues` is empty, and the residual T320-CR-601/602/603 is deferred to task.326.
+
+### Missing Criteria:
+
+1. **Acceptance Criteria:**
+   - [ ] Criterion 10 (low): the per-test timings in QA report 6 were measured at `7cae65a14`, which is not tree-equivalent to the head (`skills-config.yaml` changed in `7f22f93d2`). The figures met the bound, but they must be re-measured.
+
+### Next Steps:
+
+- [ ] Run the four suites five times, one after another, at the current head. Record `uptime` and the full command loop, and take the per-test seconds from TAP `duration_ms`
+- [ ] Record the result in QA report 7, and correct its "#10 PASS because no engine changed" line
+
+**Estimated Effort:** Small (document-only; about 10 minutes of timing runs)
+
+**Gap Report Generated:** 2026-11-26
+
+**Detailed Verification Log:** See `task.320.dod.3.task-319-leftover-findings.md`.
 <!-- change-log-start -->
 ## Change Log
 
@@ -638,6 +664,7 @@ Cycle 7 (re-entry after DoD run 2): the `finalise.deferralApprover` key is accep
 | 2026-11-26 |  | DoD incomplete — 3 gaps identified (criterion 1 against the waived T320-CR-601, criterion 10, security residual) | finalise |
 | 2026-11-26 | 1.2 | Criterion 1 amended: T320-CR-601 moved to task.326 (approved by the owner); residual T320-CR-601/602/603 to be closed there | Lorien Gamaroff |
 | 2026-11-26 |  | QA gate CONCERNS (90/100) — 0 open findings; residual deferred to task.326 | qa-task |
+| 2026-11-26 |  | DoD incomplete — 1 gap identified (criterion 10 timings measured off a tree-equivalent head) | finalise |
 <!-- change-log-end -->
 
 ---

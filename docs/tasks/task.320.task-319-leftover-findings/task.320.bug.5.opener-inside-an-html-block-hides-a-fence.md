@@ -5,6 +5,7 @@
 **Severity**: MEDIUM
 **Priority**: P2
 **Status**: New
+**Deferred To**: task.326 (approved by Lorien Gamaroff, 2026-11-26). Unfixed here; closed when task 326 lands.
 **Found By**: QA Engineer
 **Date Found**: 2026-11-25
 
