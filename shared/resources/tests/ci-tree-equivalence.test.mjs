@@ -615,7 +615,11 @@ test("task.325: readConfig refuses an exclusion that can never match, and keeps 
     "!/docs/catalogue.md",
     "!docs/catalogue.md ",
     " !docs/catalogue.md",
-    "!!docs/catalogue.md",
+    // QA cycle 3 (T325-CR-301): the path forms isDocsPath refuses before matching.
+    "!docs/generated/",
+    "!docs//catalogue.md",
+    "!docs/./catalogue.md",
+    "!docs/../catalogue.md",
   ]) {
     const dir = mkRepo({ config: cfgOf(entry) });
     try {
@@ -636,6 +640,8 @@ test("task.325: readConfig refuses an exclusion that can never match, and keeps 
     ["!docs/gen/**", "docs/gen/a.md"],
     ["!**/*.sh.md", "docs/run.sh.md"],
     ["!secret/**", "secret/a.md"],
+    // T325-CR-302: a second `!` names a file whose name starts with `!`; it does match one.
+    ["!!x.md", "!x.md"],
   ]) {
     const dir = mkRepo({ config: cfgOf(entry) });
     try {

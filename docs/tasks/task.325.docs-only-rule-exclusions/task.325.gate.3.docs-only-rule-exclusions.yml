@@ -1,0 +1,95 @@
+schema: 2
+task: 'task.325.docs-only-rule-exclusions'
+task_title: 'The docs-only CI rule can exclude a path'
+gate: CONCERNS
+status_reason: 'Cycle 2''s refusal covers only the form normalisePath rewrites. isDocsPath also refuses a path with an empty, `.` or `..` segment before it matches, so `!docs/generated/` (a gitignore habit), `!docs//x.md` and `!docs/./x.md` are still accepted and exclude nothing. Reproduced by execution. `!!x.md` is refused although it matches a file named `!x.md`.'
+reviewer: 'QA Engineer'
+head: '1beeadf886eda6ebfdad4b052d2b8d434251cbde'
+updated: '2026-11-26T11:56:20Z'
+
+top_issues:
+  - id: 'T325-CR-201'
+    severity: medium
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'Fixed in 1beeadf88 for the spellings normalisePath rewrites; the remainder of the class is T325-CR-301.'
+    suggested_action: 'None.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-11-26'
+  - id: 'T325-CR-202'
+    severity: low
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'Non-array branch returns false directly. Fixed in 1beeadf88.'
+    suggested_action: 'None.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-11-26'
+  - id: 'T325-CR-301'
+    severity: medium
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'interpretConfig (ci-tree-equivalence.js:798) checks an exclusion''s remainder against normalisePath only, but isDocsPath refuses more path forms before it matches: control characters and empty, `.` or `..` segments (:175-178). An exclusion in one of those forms can only match a path isDocsPath already refused, so it excludes nothing. Probe at 1beeadf88: isDocsPath(f, ["**", X]) is true for X = "!docs/generated/" (f = docs/generated/a.md), "!docs//x.md" and "!docs/./x.md" (f = docs/x.md), and parseConfig accepts each. Control: "!docs/generated/**" is false. The trailing-slash form is what an owner used to .gitignore would write. Origin: code-review CR-1 (medium/high) and CR-2 (low/high), reproduced by QA by execution. This is the second consecutive gate naming this mechanism, a deny-list that copies part of isDocsPath''s refusals.'
+    suggested_action: 'Consolidate: define isDocsPath''s path-form refusals (control characters, empty/./.. segments, normalisePath) once, call it from isDocsPath and on an exclusion''s remainder in interpretConfig, so the two cannot drift. Have the message suggest `!dir/**` for a directory.'
+    suggested_owner: dev
+    status: open
+  - id: 'T325-CR-302'
+    severity: low
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: '`!!x.md` is refused as "can never match", but isDocsPath("!x.md", ["**/*.md","!!x.md"]) is false: it excludes a file literally named `!x.md`. Fail-closed and rare, but the refusal and its message are wrong.'
+    suggested_action: 'Allow a remainder that starts with `!`; it names a path beginning with `!`.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 88
+
+evidence:
+  tests_reviewed: 321
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 11
+    escaped: 0
+    boundary: true
+    boundary_signals: []
+    notes: 'Re-probed at 1beeadf88, path sink, patterns ["**","!secret/**"]: 11 executed, escaped 0; the same pre-existing pair (see recommendations.future).'
+  performance:
+    status: PASS
+    notes: 'No bound claimed.'
+  reliability:
+    status: CONCERNS
+    notes: 'ci:fast at 1beeadf88: 8905 tests, 0 failed. T325-CR-301: three exclusion spellings still fail open.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The exclusion check restates part of isDocsPath''s refusals by hand; T325-CR-301 is that drift.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'T325-CR-301: one definition of the path-form refusals, used by isDocsPath and the exclusion check.'
+      refs: ['shared/resources/ci-tree-equivalence.js']
+  future:
+    - action: 'isDocsPath accepts a percent-encoded name and a path through a symlink as documentation when the patterns match it. Same on origin/develop; it never opens the paths.'
+      refs: ['shared/resources/ci-tree-equivalence.js']
+      provenance: pre-existing
+      remedy: unverified
+    - action: 'Step 4b on skills/finalise/SKILL.md reports zero-blocks-executed. Same on the merge-base copy.'
+      refs: ['skills/finalise/SKILL.md']
+      provenance: pre-existing
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T325-CR-301']

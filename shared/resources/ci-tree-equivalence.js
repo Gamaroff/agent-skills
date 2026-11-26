@@ -170,15 +170,27 @@ function isDotGitSegment(seg) {
  *    and the exclusion is ignored.
  *  - It matches none of the other patterns.
  */
+/**
+ * Is `p` in a form isDocsPath refuses before it matches anything: a control character, an empty,
+ * `.` or `..` segment, or a spelling `normalisePath` would rewrite? Defined once, because
+ * `interpretConfig` asks the same question of an exclusion's remainder: an exclusion in such a form
+ * can only match a path this predicate already refused, so it would exclude nothing (task.325 QA
+ * cycles 2–3, T325-CR-201/301 — the second cycle copied part of this list by hand and missed the
+ * rest).
+ */
+function hasPathFormDefect(p) {
+  if (/[\u0000-\u001f\u007f]/.test(p)) return true; // control characters: never documentation
+  if (p.split("/").some((seg) => seg === "" || seg === "." || seg === ".."))
+    return true;
+  return normalisePath(p) !== p;
+}
+
 function isDocsPath(file, globs) {
   if (typeof file !== "string" || file === "") return false;
-  if (/[\u0000-\u001f\u007f]/.test(file)) return false; // control characters: never documentation
-  if (file.split("/").some((seg) => seg === "" || seg === "." || seg === ".."))
-    return false;
+  if (hasPathFormDefect(file)) return false;
   if (file.startsWith(GITLINK_PREFIX)) return false; // a submodule pointer: no pattern may accept it (CR3-8)
   if (file.split("/").some(isDotGitSegment)) return false; // the repository's internals, in any spelling
   if (file.split("/").pop() === CONFIG_BASENAME) return false;
-  if (normalisePath(file) !== file) return false;
   if (!Array.isArray(globs)) return false;
   const excluded = globs.filter(
     (g) => typeof g === "string" && g.startsWith("!"),
@@ -785,21 +797,22 @@ function interpretConfig(parsed, keys) {
         'ci.docsOnly.patterns holds a bare "!": an exclusion names the path it excludes (`- "!docs/x.md"`)',
       );
     }
-    // An exclusion isDocsPath can never match excludes nothing, silently: isDocsPath refuses a
-    // path not in normalised form before it matches, so `! docs/x.md`, `!./docs/x.md` and
-    // `!/docs/x.md` keep the file documentation. A leading space makes the entry an inclusion, and
-    // `!!x` names a path starting with `!`. Refuse each spelling (QA cycle 2, T325-CR-201).
+    // An exclusion isDocsPath can never match excludes nothing, silently. Its remainder is asked the
+    // same question isDocsPath asks of a path before matching (hasPathFormDefect, one definition),
+    // so `! docs/x.md`, `!./docs/x.md`, `!/docs/x.md`, `!docs/dir/` and `!docs//x.md` are refused
+    // and the two cannot drift (QA cycles 2–3, T325-CR-201/301). A leading space makes the entry an
+    // inclusion, so it is refused too. `!!x` stays legal: it excludes a file named `!x`.
     // Inclusions are not checked here: their meaning is unchanged by task.325.
     for (const g of p) {
       const excl = g.startsWith("!");
-      const rest = excl ? g.slice(1) : null;
       if (
         (!excl && g.trimStart().startsWith("!")) ||
-        (excl && (rest.startsWith("!") || normalisePath(rest) !== rest))
+        (excl && hasPathFormDefect(g.slice(1)))
       ) {
         throw new UsageError(
           `ci.docsOnly.patterns holds ${JSON.stringify(g)}, an exclusion that can never match: ` +
-            'write it as "!" followed by the path in git\'s form, with no space, "./" or leading "/" (`- "!docs/x.md"`)',
+            'write "!" then the path in git\'s form, with no space, "./", leading or trailing "/" or empty segment ' +
+            '(`- "!docs/x.md"`; a directory is `- "!docs/dir/**"`)',
         );
       }
     }

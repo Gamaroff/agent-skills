@@ -357,17 +357,17 @@ Wording of the message or the reference.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.325.qa.2.docs-only-rule-exclusions.md](./task.325.qa.2.docs-only-rule-exclusions.md)
-- **Gate File**: [task.325.gate.2.docs-only-rule-exclusions.yml](./task.325.gate.2.docs-only-rule-exclusions.yml)
+- **Full Report**: [task.325.qa.3.docs-only-rule-exclusions.md](./task.325.qa.3.docs-only-rule-exclusions.md)
+- **Gate File**: [task.325.gate.3.docs-only-rule-exclusions.yml](./task.325.gate.3.docs-only-rule-exclusions.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: ci:fast 8904 (0 failed) at 0dfb19811
+- **Tests Executed**: ci:fast 8905 (0 failed) at 1beeadf88
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: CONCERNS
 
 ### Key Findings
-T325-CR-101 closed. One new medium finding, reproduced by execution (T325-CR-201): `readConfig` accepts an exclusion that can never match (`! docs/x.md`, `!./docs/x.md`, `!/docs/x.md`, ` !docs/x.md`). One low (T325-CR-202).
+T325-CR-201 and T325-CR-202 closed. T325-CR-301 (medium, reproduced): `!docs/generated/`, `!docs//x.md` and `!docs/./x.md` are accepted but exclude nothing, because the exclusion check copies only part of isDocsPath's path-form refusals. T325-CR-302 (low): `!!x.md` is wrongly refused.
 
 <!-- change-log-start -->
 ## Change Log
@@ -382,6 +382,8 @@ T325-CR-101 closed. One new medium finding, reproduced by execution (T325-CR-201
 | 2026-11-26 |         | QA findings fixed — cycle 1, 1 finding                 | qa-fix      |
 | 2026-11-26 |         | QA gate CONCERNS (88/100) — 1 medium, 1 low            | qa-task     |
 | 2026-11-26 |         | QA findings fixed — cycle 2, 2 findings                | qa-fix      |
+| 2026-11-26 |         | QA gate CONCERNS (88/100) — 1 medium, 1 low (cycle 3)  | qa-task     |
+| 2026-11-26 |         | QA findings fixed — cycle 3, 2 findings                | qa-fix      |
 <!-- change-log-end -->
 
 ---

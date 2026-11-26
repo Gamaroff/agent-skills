@@ -200,7 +200,8 @@ DOCS_PATTERNS: "docs/tasks/* docs/prd/* docs/bugs/*"
   ([The docs-only CI rule](../reference/configuration.md#the-docs-only-ci-rule)). That list **can**
   exclude: `- "!docs/catalogue.md"` beside `- "docs/**"` keeps the one file as code, in any order, so
   the pipelines wait for CI when it changes. A list of exclusions only, a bare `!`, and an exclusion
-  that could never match (`! docs/x.md`, `!./docs/x.md`, `!/docs/x.md`, a leading space) are refused.
+  that could never match (`! docs/x.md`, `!./docs/x.md`, `!/docs/x.md`, `!docs/dir/`, a leading
+  space) are refused. Write a directory as `!docs/dir/**`.
 
 Look again when a test starts to read a new file. Nothing in this template notices that for you.
 
