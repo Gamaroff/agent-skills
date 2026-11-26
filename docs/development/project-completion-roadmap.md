@@ -20,7 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. Phase 20 is open (opened 2026-11-09): T289 (accepted), T290 (merged with an owner waiver), T292 (accepted), T293 (accepted), T294 (accepted), B21 (fixed), T304 (accepted), T291 (accepted), T295 (accepted). Phase 21 is open (opened 2026-11-10): T301 (accepted), T303 (accepted), T302 (accepted), T296 (accepted). Phase 22 is open (opened 2026-11-10): T297 (accepted), T300 (accepted), T298 (accepted), T299. Phase 23 is open (opened 2026-11-15): T310. Phase 24 is open (opened 2026-11-25): T320 (accepted), T325 (accepted). Phase 25 is open (opened 2026-11-26): T327, T328.
+chain, a human gate. Phase 20 is open (opened 2026-11-09): T289 (accepted), T290 (merged with an owner waiver), T292 (accepted), T293 (accepted), T294 (accepted), B21 (fixed), T304 (accepted), T291 (accepted), T295 (accepted). Phase 21 is open (opened 2026-11-10): T301 (accepted), T303 (accepted), T302 (accepted), T296 (accepted). Phase 22 is open (opened 2026-11-10): T297 (accepted), T300 (accepted), T298 (accepted), T299. Phase 23 is open (opened 2026-11-15): T310. Phase 24 is open (opened 2026-11-25): T320 (accepted), T325 (accepted). Phase 25 is open (opened 2026-11-26): T327, T328. Phase 26 is open (opened 2026-11-26): T330, T331.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -162,6 +162,18 @@ not tree-equivalent to the head. They are independent of each other and share on
 
 - [ ] **T327** SubagentHandback replies are extracted, not hand-copied · deps: none · touches: finalise~, test-harness~, bundles~ · /develop-task docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md
 - [ ] **T328** A measured criterion is re-measured when the head moves · deps: none · touches: finalise~, qa-skills~, test-harness~, bundles~ · /develop-task docs/tasks/task.328.measured-criterion-re-measured-when-head-moves/task.328.measured-criterion-re-measured-when-head-moves.md
+
+## PHASE 26 — follow-ups from the task 325 and task 329 runs (opened 2026-11-26)
+
+An **override**, on the owner's request: these run after Phase 25 and ahead of the registry fallback.
+T330 closes the two pre-existing `isDocsPath` gaps task 329's QA found (a `.git:` stream segment and a
+C1 control, both read as documentation), with the four LOW findings tasks 325 and 329 deferred to it.
+T331 (observation #191) makes the AC merge refuse another document's result. It edits
+`finalise-rerun-scope.js` and the Step 3c prose after T327, so it carries `deps: T327`.
+**Tick each row `[x]` when its task is accepted, and archive the phase at close.**
+
+- [ ] **T330** isDocsPath refuses the NTFS .git stream and C1 controls · deps: none · touches: docs-pipeline~, test-harness~, bundles~ · /develop-task docs/tasks/task.330.docs-path-stream-and-c1-refusals/task.330.docs-path-stream-and-c1-refusals.md
+- [ ] **T331** The AC merge refuses another document's result · deps: T327 · touches: finalise~, test-harness~, bundles~ · /develop-task docs/tasks/task.331.ac-merge-refuses-another-documents-result/task.331.ac-merge-refuses-another-documents-result.md
 
 ## Deferred / human-gated
 
@@ -349,3 +361,4 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-11-26 | **T320 accepted + merged — PR #949** (`8607d9b1`); row ticked. Task 319's seven carried findings and two owner points are closed. It took 7 QA cycles (one loop-limit escalation) and 4 DoD runs. The residual T320-CR-601/602/603 was accepted by the owner and deferred to task 326, with criterion 1 amended and six probe deferrals approved. The last gap was criterion 10's timings, measured off a tree-equivalent head and re-measured (max 26.0 s of 30 s). Run 3's gap is observation #186. |
 | 2026-11-26 | **T327 and T328 added** as Phase 25, on the owner's request (tasks 327 and 328, cut from observations #185 and #186 of the task 320 run). T327: the `/finalise` reply extractors read a `SubagentHandback` reply. T328: a measured criterion whose figure is from a commit not tree-equivalent to the head is flagged before the DoD. Both are independent, with `deps: none`. |
 | 2026-11-26 | **T325 accepted + merged — PR #954** (`0150d033`); row ticked. `ci.docsOnly.patterns` can hold a `!` exclusion: a path any exclusion matches is code, in any order, inside `isDocsPath` only. A list of exclusions only, a bare `!`, an exclusion outside git's path form, and dialect syntax are usage errors (exit 2). It took 5 QA cycles and 2 DoD runs. Run 1 stopped on two `path`-sink probes, a sink mismatch for a name classifier, which task 329 (PR #956, a `git-name` sink) closed. Run 2: 40 probes, 0 reproduced. Merge gate: `npm run ci` on the LAN server, 8910 tests, 0 fail. T325-CR-501/502 (LOW) are deferred. |
+| 2026-11-26 | **T330 and T331 added** as Phase 26, on the owner's request. T330 (task 330, issue #957): `isDocsPath` refuses a `.git:` stream segment and a C1 control, plus T325-CR-501/502 and T329-QA-9/10. The remedy was tried green in a worktree. T331 (task 331, issue #958, observation #191): the AC merge refuses a result whose `story_file` names another document. `deps: T327`. |
