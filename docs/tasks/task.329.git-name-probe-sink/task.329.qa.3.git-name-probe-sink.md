@@ -63,6 +63,22 @@ segment + normalise row, which matches the reworded header.
 Unchanged since cycle 1: all six criteria hold. See
 [task.329.qa.1.git-name-probe-sink.md](./task.329.qa.1.git-name-probe-sink.md).
 
+## Mutation records for § 8 (added at /finalise, DoD run 1)
+
+The `/finalise` AC check found that qa.1's records M1–M7 are refusal-line removals and pin mutations.
+They are not the four mutations task § 8 names, three of which had never been run. All four were run
+on 2026-11-26 against `62fe945b1`. Before each test run, `cmp` against a snapshot confirmed the
+mutation was applied. After each run the file was restored and checked with `git diff --quiet`. The
+baseline afterwards: `security-input-corpus.test.mjs` 24/24, and the `task.329` tests in
+`security-probe.test.mjs` 3/3.
+
+- mutation-proven: M8 `git-name` dropped from `SINKS` → red: "every sink declares a floor, so a new sink cannot pass vacuously", "allCases is memoised and at least as large as the declared floors", "the prose peer contains the generated tables verbatim" → covered
+- mutation-proven: M9 hostile case `git-name.leading-slash` flipped to legitimate → red: "task.329: isDocsPath through the git-name sink engages at HEAD — every hostile refused, every legitimate accepted", "task.329: each isDocsPath refusal removed reproduces exactly its git-name cases", "per-sink case counts meet their floors", "every case appears in the document, under its own sink and direction", "the prose peer contains the generated tables verbatim" → covered
+- mutation-proven: M10 `git-name` dropped from `finalise-dod-security-prompt.md`'s sink list → red: "every sink is named in each prompt's sink enumeration" (`finalise-dod-security-prompt.md's sink enumeration does not name: git-name`) → covered
+- mutation-proven: M11 the paired segment + normalise mutation, with `leading-slash` (`/docs/a.md`) dropped from its expected list in `GIT_NAME_MUTATIONS` → red: "task.329: each isDocsPath refusal removed reproduces exactly its git-name cases" (actual extra: `leading-slash`), "task.329: every git-name hostile case is reached by a mutation of isDocsPath" → covered
+
+The run logs were kept in `.claude/state/mut-dod1/` (gitignored).
+
 ## NFR Assessment
 
 - Security — PASS (reasoned; `boundary: false`)
