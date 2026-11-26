@@ -602,6 +602,52 @@ test("task.325: readConfig reads an exclusion and refuses a list of exclusions o
   }
 });
 
+test("task.325: readConfig refuses an exclusion that can never match, and keeps the ones that can", () => {
+  // isDocsPath refuses a path not in normalised form before it matches, so an exclusion spelled
+  // with a space, `./`, a leading `/` or a second `!` excludes nothing: the file stays
+  // documentation and the owner is never told (QA cycle 2, T325-CR-201).
+  const cfgOf = (entry) =>
+    `ci:\n  docsOnly:\n    patterns:\n      - "docs/**"\n      - ${JSON.stringify(entry)}\n`;
+  for (const entry of [
+    "! docs/catalogue.md",
+    "! ",
+    "!./docs/catalogue.md",
+    "!/docs/catalogue.md",
+    "!docs/catalogue.md ",
+    " !docs/catalogue.md",
+    "!!docs/catalogue.md",
+  ]) {
+    const dir = mkRepo({ config: cfgOf(entry) });
+    try {
+      assert.throws(
+        () => eng.readConfig(dir),
+        (e) =>
+          e instanceof eng.UsageError &&
+          /ci\.docsOnly\.patterns/.test(e.message) &&
+          e.message.includes(JSON.stringify(entry)),
+        JSON.stringify(entry),
+      );
+    } finally {
+      cleanup(dir);
+    }
+  }
+  for (const [entry, path] of [
+    ["!docs/catalogue.md", "docs/catalogue.md"],
+    ["!docs/gen/**", "docs/gen/a.md"],
+    ["!**/*.sh.md", "docs/run.sh.md"],
+    ["!secret/**", "secret/a.md"],
+  ]) {
+    const dir = mkRepo({ config: cfgOf(entry) });
+    try {
+      const cfg = eng.readConfig(dir);
+      assert.deepEqual(cfg.patterns, ["docs/**", entry]);
+      assert.equal(eng.isDocsPath(path, ["**", entry]), false, entry);
+    } finally {
+      cleanup(dir);
+    }
+  }
+});
+
 test("task.325: glob-match itself has no negation — qa.testArtifactGlobs keeps its meaning", () => {
   // The exclusion lives in isDocsPath alone. matchesAnyGlob is shared with qa.testArtifactGlobs,
   // where a `!` entry matches only a path literally named with it.

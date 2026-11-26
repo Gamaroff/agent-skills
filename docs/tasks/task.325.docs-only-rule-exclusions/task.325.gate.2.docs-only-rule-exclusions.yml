@@ -1,0 +1,87 @@
+schema: 2
+task: 'task.325.docs-only-rule-exclusions'
+task_title: 'The docs-only CI rule can exclude a path'
+gate: CONCERNS
+status_reason: 'Cycle 1''s fix holds: every prose reader now states the exclusion rule. One new medium finding, reproduced by execution: readConfig accepts an exclusion spelled so that it can never match (`! docs/x.md`, `!./docs/x.md`, `!/docs/x.md`, ` !docs/x.md`), and that entry silently excludes nothing.'
+reviewer: 'QA Engineer'
+head: '0dfb1981117f2164cb1bd6ae71f9c360e85d43ca'
+updated: '2026-11-26T11:31:43Z'
+
+top_issues:
+  - id: 'T325-CR-101'
+    severity: medium
+    file: 'shared/resources/qa-docs-only-review-prompt.md'
+    finding: 'Prose route readers did not mention exclusions. Fixed in 0dfb19811 at all four sites, plus finalise/SKILL.md and configuration.md; re-read at this head.'
+    suggested_action: 'None.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-11-26'
+  - id: 'T325-CR-201'
+    severity: medium
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'The bare-`!` refusal (ci-tree-equivalence.js:783) catches only the exact string `!`. readConfig accepts `- "! docs/catalogue.md"` (probe in a scratch repo: accepted, patterns ["docs/**","! docs/catalogue.md"]). isDocsPath("docs/catalogue.md", ["docs/**", X]) is true for X = "! docs/catalogue.md", "!./docs/catalogue.md", "!/docs/catalogue.md" and " !docs/catalogue.md", and false only for "!docs/catalogue.md" (control). isDocsPath refuses a path that is not in normalised form before it matches, so an exclusion written that way can never match: the file the owner meant to keep as code stays documentation and its CI can be skipped. A leading space makes the entry an inclusion. Origin: code-review CR-1 (medium/medium), reproduced by QA by execution (step 5d: gates at any confidence).'
+    suggested_action: 'In interpretConfig, refuse an entry whose trimmed text starts with `!` when the raw text does not, and an exclusion whose remainder is empty, starts with `!`, or is not already in normalised form (normalisePath(rest) !== rest). Hold each spelling in a readConfig test, and keep "!docs/catalogue.md", "!docs/**", "!**/*.sh.md" and "!secret/**" accepted.'
+    suggested_owner: dev
+    status: open
+  - id: 'T325-CR-202'
+    severity: low
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'isDocsPath''s non-array branch `return matchesAnyGlob(file, globs)` always returns false (verified: isDocsPath("docs/x.md", "docs/**") is false). Correct, but it reads as if a string were matched.'
+    suggested_action: 'Return false directly for a non-array.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 88
+
+evidence:
+  tests_reviewed: 320
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 11
+    escaped: 0
+    boundary: true
+    boundary_signals: []
+    notes: 'Re-probed at 0dfb19811 with the path sink and patterns ["**","!secret/**"]: 11 of 11 executed, escaped 0. The same two pre-existing hostile acceptances as cycle 1 (path.encoded-traversal, path.symlink-escape); see recommendations.future. T325-CR-201 is a config-validation gap, not a path-sink escape.'
+  performance:
+    status: PASS
+    notes: 'No bound claimed.'
+  reliability:
+    status: CONCERNS
+    notes: 'ci:fast at 0dfb19811 on the LAN server: 8904 tests, 0 failed. T325-CR-201: a mistyped exclusion fails open, silently.'
+  maintainability:
+    status: PASS
+    notes: 'One predicate; glob-match.js unchanged.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'T325-CR-201: refuse an exclusion that can never match.'
+      refs: ['shared/resources/ci-tree-equivalence.js']
+  future:
+    - action: 'isDocsPath accepts a percent-encoded name (..%2f..%2fetc%2fpasswd) and a path through a symlink as documentation when the patterns match it. Same on origin/develop; isDocsPath reads git path names and never opens them. If a reader ever resolves these paths, decode and realpath them first.'
+      refs: ['shared/resources/ci-tree-equivalence.js']
+      provenance: pre-existing
+      remedy: unverified
+    - action: 'Step 4b on skills/finalise/SKILL.md reports zero-blocks-executed (its blocks hold unfilled placeholders). Same finding on the merge-base copy, and the change touches no fenced block.'
+      refs: ['skills/finalise/SKILL.md']
+      provenance: pre-existing
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T325-CR-201: refuse an exclusion that can never match']

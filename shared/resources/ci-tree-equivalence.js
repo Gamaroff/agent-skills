@@ -179,7 +179,7 @@ function isDocsPath(file, globs) {
   if (file.split("/").some(isDotGitSegment)) return false; // the repository's internals, in any spelling
   if (file.split("/").pop() === CONFIG_BASENAME) return false;
   if (normalisePath(file) !== file) return false;
-  if (!Array.isArray(globs)) return matchesAnyGlob(file, globs);
+  if (!Array.isArray(globs)) return false;
   const excluded = globs.filter(
     (g) => typeof g === "string" && g.startsWith("!"),
   );
@@ -784,6 +784,24 @@ function interpretConfig(parsed, keys) {
       throw new UsageError(
         'ci.docsOnly.patterns holds a bare "!": an exclusion names the path it excludes (`- "!docs/x.md"`)',
       );
+    }
+    // An exclusion isDocsPath can never match excludes nothing, silently: isDocsPath refuses a
+    // path not in normalised form before it matches, so `! docs/x.md`, `!./docs/x.md` and
+    // `!/docs/x.md` keep the file documentation. A leading space makes the entry an inclusion, and
+    // `!!x` names a path starting with `!`. Refuse each spelling (QA cycle 2, T325-CR-201).
+    // Inclusions are not checked here: their meaning is unchanged by task.325.
+    for (const g of p) {
+      const excl = g.startsWith("!");
+      const rest = excl ? g.slice(1) : null;
+      if (
+        (!excl && g.trimStart().startsWith("!")) ||
+        (excl && (rest.startsWith("!") || normalisePath(rest) !== rest))
+      ) {
+        throw new UsageError(
+          `ci.docsOnly.patterns holds ${JSON.stringify(g)}, an exclusion that can never match: ` +
+            'write it as "!" followed by the path in git\'s form, with no space, "./" or leading "/" (`- "!docs/x.md"`)',
+        );
+      }
     }
     if (p.length > 0 && p.every((g) => g.startsWith("!"))) {
       throw new UsageError(

@@ -353,21 +353,21 @@ Wording of the message or the reference.
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-26
-**Quality Score**: 90/100
+**Quality Score**: 88/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.325.qa.1.docs-only-rule-exclusions.md](./task.325.qa.1.docs-only-rule-exclusions.md)
-- **Gate File**: [task.325.gate.1.docs-only-rule-exclusions.yml](./task.325.gate.1.docs-only-rule-exclusions.yml)
+- **Full Report**: [task.325.qa.2.docs-only-rule-exclusions.md](./task.325.qa.2.docs-only-rule-exclusions.md)
+- **Gate File**: [task.325.gate.2.docs-only-rule-exclusions.yml](./task.325.gate.2.docs-only-rule-exclusions.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 320 (235 engine suites, 85 reenter-qa)
+- **Tests Executed**: ci:fast 8904 (0 failed) at 0dfb19811
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-One medium finding (T325-CR-101): the prose route readers of `ci.docsOnly.patterns` do not mention exclusions. Five of five mutations covered.
+T325-CR-101 closed. One new medium finding, reproduced by execution (T325-CR-201): `readConfig` accepts an exclusion that can never match (`! docs/x.md`, `!./docs/x.md`, `!/docs/x.md`, ` !docs/x.md`). One low (T325-CR-202).
 
 <!-- change-log-start -->
 ## Change Log
@@ -380,6 +380,8 @@ One medium finding (T325-CR-101): the prose route readers of `ci.docsOnly.patter
 | 2026-11-26 |         | Implemented — 15 files (6 generated), 7 tests          | develop     |
 | 2026-11-26 |         | QA gate CONCERNS (90/100) — 1 finding                  | qa-task     |
 | 2026-11-26 |         | QA findings fixed — cycle 1, 1 finding                 | qa-fix      |
+| 2026-11-26 |         | QA gate CONCERNS (88/100) — 1 medium, 1 low            | qa-task     |
+| 2026-11-26 |         | QA findings fixed — cycle 2, 2 findings                | qa-fix      |
 <!-- change-log-end -->
 
 ---

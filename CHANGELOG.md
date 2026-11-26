@@ -14,7 +14,9 @@ All notable changes to this project will be documented in this file. Format foll
 
 - **A `ci.docsOnly.patterns` list of exclusions only is refused (task 325).** Such a list, and an entry
   that is `!` alone, is a usage error naming the key (exit 2). Before, it read as "nothing is
-  documentation". Write `ci.docsOnly.enabled: false`, which says the same.
+  documentation". Write `ci.docsOnly.enabled: false`, which says the same. An exclusion that could
+  never match is refused too: a space after the `!` or before it, `!./`, `!/` or `!!`. Before, it was
+  accepted and silently excluded nothing.
 
 - **The docs-only CI skip runbook covers one run per push, unsafe docs sets and adoption.**
   [`ci-docs-only-skip.md`](./docs/runbooks/ci-docs-only-skip.md) now says how to remove a duplicate
