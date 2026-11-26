@@ -38,8 +38,8 @@ Read a `ci.docsOnly.patterns` entry starting with `!` as an exclusion in `isDocs
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline; 1 iteration; `ci:fast` 8904/0 fail; commits `3cf1d0ca4`, `c0fa90645` | —                    | 2026-11-26T11:01Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #954: https://github.com/Gamaroff/agent-skills/pull/954 | —                    | 2026-11-26T11:02Z |
 | 5–6. qa-task / qa-fix loop | ✅ Done | `task.325.qa.{N}.*.md`; `task.325.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 5 gates, 4 fixes; gate 5 PASS 96 (route 2b, 2 LOW carried); 5c APPROVE | —                    | 2026-11-26T12:57Z |
-| 7. finalise                | ⏳ Pending | `task.325.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 7. finalise                | ✅ Done | `task.325.dod.{N}.*.md`; task `status: accepted`                      | DoD run 1 GAPS (2 `path`-sink probes, a sink mismatch → task 329); DoD run 2 ACCEPTED under `git-name`, 40/0; acceptance `f3b6dc3a7` | —                    | 2026-11-26T18:28Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Implementation report committed and pushed after Step 7 | —                    | 2026-11-26T18:29Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -102,6 +102,9 @@ Read a `ci.docsOnly.patterns` entry starting with `!` as an exclusion in `isDocs
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
+
+- **DoD run 1 stopped on two `path`-sink corpus probes of `isDocsPath`** (`path.encoded-traversal`, `path.symlink-escape`). Both are pre-existing, and both are a sink mismatch: `isDocsPath` only compares git-printed names against patterns. Resolved by task 329, which added a `git-name` sink (PR #956, merged). Develop was merged into this branch at `6e0523417`, and DoD run 2 probed under that sink.
+- **Both DoD run 2 agent answers were hand-copied** (`transcript-unreadable`: the agents answered through their hand-back). The AC record says `verified: false`. Stale `.claude/state/finalise-ac-{result,merged}-2.*` files were deleted before the merge, and the merged record's document and run number were checked as task 325's.
 
 ---
 
@@ -257,12 +260,24 @@ _Track each QA review/fix cycle._
 
 ---
 
+### Step 7 — finalise — 2026-11-26
+
+- **DoD run 1** (`task.325.dod.1.*`, 13:04Z): GAPS on security only (above). The AC record was 7/7 PASS.
+- **DoD run 2** (`task.325.dod.2.*`, 18:11–18:15Z): ACCEPTED.
+  - Re-run scope: scoped. #3 and #7 were re-judged (their evidence moved in the develop merge) and five were carried. All 7 PASS.
+  - Security: 4 controls under `git-name` (the corpus with `[["**"]]`, plus run 1's three inline cases files), 40 executed, 0 reproduced. Compliance NOT_APPLICABLE; docs PASS.
+  - CI reading 1: SUCCESS @ `6e0523417` (6 checks). CI reading 2: SUCCESS (tree-equivalent to `6e0523417`) @ `f3b6dc3a7`.
+- Acceptance commit `f3b6dc3a7`: DoD run 2, the task document (`status: accepted`, Change Log 1.2), the sprint review summary, and the registry row (ticked, `planned` → `accepted`). Pushed; tracked-and-pushed assertions passed.
+- Canonical PR comment: `issuecomment-7200491317`. Tracker #947: the `done` comment was posted and the issue closed (`CLOSED`). The board was already in Done (`gh-stage` `already`).
+
+---
+
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-11-26T18:28Z
+**Final Status**: Completed
 **Branch**: feature/task.325.docs-only-rule-exclusions
 **PR**: https://github.com/Gamaroff/agent-skills/pull/954
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 5 gates, 4 fixes
+**DoD Summary**: `task.325.dod.2.docs-only-rule-exclusions.md` (ACCEPTED; run 1 GAPS superseded)
+**Tracker debt**: none
