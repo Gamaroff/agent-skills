@@ -350,24 +350,30 @@ Wording of the message or the reference.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-26
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 96/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.325.qa.4.docs-only-rule-exclusions.md](./task.325.qa.4.docs-only-rule-exclusions.md)
-- **Gate File**: [task.325.gate.4.docs-only-rule-exclusions.yml](./task.325.gate.4.docs-only-rule-exclusions.yml)
+- **Full Report**: [task.325.qa.5.docs-only-rule-exclusions.md](./task.325.qa.5.docs-only-rule-exclusions.md)
+- **Gate File**: [task.325.gate.5.docs-only-rule-exclusions.yml](./task.325.gate.5.docs-only-rule-exclusions.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: ci:fast 8905 (0 failed) at 3cffeb926
+- **Tests Executed**: ci:fast 8906 (0 failed) at 3a2d45cd9
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-T325-CR-301/302 are closed. T325-CR-401 (medium, reproduced): a brace or class exclusion is accepted and excludes nothing, because glob-match's only wildcards are `*`, `**` and `?`, and the grammar is not documented.
+Five QA cycles. The exclusion check went through four fixes:
+1. The prose readers.
+2. The normalised form.
+3. One definition of the path-form refusals.
+4. A stated glob grammar.
+
+No exclusion fails open. Two LOW findings (T325-CR-501, T325-CR-502) are carried to Deferred Work by the Cosmetic-residue exit.
 
 <!-- change-log-start -->
 ## Change Log
@@ -386,6 +392,7 @@ T325-CR-301/302 are closed. T325-CR-401 (medium, reproduced): a brace or class e
 | 2026-11-26 |         | QA findings fixed — cycle 3, 2 findings                | qa-fix      |
 | 2026-11-26 |         | QA gate CONCERNS (90/100) — 1 medium (cycle 4)          | qa-task     |
 | 2026-11-26 |         | QA findings fixed — cycle 4, 1 finding                 | qa-fix      |
+| 2026-11-26 |         | QA gate PASS (96/100) — 2 LOW carried (route 2b)        | qa-task     |
 <!-- change-log-end -->
 
 ---
@@ -431,7 +438,8 @@ are the "unchanged" controls. Mutations, each alone and restored: exclusion remo
 
 ## Deferred Work
 
-None.
+- T325-CR-501 (low), carried from gate 5 by route 2b. A bracketed literal exclusion is refused, and the refusal message's "list each path" advice names the same refused path. `?` works in its place. The fix is to say so in the message, the runbook and the CHANGELOG.
+- T325-CR-502 (low), carried from gate 5 by route 2b. The CHANGELOG says "extglob" is refused, but only `@(`, `!(` and `+(` are. The fix is to name the three openers.
 
 ---
 
