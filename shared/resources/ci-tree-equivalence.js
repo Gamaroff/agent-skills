@@ -162,7 +162,13 @@ function isDotGitSegment(seg) {
  *  - It has a segment that is a spelling of `.git` (`isDotGitSegment`): the repository's own
  *    internals. Git refuses to track such a path, so the 5c classifier already recorded it, but the
  *    predicate accepted it under `docs/**` (task.173 DoD run 4, a pre-existing LOW).
- *  - It matches none of the patterns.
+ *  - It matches a pattern that starts with `!`, read without the `!` (task.325). An exclusion wins
+ *    in any list order: it is not last-match-wins, so no later inclusion can undo it, and the answer
+ *    an exclusion gives is the one that waits for CI. Only a PATTERN is read this way; a path whose
+ *    name starts with `!` is matched as a name. Every reader of `ci.docsOnly.patterns` must ask this
+ *    function, never `matchesAnyGlob` with the patterns, or it reads `!docs/x.md` as a literal name
+ *    and the exclusion is ignored.
+ *  - It matches none of the other patterns.
  */
 function isDocsPath(file, globs) {
   if (typeof file !== "string" || file === "") return false;
@@ -173,7 +179,22 @@ function isDocsPath(file, globs) {
   if (file.split("/").some(isDotGitSegment)) return false; // the repository's internals, in any spelling
   if (file.split("/").pop() === CONFIG_BASENAME) return false;
   if (normalisePath(file) !== file) return false;
-  return matchesAnyGlob(file, globs);
+  if (!Array.isArray(globs)) return matchesAnyGlob(file, globs);
+  const excluded = globs.filter(
+    (g) => typeof g === "string" && g.startsWith("!"),
+  );
+  if (
+    excluded.length &&
+    matchesAnyGlob(
+      file,
+      excluded.map((g) => g.slice(1)),
+    )
+  )
+    return false;
+  return matchesAnyGlob(
+    file,
+    globs.filter((g) => !excluded.includes(g)),
+  );
 }
 
 /**
@@ -754,6 +775,20 @@ function interpretConfig(parsed, keys) {
       throw new UsageError(
         "ci.docsOnly.patterns must be a block list of non-empty globs " +
           '(`- "docs/**"` on its own lines; the YAML subset reads an inline [..] as a string)',
+      );
+    }
+    // task.325: a `!` pattern is an exclusion. `!` alone excludes nothing, and a list of exclusions
+    // only makes nothing documentation, which `enabled: false` says plainly. The length test comes
+    // first: `[].every` is true, and an empty list is not "a list of exclusions only".
+    if (p.includes("!")) {
+      throw new UsageError(
+        'ci.docsOnly.patterns holds a bare "!": an exclusion names the path it excludes (`- "!docs/x.md"`)',
+      );
+    }
+    if (p.length > 0 && p.every((g) => g.startsWith("!"))) {
+      throw new UsageError(
+        "ci.docsOnly.patterns holds only exclusions (entries starting with !), so nothing is documentation: " +
+          "add the patterns that are, or write `enabled: false` to turn the rule off",
       );
     }
     cfg.patterns = p;
