@@ -162,18 +162,51 @@ function isDotGitSegment(seg) {
  *  - It has a segment that is a spelling of `.git` (`isDotGitSegment`): the repository's own
  *    internals. Git refuses to track such a path, so the 5c classifier already recorded it, but the
  *    predicate accepted it under `docs/**` (task.173 DoD run 4, a pre-existing LOW).
- *  - It matches none of the patterns.
+ *  - It matches a pattern that starts with `!`, read without the `!` (task.325). An exclusion wins
+ *    in any list order: it is not last-match-wins, so no later inclusion can undo it, and the answer
+ *    an exclusion gives is the one that waits for CI. Only a PATTERN is read this way; a path whose
+ *    name starts with `!` is matched as a name. Every reader of `ci.docsOnly.patterns` must ask this
+ *    function, never `matchesAnyGlob` with the patterns, or it reads `!docs/x.md` as a literal name
+ *    and the exclusion is ignored.
+ *  - It matches none of the other patterns.
  */
+/**
+ * Is `p` in a form isDocsPath refuses before it matches anything: a control character, an empty,
+ * `.` or `..` segment, or a spelling `normalisePath` would rewrite? Defined once, because
+ * `interpretConfig` asks the same question of an exclusion's remainder: an exclusion in such a form
+ * can only match a path this predicate already refused, so it would exclude nothing (task.325 QA
+ * cycles 2–3, T325-CR-201/301 — the second cycle copied part of this list by hand and missed the
+ * rest).
+ */
+function hasPathFormDefect(p) {
+  if (/[\u0000-\u001f\u007f]/.test(p)) return true; // control characters: never documentation
+  if (p.split("/").some((seg) => seg === "" || seg === "." || seg === ".."))
+    return true;
+  return normalisePath(p) !== p;
+}
+
 function isDocsPath(file, globs) {
   if (typeof file !== "string" || file === "") return false;
-  if (/[\u0000-\u001f\u007f]/.test(file)) return false; // control characters: never documentation
-  if (file.split("/").some((seg) => seg === "" || seg === "." || seg === ".."))
-    return false;
+  if (hasPathFormDefect(file)) return false;
   if (file.startsWith(GITLINK_PREFIX)) return false; // a submodule pointer: no pattern may accept it (CR3-8)
   if (file.split("/").some(isDotGitSegment)) return false; // the repository's internals, in any spelling
   if (file.split("/").pop() === CONFIG_BASENAME) return false;
-  if (normalisePath(file) !== file) return false;
-  return matchesAnyGlob(file, globs);
+  if (!Array.isArray(globs)) return false;
+  const excluded = globs.filter(
+    (g) => typeof g === "string" && g.startsWith("!"),
+  );
+  if (
+    excluded.length &&
+    matchesAnyGlob(
+      file,
+      excluded.map((g) => g.slice(1)),
+    )
+  )
+    return false;
+  return matchesAnyGlob(
+    file,
+    globs.filter((g) => !excluded.includes(g)),
+  );
 }
 
 /**
@@ -754,6 +787,51 @@ function interpretConfig(parsed, keys) {
       throw new UsageError(
         "ci.docsOnly.patterns must be a block list of non-empty globs " +
           '(`- "docs/**"` on its own lines; the YAML subset reads an inline [..] as a string)',
+      );
+    }
+    // task.325: a `!` pattern is an exclusion. `!` alone excludes nothing, and a list of exclusions
+    // only makes nothing documentation, which `enabled: false` says plainly. The length test comes
+    // first: `[].every` is true, and an empty list is not "a list of exclusions only".
+    if (p.includes("!")) {
+      throw new UsageError(
+        'ci.docsOnly.patterns holds a bare "!": an exclusion names the path it excludes (`- "!docs/x.md"`)',
+      );
+    }
+    // An exclusion isDocsPath can never match excludes nothing, silently. Its remainder is asked the
+    // same question isDocsPath asks of a path before matching (hasPathFormDefect, one definition),
+    // so `! docs/x.md`, `!./docs/x.md`, `!/docs/x.md`, `!docs/dir/` and `!docs//x.md` are refused
+    // and the two cannot drift (QA cycles 2–3, T325-CR-201/301). A leading space makes the entry an
+    // inclusion, so it is refused too. `!!x` stays legal: it excludes a file named `!x`.
+    // Inclusions are not checked here: their meaning is unchanged by task.325.
+    for (const g of p) {
+      const excl = g.startsWith("!");
+      if (
+        (!excl && g.trimStart().startsWith("!")) ||
+        (excl && hasPathFormDefect(g.slice(1)))
+      ) {
+        throw new UsageError(
+          `ci.docsOnly.patterns holds ${JSON.stringify(g)}, an exclusion that can never match: ` +
+            'write "!" then the path in git\'s form, with no space, "./", leading or trailing "/" or empty segment ' +
+            '(`- "!docs/x.md"`; a directory is `- "!docs/dir/**"`)',
+        );
+      }
+      // glob-match's only wildcards are `*`, `**` and `?`; every other character is literal. A
+      // brace list, character class, extglob group (`@(`, `!(`, `+(`) or `|` alternative written in
+      // another dialect's habit would exclude nothing (QA cycle 4, T325-CR-401). A bare `(` stays
+      // legal: doc names hold one (`notes (draft).md`). An inclusion so written fails closed, so it
+      // is left alone.
+      if (excl && /[{}[\]|]|[@!+]\(/.test(g.slice(1))) {
+        throw new UsageError(
+          `ci.docsOnly.patterns holds ${JSON.stringify(g)}: braces, character classes and extglob are not supported ` +
+            "(only *, ** and ? are wildcards; every other character matches itself). " +
+            'List each path as its own exclusion (`- "!docs/a.md"`, `- "!docs/b.md"`), or use * or ?',
+        );
+      }
+    }
+    if (p.length > 0 && p.every((g) => g.startsWith("!"))) {
+      throw new UsageError(
+        "ci.docsOnly.patterns holds only exclusions (entries starting with !), so nothing is documentation: " +
+          "add the patterns that are, or write `enabled: false` to turn the rule off",
       );
     }
     cfg.patterns = p;

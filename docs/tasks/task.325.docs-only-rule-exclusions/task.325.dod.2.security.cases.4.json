@@ -1,0 +1,90 @@
+[
+  {
+    "id": "only-exclusions",
+    "direction": "hostile",
+    "input": "ci:\n  docsOnly:\n    patterns:\n      - \"!docs/b.md\"\n",
+    "why": "A non-empty list made only of exclusions makes nothing documentation, silently.",
+    "correct": "UsageError naming ci.docsOnly.patterns.",
+    "spec_ref": "docs/tasks/task.325.docs-only-rule-exclusions/task.325.docs-only-rule-exclusions.md:147"
+  },
+  {
+    "id": "bare-bang",
+    "direction": "hostile",
+    "input": "ci:\n  docsOnly:\n    patterns:\n      - \"docs/**\"\n      - \"!\"\n",
+    "why": "A bare ! excludes nothing.",
+    "correct": "UsageError.",
+    "spec_ref": "docs/tasks/task.325.docs-only-rule-exclusions/task.325.docs-only-rule-exclusions.md:147"
+  },
+  {
+    "id": "space-after-bang",
+    "direction": "hostile",
+    "input": "ci:\n  docsOnly:\n    patterns:\n      - \"docs/**\"\n      - \"! docs/x.md\"\n",
+    "why": "An exclusion with a space after ! can never match, so it excludes nothing silently.",
+    "correct": "UsageError.",
+    "spec_ref": "docs/tasks/task.325.docs-only-rule-exclusions/task.325.docs-only-rule-exclusions.md:154"
+  },
+  {
+    "id": "dot-slash-exclusion",
+    "direction": "hostile",
+    "input": "ci:\n  docsOnly:\n    patterns:\n      - \"docs/**\"\n      - \"!./docs/x.md\"\n",
+    "why": "A ./ prefix is not git's form, so the exclusion never matches.",
+    "correct": "UsageError.",
+    "spec_ref": "docs/tasks/task.325.docs-only-rule-exclusions/task.325.docs-only-rule-exclusions.md:154"
+  },
+  {
+    "id": "trailing-slash-exclusion",
+    "direction": "hostile",
+    "input": "ci:\n  docsOnly:\n    patterns:\n      - \"docs/**\"\n      - \"!docs/dir/\"\n",
+    "why": "A trailing / makes an empty segment, so the exclusion never matches.",
+    "correct": "UsageError.",
+    "spec_ref": "docs/tasks/task.325.docs-only-rule-exclusions/task.325.docs-only-rule-exclusions.md:154"
+  },
+  {
+    "id": "dotdot-exclusion",
+    "direction": "hostile",
+    "input": "ci:\n  docsOnly:\n    patterns:\n      - \"docs/**\"\n      - \"!docs/../catalogue.md\"\n",
+    "why": "A .. segment is refused by isDocsPath before matching, so the exclusion never matches.",
+    "correct": "UsageError.",
+    "spec_ref": "docs/tasks/task.325.docs-only-rule-exclusions/task.325.docs-only-rule-exclusions.md:154"
+  },
+  {
+    "id": "brace-exclusion",
+    "direction": "hostile",
+    "input": "ci:\n  docsOnly:\n    patterns:\n      - \"docs/**\"\n      - \"!docs/{a,b}.md\"\n",
+    "why": "This matcher reads braces literally, so the exclusion excludes neither file.",
+    "correct": "UsageError.",
+    "spec_ref": "docs/tasks/task.325.docs-only-rule-exclusions/task.325.docs-only-rule-exclusions.md:154"
+  },
+  {
+    "id": "extglob-exclusion",
+    "direction": "hostile",
+    "input": "ci:\n  docsOnly:\n    patterns:\n      - \"docs/**\"\n      - \"!docs/@(a|b).md\"\n",
+    "why": "Extglob is read literally here, so the exclusion excludes nothing.",
+    "correct": "UsageError.",
+    "spec_ref": "docs/tasks/task.325.docs-only-rule-exclusions/task.325.docs-only-rule-exclusions.md:154"
+  },
+  {
+    "id": "valid-file-exclusion",
+    "direction": "legitimate",
+    "input": "ci:\n  docsOnly:\n    patterns:\n      - \"docs/**\"\n      - \"!docs/catalogue.md\"\n",
+    "why": "A file exclusion in git's form beside an inclusion is the intended use.",
+    "correct": "Accepted: a config whose patterns keep both entries.",
+    "spec_ref": "docs/tasks/task.325.docs-only-rule-exclusions/task.325.docs-only-rule-exclusions.md:156"
+  },
+  {
+    "id": "valid-dir-exclusion",
+    "direction": "legitimate",
+    "input": "ci:\n  docsOnly:\n    patterns:\n      - \"docs/**\"\n      - \"!docs/dir/**\"\n",
+    "why": "The migration's stated way to exclude a directory must be accepted.",
+    "correct": "Accepted.",
+    "spec_ref": "docs/tasks/task.325.docs-only-rule-exclusions/task.325.docs-only-rule-exclusions.md:156"
+  },
+  {
+    "id": "valid-question-wildcard",
+    "direction": "legitimate",
+    "input": "ci:\n  docsOnly:\n    patterns:\n      - \"docs/**\"\n      - \"!docs/?.md\"\n",
+    "why": "The migration names ? as a supported wildcard in an exclusion.",
+    "correct": "Accepted.",
+    "spec_ref": "docs/tasks/task.325.docs-only-rule-exclusions/task.325.docs-only-rule-exclusions.md:156"
+  }
+]

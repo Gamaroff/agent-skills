@@ -1,0 +1,34 @@
+[
+  {
+    "id": "excluded-file",
+    "direction": "hostile",
+    "input": "docs/catalogue.md",
+    "why": "An excluded file that docs/** also matches must not count as documentation.",
+    "correct": "Refused (code): the exclusion wins over the inclusion.",
+    "spec_ref": "docs/tasks/task.325.docs-only-rule-exclusions/task.325.docs-only-rule-exclusions.md:94"
+  },
+  {
+    "id": "excluded-dir-deep",
+    "direction": "hostile",
+    "input": "docs/guides/x/y.md",
+    "why": "A file nested under an excluded directory glob must not count as documentation.",
+    "correct": "Refused (code).",
+    "spec_ref": "docs/tasks/task.325.docs-only-rule-exclusions/task.325.docs-only-rule-exclusions.md:95"
+  },
+  {
+    "id": "unmatched-code",
+    "direction": "hostile",
+    "input": "src/a.ts",
+    "why": "A path that no inclusion matches stays code.",
+    "correct": "Refused (code).",
+    "spec_ref": "docs/tasks/task.325.docs-only-rule-exclusions/task.325.docs-only-rule-exclusions.md:96"
+  },
+  {
+    "id": "sibling-docs",
+    "direction": "legitimate",
+    "input": "docs/a.md",
+    "why": "A sibling the exclusions do not name stays documentation.",
+    "correct": "Accepted (docs).",
+    "spec_ref": "docs/tasks/task.325.docs-only-rule-exclusions/task.325.docs-only-rule-exclusions.md:93"
+  }
+]

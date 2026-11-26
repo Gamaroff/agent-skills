@@ -1,0 +1,88 @@
+schema: 2
+task: 'task.325.docs-only-rule-exclusions'
+task_title: 'The docs-only CI rule can exclude a path'
+gate: CONCERNS
+status_reason: 'Cycle 3 consolidated the path-form refusals, and isDocsPath agrees with origin/develop on 216 path and pattern cases with no `!` entry. One medium, reproduced: an exclusion written in another glob dialect is accepted, and it excludes nothing. Examples are braces (`!docs/{catalogue,index}.md`) and a character class (`!docs/[ab].md`). glob-match treats `{` and `[` as literal characters, and no doc says so.'
+reviewer: 'QA Engineer'
+head: '3cffeb926391f3aaba71b44efecd7fe19dc22ec4'
+updated: '2026-11-26T12:23:44Z'
+
+top_issues:
+  - id: 'T325-CR-301'
+    severity: medium
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'Fixed in 3cffeb926 (hasPathFormDefect, one definition).'
+    suggested_action: 'None.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-11-26'
+  - id: 'T325-CR-302'
+    severity: low
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'Fixed in 3cffeb926: !!x.md is legal and tested.'
+    suggested_action: 'None.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-11-26'
+  - id: 'T325-CR-401'
+    severity: medium
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'Reproduced by execution at 3cffeb926. With the list ["docs/**","!docs/{catalogue,index}.md"], isDocsPath returns true for both docs/catalogue.md and docs/index.md. isDocsPath("docs/a.md", ["docs/**","!docs/[ab].md"]) is also true. glob-match''s only wildcards are `*`, `**` and `?`; every other character matches itself, so `{` and `[` are literal (matchesAnyGlob("docs/{a,b}.md", ["docs/{a,b}.md"]) is true). A gitignore or minimatch user who writes a brace or class exclusion gets one that silently excludes nothing, and the docs never state the grammar. This is the third consecutive gate naming the exclusion check: it keeps closing one shape at a time. Origin: code-review CR-1 (medium/medium).'
+    suggested_action: 'State the grammar in the reference and the runbook: only `*`, `**` and `?` are wildcards, and every other character matches itself. Refuse `{`, `}`, `[` and `]` in an exclusion with a "not supported" message, not "can never match", since such a pattern can match a file literally named that way. Keep the refusal claim scoped: the docs should not imply that every non-matching exclusion is refused.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 321
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 11
+    escaped: 0
+    boundary: true
+    boundary_signals: []
+    notes: 'Re-probed at 3cffeb926 with the path sink and patterns ["**","!secret/**"]: 11 executed, 0 escaped. The same two pre-existing cases are still accepted.'
+  performance:
+    status: PASS
+    notes: 'No bound claimed.'
+  reliability:
+    status: CONCERNS
+    notes: 'ci:fast at 3cffeb926: 8905 tests, 0 failed. T325-CR-401: a dialect exclusion fails open.'
+  maintainability:
+    status: PASS
+    notes: 'hasPathFormDefect is one definition. The reviewer compared isDocsPath with base on 216 cases and found no difference.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'T325-CR-401: document the glob grammar and refuse brace and class syntax in an exclusion.'
+      refs: ['shared/resources/ci-tree-equivalence.js', 'docs/reference/configuration.md']
+  future:
+    - action: 'isDocsPath accepts a percent-encoded name and a path through a symlink as documentation when the patterns match it. The same happens on origin/develop.'
+      refs: ['shared/resources/ci-tree-equivalence.js']
+      provenance: pre-existing
+      remedy: unverified
+    - action: 'Step 4b on skills/finalise/SKILL.md reports zero-blocks-executed. The merge-base copy reports the same.'
+      refs: ['skills/finalise/SKILL.md']
+      provenance: pre-existing
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T325-CR-401']

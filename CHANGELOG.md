@@ -17,6 +17,20 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **`ci.docsOnly.patterns` can exclude a path (task 325).** An entry that starts with `!` now makes the
+  path it matches code, in any list order, so `- "docs/**"` with `- "!docs/catalogue.md"` keeps one
+  tested file out of the docs-only rule and the pipelines wait for CI when it changes. Before, such an
+  entry was accepted and matched nothing. A project that already wrote one gets the exclusion it wrote:
+  it waits more, never less. A file whose name itself starts with `!` is still matched as a name.
+
+- **A `ci.docsOnly.patterns` list of exclusions only is refused (task 325).** Such a list, and an entry
+  that is `!` alone, is a usage error naming the key (exit 2). Before, it read as "nothing is
+  documentation". Write `ci.docsOnly.enabled: false`, which says the same. Two kinds of
+  exclusion that would silently exclude nothing are refused too: one whose path is not in git's
+  form (a space after the `!` or before it, `!./`, `!/`, a trailing `/`, an empty, `.` or `..`
+  segment; write a directory as `!docs/dir/**`), and one holding braces, a character class, extglob
+  or a `|`, which this matcher reads literally (only `*`, `**` and `?` are wildcards; list each path instead).
+
 - **The docs-only CI skip runbook covers one run per push, unsafe docs sets and adoption.**
   [`ci-docs-only-skip.md`](./docs/runbooks/ci-docs-only-skip.md) now says how to remove a duplicate
   branch trigger and what that costs, how to find the files tests read before you skip on them, what

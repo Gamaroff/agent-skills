@@ -1,0 +1,66 @@
+schema: 2
+task: 'task.325.docs-only-rule-exclusions'
+task_title: 'The docs-only CI rule can exclude a path'
+gate: CONCERNS
+status_reason: 'The engine, its tests and the reference are right, and every mutation turns a named test red. One medium finding: the prose readers that route on ci.docsOnly.patterns by judgement (the QA diff-review route, the docs-only review prompt) still say "matches the patterns" and never mention exclusions.'
+reviewer: 'QA Engineer'
+head: '7aa55acb9254e1b7a71ea23a001b261ee1fea2c3'
+updated: '2026-11-26T11:11:40Z'
+
+top_issues:
+  - id: 'T325-CR-101'
+    severity: medium
+    file: 'shared/resources/qa-docs-only-review-prompt.md'
+    finding: 'The routes decided by reading, not by isDocsPath, still describe documentation as "every path matches ci.docsOnly.patterns" with no word on exclusions: shared/resources/qa-docs-only-review-prompt.md:12 and :19, skills/qa-task/SKILL.md:610, skills/qa-story/SKILL.md:1115 (the last two are bundled from shared sources or written in place). With `docs/**` and `!docs/catalogue.md`, docs/catalogue.md matches `docs/**`, so an agent can send the excluded, tested file down the docs-only claim-check route instead of code review. skills/finalise/SKILL.md:1535 describes the engine the same way. Origin: code-review CR-1 (medium/medium), confirmed by QA reading each site.'
+    suggested_action: 'At each site, say that a path matching an entry starting with `!` is code (the engine rule, isDocsPath), and point at the reference row rather than restating the matcher.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 320
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 11
+    escaped: 0
+    boundary: true
+    boundary_signals: []
+    notes: 'isDocsPath probed with the path sink and patterns ["**","!secret/**"]: 11 of 11 executed. Two hostile cases are accepted (path.encoded-traversal, path.symlink-escape), with the same result on origin/develop, so both are pre-existing. isDocsPath classifies git path names and never opens a path, so neither is a traversal here. Recorded under recommendations.future.'
+  performance:
+    status: PASS
+    notes: 'No bound claimed. One filter pass per call over the pattern list.'
+  reliability:
+    status: PASS
+    notes: '235 of 235 across the four engine suites and 85 of 85 in reenter-qa-after-finalise.test.sh at this head. ci:fast on the LAN server at the code commit: 8904 tests, 0 failed. Usage errors exit 2 and name the key.'
+  maintainability:
+    status: PASS
+    notes: 'One predicate; glob-match.js unchanged, so qa.testArtifactGlobs keeps its meaning (a test holds this).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'isDocsPath accepts a percent-encoded name (..%2f..%2fetc%2fpasswd) and a path through a symlink as documentation when the patterns match it. Same on origin/develop; isDocsPath reads git path names and never opens them. If a reader ever resolves these paths, decode and realpath them first.'
+      refs: ['shared/resources/ci-tree-equivalence.js']
+      provenance: pre-existing
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T325-CR-101: state the exclusion rule at the prose readers']

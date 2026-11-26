@@ -1,0 +1,33 @@
+{
+  "sink": "path",
+  "entry": "shared/resources/ci-tree-equivalence.js#isDocsPath",
+  "name": "isDocsPath exclusion wins (exclusions first)",
+  "call_site": null,
+  "verdict": "engages",
+  "reason": "hostile-rejected-legitimate-accepted",
+  "executed": 3,
+  "passed": 3,
+  "reproduced": 0,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "observation_limits": [
+    "effects-after-accept"
+  ],
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": [
+    [
+      "!docs/guides/**",
+      "!docs/catalogue.md",
+      "docs/**"
+    ]
+  ],
+  "slot": null,
+  "fixture_setup": null,
+  "fixture_copy": null,
+  "ran_at": "2026-11-26T13:01:49.034Z"
+}

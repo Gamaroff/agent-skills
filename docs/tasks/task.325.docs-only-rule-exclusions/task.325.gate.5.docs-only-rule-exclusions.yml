@@ -1,0 +1,97 @@
+schema: 2
+task: 'task.325.docs-only-rule-exclusions'
+task_title: 'The docs-only CI rule can exclude a path'
+gate: PASS
+status_reason: 'Cycle 4 states the glob grammar and refuses the dialect syntax people type, and no exclusion fails open any more. Every reader of the patterns goes through isDocsPath. Two LOW entries remain, both fail-closed or wording. A bracketed literal file name is refused, and the advice in the refusal message cannot be followed for it (`?` works instead). The CHANGELOG says "extglob" where only `@(`, `!(` and `+(` are refused.'
+reviewer: 'QA Engineer'
+head: '3a2d45cd9b51cd26112d200f81e26f22b27dc8b5'
+updated: '2026-11-26T12:51:21Z'
+
+top_issues:
+  - id: 'T325-CR-401'
+    severity: medium
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'Fixed in 3a2d45cd9: grammar stated, dialect syntax refused.'
+    suggested_action: 'None.'
+    suggested_owner: dev
+    status: closed
+    fixed_date: '2026-11-26'
+  - id: 'T325-CR-501'
+    severity: low
+    file: 'shared/resources/ci-tree-equivalence.js'
+    finding: 'Reproduced: `- "!docs/blog/[slug].md"` is refused (exit 2). The documented grammar would match that file literally. The message says "list each path as its own exclusion", which names the same refused path. `!docs/blog/?slug?.md` does exclude it (isDocsPath false). This is fail-closed: the owner gets a usage error, never a silent skip.'
+    suggested_action: 'In the bracket refusal message, the runbook and the CHANGELOG, say to replace each `[` or `]` with `?` for a literal bracketed name.'
+    suggested_owner: dev
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+  - id: 'T325-CR-502'
+    severity: low
+    file: 'CHANGELOG.md'
+    finding: 'The CHANGELOG says an exclusion "holding ... extglob" is refused. The code refuses only `@(`, `!(` and `+(`: `!docs/*(draft).md` and `!docs/?(a).md` are accepted, by design, because `*` and `?` are wildcards in the documented grammar. configuration.md names the three openers exactly.'
+    suggested_action: 'Name the three openers in the CHANGELOG, as configuration.md does.'
+    suggested_owner: dev
+    status: closed
+    resolution: 'carried to recommendations.future (route 2b)'
+
+waiver:
+  active: false
+
+quality_score: 96
+
+evidence:
+  tests_reviewed: 322
+  phases_verified: '3/3'
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 11
+    escaped: 0
+    boundary: true
+    boundary_signals: []
+    notes: 'Re-probed at 3a2d45cd9 with the path sink and patterns ["**","!secret/**"]: 11 executed, 0 escaped. The same two pre-existing acceptances remain.'
+  performance:
+    status: PASS
+    notes: 'No bound claimed.'
+  reliability:
+    status: PASS
+    notes: 'ci:fast at 3a2d45cd9: 8906 tests, 0 failed. No exclusion fails open.'
+  maintainability:
+    status: PASS
+    notes: 'hasPathFormDefect is one definition; the grammar is stated once in the reference.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - id: 'T325-CR-501'
+      action: 'A bracketed literal exclusion (`!docs/blog/[slug].md`) is refused and the message''s "list each path" remedy names the same refused path; `!docs/blog/?slug?.md` works. Fail-closed.'
+      suggested_action: 'In the bracket refusal message, the runbook and the CHANGELOG, say to replace each `[` or `]` with `?` for a literal bracketed name.'
+      refs: ['shared/resources/ci-tree-equivalence.js']
+      carried_from: 'top_issues (route 2b, cycle 5)'
+    - id: 'T325-CR-502'
+      action: 'The CHANGELOG says "extglob" is refused; only `@(`, `!(` and `+(` are (configuration.md names them exactly).'
+      suggested_action: 'Name the three openers in the CHANGELOG, as configuration.md does.'
+      refs: ['CHANGELOG.md']
+      carried_from: 'top_issues (route 2b, cycle 5)'
+    - action: 'isDocsPath accepts a percent-encoded name and a path through a symlink as documentation when the patterns match it. Same on origin/develop.'
+      refs: ['shared/resources/ci-tree-equivalence.js']
+      provenance: pre-existing
+      remedy: unverified
+    - action: 'Step 4b on skills/finalise/SKILL.md reports zero-blocks-executed. Same on the merge-base copy.'
+      refs: ['skills/finalise/SKILL.md']
+      provenance: pre-existing
+      remedy: unverified
+
+deployment_readiness:
+  staging: PASS
+  production: PASS
+  conditions: []

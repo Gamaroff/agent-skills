@@ -149,6 +149,19 @@ test("engine mode: a docs delta is docs-only, and one code path makes it not", (
   assert.deepEqual(r.rec.code, ["src.js"]);
 });
 
+test("task.325: a commit that changes an excluded path is code — the site pushes; a sibling defers", (t) => {
+  const config =
+    'ci:\n  docsOnly:\n    patterns:\n      - "docs/**"\n      - "!docs/catalogue.md"\n';
+  const { wt } = fixture(t, { config });
+  commit(wt, "docs/a.md");
+  assert.equal(policy(wt, ["--site", "qa-cycle"]).out, "defer");
+  commit(wt, "docs/catalogue.md");
+  const r = engineMode(wt, ["--base", "origin/feature/x"]);
+  assert.equal(r.rec.docsOnly, false);
+  assert.deepEqual(r.rec.code, ["docs/catalogue.md"]);
+  assert.equal(policy(wt, ["--site", "qa-cycle"]).out, "push");
+});
+
 test("engine mode: without --base the delta is unknown, never docs-only", (t) => {
   const { wt } = fixture(t);
   commit(wt, "docs/a.md");

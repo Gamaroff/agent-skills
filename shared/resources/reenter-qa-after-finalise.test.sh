@@ -231,6 +231,11 @@ mkrepo narrowed; setcfg $'ci:\n  docsOnly:\n    patterns:\n      - "docs/**"\n';
 WANT_MAX=5; accept "patterns narrowed to docs/** → a root CHANGELOG.md is code and re-enters"
 mkrepo widened; setcfg $'ci:\n  docsOnly:\n    patterns:\n      - "docs/**"\n      - "CHANGELOG.md"\n'; docfix CHANGELOG.md
 expect_refusal "patterns that name CHANGELOG.md → document-only" no-code-moved
+# task.325: an exclusion pattern makes the file it names code, through this real reader.
+mkrepo excluded; setcfg $'ci:\n  docsOnly:\n    patterns:\n      - "docs/**"\n      - "!docs/catalogue.md"\n'; docfix docs/catalogue.md
+WANT_MAX=5; accept "an excluded path (!docs/catalogue.md) is code: the fix re-enters"
+mkrepo excluded-sibling; setcfg $'ci:\n  docsOnly:\n    patterns:\n      - "docs/**"\n      - "!docs/catalogue.md"\n'; docfix docs/other.md
+expect_refusal "a sibling of an excluded path stays documentation → document-only" no-code-moved
 mkrepo disabled; setcfg $'ci:\n  docsOnly:\n    enabled: false\n'; docfix CHANGELOG.md
 WANT_MAX=5; accept "ci.docsOnly.enabled: false → every path counts, the fix re-enters"
 mkrepo cfg-change; docfix README.md; setcfg $'ci:\n  docsOnly:\n    patterns:\n      - "**/*"\n'

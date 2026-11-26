@@ -508,6 +508,213 @@ test("readConfig: a wrong-typed value is a usage error naming the key, never the
   }
 });
 
+// ── exclusions: a pattern that starts with `!` (task.325) ─────────────────
+
+const EXCL = ["docs/**", "!docs/catalogue.md", "!docs/guides/**"];
+
+test("task.325: an exclusion pattern makes the path it matches code, in any list order", () => {
+  const rows = [
+    ["docs/a.md", EXCL, true],
+    ["docs/catalogue.md", EXCL, false],
+    [
+      "docs/catalogue.md",
+      ["!docs/catalogue.md", "docs/**", "!docs/guides/**"],
+      false,
+    ],
+    [
+      "docs/catalogue.md",
+      ["!docs/guides/**", "!docs/catalogue.md", "docs/**"],
+      false,
+    ],
+    ["docs/guides/x/y.md", EXCL, false],
+    ["src/a.ts", EXCL, false],
+    ["docs/a.md", ["!docs/b.md"], false],
+  ];
+  for (const [file, globs, want] of rows)
+    assert.equal(
+      eng.isDocsPath(file, globs),
+      want,
+      `${file} ${JSON.stringify(globs)}`,
+    );
+});
+
+test("task.325: a path whose NAME starts with `!` is matched as a name; no `!` in the list changes nothing", () => {
+  // Only a pattern that starts with `!` is an exclusion. A file named `!x.md` is documentation under
+  // the defaults, as it was before.
+  assert.equal(eng.isDocsPath("!x.md", eng.DEFAULT_PATTERNS), true);
+  assert.equal(eng.isDocsPath("docs/!x.md", ["docs/**"]), true);
+  for (const f of ["docs/a.md", "docs/catalogue.md", "README.md", "src/a.ts"])
+    assert.equal(
+      eng.isDocsPath(f, eng.DEFAULT_PATTERNS),
+      f !== "src/a.ts",
+      `defaults: ${f}`,
+    );
+  // An empty list is unchanged: nothing is documentation.
+  assert.equal(eng.isDocsPath("docs/a.md", []), false);
+});
+
+test("task.325: an ancestor walk whose delta holds an excluded path is code-changed; without the exclusion it is tree-equivalent", async () => {
+  const delta = ["docs/a.md", "docs/catalogue.md"];
+  const walk = (patterns) =>
+    eng.classifyTreeEquivalence({
+      headRollup: "PENDING",
+      ancestors: [A("g1", delta, "SUCCESS")],
+      patterns,
+      enabled: true,
+    });
+  const excluded = await walk(EXCL);
+  assert.equal(excluded.reason, REASONS.CODE_CHANGED);
+  assert.match(excluded.detail, /docs\/catalogue\.md/);
+  assert.equal((await walk(["docs/**"])).reason, REASONS.TREE_EQUIVALENT);
+});
+
+test("task.325: readConfig reads an exclusion and refuses a list of exclusions only, or a bare `!`, naming the key", () => {
+  const ok = mkRepo({
+    config:
+      'ci:\n  docsOnly:\n    patterns:\n      - "docs/**"\n      - "!docs/catalogue.md"\n',
+  });
+  try {
+    const cfg = eng.readConfig(ok);
+    assert.deepEqual(cfg.patterns, ["docs/**", "!docs/catalogue.md"]);
+    assert.equal(eng.isDocsPath("docs/catalogue.md", cfg.patterns), false);
+    assert.equal(eng.isDocsPath("docs/other.md", cfg.patterns), true);
+  } finally {
+    cleanup(ok);
+  }
+  const refused = [
+    'ci:\n  docsOnly:\n    patterns:\n      - "!docs/b.md"\n',
+    "ci:\n  docsOnly:\n    patterns:\n      - !docs/b.md\n      - '!docs/c.md'\n",
+    'ci:\n  docsOnly:\n    patterns:\n      - "docs/**"\n      - "!"\n',
+  ];
+  for (const config of refused) {
+    const dir = mkRepo({ config });
+    try {
+      assert.throws(
+        () => eng.readConfig(dir),
+        (e) =>
+          e instanceof eng.UsageError &&
+          /ci\.docsOnly\.patterns/.test(e.message),
+        config,
+      );
+    } finally {
+      cleanup(dir);
+    }
+  }
+});
+
+test("task.325: readConfig refuses an exclusion that can never match, and keeps the ones that can", () => {
+  // isDocsPath refuses a path not in normalised form before it matches, so an exclusion spelled
+  // with a space, `./`, a leading `/` or a second `!` excludes nothing: the file stays
+  // documentation and the owner is never told (QA cycle 2, T325-CR-201).
+  const cfgOf = (entry) =>
+    `ci:\n  docsOnly:\n    patterns:\n      - "docs/**"\n      - ${JSON.stringify(entry)}\n`;
+  for (const entry of [
+    "! docs/catalogue.md",
+    "! ",
+    "!./docs/catalogue.md",
+    "!/docs/catalogue.md",
+    "!docs/catalogue.md ",
+    " !docs/catalogue.md",
+    // QA cycle 3 (T325-CR-301): the path forms isDocsPath refuses before matching.
+    "!docs/generated/",
+    "!docs//catalogue.md",
+    "!docs/./catalogue.md",
+    "!docs/../catalogue.md",
+  ]) {
+    const dir = mkRepo({ config: cfgOf(entry) });
+    try {
+      assert.throws(
+        () => eng.readConfig(dir),
+        (e) =>
+          e instanceof eng.UsageError &&
+          /ci\.docsOnly\.patterns/.test(e.message) &&
+          e.message.includes(JSON.stringify(entry)),
+        JSON.stringify(entry),
+      );
+    } finally {
+      cleanup(dir);
+    }
+  }
+  for (const [entry, path] of [
+    ["!docs/catalogue.md", "docs/catalogue.md"],
+    ["!docs/gen/**", "docs/gen/a.md"],
+    ["!**/*.sh.md", "docs/run.sh.md"],
+    ["!secret/**", "secret/a.md"],
+    // T325-CR-302: a second `!` names a file whose name starts with `!`; it does match one.
+    ["!!x.md", "!x.md"],
+    // `?` is one of the three wildcards, and characters doc names really hold are literal.
+    ["!docs/?.md", "docs/a.md"],
+    ["!docs/notes (draft).md", "docs/notes (draft).md"],
+    ["!docs/c++.md", "docs/c++.md"],
+  ]) {
+    const dir = mkRepo({ config: cfgOf(entry) });
+    try {
+      const cfg = eng.readConfig(dir);
+      assert.deepEqual(cfg.patterns, ["docs/**", entry]);
+      assert.equal(eng.isDocsPath(path, ["**", entry]), false, entry);
+    } finally {
+      cleanup(dir);
+    }
+  }
+});
+
+test("task.325: readConfig refuses brace and class syntax in an exclusion, which this matcher reads literally", () => {
+  // glob-match's only wildcards are `*`, `**` and `?`. A gitignore or minimatch user's
+  // `!docs/{a,b}.md` matches neither docs/a.md nor docs/b.md here, so it would exclude nothing
+  // (QA cycle 4, T325-CR-401). Not "can never match": a file literally named with the braces exists.
+  const cfgOf = (entry) =>
+    `ci:\n  docsOnly:\n    patterns:\n      - "docs/**"\n      - ${JSON.stringify(entry)}\n`;
+  for (const entry of [
+    "!docs/{catalogue,index}.md",
+    "!docs/[ab].md",
+    "!docs/*.{md,txt}",
+    "!docs/a]b.md",
+    "!@(docs/a.md)",
+    "!docs/!(x).md",
+    "!docs/+(a).md",
+    "!docs/a.md|docs/b.md",
+  ]) {
+    const dir = mkRepo({ config: cfgOf(entry) });
+    try {
+      assert.throws(
+        () => eng.readConfig(dir),
+        (e) =>
+          e instanceof eng.UsageError &&
+          e.message.includes(JSON.stringify(entry)) &&
+          /not supported/.test(e.message),
+        entry,
+      );
+    } finally {
+      cleanup(dir);
+    }
+  }
+  // An inclusion with braces fails closed (it matches less), so it is left alone.
+  const incl = mkRepo({
+    config: 'ci:\n  docsOnly:\n    patterns:\n      - "docs/{a,b}.md"\n',
+  });
+  try {
+    assert.deepEqual(eng.readConfig(incl).patterns, ["docs/{a,b}.md"]);
+  } finally {
+    cleanup(incl);
+  }
+  // The premise, pinned: if glob-match ever learns braces or classes, this goes red and the
+  // refusal above should be revisited.
+  const { matchesAnyGlob } = require(join(__dirname, "..", "glob-match.js"));
+  assert.equal(matchesAnyGlob("docs/a.md", ["docs/{a,b}.md"]), false);
+  assert.equal(matchesAnyGlob("docs/a.md", ["docs/[ab].md"]), false);
+  assert.equal(matchesAnyGlob("docs/{a,b}.md", ["docs/{a,b}.md"]), true);
+  assert.equal(matchesAnyGlob("docs/a.md", ["docs/?.md"]), true);
+});
+
+test("task.325: glob-match itself has no negation — qa.testArtifactGlobs keeps its meaning", () => {
+  // The exclusion lives in isDocsPath alone. matchesAnyGlob is shared with qa.testArtifactGlobs,
+  // where a `!` entry matches only a path literally named with it.
+  const { matchesAnyGlob } = require(join(__dirname, "..", "glob-match.js"));
+  assert.equal(matchesAnyGlob("docs/catalogue.md", EXCL), true);
+  assert.equal(matchesAnyGlob("docs/b.md", ["!docs/b.md"]), false);
+  assert.equal(matchesAnyGlob("!docs/b.md", ["!docs/b.md"]), true);
+});
+
 // ── 2. the CLI against real git ──────────────────────────────────────────
 
 /** A repo whose first commit is code (green) with `n` docs-only commits on top. */

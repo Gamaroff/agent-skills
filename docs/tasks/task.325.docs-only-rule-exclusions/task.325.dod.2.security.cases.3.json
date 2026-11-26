@@ -1,0 +1,26 @@
+[
+  {
+    "id": "excluded-file-reordered",
+    "direction": "hostile",
+    "input": "docs/catalogue.md",
+    "why": "The order of the list must not let a later inclusion undo an exclusion (not last-match-wins).",
+    "correct": "Refused (code) in either list order.",
+    "spec_ref": "docs/tasks/task.325.docs-only-rule-exclusions/task.325.docs-only-rule-exclusions.md:94"
+  },
+  {
+    "id": "excluded-dir-reordered",
+    "direction": "hostile",
+    "input": "docs/guides/x/y.md",
+    "why": "A directory exclusion must hold when it is listed before the inclusion.",
+    "correct": "Refused (code).",
+    "spec_ref": "docs/tasks/task.325.docs-only-rule-exclusions/task.325.docs-only-rule-exclusions.md:95"
+  },
+  {
+    "id": "sibling-docs-reordered",
+    "direction": "legitimate",
+    "input": "docs/a.md",
+    "why": "Listing the exclusions first must not over-block the inclusion.",
+    "correct": "Accepted (docs).",
+    "spec_ref": "docs/tasks/task.325.docs-only-rule-exclusions/task.325.docs-only-rule-exclusions.md:93"
+  }
+]

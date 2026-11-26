@@ -1532,7 +1532,7 @@ echo "CI_ROLLUP=$CI_ROLLUP CI_TREE_EQ=$CI_TREE_EQ"
 
 The engine decides on four things and this step re-derives none of them: the head's rollup is
 `PENDING`/`NONE`; a first-parent ancestor has a green rollup **of its own checks**; every file changed
-since it matches `ci.docsOnly.patterns` (default `**/*.md`, `docs/**`), with a change to `skills-config.yaml`
+since it matches `ci.docsOnly.patterns` (default `**/*.md`, `docs/**`) and none of its `!` exclusions, with a change to `skills-config.yaml`
 or to a submodule pointer never counting as docs; and `ci.docsOnly.checkCommand`, when configured, passes
 (bounded by `ci.docsOnly.checkTimeoutSeconds`). Four things make it stricter than this head reduction, on
 purpose: an ancestor with **any** skipped or neutral check is `NONE`, not green (a paths-filter job can
