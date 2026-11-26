@@ -118,6 +118,27 @@ _Track each QA review/fix cycle._
 - T327-CI-1: the report's fast-gate line names "the LAN test server", not user@address. The report is committed with this cycle's fix (deviation from Step 8 deferral), so the `link-check` lane re-runs on a fixed tree.
 - Mutations: (g) identity by spelling only → QA-1 test red; (h) agent-id route not checked → QA-1 test red; (i) no directory refusal → QA-3 test red. Each reverted.
 - Probe: `git grep` for the refusal message and "names the `--transcript`" across SKILL.md, references and shared resources → only `shared/resources/agent-reply-block.js` (updated). CHANGELOG bullet updated. Population 1.
+- Fast gate: ci:fast on the LAN test server → 8921 pass, 0 fail. Commit `17b74641b` (fix, gate 1, QA report 1, this report); push-policy qa-cycle → push.
+
+### QA Cycle 2 — 2026-11-26
+**Gate Result**: FAIL
+**Issues Found**: 2: T327-QA-4 a hand-back from an earlier turn is extracted after a new prompt (high, reproduced, new to the branch); T327-QA-5 an lstat error reads as nothing there (low, reproduced). All four cycle-1 findings verified fixed.
+**HIGH findings**: 1
+**MEDIUM findings**: 0
+**Traceability**: skipped (not re-run — cycle 2)
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+
+#### qa-fix (5b)
+
+- changes-requested → stage-disabled. Findings inline from gate 2 (ingester not dispatched).
+- Narrowing residue: shared/resources/agent-reply-block.js (trigger: repeat subject, from `repeat-subject.mjs`). Move: patch, because the findings are distinct defects in different mechanisms: cycle 1's were the `--out` removal, and this cycle's high is reply selection across a turn boundary.
+- T327-QA-4: new `isPrompt()`. A `user` line that is not only `tool_result` blocks opens a new turn and drops the hand-back; the hand-back's own `tool_result` keeps it. Test "task 327 QA-4 …": string and block-array prompts give unreadable, a new hand-back gives the new block, and the control is extracted.
+- T327-QA-5: `clearOut` treats only ENOENT as nothing there; any other lstat error is a named `usage` refusal. Test "task 327 QA-5 …".
+- CR-3 (advisory cleanup) applied: the module header now says usage answers leave `--out` in place and a symlink `--out` is removed, not followed.
+- Mutations: (j) never clear → QA-4 red; (k) every user line clears → 4 tests red (hand-back-only, same-message tie, hand-back-after-text, QA-4); (l) every lstat error absent → QA-5 red. Each reverted.
+- Probe: phrase "SubagentHandback" + "final turn" across SKILL.md and shared resources: `skills/finalise/SKILL.md` names the reply field and does not state the turn rule (unaffected); CHANGELOG bullet updated. Population 1 code site.
 
 ---
 

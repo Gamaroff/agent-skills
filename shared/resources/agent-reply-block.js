@@ -37,10 +37,11 @@
  * The block taken is the LAST one with the info string: an agent that quotes its own format earlier in
  * the reply must not have the quotation run.
  *
- * `extract` removes --out before it reads anything, so every answer but `extracted` leaves no file
- * there: an earlier run's file cannot be read as this run's output (task 327). An --out that is the
- * transcript file — by path, symlink or hard link, and on the --agent-id route the transcript found —
- * is a usage error for that reason, and so is an --out that is a directory or cannot be removed.
+ * `extract` removes --out before it reads anything, so every answer but `extracted` and `usage` leaves
+ * no file there: an earlier run's file cannot be read as this run's output (task 327). A `usage` answer
+ * leaves --out as it found it: an --out that is the transcript file (by path, symlink or hard link, and
+ * on the --agent-id route the transcript found), a directory, or a path that cannot be checked or
+ * removed. A symlink at --out is removed itself, never followed.
  */
 "use strict";
 
@@ -124,9 +125,18 @@ function findTranscripts(agentId, root) {
  * An async agent can instead reply through a `SubagentHandback` tool call, whose `input.message` is the
  * reply; its `tool_result` line then empties the text tail (task 327). So there are two candidates, and
  * the LATER one in the transcript is the reply: a resumed agent answers with its newest message, in
- * either shape. Only that exact tool name with a non-empty string `message` counts. Returns
+ * either shape. Only that exact tool name with a non-empty string `message` counts. A new prompt (a
+ * `user` line that is not only `tool_result` blocks) opens a new turn and drops an earlier hand-back:
+ * a resumed agent that has not answered yet has no reply (QA cycle 2). Returns
  * `{ text, reply: "text" | "handback" }`, or `null` when neither exists or a line does not parse.
  */
+function isPrompt(o) {
+  const c = o.message && o.message.content;
+  if (typeof c === "string") return true;
+  if (!Array.isArray(c)) return false;
+  return c.some((b) => !(b && b.type === "tool_result"));
+}
+
 function replyText(jsonl) {
   const lines = jsonl.split("\n").filter((l) => l.trim() !== "");
   // Positions are [line, block] pairs, compared in order: of the two reply shapes, the later wins.
@@ -142,6 +152,10 @@ function replyText(jsonl) {
     }
     if (o && o.type === "user") {
       tail = [];
+      // A new prompt opens a new turn, and an earlier turn's hand-back is not its reply. A line made
+      // only of tool_result blocks (the hand-back's own result among them) continues the turn
+      // (task 327, QA cycle 2).
+      if (isPrompt(o)) handback = null;
       continue;
     }
     if (!(o && o.type === "assistant" && o.message)) continue;
@@ -224,8 +238,11 @@ function clearOut(out) {
   let st;
   try {
     st = fs.lstatSync(out);
-  } catch {
-    return null; // nothing there
+  } catch (e) {
+    // Only "no such file" means nothing there; any other failure means this call could not look
+    // (ENOTDIR, EACCES, ELOOP), and that is a refusal, never a pass (QA cycle 2, T327-QA-5).
+    if (e && e.code === "ENOENT") return null;
+    return `extract --out cannot be checked: ${out} (${(e && e.code) || e})`;
   }
   if (st.isDirectory()) return `extract --out is a directory: ${out}`;
   try {

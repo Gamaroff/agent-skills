@@ -359,6 +359,71 @@ test("task 327: a block only in an earlier hand-back, then a text turn with no b
     assert.equal(existsSync(out), false);
   }));
 
+test("task 327 QA-4: a hand-back from an earlier turn is not the reply once a new prompt opens a turn", () =>
+  withDir((dir) => {
+    const prompt = {
+      type: "user",
+      message: { role: "user", content: "now redo it" },
+    };
+    const promptBlocks = {
+      type: "user",
+      message: {
+        role: "user",
+        content: [{ type: "text", text: "now redo it" }],
+      },
+    };
+    const earlier = [
+      { type: "user", message: { role: "user", content: "task" } },
+      asst([handback("Done.\n" + fenced("old: 1"))]),
+      toolResult,
+    ];
+    // Resumed and still working: no reply yet, so nothing is extracted — in either prompt shape.
+    for (const [id, p] of [
+      ["r1", prompt],
+      ["r2", promptBlocks],
+    ]) {
+      const { r, out } = run327(dir, id, [
+        ...earlier,
+        p,
+        asst([handback("x", "Read")]),
+        toolResult,
+      ]);
+      assert.equal(
+        r.reason,
+        "transcript-unreadable",
+        `${id}: no reply in the open turn`,
+      );
+      assert.equal(existsSync(out), false);
+    }
+    // Resumed and answered by a new hand-back: the new one is the reply.
+    const { r: r3, out: out3 } = run327(dir, "r3", [
+      ...earlier,
+      prompt,
+      asst([handback("Again.\n" + fenced("new: 2"))]),
+      toolResult,
+    ]);
+    assert.equal(r3.reason, "extracted");
+    assert.equal(readFileSync(out3, "utf8"), "new: 2\n");
+    // Control: the hand-back's own tool_result does not end its turn.
+    const { r: r4 } = run327(dir, "r4", earlier);
+    assert.equal(r4.reason, "extracted");
+  }));
+
+test("task 327 QA-5: an --out that cannot be checked is a named usage error, not a crash", () =>
+  withDir((dir) => {
+    const f = rowsTranscript(dir, "e1", [asst([text(fenced("a: 1"))])]);
+    const file = join(dir, "plain");
+    writeFileSync(file, "x\n");
+    const r = arb.extract({
+      transcript: f,
+      block: "finalise-ac-yaml",
+      out: join(file, "sub.yaml"),
+    });
+    assert.equal(r.reason, "usage");
+    assert.equal(r.exitCode, 2);
+    assert.match(r.message, /cannot be checked/);
+  }));
+
 test("task 327: a tool_use of another name is never read as a reply", () =>
   withDir((dir) => {
     const { r } = run327(dir, "n1", [
