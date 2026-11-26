@@ -77,6 +77,9 @@ baseline afterwards: `security-input-corpus.test.mjs` 24/24, and the `task.329` 
 - mutation-proven: M10 `git-name` dropped from `finalise-dod-security-prompt.md`'s sink list → red: "every sink is named in each prompt's sink enumeration" (`finalise-dod-security-prompt.md's sink enumeration does not name: git-name`) → covered
 - mutation-proven: M11 the paired segment + normalise mutation, with `leading-slash` (`/docs/a.md`) dropped from its expected list in `GIT_NAME_MUTATIONS` → red: "task.329: each isDocsPath refusal removed reproduces exactly its git-name cases" (actual extra: `leading-slash`), "task.329: every git-name hostile case is reached by a mutation of isDocsPath" → covered
 
+- **mutation SURVIVED**: M12 `git-name` dropped from `security-review-prompt.md`'s sink list (`:79`), run against `f43ad031c` → **no test red**: `security-input-corpus.test.mjs` 24/24. The enumeration test extracts the review prompt from `` `SINKS` ( `` to `No sink fits`. That span also holds the table row (`:88`) and the routing sentence (`:93`), and both name `git-name`, so the list can drop the sink and the test still passes. § 8's "`git-name` dropped from either prompt's list" therefore does not hold for this prompt. → **not covered** (at `f43ad031c`)
+- mutation-proven (after the /finalise Step 8a fix): with the review prompt's extract ending at `Pick by`, M12 → red: "every sink is named in each prompt's sink enumeration" (`security-review-prompt.md's sink enumeration does not name: git-name`), 23 pass / 1 fail. M10 still → the same test red. With the prompt restored: 24/24. → covered
+
 The run logs were kept in `.claude/state/mut-dod1/` (gitignored).
 
 ## NFR Assessment

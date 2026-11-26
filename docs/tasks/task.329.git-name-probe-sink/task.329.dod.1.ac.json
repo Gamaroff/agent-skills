@@ -1,0 +1,171 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "f43ad031cb8fe35db964c07ec86c210c99742f3b",
+  "dirty_paths": [
+    "docs/tasks/task.329.git-name-probe-sink/task.329.git-name-probe-sink.md",
+    "docs/tasks/task.329.git-name-probe-sink/task.329.implementation.1.git-name-probe-sink-initial-run.md",
+    "docs/tasks/task.329.git-name-probe-sink/task.329.pr-review.1.git-name-probe-sink.md"
+  ],
+  "document": "docs/tasks/task.329.git-name-probe-sink/task.329.git-name-probe-sink.md",
+  "result": {
+    "bytes": 10040,
+    "sha256": "41fd9c21aa6220015a969bbc633c99984e114de43be572a28b9099c12912bdd1",
+    "verified": false
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 7,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "a35860ec481f9c9af93aa29b62d705124c2e0bb6545f2d8b4f446419356ca3ab",
+      "status": "PASS",
+      "description": "Every row of the § 8 table holds in a test",
+      "code_citation": "shared/resources/security-input-corpus.mjs:677",
+      "test_citation": "shared/resources/tests/security-probe.test.mjs:4752",
+      "members": [
+        {
+          "member": "corpusFor(\\\"git-name\\\"): FLOORS git-name {hostile: 14, legitimate: 8}; ids prefixed git-name.",
+          "evidence": "shared/resources/tests/security-input-corpus.test.mjs:63 (FLOORS), :209 (counts meet floors), :147 (ids namespaced by sink)",
+          "status": "PASS"
+        },
+        {
+          "member": "parity test of the .md tables passes after regeneration",
+          "evidence": "shared/resources/tests/security-input-corpus.test.mjs:513",
+          "status": "PASS"
+        },
+        {
+          "member": "enumeration test names git-name in both prompts",
+          "evidence": "shared/resources/tests/security-input-corpus.test.mjs:596",
+          "status": "PASS"
+        },
+        {
+          "member": "isDocsPath through --sink git-name with [[\\\"**\\\"]] at HEAD: every hostile rejected, every legitimate accepted",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:4726",
+          "status": "PASS"
+        },
+        {
+          "member": "the same with each § 3 line removed in a temp copy: exactly the listed cases reproduce",
+          "evidence": "shared/resources/tests/security-probe.test.mjs:4752 (GIT_NAME_MUTATIONS at :4698, mkdtemp + rmSync in finally); coverage of every hostile id at :4740",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "All five § 8 rows map to tests in shared/resources/tests/*.test.mjs, part of `npm test` (package.json test:suite), which .github/workflows/test.yml runs on every pull_request with no paths filter. Code: SINKS:34, GIT_NAME:677, CORPUS:1257, SINK_BLURB:1355 in security-input-corpus.mjs. criteria-drift.js: clean (exit 0, no changed criteria). The only uncommitted task-file edit adds `pr_number: 956` to frontmatter — § 3/§ 8/§ 9 untouched."
+    },
+    {
+      "id": "#2",
+      "text_hash": "7aed04672cb667be1936d80b14d3f23e7a02519189dc65abd55690642062e0ae",
+      "status": "PASS",
+      "description": "corpusFor(\\\"path\\\") unchanged, pinned by a test at 684b2db38",
+      "code_citation": "shared/resources/security-input-corpus.mjs:577",
+      "test_citation": "shared/resources/tests/security-input-corpus.test.mjs:230",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The test deepEquals the 11 `path` id:direction pairs (8 hostile, 3 legitimate). The `const PATH = sinkCases(\\\"path\\\"…` block is byte-identical at 684b2db38 and HEAD (same md5 of the extracted block). Runs in test.yml npm test on every PR."
+    },
+    {
+      "id": "#3",
+      "text_hash": "3f4840e8e5357334d3ea4640273ec8c735da15b43ebaa0dbd95a1af07d077403",
+      "status": "PASS",
+      "description": "Not applicable: no bound is claimed",
+      "code_citation": "docs/tasks/task.329.git-name-probe-sink/task.329.git-name-probe-sink.md:330",
+      "test_citation": "NOT_APPLICABLE: no unit tests applicable — task § 8 'Performance Tests: Not applicable.' (task file :317)",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The criterion claims no performance bound; the task explicitly states performance tests are not applicable (:317). Nothing to measure or test."
+    },
+    {
+      "id": "#4",
+      "text_hash": "416cfaa6810f7c0b13e1c445c2a5d6155cc78f55a42ac9860bd3e7181cb72d7f",
+      "status": "PASS",
+      "description": "Every § 8 mutation recorded in QA report with the red test",
+      "code_citation": "docs/tasks/task.329.git-name-probe-sink/task.329.qa.3.git-name-probe-sink.md:66",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "git-name dropped from SINKS",
+          "evidence": "docs/tasks/task.329.git-name-probe-sink/task.329.qa.3.git-name-probe-sink.md:75 (M8 -> red: 'every sink declares a floor…', 'allCases is memoised…', 'the prose peer contains the generated tables verbatim')",
+          "status": "PASS"
+        },
+        {
+          "member": "one hostile case flipped to legitimate",
+          "evidence": "docs/tasks/task.329.git-name-probe-sink/task.329.qa.3.git-name-probe-sink.md:76 (M9 git-name.leading-slash flipped -> red: HEAD probe test, mutation test, floors, doc placement, parity)",
+          "status": "PASS"
+        },
+        {
+          "member": "git-name dropped from either prompt's list",
+          "evidence": "docs/tasks/task.329.git-name-probe-sink/task.329.qa.3.git-name-probe-sink.md:77 (M10 dropped from finalise-dod-security-prompt.md's list -> red: 'every sink is named in each prompt's sink enumeration')",
+          "status": "PASS"
+        },
+        {
+          "member": "paired segment + normalise mutation without the test expecting /docs/a.md",
+          "evidence": "docs/tasks/task.329.git-name-probe-sink/task.329.qa.3.git-name-probe-sink.md:78 (M11 -> red: 'each isDocsPath refusal removed reproduces exactly its git-name cases' (extra leading-slash), and 'every git-name hostile case is reached by a mutation')",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "The four § 8 mutations are recorded as M8–M11 in qa.3 § 'Mutation records for § 8', committed at HEAD f43ad031c, run against 62fe945b1, each naming the mutation, the red test(s), and confirmed applied (cmp) and restored (git diff --quiet). qa.1's M1–M7 are additional refusal-line/pin mutations. M10 mutated only finalise-dod-security-prompt.md — 'either prompt's list' read as the one listed mutation, recorded; see advisory on the review prompt."
+    },
+    {
+      "id": "#5",
+      "text_hash": "4999c165b79021a23c9d1010200e422554cb68ede31c8b2797ca34a95f6dccd8",
+      "status": "PASS",
+      "description": "npm run test:remote and npm run bundle:check pass",
+      "code_citation": ".github/workflows/test.yml:1",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ d71760925 — RERUN_AT_HEAD is none and no committed record shows either command passing at the head: qa.1:77/:196 records test:remote run 2 as 8898 pass / 1 fail (push-policy.test.mjs:1498, timeout under load) and defers to CI, and qa.1's bundle:check '0 problems' was at d38fa3a27, before eed003c37 changed the corpus source. Asks of CI: test:remote runs ci:fast (format:check && npm test, package.json:25), and test.yml runs both steps on every pull_request; bundle:check (bundle_skill.py --check) is a step of .github/workflows/validate.yml, which fires on skills/** changes, which this diff touches (skills/*/references/). CI was green on eed003c37; the delta to f43ad031c is task-directory documents only. /finalise Step 6 must grade this from CI on the head.",
+      "ci_reading": "CI reading 1: SUCCESS @ d71760925"
+    },
+    {
+      "id": "#6",
+      "text_hash": "e682bc56a1f55161014419a912ff02304cd7cc372fe76dd0a0a020815e386e00",
+      "status": "PASS",
+      "description": "Both prompts and probe-boundary-rule.md say when to choose git-name over path",
+      "code_citation": "shared/resources/finalise-dod-security-prompt.md:164",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [
+        {
+          "member": "finalise-dod-security-prompt.md",
+          "evidence": "shared/resources/finalise-dod-security-prompt.md:164-167 ('A name passed to a filesystem call is `path`; a name only compared against patterns, never opened or decoded (a classifier of `git diff --name-only` output), is `git-name`.'); also list :160 and isDocsPath row :97",
+          "status": "PASS"
+        },
+        {
+          "member": "security-review-prompt.md",
+          "evidence": "shared/resources/security-review-prompt.md:93 ('A name passed to a filesystem call is `path`; a name only compared against patterns is `git-name`.'); also table row :88 and list :79",
+          "status": "PASS"
+        },
+        {
+          "member": "probe-boundary-rule.md",
+          "evidence": "shared/resources/probe-boundary-rule.md:206-209 ('`git-name` models git-form names, so a classifier of `git diff --name-only` output … is probed there, not under `path`…')",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "All three texts were read and each states the routing rule (filesystem call → path; pattern-compared only → git-name). The enumeration test (security-input-corpus.test.mjs:596) pins the sink lists in both prompts, not the routing sentences; probe-boundary-rule.md's text is not pinned by any test. Bundled copies are held by bundle:check."
+    },
+    {
+      "id": "#7",
+      "text_hash": "edcc0bcb1bfcea2890827e38e641060e77f37bba366dcbcc130cd77c9ef76165",
+      "status": "PASS",
+      "description": "CHANGELOG [Unreleased] names the sink and the routing rule",
+      "code_citation": "CHANGELOG.md:9",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "CHANGELOG.md:9-16, under `## [Unreleased]` (:5) / `### Added`: names 'A `git-name` security-probe sink, for classifiers of repository names', gives the rule (a function that only compares a git-printed name against patterns belongs there, not under `path`), and states the DoD and review prompts and the probe boundary rule say when to choose `git-name` over `path` (task 329). CHANGELOG.md content is not pinned by a repository test (changelog-cites.test.mjs tests the guard on fixtures)."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#4",
+      "note": "The § 8 mutation 'git-name dropped from either prompt's list' was recorded only for finalise-dod-security-prompt.md (qa.3:77). For security-review-prompt.md the enumeration test (security-input-corpus.test.mjs:604-606) extracts from '`SINKS` (' (:78) to 'No sink fits' (:97). That span also contains the table row naming `git-name` (:88) and the routing sentence (:93), so dropping `git-name` from the :79 list alone would likely leave `extract.includes('`git-name`')` true and the test green. Reasoned from the test code, not executed (read-only agent). The prompt text is correct today — this is test strength only."
+    }
+  ]
+}

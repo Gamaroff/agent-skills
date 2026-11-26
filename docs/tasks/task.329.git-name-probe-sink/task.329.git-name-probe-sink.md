@@ -5,20 +5,22 @@ type: task
 description: "Add a git-name sink to the security input corpus, and route a classifier of git-form repository names (isDocsPath) to it instead of the filesystem path sink, whose decoding and symlink cases cannot apply to a name."
 tags: [security-probe, corpus, finalise]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: High
 risk_level: low
 created: 2026-11-26
 updated: 2026-11-26
+completed_date: 2026-11-26
 estimated_effort_hours: 4
 github_issue: 955
+pr_number: 956
 ---
 
 # Technical Task: A git-name sink for classifiers of repository names
 
 **GitHub Issue**: [#955](https://github.com/Gamaroff/agent-skills/issues/955)
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.329.review.1.git-name-probe-sink.md` implemented 2026-11-26
 
 ---
@@ -321,22 +323,22 @@ Not applicable.
 
 ### Functional
 
-- [ ] Every row of the § 8 table holds in a test
-- [ ] `corpusFor("path")` is unchanged, held by a test in `security-input-corpus.test.mjs` that pins the `path` ids and directions as they stand at `684b2db38`
+- [x] Every row of the § 8 table holds in a test
+- [x] `corpusFor("path")` is unchanged, held by a test in `security-input-corpus.test.mjs` that pins the `path` ids and directions as they stand at `684b2db38`
 
 ### Performance
 
-- [ ] Not applicable: no bound is claimed
+- [x] Not applicable: no bound is claimed
 
 ### Code Quality
 
-- [ ] Every mutation in § 8 is recorded in the QA report with the test it turned red
-- [ ] `npm run test:remote` and `npm run bundle:check` pass
+- [x] Every mutation in § 8 is recorded in the QA report with the test it turned red
+- [x] `npm run test:remote` and `npm run bundle:check` pass
 
 ### Migration
 
-- [ ] Both prompts and `probe-boundary-rule.md` say when to choose `git-name` over `path`
-- [ ] `CHANGELOG.md` `[Unreleased]` names the sink and the routing rule
+- [x] Both prompts and `probe-boundary-rule.md` say when to choose `git-name` over `path`
+- [x] `CHANGELOG.md` `[Unreleased]` names the sink and the routing rule
 
 ---
 
@@ -421,11 +423,34 @@ carried to Deferred Work by the cosmetic-residue exit.
 - **T329-QA-9** (LOW) — carried to gate 3 `recommendations.future` (route 2b, cycle 3): the `plus-signs` glob-compiling clause is not exercised, because the sink probes with `**`
 - **T329-QA-10** (LOW) — carried to gate 3 `recommendations.future` (route 2b, cycle 3): the `IS_DOCS_LINES` comment says every refusal has two spellings, but `dotGit` and `config` have one
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.329.qa.3.git-name-probe-sink.md`
+**Gate File**: `task.329.gate.3.git-name-probe-sink.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 96/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** all 7 met. The § 8 mutation record (#4) needed one fix in this run: M12, `git-name` dropped from the review prompt's list, survived, and `d71760925` ends the enumeration extract at the list sentence so M12 turns the test red
+✅ **Tests:** `npm run test:remote` at `d71760925`: 8902 tests, 0 fail; CI SUCCESS on all 6 checks
+✅ **PR Review:** PR #956; `task.329.pr-review.1.git-name-probe-sink.md` CONCERNS, no open coverage finding (the host requires no review)
+✅ **Documentation:** CHANGELOG `[Unreleased]` cites task 329; both prompts, `probe-boundary-rule.md` and `security-input-corpus.md` updated
+✅ **Security Review:** PASS — no secrets or unsafe patterns; `boundary: false`
+✅ **Compliance Review:** NOT_APPLICABLE — internal developer tooling
+
+**Detailed Verification Log:** See `task.329.dod.1.git-name-probe-sink.md` for complete verification evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-11-26
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                                  | Author      |
-| ---------- | ------- | ------------------------------------------------------------ | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-26 | 1.0     | Initial draft — from task 325's finalise probe gaps          | create-task |
 | 2026-11-26 | 1.1     | Review passed (8/10) — `path` criterion given a test; SINKS-enumerating tests named | review-task |
 | 2026-11-26 |         | Status → ready-for-development                               | review-task |
@@ -435,6 +460,7 @@ carried to Deferred Work by the cosmetic-residue exit.
 | 2026-11-26 |         | QA gate CONCERNS (90/100) — 2 MEDIUM, 3 LOW open | qa-task |
 | 2026-11-26 |         | QA findings fixed — 5 corpus and comment texts scoped to what each case tests, 1 iteration | qa-fix |
 | 2026-11-26 |         | QA gate PASS (96/100) — 2 LOW carried to Deferred Work (cosmetic-residue exit) | qa-task |
+| 2026-11-26 | 1.2 | DoD passed — accepted (PR #956) | finalise |
 <!-- change-log-end -->
 
 ---
