@@ -43,7 +43,7 @@ All seven § 9 criteria are verified in [task.329.qa.1.git-name-probe-sink.md](.
 
 Skipped (`--no-code`). The develop pipeline's QA step ran the code reviewer on every cycle (gates 1–3).
 
-**Anchors:** 2 checked against `HEAD` — all verified
+**Anchors:** 2 checked by hand against the reviewed tree (the gate-3 commit), not by `finding-anchors.js`. Both matched their `line_text`. Adding `pr_number:` afterwards shifts PC-2's line by one
 
 ## Machine-Readable Findings
 
