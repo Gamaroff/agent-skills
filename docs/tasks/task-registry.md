@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-11-26
-**Next Available Task Number:** **327**
+**Next Available Task Number:** **329**
 
 ## How to use
 
@@ -368,6 +368,8 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 324 | [The CI skip template can exclude paths, and a guard holds its wiring](task.324.ci-skip-exclusions-and-guard/task.324.ci-skip-exclusions-and-guard.md) | planned | infrastructure | Medium | 2026-11-25 | — | `CODE_PATTERNS` in both classifier templates, scripts and test files on it by default; an optional dependency-free guard for GitHub Actions (gate, aggregate, trigger, never-docs, reader) · four phases · independent |
 | 325 | [The docs-only CI rule can exclude a path](task.325.docs-only-rule-exclusions/task.325.docs-only-rule-exclusions.md) | planned | infrastructure | Medium | 2026-11-25 | task.320 | a `!` pattern in `ci.docsOnly.patterns` excludes, inside `isDocsPath` only; tried, 222 tests green · three phases · edits the engine task 320 edits |
 | 326 | [Task 320's accepted residual is closed](task.326.task-320-accepted-residual/task.326.task-320-accepted-residual.md) | planned | refactoring | Low | 2026-11-26 | task.320 | the three findings accepted at task 320's QA loop limit: T320-CR-601 (an opener inside an HTML block hides a fence), 602 (`?` with a comment, alias keys), 603 (an indented closed comment refused) · three phases |
+| 327 | [SubagentHandback replies are extracted, not hand-copied](task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md) | planned | refactoring | Medium | 2026-11-26 | — | observation #185: `agent-reply-block.js` reads a `SubagentHandback` reply when no later text reply exists, so both `/finalise` extracts stop answering `transcript-unreadable`; a failed extract clears its `--out` first · four phases · independent |
+| 328 | [A measured criterion is re-measured when the head moves](task.328.measured-criterion-re-measured-when-head-moves/task.328.measured-criterion-re-measured-when-head-moves.md) | planned | refactoring | Medium | 2026-11-26 | — | observation #186: the record preflight detects a measured criterion (its bound words miss "longer than") and flags it `measured`; QA cites finalise's tree-equivalence rule before carrying a measured PASS forward · three phases · independent |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
@@ -384,6 +386,8 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 ---
 
 ## Notes
+
+- **Tasks 327–328 are task.320's DoD-instrument follow-ups (obs #185, #186)**, filed 2026-11-26. They are one shippable unit each and independent of each other. **327** lets the `/finalise` reply extractors read a `SubagentHandback` reply, which every DoD run in this harness had to hand-copy. **328** flags a measured criterion so its figure is re-measured when the head moves, the gap that cost task 320 its third DoD run. They share only soft roadmap tags (Phase 25), and either can land first.
 
 - **Tasks 252–253 split the tinker-city `migrate-doc-numbering.mjs` handoff (2026-11-03)** — one shippable unit each, independent of each other. 252 makes the tool name every document it would skip (the root problem: a green `--check` hid unmigrated documents). 253 adds the smaller safety nets (multi-line links, post-apply dead-link scan, frontmatter, registry stub, dirty/behind guard, generated files, legacy-name warning). Both edit the same script and test file, so land one and rebase the other.
 

@@ -20,7 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. Phase 20 is open (opened 2026-11-09): T289 (accepted), T290 (merged with an owner waiver), T292 (accepted), T293 (accepted), T294 (accepted), B21 (fixed), T304 (accepted), T291 (accepted), T295 (accepted). Phase 21 is open (opened 2026-11-10): T301 (accepted), T303 (accepted), T302 (accepted), T296 (accepted). Phase 22 is open (opened 2026-11-10): T297 (accepted), T300 (accepted), T298 (accepted), T299. Phase 23 is open (opened 2026-11-15): T310. Phase 24 is open (opened 2026-11-25): T320, T325.
+chain, a human gate. Phase 20 is open (opened 2026-11-09): T289 (accepted), T290 (merged with an owner waiver), T292 (accepted), T293 (accepted), T294 (accepted), B21 (fixed), T304 (accepted), T291 (accepted), T295 (accepted). Phase 21 is open (opened 2026-11-10): T301 (accepted), T303 (accepted), T302 (accepted), T296 (accepted). Phase 22 is open (opened 2026-11-10): T297 (accepted), T300 (accepted), T298 (accepted), T299. Phase 23 is open (opened 2026-11-15): T310. Phase 24 is open (opened 2026-11-25): T320 (accepted), T325. Phase 25 is open (opened 2026-11-26): T327, T328.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -148,8 +148,20 @@ for T325 to be queued. It edits `ci-tree-equivalence.js`, which T320 edits first
 reads as already shipped, and T325 was selected at once without it. **Tick each row `[x]` when its
 task is accepted, and archive the phase at close.**
 
-- [ ] **T320** Task 319's leftover findings are closed · deps: none · touches: docs-config~, test-harness~, bundles~ · /develop-task docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md
+- [x] **T320** Task 319's leftover findings are closed · deps: none · touches: docs-config~, test-harness~, bundles~ · /develop-task docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md
 - [ ] **T325** The docs-only CI rule can exclude a path · deps: T320 · touches: docs-config~, docs-pipeline~, test-harness~, bundles~ · /develop-task docs/tasks/task.325.docs-only-rule-exclusions/task.325.docs-only-rule-exclusions.md
+
+## PHASE 25 — DoD instrument fixes cut from the task.320 observations (opened 2026-11-26)
+
+An **override**: without it the registry fallback selects T321 first, ahead of these. The owner asked
+for both to be queued. Each cost task 320 a DoD run. T327 (observation #185) teaches the `/finalise`
+reply extractors to read a `SubagentHandback` reply, which every DoD run in this harness had to
+hand-copy. T328 (observation #186) flags a measured criterion whose figure comes from a commit that is
+not tree-equivalent to the head. They are independent of each other and share only soft tags.
+**Tick each row `[x]` when its task is accepted, and archive the phase at close.**
+
+- [ ] **T327** SubagentHandback replies are extracted, not hand-copied · deps: none · touches: finalise~, test-harness~, bundles~ · /develop-task docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md
+- [ ] **T328** A measured criterion is re-measured when the head moves · deps: none · touches: finalise~, qa-skills~, test-harness~, bundles~ · /develop-task docs/tasks/task.328.measured-criterion-re-measured-when-head-moves/task.328.measured-criterion-re-measured-when-head-moves.md
 
 ## Deferred / human-gated
 
@@ -334,3 +346,5 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-11-15 | **T310 added** as Phase 23 (task 310, filed from the task 309 5c review, finding CR-1): the `/finalise` 6c poll block reads `CI_HEAD_2` and `PR_NUMBER` without binding them. Low priority, `deps: T309` (merged), touches `skills/finalise/SKILL.md` and `finalise-publish-boundary.test.mjs`. |
 | 2026-11-15 | **T310 accepted + merged — PR #910** (`9658a797`); row ticked. The first `/finalise` 6c poll block now halts by name when `CI_HEAD_2` or `PR_NUMBER` is unbound, and a behaviour test runs the shipped guard line with each input unbound. Mutation proof: weakening the guard turned two tests red. QA gate PASS 95, PR review APPROVE; remote `ci` gate green. |
 | 2026-11-25 | **T320 and T325 added** as Phase 24. T325 (task 325, issue #947, cut from a CI adoption handoff): a `!` pattern in `ci.docsOnly.patterns` excludes a path. Queued on the owner's request, `deps: T320`. T320 (task 320, issue #938) was planned and had no row; it is here so that the dependency holds. |
+| 2026-11-26 | **T320 accepted + merged — PR #949** (`8607d9b1`); row ticked. Task 319's seven carried findings and two owner points are closed. It took 7 QA cycles (one loop-limit escalation) and 4 DoD runs. The residual T320-CR-601/602/603 was accepted by the owner and deferred to task 326, with criterion 1 amended and six probe deferrals approved. The last gap was criterion 10's timings, measured off a tree-equivalent head and re-measured (max 26.0 s of 30 s). Run 3's gap is observation #186. |
+| 2026-11-26 | **T327 and T328 added** as Phase 25, on the owner's request (tasks 327 and 328, cut from observations #185 and #186 of the task 320 run). T327: the `/finalise` reply extractors read a `SubagentHandback` reply. T328: a measured criterion whose figure is from a commit not tree-equivalent to the head is flagged before the DoD. Both are independent, with `deps: none`. |
