@@ -290,9 +290,9 @@ A classifier deciding **which class a repository-relative name belongs to**, suc
 | `..%2f..%2fetc%2fpasswd` | The same input is hostile under `path`, where a later decode re-introduces the traversal. In a git name nothing decodes it: it is one segment, and that segment is not `..`. | Accept: the name is literal, and decoding it is the defect. |
 | `uploads/link-to-etc/passwd` | A name classifier never opens the file, so whether `link-to-etc` is a symlink in some worktree decides nothing. `path.symlink-escape` is about the kernel, and no kernel is involved here. | Accept under `**`: decide on the name. |
 | `docs/notes (draft).md` | Spaces and parentheses are ordinary in names. A check written for a shell word refuses a real document. | Accept. |
-| `docs/c++.md` | `+` is a regex quantifier. A matcher that builds a regex from the name without escaping it refuses, or mismatches, a real file. | Accept: match the name literally. |
-| `docs/café.md` | Non-ASCII names are legal, and git prints them raw with `core.quotePath=false`. A check that refuses every byte above 0x7F refuses them. | Accept: only control characters are refused. |
-| `docs/.gitkeep` | It begins with `.git` and is not `.git`. A prefix check written to stop the repository's internals takes it with them. | Accept: only a spelling of `.git` is internal (any case, trailing dots or spaces, ignorable code points, `git~1`). A name that merely begins with `.git` is not. |
+| `docs/c++.md` | `+` is a regex quantifier. A matcher that treats the name as a pattern, or compiles a glob to a regex without escaping its literal parts, refuses or mismatches a real file. | Accept: match the name literally. |
+| `docs/café.md` | Non-ASCII names are legal, and git prints them raw with `core.quotePath=false`. A check that refuses every byte above 0x7F refuses them. | Accept: a character above 0x7F is not refused for being non-ASCII. |
+| `docs/.gitkeep` | It begins with `.git` and is not `.git`. A prefix check written to stop the repository's internals takes it with them. | Accept: a name that merely begins with `.git` is not the repository's internals. What counts as `.git` itself (case, trailing dots, `git~1`) is a separate question that this case does not settle. |
 | `docs/archive..2026.md` | `..` inside a segment is not traversal. A substring check refuses a real name. | Accept: only a whole `..` segment is refused. |
 
 ### `template-render`

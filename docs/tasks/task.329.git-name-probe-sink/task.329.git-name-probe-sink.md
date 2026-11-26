@@ -396,25 +396,26 @@ A case's wording or direction.
 
 ## QA Testing Results
 
-**QA Status**: PASS
+**QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-26
-**Quality Score**: 100/100
-**Gate Decision**: PASS
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.329.qa.1.git-name-probe-sink.md](./task.329.qa.1.git-name-probe-sink.md)
-- **Gate File**: [task.329.gate.1.git-name-probe-sink.yml](./task.329.gate.1.git-name-probe-sink.yml)
+- **Full Report**: [task.329.qa.2.git-name-probe-sink.md](./task.329.qa.2.git-name-probe-sink.md)
+- **Gate File**: [task.329.gate.2.git-name-probe-sink.yml](./task.329.gate.2.git-name-probe-sink.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 4 task tests, plus the full fast gate (8898 pass, 1 push-policy load flake)
+- **Tests Executed**: 4 task tests; the cycle-2 refute pass ran isDocsPath on each claim it doubted
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-No critical issues. Seven mutations proved the tests: each turned its predicted test red. Three LOW
-wording errors in the new corpus prose are open (T329-QA-1, T329-QA-2, T329-QA-3).
+Two git-name `correct` texts claim more than isDocsPath does (T329-QA-4, T329-QA-5, MEDIUM), and
+three further texts are inaccurate (T329-QA-6 to T329-QA-8, LOW). The isDocsPath gaps behind them
+are identical on develop and are routed to a follow-up.
 
 <!-- change-log-start -->
 ## Change Log
@@ -427,6 +428,8 @@ wording errors in the new corpus prose are open (T329-QA-1, T329-QA-2, T329-QA-3
 | 2026-11-26 |         | Implemented — 10 source files (+14 bundled copies), 4 tests  | develop     |
 | 2026-11-26 |         | QA gate PASS (100/100) — 3 LOW findings open                 | qa-task     |
 | 2026-11-26 |         | QA findings fixed — 3 LOW wording errors in the corpus prose, 1 iteration | qa-fix |
+| 2026-11-26 |         | QA gate CONCERNS (90/100) — 2 MEDIUM, 3 LOW open | qa-task |
+| 2026-11-26 |         | QA findings fixed — 5 corpus and comment texts scoped to what each case tests, 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ---

@@ -670,8 +670,10 @@ const PATH = sinkCases("path", [
 // task.329: `isDocsPath` was probed under `path` and two cases "reproduced" that
 // are not defects for a name classifier: git prints `%2f` literally, and a name
 // is never opened, so a symlink in the worktree decides nothing. Each hostile
-// case below is one a broken copy of `isDocsPath` (one refusal line removed)
-// admits; the probe test proves that, line by line.
+// case below is one a broken copy of `isDocsPath` admits. Most need one refusal
+// line removed; `leading-slash` and `dot-slash` have two defences (the segment
+// check and the normalise check) and need both removed. The probe test proves
+// each, line by line.
 
 const GIT_NAME = sinkCases("git-name", [
   {
@@ -804,7 +806,7 @@ const GIT_NAME = sinkCases("git-name", [
     id: "plus-signs",
     direction: "legitimate",
     input: "docs/c++.md",
-    why: "`+` is a regex quantifier. A matcher that builds a regex from the name without escaping it refuses, or mismatches, a real file.",
+    why: "`+` is a regex quantifier. A matcher that treats the name as a pattern, or compiles a glob to a regex without escaping its literal parts, refuses or mismatches a real file.",
     correct: "Accept: match the name literally.",
   },
   {
@@ -812,7 +814,8 @@ const GIT_NAME = sinkCases("git-name", [
     direction: "legitimate",
     input: "docs/café.md",
     why: "Non-ASCII names are legal, and git prints them raw with `core.quotePath=false`. A check that refuses every byte above 0x7F refuses them.",
-    correct: "Accept: only control characters are refused.",
+    correct:
+      "Accept: a character above 0x7F is not refused for being non-ASCII.",
   },
   {
     id: "dotfile",
@@ -820,7 +823,7 @@ const GIT_NAME = sinkCases("git-name", [
     input: "docs/.gitkeep",
     why: "It begins with `.git` and is not `.git`. A prefix check written to stop the repository's internals takes it with them.",
     correct:
-      "Accept: only a spelling of `.git` is internal (any case, trailing dots or spaces, ignorable code points, `git~1`). A name that merely begins with `.git` is not.",
+      "Accept: a name that merely begins with `.git` is not the repository's internals. What counts as `.git` itself (case, trailing dots, `git~1`) is a separate question that this case does not settle.",
   },
   {
     id: "dots-in-name",

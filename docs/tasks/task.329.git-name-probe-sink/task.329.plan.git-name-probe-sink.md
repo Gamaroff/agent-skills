@@ -72,7 +72,7 @@ their directions. This holds the criterion that `path` is unchanged.
   - `dot-git-case`: on a case-insensitive filesystem `.GIT` is the repository's directory.
   - `config-*`: this repository's pipeline config. A change to it changes pipeline behaviour, so it is
     never documentation.
-  - `dotfile`: only a spelling of `.git`, in any case, is internal. A `.git` prefix is not.
+  - `dotfile`: a `.git` prefix is not the repository's internals.
 - `CORPUS` (`:1081`): add `"git-name": GIT_NAME,` after `path`.
 - `SINK_BLURB` (`:1174`): add after `path`:
 

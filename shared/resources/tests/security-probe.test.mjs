@@ -4663,8 +4663,8 @@ test("task.131: lintReport through the markdown-structure sink engages — every
 
 const GIT_NAME_ENTRY = "shared/resources/ci-tree-equivalence.js#isDocsPath";
 const GIT_NAME_ARGS = [["**"]];
-// Each refusal has two spellings: inline in isDocsPath, and (since task.325) in
-// the hasPathFormDefect helper it calls. Exactly one spelling must occur, exactly
+// Each refusal has two spellings: inline in isDocsPath, as on develop, and in a
+// hasPathFormDefect helper, which the unmerged task-325 branch adds. Exactly one spelling must occur, exactly
 // once, so the test holds on both sides of that refactor and fails on a third.
 const IS_DOCS_LINES = Object.freeze({
   control: [

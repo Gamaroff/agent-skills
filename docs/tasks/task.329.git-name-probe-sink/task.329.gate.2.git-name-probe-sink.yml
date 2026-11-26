@@ -1,0 +1,96 @@
+schema: 2
+task: 'task.329.git-name-probe-sink'
+task_title: 'A git-name sink for classifiers of repository names'
+gate: CONCERNS
+status_reason: 'The cycle-2 refute pass found that two git-name `correct` texts misstate what isDocsPath refuses; QA ran isDocsPath on each claim and confirmed it false. Three further case and comment texts are inaccurate. Two isDocsPath gaps it exposed are identical on develop and are routed to a follow-up.'
+reviewer: 'QA Engineer'
+head: '6709861a4558af387ae7e90df728ddbf542ab19c'
+updated: '2026-11-26T14:27:14Z'
+
+top_issues:
+  - id: 'T329-QA-4'
+    severity: medium
+    file: 'shared/resources/security-input-corpus.mjs'
+    finding: 'git-name.dotfile correct: presents its list of .git spellings as complete, but isDocsPath("docs/.git::$INDEX_ALLOCATION/x.md", ["**"]) and isDocsPath("docs/.git:x/y.md", ["**"]) both return true (QA ran both). The list is not what isDotGitSegment refuses in full, and git treats `.git:` as the repository on NTFS. (origin: code-review CR-1, reproduced by QA)'
+    suggested_action: 'Reword so the list is not claimed to be complete (name the spellings isDocsPath refuses today, and say the NTFS `.git:` stream form is a known gap tracked for follow-up)'
+    suggested_owner: dev
+    status: open
+  - id: 'T329-QA-5'
+    severity: medium
+    file: 'shared/resources/security-input-corpus.mjs'
+    finding: 'git-name.non-ascii correct: "only control characters are refused" is false both ways. isDocsPath refuses "docs/a.md " (trailing space, normalisePath trims it) and "docs/a<U+2028>.md" (** does not cross a line terminator), and accepts "docs/a<U+0085>.md", a C1 control (QA ran all three). (origin: code-review CR-2, reproduced by QA)'
+    suggested_action: 'State the narrow rule the case tests: a byte above 0x7F is not refused for being non-ASCII. Do not claim this is the only refusal'
+    suggested_owner: dev
+    status: open
+  - id: 'T329-QA-6'
+    severity: low
+    file: 'shared/resources/security-input-corpus.mjs'
+    finding: 'The GIT_NAME header says each hostile case is admitted by a copy with one refusal line removed. leading-slash and dot-slash need two (segment and normalise), as GIT_NAME_MUTATIONS records. (origin: code-review CR-3, confirmed against the test table)'
+    suggested_action: 'Say one or more refusal lines, and name the two cases with two defences'
+    suggested_owner: dev
+    status: open
+  - id: 'T329-QA-7'
+    severity: low
+    file: 'shared/resources/tests/security-probe.test.mjs'
+    finding: 'The IS_DOCS_LINES comment says hasPathFormDefect exists "since task.325". It exists only on the unmerged task-325 branch. (origin: code-review CR-4, confirmed: absent on develop and on this branch)'
+    suggested_action: 'Say the second spelling anticipates the unmerged task-325 refactor'
+    suggested_owner: dev
+    status: open
+  - id: 'T329-QA-8'
+    severity: low
+    file: 'shared/resources/security-input-corpus.mjs'
+    finding: 'git-name.plus-signs why: describes a matcher building a regex from the name. A glob matcher compiles the pattern, not the name, and globMatch (glob-match.js:77) builds no regex at all. (origin: code-review CR-5, confirmed by reading glob-match.js)'
+    suggested_action: 'Describe the real risk: a matcher that compiles the pattern to a regex without escaping its literal parts, or one that treats the name as a pattern'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 4
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: false
+    boundary_signals: []
+    notes: 'The change set still adds no boundary to shipped code. The isDocsPath gaps the refute pass found (NTFS .git: stream, C1 U+0085) are in code this PR does not touch and are identical on develop; they are routed to recommendations.future.'
+  performance:
+    status: PASS
+    notes: 'Unchanged from gate 1.'
+  reliability:
+    status: PASS
+    notes: 'Unchanged from gate 1.'
+  maintainability:
+    status: CONCERNS
+    notes: 'Corpus prose that misstates the classifier it is calibrated on misleads the next implementer; T329-QA-4 and T329-QA-5.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Correct the git-name dotfile and non-ascii correct texts (T329-QA-4, T329-QA-5)'
+      refs: ['shared/resources/security-input-corpus.mjs']
+  future:
+    - action: 'isDocsPath admits the NTFS alternate-stream spelling of .git (docs/.git::$INDEX_ALLOCATION/x.md, docs/.git:x/y.md) and the C1 control U+0085. Fold from ":" onward in isDotGitSegment as git does, refuse C1 controls, and add hostile git-name cases with mutation rows. Identical on develop (isDocsPath unchanged by this PR), so a follow-up task, not this branch'
+      refs: ['shared/resources/ci-tree-equivalence.js']
+      provenance: pre-existing
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T329-QA-4 and T329-QA-5 fixed']
