@@ -5,7 +5,7 @@ How to use this document: work top to bottom. Only `[ ]` rows are candidates; `[
 [`roadmap-history.md`](./roadmap-history.md), so a `deps:` entry naming no current row means
 _already shipped_, not an error. Resolve any such reference there.
 
-**Phases 1 through 18, and Phase 24, are complete and archived** to
+**Phases 1 through 24 are complete and archived** to
 [`roadmap-history.md`](./roadmap-history.md) — resolve any `deps:` naming a row you cannot find here
 against that file. The rows under "Deferred / human-gated" remain invisible to selection.
 
@@ -67,79 +67,6 @@ Read only by `--batch`. Two rows conflict when they share a tag that **either** 
 | `docs-pipeline`    | `docs/runbooks/*`, `docs/concepts/*`, `docs/reference/pipeline-artifacts.md`, `docs/operations/workflows.md`, `skills/develop-*/README.md` |
 | `pipeline-lock`    | `shared/resources/advance-pipeline-lock.sh`, `advance-pipeline-lock.test.sh`  |
 
-## PHASE 19 — shared-checkout safety before the QA-loop rework (opened 2026-10-29)
-
-An **override**: without it the registry fallback selects T244 first, because it takes the
-lowest-numbered task. T245 goes first because this checkout is shared with a parallel session (the
-T243 wireframe work), and T245 fixes the two places that session's edits break a run: `/finalise` 6a
-sweeping its registry row into an acceptance commit (obs #127), and the QA re-review halting on its
-edit (obs #126). T244's QA loop runs the re-review on every cycle, so it benefits directly. The two
-rows are independent (`deps: none`). They share a soft edit to `qa-task`/`qa-story`, so the second
-to merge rebases.
-
-- [x] **T245** Shared-checkout-safe guards and staging · deps: none · touches: finalise!, qa-skills~, orchestrators~, bundles~ · /develop-task docs/tasks/task.245.shared-checkout-safe-guards-and-staging/task.245.shared-checkout-safe-guards-and-staging.md · ✅ **accepted + merged** ([PR #796](https://github.com/Gamaroff/agent-skills/pull/796), QA PASS 100/100)
-- [x] **T244** The QA loop always ends on a gate · deps: none · touches: pipeline-steps!, qa-skills~, bundles~ · /develop-task docs/tasks/task.244.qa-loop-ends-on-a-gate/task.244.qa-loop-ends-on-a-gate.md
-
-## PHASE 20 — close the snippet runner's known write gaps (opened 2026-11-09)
-
-An **override**: without it the registry fallback selects T275 first, the lowest-numbered planned
-task. T289 goes first because the QA snippet runner decides what a QA gate executes, and task 274
-left seven ways a block classifies `runnable` and writes (reproduced by execution, identical on
-develop). Every QA run until T289 lands carries that exposure. **Tick the row `[x]` when T289 is
-accepted, and archive the phase at close.**
-
-- [x] **T289** QA snippet runner allows flags, not just commands · deps: none · touches: test-harness~, bundles~ · /develop-task docs/tasks/task.289.qa-snippet-runner-flag-level-allow-list/task.289.qa-snippet-runner-flag-level-allow-list.md
-- [x] **T290** QA snippet runner reads a # after an escaped space as a comment · deps: none · touches: test-harness~, bundles~ · /develop-task docs/tasks/task.290.qa-snippet-runner-comment-after-escaped-space/task.290.qa-snippet-runner-comment-after-escaped-space.md
-- [x] **T292** One bash tokenizer for the QA snippet classifier · deps: none · touches: test-harness~, bundles~ · /develop-task docs/tasks/task.292.qa-snippet-classifier-one-bash-tokenizer/task.292.qa-snippet-classifier-one-bash-tokenizer.md · ✅ **accepted + merged** ([PR #869](https://github.com/Gamaroff/agent-skills/pull/869), QA CONCERNS 90/100)
-- [x] **T293** QA snippet classifier refuses indirect evaluation · deps: none · touches: test-harness~, bundles~ · /develop-task docs/tasks/task.293.qa-snippet-classifier-indirect-evaluation/task.293.qa-snippet-classifier-indirect-evaluation.md
-- [x] **T294** QA snippet classifier allow-list · deps: T293 · touches: test-harness~, bundles~ · /develop-task docs/tasks/task.294.qa-snippet-classifier-allow-list/task.294.qa-snippet-classifier-allow-list.md · ✅ **accepted + merged** ([PR #874](https://github.com/Gamaroff/agent-skills/pull/874), QA PASS 95/100)
-- [x] **B21** The PreCompact claim uses mkdir, which is not exclusive on some kernels · deps: none · touches: orchestrators~, bundles~ · /develop-bug docs/bugs/bug.21.precompact-claim-mkdir-not-exclusive/bug.21.precompact-claim-mkdir-not-exclusive.md · ✅ **fixed + merged** ([PR #881](https://github.com/Gamaroff/agent-skills/pull/881), verify PASS)
-- [x] **T304** QA snippet classifier refuses git literal execution · deps: T294 · touches: test-harness~, bundles~ · /develop-task docs/tasks/task.304.qa-snippet-classifier-git-literal-execution/task.304.qa-snippet-classifier-git-literal-execution.md · ✅ **accepted + merged** ([PR #876](https://github.com/Gamaroff/agent-skills/pull/876), QA PASS 95/100)
-- [x] **T291** The context-pressure statusline test leaks a ctx-wrap- temp directory · deps: none · touches: test-harness~ · /develop-task docs/tasks/task.291.context-pressure-statusline-test-leaks-ctx-wrap-directory/task.291.context-pressure-statusline-test-leaks-ctx-wrap-directory.md
-- [x] **T295** Run the test suite on the LAN server (test:remote) · deps: none · touches: test-harness~ · /develop-task docs/tasks/task.295.test-remote-lan-server-route/task.295.test-remote-lan-server-route.md
-
-## PHASE 21 — follow-ups to the PreCompact lock fix and the test route (opened 2026-11-10)
-
-An **override**: without it the registry fallback selects the lowest-numbered planned task, which is
-T275 or older work, ahead of these. They follow PR #873 (the PreCompact hook keeps the lock) and task
-295 (`test:remote`), and the owner asked for them to be queued. T301 and T303 both edit the PreCompact
-hook, so whichever merges second rebases (`pipeline-lock~`). T302 and T296 both edit
-`scripts/remote-test/run.sh` (no tag covers it, so both carry `test-harness~`), so the second to
-merge rebases. **Tick each row `[x]` when its task is accepted, and archive the phase at close.**
-
-- [x] **T301** PreCompact pause comment names the cycle and the pause count · deps: none · touches: pipeline-lock~, pipeline-steps~, test-harness~, bundles~ · /develop-task docs/tasks/task.301.precompact-pause-comment-names-cycle-and-count/task.301.precompact-pause-comment-names-cycle-and-count.md · ✅ **accepted + merged** ([PR #886](https://github.com/Gamaroff/agent-skills/pull/886), QA PASS 100/100)
-- [x] **T303** Pause commits restart CI and block the docs-only shortcut · deps: none · touches: pipeline-lock~, finalise~, test-harness~, bundles~ · /develop-task docs/tasks/task.303.pause-commits-restart-ci-and-block-docs-only-shortcut/task.303.pause-commits-restart-ci-and-block-docs-only-shortcut.md · ✅ **accepted + merged** ([PR #889](https://github.com/Gamaroff/agent-skills/pull/889), QA PASS 95/100)
-- [x] **T302** test:remote from a linked worktree · deps: none · touches: test-harness~ · /develop-task docs/tasks/task.302.test-remote-from-a-linked-worktree/task.302.test-remote-from-a-linked-worktree.md · ✅ **accepted + merged** ([PR #890](https://github.com/Gamaroff/agent-skills/pull/890), QA PASS 95/100)
-- [x] **T296** test:remote per-run lock and image-tag prune · deps: none · touches: test-harness~ · /develop-task docs/tasks/task.296.test-remote-per-run-lock-and-image-prune/task.296.test-remote-per-run-lock-and-image-prune.md · ✅ **accepted + merged** ([PR #891](https://github.com/Gamaroff/agent-skills/pull/891), QA PASS 96/100)
-
-## PHASE 22 — skill fixes cut from the task.295 observations (opened 2026-11-10)
-
-An **override**: without it the registry fallback selects the lowest-numbered planned task, which is
-T275 or older work, ahead of these. Each task was cut from observations #161 to #165 logged while
-finishing task 295, and each starts with a premise check, because two of the observations were
-partly wrong when read against the code (T297, T300). T297 to T300 are independent; they edit different
-skills, but all regenerate bundled copies (`bundles~`), so whichever merges later runs
-`npm run bundle` again. T306 is a fifth row, cut from a task.296 finding rather than these
-observations: it runs last (`deps: T300`) because it edits the same engine as T300. **Tick each row `[x]` when its task is accepted, and archive the phase at
-close.**
-
-- [x] **T297** QA loop fast gate and an earlier structural move · deps: none · touches: pipeline-steps~, qa-skills~, bundles~ · /develop-task docs/tasks/task.297.qa-loop-fast-gate-and-earlier-structural-move/task.297.qa-loop-fast-gate-and-earlier-structural-move.md · ✅ **accepted + merged** ([PR #895](https://github.com/Gamaroff/agent-skills/pull/895), QA PASS 100/100)
-- [x] **T300** security-probe names the sink it observes · deps: none · touches: finalise~, bundles~ · /develop-task docs/tasks/task.300.security-probe-names-the-sink-it-observes/task.300.security-probe-names-the-sink-it-observes.md
-- [x] **T298** review-task runs a plan's command and checks CI parity · deps: none · touches: review-skills~, templates~, bundles~ · /develop-task docs/tasks/task.298.review-task-runs-plan-command-and-ci-parity/task.298.review-task-runs-plan-command-and-ci-parity.md
-- [x] **T299** Orchestration reads status and time from the instrument · deps: none · touches: pipeline-steps~, test-harness~, bundles~ · /develop-task docs/tasks/task.299.orchestration-status-and-timestamp-from-the-instrument/task.299.orchestration-status-and-timestamp-from-the-instrument.md · ✅ **accepted + merged** ([PR #899](https://github.com/Gamaroff/agent-skills/pull/899), QA PASS 95/100)
-- [x] **T306** Probe sandbox HOME shared across cases · deps: T300 · touches: finalise~, bundles~ · /develop-task docs/tasks/task.306.probe-sandbox-home-shared-across-cases/task.306.probe-sandbox-home-shared-across-cases.md
-- [x] **T307** Instrument-read guard quote and redirect edges · deps: T299 · touches: test-harness~ · /develop-task docs/tasks/task.307.instrument-read-guard-quote-and-redirect-edges/task.307.instrument-read-guard-quote-and-redirect-edges.md
-
-## PHASE 23 — follow-up to the 6c CI poll block (opened 2026-11-15)
-
-An **override**: without it the registry fallback selects the lowest-numbered planned task, which is
-T275 or older work, ahead of this. T310 closes finding CR-1 of the task 309 5c review (the 6c poll
-block reads `CI_HEAD_2` and `PR_NUMBER` without binding them), and the owner asked for it to be queued.
-It edits the block task 309 just changed, so it carries `deps: T309` (merged). **Tick the row `[x]`
-when T310 is accepted, and archive the phase at close.**
-
-- [x] **T310** The finalise 6c poll block guards its inputs · deps: T309 · touches: finalise~, test-harness~, bundles~ · /develop-task docs/tasks/task.310.finalise-6c-poll-block-guards-its-inputs/task.310.finalise-6c-poll-block-guards-its-inputs.md
-
 ## PHASE 25 — DoD instrument fixes cut from the task.320 observations (opened 2026-11-26)
 
 An **override**: without it the registry fallback selects T321 first, ahead of these. The owner asked
@@ -175,7 +102,7 @@ Rows here are invisible to selection. Move a row up into a phase when it becomes
 
 ## Housekeeping
 
-- [x] Archive accepted rows to `roadmap-history.md` at each phase close — Phase 5 archived 2026-09-12; Phases 6, 7 and 8 archived 2026-10-06; Phases 9 and 10 archived 2026-10-11; Phase 11 archived 2026-10-16; Phase 12 archived 2026-10-20; Phase 13 archived 2026-10-21; Phases 14 and 15 archived 2026-10-22; Phase 16 archived 2026-10-23; Phase 17 archived 2026-10-27; Phase 18 archived 2026-10-28; Phase 24 archived 2026-11-26
+- [x] Archive accepted rows to `roadmap-history.md` at each phase close — Phase 5 archived 2026-09-12; Phases 6, 7 and 8 archived 2026-10-06; Phases 9 and 10 archived 2026-10-11; Phase 11 archived 2026-10-16; Phase 12 archived 2026-10-20; Phase 13 archived 2026-10-21; Phases 14 and 15 archived 2026-10-22; Phase 16 archived 2026-10-23; Phase 17 archived 2026-10-27; Phase 18 archived 2026-10-28; Phases 19 to 24 archived 2026-11-26
 - [ ] If a phase is ever re-opened: tick its rows `[x]` as each item is accepted — an unticked row for an accepted item is still selected and stalls the loop
 
 **Registry-selected items need no row here.** When selection falls through to the registries (the
@@ -351,4 +278,5 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-11-26 | **T327 and T328 added** as Phase 25, on the owner's request (tasks 327 and 328, cut from observations #185 and #186 of the task 320 run). T327: the `/finalise` reply extractors read a `SubagentHandback` reply. T328: a measured criterion whose figure is from a commit not tree-equivalent to the head is flagged before the DoD. Both are independent, with `deps: none`. |
 | 2026-11-26 | **T325 accepted + merged — PR #954** (`0150d033`); row ticked. `ci.docsOnly.patterns` can hold a `!` exclusion: a path any exclusion matches is code, in any order, inside `isDocsPath` only. A list of exclusions only, a bare `!`, an exclusion outside git's path form, and dialect syntax are usage errors (exit 2). It took 5 QA cycles and 2 DoD runs. Run 1 stopped on two `path`-sink probes, a sink mismatch for a name classifier, which task 329 (PR #956, a `git-name` sink) closed. Run 2: 40 probes, 0 reproduced. Merge gate: `npm run ci` on the LAN server, 8910 tests, 0 fail. T325-CR-501/502 (LOW) are deferred. |
 | 2026-11-26 | **T330 and T331 added** as Phase 26, on the owner's request. T330 (task 330, issue #957): `isDocsPath` refuses a `.git:` stream segment and a C1 control, plus T325-CR-501/502 and T329-QA-9/10. The remedy was tried green in a worktree. T331 (task 331, issue #958, observation #191): the AC merge refuses a result whose `story_file` names another document. `deps: T327`. |
-| 2026-11-26 | **Phase 24 archived** to `roadmap-history.md`. Both rows (T320, T325) moved verbatim with their `touches:` tags and acceptance annotations, so a `deps:` naming either still resolves there. Phases 25 and 26 stay open. Phases 19–23 are fully ticked but not yet archived. |
+| 2026-11-26 | **Phase 24 archived** to `roadmap-history.md`. Both rows (T320, T325) moved verbatim with their `touches:` tags and acceptance annotations, so a `deps:` naming either still resolves there. Phases 25 and 26 stay open. |
+| 2026-11-26 | **Phases 19–23 archived** to `roadmap-history.md`. All 22 rows were ticked, and they moved verbatim with their `touches:` tags. The 11 rows without an acceptance annotation got one, giving the merged PR and merge commit read from GitHub. Each phase's closing date is its last PR's merge date. Phases 1 through 24 are now all archived; Phases 25 and 26 stay open. |
