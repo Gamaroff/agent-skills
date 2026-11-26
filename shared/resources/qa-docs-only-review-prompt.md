@@ -9,9 +9,10 @@ description: Read-only Explore-subagent prompt + route rule for the QA diff revi
 
 `/qa-task` Step 3b and `/qa-story` Phase 1.6 take this route **instead of** `code-review-prompt.md`
 when **every** path in the change set is documentation, as `ci.docsOnly` defines it: each changed path
-matches `ci.docsOnly.patterns` (default `**/*.md`, `docs/**`), and none is a path the rule never
-treats as documentation (a `skills-config.yaml` anywhere in the delta, a path in an unusual form, a
-submodule pointer). The rule and its exceptions are stated once, in `docs/reference/configuration.md`
+matches `ci.docsOnly.patterns` (default `**/*.md`, `docs/**`) and no exclusion in it (an entry
+starting with `!`, such as `!docs/catalogue.md`: a path it names is code whatever the other entries
+say), and none is a path the rule never treats as documentation (a `skills-config.yaml` anywhere in
+the delta, a path in an unusual form, a submodule pointer). The rule and its exceptions are stated once, in `docs/reference/configuration.md`
 under `ci.docsOnly`; do not write a second matcher. One code file in the change set sends the whole
 review down the code-review route.
 

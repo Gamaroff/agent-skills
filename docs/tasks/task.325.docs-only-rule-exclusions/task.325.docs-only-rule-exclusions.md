@@ -221,11 +221,15 @@ None.
 4. ✅ `docs/reference/configuration.md`
 5. ✅ `docs/runbooks/ci-docs-only-skip.md`
 6. ✅ `CHANGELOG.md`
+6a. ✅ `shared/resources/qa-docs-only-review-prompt.md`, `skills/qa-task/SKILL.md`,
+   `skills/qa-story/SKILL.md`, `skills/finalise/SKILL.md` — the prose readers state the exclusion
+   (QA cycle 1, T325-CR-101)
 
 ### Generated
 
 7. ✅ `skills/*/references/` copies of 1, by `npm run bundle`: `develop-batch`, `develop-bug`,
-   `develop-next`, `develop-story`, `develop-task`, `finalise`
+   `develop-next`, `develop-story`, `develop-task`, `finalise`; and of
+   `qa-docs-only-review-prompt.md` in `qa-task` and `qa-story`
 
 ### Files to Delete
 
@@ -344,6 +348,27 @@ Wording of the message or the reference.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-26
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.325.qa.1.docs-only-rule-exclusions.md](./task.325.qa.1.docs-only-rule-exclusions.md)
+- **Gate File**: [task.325.gate.1.docs-only-rule-exclusions.yml](./task.325.gate.1.docs-only-rule-exclusions.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 320 (235 engine suites, 85 reenter-qa)
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+One medium finding (T325-CR-101): the prose route readers of `ci.docsOnly.patterns` do not mention exclusions. Five of five mutations covered.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -353,6 +378,8 @@ Wording of the message or the reference.
 | 2026-11-26 | 1.1     | Review passed (8/10) — fixed a false `!`-path clarification, scoped the usage error to non-empty lists, refreshed line anchors | review-task |
 | 2026-11-26 |         | Status → ready-for-development                        | review-task |
 | 2026-11-26 |         | Implemented — 15 files (6 generated), 7 tests          | develop     |
+| 2026-11-26 |         | QA gate CONCERNS (90/100) — 1 finding                  | qa-task     |
+| 2026-11-26 |         | QA findings fixed — cycle 1, 1 finding                 | qa-fix      |
 <!-- change-log-end -->
 
 ---
