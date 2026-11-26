@@ -62,8 +62,9 @@ All notable changes to this project will be documented in this file. Format foll
   unverified hand copy. The reader now takes the later of the final-turn text and the last
   `SubagentHandback` message, and says which in a new `reply` field (`text` or `handback`). Only that
   tool name with a non-empty string `message` counts. A failed extract now also removes any earlier
-  file at `--out`, so a stale plan can no longer be read as its output, and an `--out` that names the
-  `--transcript` file is a usage error.
+  file at `--out`, so a stale plan can no longer be read as its output. An `--out` that is the
+  transcript (by path, symlink or hard link, or the transcript `--agent-id` finds) is a usage error,
+  and so is a directory `--out`.
 
 ## [v0.69.0] - 2026-11-25
 

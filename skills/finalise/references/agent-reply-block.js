@@ -39,8 +39,9 @@
  * the reply must not have the quotation run.
  *
  * `extract` removes --out before it reads anything, so every answer but `extracted` leaves no file
- * there: an earlier run's file cannot be read as this run's output (task 327). An --out that names the
- * --transcript file is a usage error for that reason.
+ * there: an earlier run's file cannot be read as this run's output (task 327). An --out that is the
+ * transcript file — by path, symlink or hard link, and on the --agent-id route the transcript found —
+ * is a usage error for that reason, and so is an --out that is a directory or cannot be removed.
  */
 "use strict";
 
@@ -201,25 +202,70 @@ function lastBlock(text, info) {
 }
 
 /**
+ * True when `a` and `b` name one file: the same resolved path, or — when both exist — the same
+ * device and inode, so a symlink or a hard link to a file is that file (task 327, QA cycle 1).
+ */
+function sameFile(a, b) {
+  if (path.resolve(a) === path.resolve(b)) return true;
+  let sa, sb;
+  try {
+    sa = fs.statSync(a);
+    sb = fs.statSync(b);
+  } catch {
+    return false; // one of them does not exist: nothing at `a` can be the file at `b`
+  }
+  return sa.dev === sb.dev && sa.ino === sb.ino;
+}
+
+/**
+ * Remove a file at `out`, if there is one. Returns null on success, or the refusal message when `out`
+ * is a directory or cannot be removed — a named answer, never a crash (task 327, QA cycle 1).
+ */
+function clearOut(out) {
+  let st;
+  try {
+    st = fs.lstatSync(out);
+  } catch {
+    return null; // nothing there
+  }
+  if (st.isDirectory()) return `extract --out is a directory: ${out}`;
+  try {
+    fs.rmSync(out, { force: true });
+  } catch (e) {
+    return `extract --out cannot be removed: ${out} (${(e && e.code) || e})`;
+  }
+  return null;
+}
+
+/**
  * Extract the block. `opts`: { agentId | transcript, block, out, projectsRoot }.
  * Returns { reason, exitCode: 0, ... }.
  */
 function extract(opts) {
-  // A failed extract must never leave an earlier run's file to be read as its output (task 327). The
-  // usage checks run first (main, finalise-rerun-scope.js), and they refuse an --out that IS the
-  // --transcript; the same test here keeps a direct caller from deleting its own input.
-  if (
-    opts.out &&
-    !(
-      opts.transcript &&
-      path.resolve(opts.out) === path.resolve(opts.transcript)
-    )
-  )
-    fs.rmSync(opts.out, { force: true });
+  // Find the transcript first, writing nothing: --out is removed only once every file this call could
+  // read is known, so the removal can never be the input (task 327, QA cycle 1).
   let file = opts.transcript || null;
+  let hits = [];
   if (!file) {
     const root = opts.projectsRoot || defaultProjectsRoot();
-    const hits = findTranscripts(opts.agentId, root);
+    hits = findTranscripts(opts.agentId, root);
+  }
+  // A failed extract must never leave an earlier run's file to be read as its output (task 327).
+  // The test is file identity, not spelling: a symlink or a hard link to the transcript is the
+  // transcript (QA cycle 1, T327-QA-1).
+  const sources = file ? [file] : hits;
+  if (opts.out && sources.some((s) => sameFile(opts.out, s)))
+    return {
+      reason: "usage",
+      exitCode: 2,
+      message: "extract --out must not be the transcript file",
+    };
+  if (opts.out) {
+    const refused = clearOut(opts.out);
+    if (refused) return { reason: "usage", exitCode: 2, message: refused };
+  }
+  if (!file) {
+    const root = opts.projectsRoot || defaultProjectsRoot();
     if (hits.length === 0)
       return {
         reason: "transcript-not-found",
@@ -334,10 +380,8 @@ function extractUsageError(opts) {
   if (!opts.block) return "extract needs --block";
   if (!opts.out) return "extract needs --out";
   // extract removes --out before reading (task 327): the same file would be the input it deletes.
-  if (
-    opts.transcript &&
-    path.resolve(opts.out) === path.resolve(opts.transcript)
-  )
+  // File identity, not spelling: a symlink or a hard link to the transcript is the transcript.
+  if (opts.transcript && sameFile(opts.out, opts.transcript))
     return "extract --out must not be the --transcript file";
   return null;
 }

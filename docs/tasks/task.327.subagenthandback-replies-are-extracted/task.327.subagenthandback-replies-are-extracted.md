@@ -242,7 +242,7 @@ command and its `reason` and `sha256` in the QA report.
 - [ ] A block only in an earlier turn is not read (the existing final-turn rule holds for hand-backs; Phase 1)
 - [ ] A `tool_use` of any other name is never read as a reply; an empty or non-string hand-back `message` answers `transcript-unreadable` (Phase 1: no candidate returns `null`)
 - [ ] After any answer but `extracted`, no file exists at `--out`, even when one existed before (Phase 2)
-- [ ] An `--out` that names the `--transcript` file is a usage error (exit 2) and the transcript is left unchanged (Phase 2)
+- [ ] An `--out` that names the `--transcript` file is a usage error (exit 2) and the transcript is left unchanged (Phase 2) — added in review 1 (Important fix), approved by review-task
 - [ ] `finalise-rerun-scope.js extract` on a hand-back transcript writes the AC YAML, and `merge` with its `sha256` records `verified: true` (Phase 3)
 - [ ] One real hand-back transcript from this host extracts, with the command, `reason` and `sha256` recorded in the QA report
 
@@ -280,6 +280,27 @@ agent's block, or a text-reply transcript answers differently from before. Steps
 
 **Forward fix.** A new reply shape gets its own fixture and reader branch.
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-26
+**Quality Score**: 80/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.327.qa.1.subagenthandback-replies-are-extracted.md](./task.327.qa.1.subagenthandback-replies-are-extracted.md)
+- **Gate File**: [task.327.gate.1.subagenthandback-replies-are-extracted.yml](./task.327.gate.1.subagenthandback-replies-are-extracted.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 81 (16 + 65), plus ci:fast 8919/0
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: CONCERNS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+A symlinked `--transcript` gets past the same-file guard, and the transcript is deleted (T327-QA-1, reproduced). CI `link-check` is red on a `mailto:` false link in the implementation report (T327-CI-1). Criterion 7 reads as added without an approver (T327-QA-2). A directory `--out` crashes `extract` (T327-QA-3, low).
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -289,6 +310,8 @@ agent's block, or a text-reply transcript answers differently from before. Steps
 | 2026-11-26 | 1.1 | Review passed (9/10) — added the `--out` = `--transcript` refusal, its fixture and criterion; corrected two SKILL.md anchors | review-task |
 | 2026-11-26 |  | Status → ready-for-development | review-task |
 | 2026-11-26 |  | Implemented — 6 files, 13 tests | develop |
+| 2026-11-26 |  | QA gate CONCERNS (80/100) — 4 findings | qa-task |
+| 2026-11-26 |  | QA findings fixed (4 of 4) — gate 1 CONCERNS, 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ## Progress Tracking

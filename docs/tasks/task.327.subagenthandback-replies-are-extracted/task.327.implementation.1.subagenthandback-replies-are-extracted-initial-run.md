@@ -35,7 +35,7 @@ Teach the shared agent-reply reader to take a `SubagentHandback` message as the 
 | 1. create-branch           | ✅ Done    | Branch `feature/task.327.*` exists in git                              | Branch created at `3f344ccfa` | —                    | 2026-11-26T20:10Z |
 | 2. review-task             | ✅ Done    | `task.327.review.{N}.{name}.md` exists (or skip logged)                | review.1 — 9/10 READY; Planned → Ready for Development | —                    | 2026-11-26T20:12Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; 4/4 phases; ci:fast 8919/0 | —                    | 2026-11-26T20:32Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #959: https://github.com/Gamaroff/agent-skills/pull/959 | —                    | 2026-11-26T20:34Z |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.327.qa.{N}.*.md`; `task.327.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.327.dod.{N}.*.md`; task `status: accepted`                       |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
@@ -73,9 +73,19 @@ Teach the shared agent-reply reader to take a `SubagentHandback` message as the 
 - Mutation table (each reverted after): (a) drop hand-back branch → 3 module cases + the CLI hand-back/merge case red; (b) hand-back wins regardless of order → "text after hand-back" and "earlier hand-back then text" red; (c) any tool name → "another name is never read" red; (c2) accept empty message → "empty or not a string" red; (d) drop `rmSync` → module stale-`--out` case + CLI stale-`--out` case red; (e) drop the usage refusal → "`--out` names the `--transcript`" red; (f) drop the in-`extract` same-file guard → same test red (direct-call assertion added for it).
 - Real transcript: `command node shared/resources/agent-reply-block.js extract --transcript ~/.claude/projects/<project>/<session>/subagents/agent-a7b3a36606dac7dad.jsonl --block finalise-ac-yaml --out <scratch>/ac.yaml --json` → `extracted`, 17900 bytes, sha256 `77072d335c5e3efee8b7192872d87b047c51a7fe5398afd668f0f8f602a970c9`, `reply: handback`; byte-identical (`cmp`) to the `jq | awk` hand copy.
 - Formatting: prettier reformatted the three edited JS files; `npm run bundle` then `bundle:check` clean (129 skills, 0 problems).
-- Fast gate iter 1: `npm run test:remote` (ci:fast on ci@192.168.1.249) → TEST_EXIT=0, 8919 pass, 0 fail; tmp-leak ratchet ok. CHANGELOG placement: 987 bullets below the first release heading at base and head (new entry is in `[Unreleased]`).
+- Fast gate iter 1: `npm run test:remote` (ci:fast on the LAN test server) → TEST_EXIT=0, 8919 pass, 0 fail; tmp-leak ratchet ok. CHANGELOG placement: 987 bullets below the first release heading at base and head (new entry is in `[Unreleased]`).
 - Loop audit run inline (no Explore subagent): status Ready for Review, 4/4 phases ticked. Development completion comment posted to github issue 952.
 - Hook note: a PostToolUse hook flagged "a dozen edits between the same two test runs"; those were the deliberate mutate/revert cycles above, not a stuck fix. GitHub board: work-started → transitioned. Priority-default block not run (issue already prioritised by create-task).
+
+---
+
+### Step 4 — create-pr
+
+- Scope: work-item dir, CHANGELOG.md, shared/resources, shared/resources/tests, skills/finalise/references, skills/finalise. No out-of-scope untracked files held; leak check clean on both commits.
+- Report links: doc-links 0 relative links, ok.
+- Commits: `930e65c9a` (review 1), `c1976c873` (implementation); pushed.
+- PR created: https://github.com/Gamaroff/agent-skills/pull/959 (base develop, Closes #952). PR body written by hand; summariser subagent not dispatched.
+- Tracker in-review comment: posted. GitHub board: in-review → stage-disabled. Post-PR state check (inline `gh pr view`, poller not dispatched): OPEN, errors = 0.
 
 ---
 
@@ -89,6 +99,26 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-11-26
+**Gate Result**: CONCERNS
+**Issues Found**: 4: T327-QA-1 symlinked transcript passes the same-file guard and is deleted (medium, reproduced); T327-CI-1 link-check red on a mailto false link in this report (medium); T327-QA-2 criterion 7 added without a recorded approver (medium); T327-QA-3 directory --out crashes extract (low)
+**HIGH findings**: 0
+**MEDIUM findings**: 3
+**Traceability**: skipped (mapper not dispatched — criteria mapped inline by qa-task)
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
+
+#### qa-fix (5b)
+
+- Findings ingested inline from gate 1, which this session wrote; the ingester subagent was not dispatched (independence loss). changes-requested → stage-disabled.
+- T327-QA-1: new `sameFile()` compares resolved path, then dev+ino when both exist. Both guards use it. `extract` now finds the transcript (agent-id discovery included) before removing `--out`, and refuses with exit 2 when `--out` is any file it could read. Test: "task 327 QA-1 … symlink, hard link or the agent-id route" (6 routes + control).
+- T327-QA-3: new `clearOut()` refuses a directory `--out` and an unremovable one with a named `usage` answer, exit 2. Test: "task 327 QA-3: a directory --out …".
+- T327-QA-2: criterion 7 now carries "added in review 1 (Important fix), approved by review-task". Wording otherwise unchanged. criteria-drift reports it `approved: true`. The approver is the pipeline's review step, not a person: under develop-next the review fix was auto-accepted.
+- T327-CI-1: the report's fast-gate line names "the LAN test server", not user@address. The report is committed with this cycle's fix (deviation from Step 8 deferral), so the `link-check` lane re-runs on a fixed tree.
+- Mutations: (g) identity by spelling only → QA-1 test red; (h) agent-id route not checked → QA-1 test red; (i) no directory refusal → QA-3 test red. Each reverted.
+- Probe: `git grep` for the refusal message and "names the `--transcript`" across SKILL.md, references and shared resources → only `shared/resources/agent-reply-block.js` (updated). CHANGELOG bullet updated. Population 1.
+
 ---
 
 ## Completion
@@ -96,7 +126,7 @@ _Track each QA review/fix cycle._
 **Finished**: {populated at end}
 **Final Status**: {Completed / Failed / Escalated}
 **Branch**: feature/task.327.subagenthandback-replies-are-extracted
-**PR**: {populated after Step 4}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/959
 **QA Iterations**: {populated at end}
 **DoD Summary**: {populated after Step 7}
 **Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}

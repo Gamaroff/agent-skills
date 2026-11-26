@@ -14,7 +14,9 @@ import {
   mkdtempSync,
   readFileSync,
   existsSync,
+  linkSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -447,6 +449,115 @@ test("task 327: an --out that names the --transcript file is a usage error and t
       true,
       "extract never removes the transcript it reads",
     );
+  }));
+
+test("task 327 QA-1: an --out that is the transcript by symlink, hard link or the agent-id route is refused and the transcript survives", () =>
+  withDir((dir) => {
+    const f = rowsTranscript(dir, "alias", [asst([text(fenced("a: 1"))])]);
+    const before = readFileSync(f);
+    const link = join(dir, "link.jsonl");
+    symlinkSync(f, link);
+    const hard = join(dir, "hard.jsonl");
+    linkSync(f, hard);
+    const cli = (transcript, out) =>
+      spawnSync(
+        process.execPath,
+        [
+          MOD,
+          "extract",
+          "--transcript",
+          transcript,
+          "--block",
+          "finalise-ac-yaml",
+          "--out",
+          out,
+          "--json",
+        ],
+        { encoding: "utf8" },
+      );
+    const routes = [
+      [
+        "CLI: --transcript a symlink, --out the file",
+        () => cli(link, f).status,
+      ],
+      [
+        "CLI: --transcript the file, --out a symlink",
+        () => cli(f, link).status,
+      ],
+      [
+        "CLI: --transcript a hard link, --out the file",
+        () => cli(hard, f).status,
+      ],
+      [
+        "direct: --transcript a symlink",
+        () =>
+          arb.extract({ transcript: link, block: "finalise-ac-yaml", out: f })
+            .exitCode,
+      ],
+      [
+        "direct: --transcript a hard link",
+        () =>
+          arb.extract({ transcript: hard, block: "finalise-ac-yaml", out: f })
+            .exitCode,
+      ],
+      [
+        "direct: --agent-id finds the --out file",
+        () =>
+          arb.extract({
+            agentId: "alias",
+            block: "finalise-ac-yaml",
+            out: f,
+            projectsRoot: join(dir, "projects"),
+          }).exitCode,
+      ],
+    ];
+    for (const [name, run] of routes) {
+      assert.equal(run(), 2, `${name}: a usage error`);
+      assert.deepEqual(
+        readFileSync(f),
+        before,
+        `${name}: the transcript survives`,
+      );
+    }
+    // Control: a different file at --out is still cleared and written.
+    const out = join(dir, "other.yaml");
+    writeFileSync(out, "stale\n");
+    const ok = arb.extract({
+      transcript: link,
+      block: "finalise-ac-yaml",
+      out,
+    });
+    assert.equal(ok.reason, "extracted");
+    assert.equal(readFileSync(out, "utf8"), "a: 1\n");
+  }));
+
+test("task 327 QA-3: a directory --out is a named usage error, not a crash, and is left in place", () =>
+  withDir((dir) => {
+    const f = rowsTranscript(dir, "d1", [asst([text("no block here")])]);
+    const out = join(dir, "a-dir");
+    mkdirSync(out);
+    const r = arb.extract({ transcript: f, block: "finalise-ac-yaml", out });
+    assert.equal(r.reason, "usage");
+    assert.equal(r.exitCode, 2);
+    assert.match(r.message, /--out is a directory/);
+    assert.equal(existsSync(out), true);
+    const cli = spawnSync(
+      process.execPath,
+      [
+        MOD,
+        "extract",
+        "--transcript",
+        f,
+        "--block",
+        "finalise-ac-yaml",
+        "--out",
+        out,
+        "--json",
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(cli.status, 2, cli.stderr);
+    assert.match(cli.stdout, /"reason": "usage"/);
   }));
 
 test("CLI: an agent id that is a path, or both sources, or no block name, is a usage error (exit 2)", () => {
