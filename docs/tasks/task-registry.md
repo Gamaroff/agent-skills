@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-11-26
-**Next Available Task Number:** **329**
+**Next Available Task Number:** **330**
 
 ## How to use
 
@@ -370,6 +370,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 326 | [Task 320's accepted residual is closed](task.326.task-320-accepted-residual/task.326.task-320-accepted-residual.md) | planned | refactoring | Low | 2026-11-26 | task.320 | the three findings accepted at task 320's QA loop limit: T320-CR-601 (an opener inside an HTML block hides a fence), 602 (`?` with a comment, alias keys), 603 (an indented closed comment refused) · three phases |
 | 327 | [SubagentHandback replies are extracted, not hand-copied](task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md) | planned | refactoring | Medium | 2026-11-26 | — | observation #185: `agent-reply-block.js` reads a `SubagentHandback` reply when no later text reply exists, so both `/finalise` extracts stop answering `transcript-unreadable`; a failed extract clears its `--out` first · four phases · independent |
 | 328 | [A measured criterion is re-measured when the head moves](task.328.measured-criterion-re-measured-when-head-moves/task.328.measured-criterion-re-measured-when-head-moves.md) | planned | refactoring | Medium | 2026-11-26 | — | observation #186: the record preflight detects a measured criterion (its bound words miss "longer than") and flags it `measured`; QA cites finalise's tree-equivalence rule before carrying a measured PASS forward · three phases · independent |
+| 329 | [A git-name sink for classifiers of repository names](task.329.git-name-probe-sink/task.329.git-name-probe-sink.md) | planned | infrastructure | High | 2026-11-26 | — | task.325.dod.1's two `path`-sink probes on `isDocsPath` were a sink mismatch: a `git-name` corpus sink, routed from both security prompts, with each hostile case proved against a broken copy · three phases · unblocks task 325's finalise |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
