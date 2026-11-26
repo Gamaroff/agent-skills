@@ -5,7 +5,7 @@ How to use this document: work top to bottom. Only `[ ]` rows are candidates; `[
 [`roadmap-history.md`](./roadmap-history.md), so a `deps:` entry naming no current row means
 _already shipped_, not an error. Resolve any such reference there.
 
-**Phases 1 through 18 are complete and archived** to
+**Phases 1 through 18, and Phase 24, are complete and archived** to
 [`roadmap-history.md`](./roadmap-history.md) — resolve any `deps:` naming a row you cannot find here
 against that file. The rows under "Deferred / human-gated" remain invisible to selection.
 
@@ -140,17 +140,6 @@ when T310 is accepted, and archive the phase at close.**
 
 - [x] **T310** The finalise 6c poll block guards its inputs · deps: T309 · touches: finalise~, test-harness~, bundles~ · /develop-task docs/tasks/task.310.finalise-6c-poll-block-guards-its-inputs/task.310.finalise-6c-poll-block-guards-its-inputs.md
 
-## PHASE 24 — the docs-only rule can exclude a path (opened 2026-11-25)
-
-An **override**: without it the registry fallback selects T321 first, ahead of these. The owner asked
-for T325 to be queued. It edits `ci-tree-equivalence.js`, which T320 edits first, so it carries
-`deps: T320`. T320 has a row here for that reason alone: a `deps:` entry that names no current row
-reads as already shipped, and T325 was selected at once without it. **Tick each row `[x]` when its
-task is accepted, and archive the phase at close.**
-
-- [x] **T320** Task 319's leftover findings are closed · deps: none · touches: docs-config~, test-harness~, bundles~ · /develop-task docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md
-- [x] **T325** The docs-only CI rule can exclude a path · deps: T320 · touches: docs-config~, docs-pipeline~, test-harness~, bundles~ · /develop-task docs/tasks/task.325.docs-only-rule-exclusions/task.325.docs-only-rule-exclusions.md
-
 ## PHASE 25 — DoD instrument fixes cut from the task.320 observations (opened 2026-11-26)
 
 An **override**: without it the registry fallback selects T321 first, ahead of these. The owner asked
@@ -186,7 +175,7 @@ Rows here are invisible to selection. Move a row up into a phase when it becomes
 
 ## Housekeeping
 
-- [x] Archive accepted rows to `roadmap-history.md` at each phase close — Phase 5 archived 2026-09-12; Phases 6, 7 and 8 archived 2026-10-06; Phases 9 and 10 archived 2026-10-11; Phase 11 archived 2026-10-16; Phase 12 archived 2026-10-20; Phase 13 archived 2026-10-21; Phases 14 and 15 archived 2026-10-22; Phase 16 archived 2026-10-23; Phase 17 archived 2026-10-27; Phase 18 archived 2026-10-28
+- [x] Archive accepted rows to `roadmap-history.md` at each phase close — Phase 5 archived 2026-09-12; Phases 6, 7 and 8 archived 2026-10-06; Phases 9 and 10 archived 2026-10-11; Phase 11 archived 2026-10-16; Phase 12 archived 2026-10-20; Phase 13 archived 2026-10-21; Phases 14 and 15 archived 2026-10-22; Phase 16 archived 2026-10-23; Phase 17 archived 2026-10-27; Phase 18 archived 2026-10-28; Phase 24 archived 2026-11-26
 - [ ] If a phase is ever re-opened: tick its rows `[x]` as each item is accepted — an unticked row for an accepted item is still selected and stalls the loop
 
 **Registry-selected items need no row here.** When selection falls through to the registries (the
@@ -362,3 +351,4 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-11-26 | **T327 and T328 added** as Phase 25, on the owner's request (tasks 327 and 328, cut from observations #185 and #186 of the task 320 run). T327: the `/finalise` reply extractors read a `SubagentHandback` reply. T328: a measured criterion whose figure is from a commit not tree-equivalent to the head is flagged before the DoD. Both are independent, with `deps: none`. |
 | 2026-11-26 | **T325 accepted + merged — PR #954** (`0150d033`); row ticked. `ci.docsOnly.patterns` can hold a `!` exclusion: a path any exclusion matches is code, in any order, inside `isDocsPath` only. A list of exclusions only, a bare `!`, an exclusion outside git's path form, and dialect syntax are usage errors (exit 2). It took 5 QA cycles and 2 DoD runs. Run 1 stopped on two `path`-sink probes, a sink mismatch for a name classifier, which task 329 (PR #956, a `git-name` sink) closed. Run 2: 40 probes, 0 reproduced. Merge gate: `npm run ci` on the LAN server, 8910 tests, 0 fail. T325-CR-501/502 (LOW) are deferred. |
 | 2026-11-26 | **T330 and T331 added** as Phase 26, on the owner's request. T330 (task 330, issue #957): `isDocsPath` refuses a `.git:` stream segment and a C1 control, plus T325-CR-501/502 and T329-QA-9/10. The remedy was tried green in a worktree. T331 (task 331, issue #958, observation #191): the AC merge refuses a result whose `story_file` names another document. `deps: T327`. |
+| 2026-11-26 | **Phase 24 archived** to `roadmap-history.md`. Both rows (T320, T325) moved verbatim with their `touches:` tags and acceptance annotations, so a `deps:` naming either still resolves there. Phases 25 and 26 stay open. Phases 19–23 are fully ticked but not yet archived. |

@@ -325,3 +325,14 @@ Tick T238 when PR #770 merges; T240 is selected next.
 
 - [x] **T238** QA loop acts on the signals it already has · deps: none · touches: pipeline-steps!, qa-skills~, bundles~ · /develop-task docs/tasks/task.238.qa-loop-acts-on-signals-it-has/task.238.qa-loop-acts-on-signals-it-has.md — ✅ **accepted + merged** ([PR #770](https://github.com/Gamaroff/agent-skills/pull/770), `780ac732`; QA CONCERNS 90/100 after 10 cycles with 4 owner-granted, DoD accepted on run 2, CI 6/6). The QA loop keeps a red gate log, classifies a red fast gate, reads PR CI once at Step 10 on GitHub and Bitbucket, and sends a 5c `CONCERNS` with an open coverage finding back to 5b. CR10-1 deferred to T240
 - [x] **T240** Fail-closed reader for the 5c open-coverage check · deps: T238 · touches: pipeline-steps!, bundles~ · /develop-task docs/tasks/task.240.open-coverage-fail-closed-reader/task.240.open-coverage-fail-closed-reader.md — ✅ **accepted + merged** ([PR #776](https://github.com/Gamaroff/agent-skills/pull/776), `d820f8f2`; QA PASS 100/100 after 9 cycles, DoD accepted, CI 6/6). §5c's open-coverage count comes from `open-coverage.js`, a strict Node reader that answers `unreadable` (and halts) on anything it cannot place, in place of a 35-line awk
+
+## PHASE 24 — the docs-only rule can exclude a path (opened 2026-11-25, closed 2026-11-26)
+
+An **override**: without it the registry fallback selects T321 first, ahead of these. The owner asked
+for T325 to be queued. It edits `ci-tree-equivalence.js`, which T320 edits first, so it carries
+`deps: T320`. T320 has a row here for that reason alone: a `deps:` entry that names no current row
+reads as already shipped, and T325 was selected at once without it. **Tick each row `[x]` when its
+task is accepted, and archive the phase at close.**
+
+- [x] **T320** Task 319's leftover findings are closed · deps: none · touches: docs-config~, test-harness~, bundles~ · /develop-task docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md — ✅ **accepted + merged** ([PR #949](https://github.com/Gamaroff/agent-skills/pull/949), `8607d9b1`; QA CONCERNS 90/100 after 7 cycles with one loop-limit escalation, DoD accepted on run 4). Task 319's seven carried findings and two owner points are closed; the residual T320-CR-601/602/603 was deferred to task 326
+- [x] **T325** The docs-only CI rule can exclude a path · deps: T320 · touches: docs-config~, docs-pipeline~, test-harness~, bundles~ · /develop-task docs/tasks/task.325.docs-only-rule-exclusions/task.325.docs-only-rule-exclusions.md — ✅ **accepted + merged** ([PR #954](https://github.com/Gamaroff/agent-skills/pull/954), `0150d033`; QA PASS 96/100 after 5 cycles, DoD accepted on run 2, CI 6/6). A `!` entry in `ci.docsOnly.patterns` excludes a path, in any order, inside `isDocsPath` only; run 1's two `path`-sink probes were a sink mismatch that task 329 closed with a `git-name` sink
