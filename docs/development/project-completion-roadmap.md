@@ -20,7 +20,7 @@ finished work. Rules:
 §"Registry fallback frontier".
 
 Add a phase only to express *sequencing* the registries cannot: a deliberate order, a dependency
-chain, a human gate. Phase 20 is open (opened 2026-11-09): T289 (accepted), T290 (merged with an owner waiver), T292 (accepted), T293 (accepted), T294 (accepted), B21 (fixed), T304 (accepted), T291 (accepted), T295 (accepted). Phase 21 is open (opened 2026-11-10): T301 (accepted), T303 (accepted), T302 (accepted), T296 (accepted). Phase 22 is open (opened 2026-11-10): T297 (accepted), T300 (accepted), T298 (accepted), T299. Phase 23 is open (opened 2026-11-15): T310. Phase 24 is open (opened 2026-11-25): T320 (accepted), T325. Phase 25 is open (opened 2026-11-26): T327, T328.
+chain, a human gate. Phase 20 is open (opened 2026-11-09): T289 (accepted), T290 (merged with an owner waiver), T292 (accepted), T293 (accepted), T294 (accepted), B21 (fixed), T304 (accepted), T291 (accepted), T295 (accepted). Phase 21 is open (opened 2026-11-10): T301 (accepted), T303 (accepted), T302 (accepted), T296 (accepted). Phase 22 is open (opened 2026-11-10): T297 (accepted), T300 (accepted), T298 (accepted), T299. Phase 23 is open (opened 2026-11-15): T310. Phase 24 is open (opened 2026-11-25): T320 (accepted), T325 (accepted). Phase 25 is open (opened 2026-11-26): T327, T328.
 
 > ⚠️ **A phase costs upkeep that a registry row does not, and the cost is not obvious.** Roadmap rows
 > are matched on the **checkbox alone** — they do **not** consult the target document's frontmatter.
@@ -149,7 +149,7 @@ reads as already shipped, and T325 was selected at once without it. **Tick each 
 task is accepted, and archive the phase at close.**
 
 - [x] **T320** Task 319's leftover findings are closed · deps: none · touches: docs-config~, test-harness~, bundles~ · /develop-task docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md
-- [ ] **T325** The docs-only CI rule can exclude a path · deps: T320 · touches: docs-config~, docs-pipeline~, test-harness~, bundles~ · /develop-task docs/tasks/task.325.docs-only-rule-exclusions/task.325.docs-only-rule-exclusions.md
+- [x] **T325** The docs-only CI rule can exclude a path · deps: T320 · touches: docs-config~, docs-pipeline~, test-harness~, bundles~ · /develop-task docs/tasks/task.325.docs-only-rule-exclusions/task.325.docs-only-rule-exclusions.md
 
 ## PHASE 25 — DoD instrument fixes cut from the task.320 observations (opened 2026-11-26)
 
@@ -348,3 +348,4 @@ fallback (T99–T105, T107) have no row here and that is correct; do not backfil
 | 2026-11-25 | **T320 and T325 added** as Phase 24. T325 (task 325, issue #947, cut from a CI adoption handoff): a `!` pattern in `ci.docsOnly.patterns` excludes a path. Queued on the owner's request, `deps: T320`. T320 (task 320, issue #938) was planned and had no row; it is here so that the dependency holds. |
 | 2026-11-26 | **T320 accepted + merged — PR #949** (`8607d9b1`); row ticked. Task 319's seven carried findings and two owner points are closed. It took 7 QA cycles (one loop-limit escalation) and 4 DoD runs. The residual T320-CR-601/602/603 was accepted by the owner and deferred to task 326, with criterion 1 amended and six probe deferrals approved. The last gap was criterion 10's timings, measured off a tree-equivalent head and re-measured (max 26.0 s of 30 s). Run 3's gap is observation #186. |
 | 2026-11-26 | **T327 and T328 added** as Phase 25, on the owner's request (tasks 327 and 328, cut from observations #185 and #186 of the task 320 run). T327: the `/finalise` reply extractors read a `SubagentHandback` reply. T328: a measured criterion whose figure is from a commit not tree-equivalent to the head is flagged before the DoD. Both are independent, with `deps: none`. |
+| 2026-11-26 | **T325 accepted + merged — PR #954** (`0150d033`); row ticked. `ci.docsOnly.patterns` can hold a `!` exclusion: a path any exclusion matches is code, in any order, inside `isDocsPath` only. A list of exclusions only, a bare `!`, an exclusion outside git's path form, and dialect syntax are usage errors (exit 2). It took 5 QA cycles and 2 DoD runs. Run 1 stopped on two `path`-sink probes, a sink mismatch for a name classifier, which task 329 (PR #956, a `git-name` sink) closed. Run 2: 40 probes, 0 reproduced. Merge gate: `npm run ci` on the LAN server, 8910 tests, 0 fail. T325-CR-501/502 (LOW) are deferred. |
