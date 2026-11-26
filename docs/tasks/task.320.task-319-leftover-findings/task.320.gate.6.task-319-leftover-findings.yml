@@ -1,11 +1,11 @@
 schema: 2
 task: 'task.320.task-319-leftover-findings'
 task_title: "Task 319's leftover findings are closed"
-gate: CONCERNS
+gate: WAIVED
 status_reason: 'Cycle 5 findings all fixed and held. One medium and two low findings remain at the edges of the two rules cycle 5 introduced, each reproduced with its control. Criterion 10 holds on this head.'
 reviewer: 'QA Engineer'
 head: '7cae65a149fb9bcd1c6e59e6fdad07b6d8b1a769'
-updated: '2026-11-25T23:02:49Z'
+updated: '2026-11-26T03:39:50Z'
 
 top_issues:
   - id: 'T320-CR-601'
@@ -14,24 +14,27 @@ top_issues:
     finding: 'Line 334: a column-0 <!-- inside an open HTML block (<details>, <div>, <pre>, <table>) starts no Markdown comment, but partsOf opens a comment block that runs to a later -->, so a ## line in the real fence after it does not end the criteria section and the document is read past: none-named, where scan-broken is required (reproduced 4 of 4; control: with no later --> the answer is scan-broken). The same on 90aabca6c: a gap in the T320-CR-501 remedy, not a regression.'
     suggested_action: 'Start no comment block while an HTML block is open, reusing the HTML block lists already in the file.'
     suggested_owner: dev
-    status: open
+    status: waived
   - id: 'T320-CR-602'
     severity: low
     file: 'shared/resources/ci-tree-equivalence.js'
     finding: 'Line 463: an explicit key with a trailing comment (? ci # c) and an alias key (*k :) are not read as ci or pipeline, so the defaults apply where YAML reads docsOnly.enabled false and pushRecordCommits eager (reproduced; control: ? ci alone is refused).'
     suggested_action: 'Strip a trailing comment before the explicit-key colon is added, and refuse an alias key at the top level.'
     suggested_owner: dev
-    status: open
+    status: waived
   - id: 'T320-CR-603'
     severity: low
     file: 'shared/resources/finalise-rerun-at-head.js'
     finding: 'Line 334: a closed comment indented 1 to 3 spaces, or inside a list item, is a comment in Markdown, but its fence marker opens a fence in partsOf, so a later ## heading is hidden and a document that names the command only under it is refused: scan-broken, where 90aabca6c gave none-named (reproduced 4 of 4). No tracked Markdown file splits differently (5021 checked).'
     suggested_action: "Let an opener indented 0 to 3 spaces past its container's content start a comment block."
     suggested_owner: dev
-    status: open
+    status: waived
 
 waiver:
-  active: false
+  active: true
+  reason: 'residual accepted at the loop-limit escalation'
+  approved_by: 'Lorien Gamaroff'
+  approved_at: '2026-11-26'
 
 quality_score: 90
 

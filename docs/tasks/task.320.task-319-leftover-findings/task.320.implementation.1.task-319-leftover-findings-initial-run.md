@@ -87,6 +87,7 @@ Close the seven low findings task 319 carried forward and its two owner points (
 - Finalise: CI reading 1 SUCCESS @ `7f00b91ffbbefa701cf30eb70311aea6581c8163` (6 of 6 checks). No reading 2: not accepted
 - Finalise: decision IN PROGRESS. Security FAIL (86 probes executed, 5 reproduced: 3 medium, 2 low) and criterion 10 FAIL (low). The fix-and-recheck path was not taken: two sections fail and three probes are medium
 - Finalise: run in develop-next, so the pipeline HALTs; no merge and no tick
+- QA residual accepted at the loop-limit escalation (cycle 6): gate.6 recorded as WAIVED (T320-CR-601, T320-CR-602, T320-CR-603); approved by Lorien Gamaroff on 2026-11-26 — residual accepted at the loop-limit escalation. Recorded by accept-qa-residual; the run resumes at Step 5c.
 
 ---
 
@@ -251,8 +252,8 @@ _Track each QA review/fix cycle._
 **Suite**: green on the LAN server (8898 tests, 8895 pass, 0 fail, 3 skipped); CI green on `7cae65a149fb`
 **Traceability**: skipped (no Success Criteria table)
 **PR Review**: not reached — gate did not exit the loop
-**Loop exit**: n/a — this exit not taken (route classifier: `continue`, `not-a-pass-gate`; route 2 declined: `product-defect-signal`)
-**Action**: Escalating — loop limit reached
+**Loop exit**: residual accepted by Lorien Gamaroff on 2026-11-26 (accept-qa-residual)
+**Action**: Proceeding to 5c (PR conformance review)
 
 ---
 
