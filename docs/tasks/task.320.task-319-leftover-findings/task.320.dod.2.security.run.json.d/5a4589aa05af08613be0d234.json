@@ -1,0 +1,27 @@
+{
+  "sink": "template-render",
+  "entry": "shared/resources/ci-tree-equivalence.js#parseConfig",
+  "name": "config qa.6",
+  "call_site": null,
+  "verdict": "absent",
+  "reason": "no-hostile-case-was-rejected",
+  "executed": 3,
+  "passed": 1,
+  "reproduced": 2,
+  "overblocked": 0,
+  "declined": 0,
+  "declined_cases": [],
+  "escaped": 0,
+  "observation_limits": [
+    "effects-after-accept"
+  ],
+  "shells": null,
+  "interpreter": null,
+  "fake_gh": null,
+  "argv": null,
+  "args": null,
+  "slot": null,
+  "fixture_setup": null,
+  "fixture_copy": null,
+  "ran_at": "2026-11-26T03:55:08.789Z"
+}

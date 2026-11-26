@@ -1,0 +1,106 @@
+[
+  {
+    "id": "hostile-escaped-after-scalar",
+    "input": "note: |\n  text\n\"c\\x69\":\n  docsOnly:\n    enabled: false\n",
+    "direction": "hostile",
+    "why": "DoD 1: the parse stops at the block scalar",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:466"
+  },
+  {
+    "id": "hostile-escaped-beside-plain",
+    "input": "ci:\n  skipMarker: \"[x]\"\nnote: >-\n  text\n\"c\\x69\":\n  docsOnly:\n    enabled: false\n",
+    "direction": "hostile",
+    "why": "DoD 1: a plain block before the scalar, an escaped one after it",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:466"
+  },
+  {
+    "id": "hostile-near-miss-after-scalar",
+    "input": "note: |\n  text\nCI:\n  docsOnly:\n    enabled: false\n",
+    "direction": "hostile",
+    "why": "DoD 1: a near miss with no escape in it",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:466"
+  },
+  {
+    "id": "hostile-indented-file",
+    "input": "  note: |\n    text\n  \"c\\x69\":\n    docsOnly:\n      enabled: false\n",
+    "direction": "hostile",
+    "why": "the whole file is indented",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:466"
+  },
+  {
+    "id": "hostile-lone-cr",
+    "input": "tracker: github\nnote: x\r\"c\\x69\":\n  docsOnly:\n    enabled: false\n",
+    "direction": "hostile",
+    "why": "a lone CR ends a line in YAML",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:466"
+  },
+  {
+    "id": "hostile-after-second-document",
+    "input": "a: 1\n---\n'c\\x69':\n  docsOnly:\n    enabled: false\n",
+    "direction": "hostile",
+    "why": "a document marker before it",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:466"
+  },
+  {
+    "id": "hostile-exact-indented-file",
+    "input": "  note: |\n    text\n  ci:\n    docsOnly:\n      enabled: false\n",
+    "direction": "hostile",
+    "why": "T320-CR-502: the exact key, in a file that is indented whole",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:466"
+  },
+  {
+    "id": "hostile-exact-lone-cr",
+    "input": "tracker: github\nnote: x\rci:\n  docsOnly:\n    enabled: false\n",
+    "direction": "hostile",
+    "why": "T320-CR-502: the exact key after a lone CR",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:466"
+  },
+  {
+    "id": "hostile-cr-before-the-colon",
+    "input": "CI\r:\n  docsOnly:\n    enabled: false\n",
+    "direction": "hostile",
+    "why": "T320-CR-503: a key the parse reads and the source rows do not",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:466"
+  },
+  {
+    "id": "legit-key-text-in-a-scalar",
+    "input": "ci:\n  skipMarker: \"[x]\"\nnote: |\n  CI: x\n  \"c\\x69\": y\n",
+    "direction": "legitimate",
+    "why": "the text of a block scalar holds no top-level key",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:466"
+  },
+  {
+    "id": "legit-key-under-another",
+    "input": "other:\n  CI: x\n  \"c\\x69\": y\nci:\n  skipMarker: \"[x]\"\n",
+    "direction": "legitimate",
+    "why": "a key under another block is not ours",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:466"
+  },
+  {
+    "id": "legit-key-in-a-comment",
+    "input": "# CI: x\n# \"c\\x69\": y\nci:\n  skipMarker: \"[x]\"\n",
+    "direction": "legitimate",
+    "why": "a commented row is not a key",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:466"
+  },
+  {
+    "id": "legit-crlf",
+    "input": "ci:\r\n  skipMarker: \"[x]\"\r\nnote: |\r\n  text\r\n",
+    "direction": "legitimate",
+    "why": "CRLF line ends are not lone CRs",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:466"
+  }
+]

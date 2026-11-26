@@ -4,7 +4,7 @@
 **Bug ID**: TASK-320-BUG-3
 **Severity**: MEDIUM
 **Priority**: P2
-**Status**: Ready for QA
+**Status**: Closed
 **Found By**: QA Engineer
 **Date Found**: 2026-11-25
 
@@ -49,3 +49,4 @@ Let only an opener that starts a Markdown comment block hide a fence.
 | Date | Status | Changed By | Notes |
 | --- | --- | --- | --- |
 | 2026-11-26 | Ready for QA | qa-fix | Fixed in QA cycle 5 |
+| 2026-11-26 | Closed | qa-task | Verified by task.320.qa.6.task-319-leftover-findings.md (T320-CR-501 FIXED) |

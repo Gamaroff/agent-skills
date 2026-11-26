@@ -37,8 +37,8 @@ Close the seven low findings task 319 carried forward and its two owner points (
 | 2. review-task             | ✅ Done    | `task.320.review.{N}.{name}.md` exists (or skip logged)                | `task.320.review.1.task-319-leftover-findings.md` — READY TO IMPLEMENT, 9/10 | —                    | 2026-11-25T15:31Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration, 18/18; fast gate 8895 tests, 0 fail | `.summaries/step-3-iteration-audit-1.json` | 2026-11-25T17:04Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #949: https://github.com/Gamaroff/agent-skills/pull/949 | —                    | 2026-11-25T17:05Z |
-| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.320.qa.{N}.*.md`; `task.320.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 4 cycles, gate PASS (100), PR review CONCERNS with no open coverage finding, then re-entered after DoD run 1: cycles 5 and 6, gate 6 CONCERNS (90), loop limit reached (6 of 6) — escalated | —                    | 2026-11-25T20:45Z |
-| 7. finalise                | ❌ Failed  | `task.320.dod.{N}.*.md`; task `status: accepted`                       | DoD gaps, NOT ACCEPTED (3): `task.320.dod.1.task-319-leftover-findings.md`; status stays `ready-for-review` | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.320.qa.{N}.*.md`; `task.320.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 4 cycles, gate PASS (100), PR review CONCERNS with no open coverage finding, then re-entered after DoD run 1: cycles 5 and 6, gate 6 CONCERNS (90), loop limit reached (6 of 6) — escalated; residual accepted 2026-11-26 (gate 6 WAIVED), 5c PR review 2 CONCERNS with no open coverage finding, 5 doc-only findings carried | —                    | 2026-11-25T20:45Z |
+| 7. finalise                | ❌ Failed  | `task.320.dod.{N}.*.md`; task `status: accepted`                       | DoD gaps, NOT ACCEPTED (3): `task.320.dod.1.task-319-leftover-findings.md`; run 2 after residual acceptance, GAPS (3): `task.320.dod.2.task-319-leftover-findings.md`; status stays `ready-for-review` | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -88,6 +88,10 @@ Close the seven low findings task 319 carried forward and its two owner points (
 - Finalise: decision IN PROGRESS. Security FAIL (86 probes executed, 5 reproduced: 3 medium, 2 low) and criterion 10 FAIL (low). The fix-and-recheck path was not taken: two sections fail and three probes are medium
 - Finalise: run in develop-next, so the pipeline HALTs; no merge and no tick
 - QA residual accepted at the loop-limit escalation (cycle 6): gate.6 recorded as WAIVED (T320-CR-601, T320-CR-602, T320-CR-603); approved by Lorien Gamaroff on 2026-11-26 — residual accepted at the loop-limit escalation. Recorded by accept-qa-residual; the run resumes at Step 5c.
+- QA residual accepted at the loop-limit escalation: residual accepted at the loop-limit escalation; re-entering at 5c. The acceptance commit `650152741` was pushed before 5c, which reads the gate on origin (push-policy site `qa-pre-5c`)
+- Step 5c: PR review 2 is CONCERNS, with 5 findings (1 medium, 4 low) and 0 open coverage findings. All 5 were doc-only and are fixed in the carry: bugs 3 and 4 closed against QA cycle 6, bug 5's acceptance recorded (status stays New), and `pr_number: 949` and `updated:` set on the task. They are staged to ride the next commit. `ready-for-merge`: stage-disabled
+- Finalise run 2: CI reading 1 SUCCESS @ `6501527418374178fd677c78e15673830876b5bf` (6 of 6 checks). No reading 2: not accepted
+- Finalise run 2: decision IN PROGRESS. AC 15/17: #1 FAIL (high), because T320-CR-601 sits inside the criterion's wording and the gate waiver does not amend a criterion; #10 FAIL (low), because the timing command is not named. Security FAIL: 194 probes, 8 reproduced, every one a waived T320-CR-601/602/603 shape. Fix-and-recheck not taken: #1 is high and more than one finding is open
 
 ---
 
@@ -108,6 +112,11 @@ _Problems encountered and how they were resolved or escalated._
 - QA cycle 5: two bug-report status lines were changed with `sed -i`, against the operator's edit rule. The one-word change was checked by reading it back
 - QA cycle 5: the first fast gate had one failure, the link check over two bug reports not yet staged (it reads the index). Green once staged
 - QA cycle 6: QA's own run of the `90aabca6c` engine for the previous-head column failed in the scratch tree (old engine, current sibling modules); the QA report gives that column as the reviewer's reading
+- Step 7 (run 2), gap 1 (high): criterion 1 fails on T320-CR-601. The owner accepted the residual on the QA gate, but the criterion still names the case. The owner must decide: fix T320-CR-601 (code, re-enters QA at 5a), or amend criterion 1 to move the HTML-block case to a named follow-up task (document-only, resumes at 7)
+- Step 7 (run 2), gap 2 (low): criterion 10 has no named timing command beside QA report 6's table
+- Step 7 (run 2), gap 3: 8 probes reproduce the waived residual (T320-CR-601 ×2, 602 ×4, 603 ×2). No `deferrals.json` defers them, and the gate waiver is not a deferral
+- Step 7 (run 2): `agent-reply-block.js` and `finalise-rerun-scope.js extract` answered `transcript-unreadable` again (same defect as run 1). The AC YAML and the probe plan were cut out of the hand-back messages by `jq` and `awk`, not retyped; `merge` ran without `--sha256`. A stale 7-entry `probe-plan.json` from run 1 was on disk; it was overwritten before the probe ran
+- Step 7 (run 2): the probe severity re-dispatch (Step 3b.1 item 3) was not run, because the run ends in gaps on criterion 1 whatever the grades are
 
 ### QA Loop Limit Reached — 2026-11-25
 
@@ -251,7 +260,7 @@ _Track each QA review/fix cycle._
 **MEDIUM findings**: 1
 **Suite**: green on the LAN server (8898 tests, 8895 pass, 0 fail, 3 skipped); CI green on `7cae65a149fb`
 **Traceability**: skipped (no Success Criteria table)
-**PR Review**: not reached — gate did not exit the loop
+**PR Review**: CONCERNS — [task.320.pr-review.2.task-319-leftover-findings.md](./task.320.pr-review.2.task-319-leftover-findings.md); 5 findings (1 medium, 4 low; 0 open coverage), all doc-only and fixed in the carry (bugs 3 and 4 closed, bug 5's acceptance recorded, `pr_number` and `updated:` set); `ready-for-merge`: stage-disabled
 **Loop exit**: residual accepted by Lorien Gamaroff on 2026-11-26 (accept-qa-residual)
 **Action**: Proceeding to 5c (PR conformance review)
 
@@ -259,10 +268,10 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: halted at Step 7, 2026-11-25T21:10Z; after the QA re-entry, halted at Step 5 (loop limit), 2026-11-25T23:06Z
-**Final Status**: Escalated (QA loop limit reached: gate 6 CONCERNS, 1 medium and 2 low open)
+**Finished**: halted at Step 7, 2026-11-25T21:10Z; after the QA re-entry, halted at Step 5 (loop limit), 2026-11-25T23:06Z; after the residual was accepted, halted at Step 7 (DoD gaps), 2026-11-26T03:58Z
+**Final Status**: Halted (DoD run 2 gaps: criterion 1 against the waived T320-CR-601, criterion 10, security residual)
 **Branch**: feature/task.320.task-319-leftover-findings
 **PR**: https://github.com/Gamaroff/agent-skills/pull/949
 **QA Iterations**: 6
-**DoD Summary**: task.320.dod.1.task-319-leftover-findings.md — GAPS (3), not accepted
+**DoD Summary**: task.320.dod.2.task-319-leftover-findings.md — GAPS (3), not accepted (run 1: task.320.dod.1 — GAPS (3))
 **Tracker debt**: none

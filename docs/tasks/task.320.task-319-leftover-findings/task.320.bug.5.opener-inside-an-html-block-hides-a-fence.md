@@ -31,3 +31,10 @@ A criterion that names a listed command is not re-run, and nothing says so. No t
 ## Recommendation
 
 Start no comment block while an HTML block is open, reusing the HTML block lists already in the file.
+
+## Status History
+
+| Date | Status | Changed By | Notes |
+| --- | --- | --- | --- |
+| 2026-11-25 | New | qa-task | Raised by task.320.qa.6.task-319-leftover-findings.md as T320-CR-601 |
+| 2026-11-26 | New | Lorien Gamaroff | Not fixed in task.320: residual accepted at the QA loop-limit escalation (task.320.gate.6.task-319-leftover-findings.yml waiver). Left open for a follow-up |

@@ -9,9 +9,10 @@ status: ready-for-review
 priority: Low
 risk_level: low
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-26
 estimated_effort_hours: 8
 github_issue: 938
+pr_number: 949
 ---
 
 # Technical Task: Task 319's leftover findings are closed
@@ -548,9 +549,9 @@ Phase 1's file and is reverted first.
 
 Cycle 6: every gate-5 finding is fixed, and criterion 10 holds on the head. One medium (T320-CR-601) and two low (T320-CR-602, T320-CR-603) remain at the edges of the cycle-5 rules.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded)
 
-**Status:** IN PROGRESS
+**Status:** IN PROGRESS (superseded by run 2 below)
 
 ### QA Gate Status
 
@@ -578,6 +579,37 @@ Cycle 6: every gate-5 finding is fixed, and criterion 10 holds on the head. One 
 **Gap Report Generated:** 2026-11-25
 
 **Detailed Verification Log:** See `task.320.dod.1.task-319-leftover-findings.md`.
+
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.320.qa.6.task-319-leftover-findings.md`
+**Gate File**: `task.320.gate.6.task-319-leftover-findings.yml`
+**Gate Status**: WAIVED (90/100). The residual (T320-CR-601, 602, 603) was accepted by the owner at the loop-limit escalation on 2026-11-26.
+
+### Missing Criteria:
+
+1. **Acceptance Criteria:**
+   - [ ] Criterion 1 (high): T320-CR-601 (bug 5) is inside the criterion's wording. An HTML block before a column-0 `<!--` hides a fenced `## ` line, and the head answers `none-named` where the criterion requires a refusal. The gate waiver does not amend the criterion.
+   - [ ] Criterion 10 (low): the command that produced the per-test timings in QA report 6 is not named.
+
+2. **Security Review** (`task.320.dod.2.security.run.json`, 194 probes executed):
+   - [ ] 8 probes reproduce the waived residual: T320-CR-601 (2), T320-CR-602 (4) and T320-CR-603 (2). They are not deferred, because no `deferrals.json` names them.
+
+### Next Steps:
+
+- [ ] Owner decision on criterion 1: fix T320-CR-601 in code (re-enters QA at 5a), or amend criterion 1 to move the HTML-block case to a named follow-up task (document-only, resumes at Step 7)
+- [ ] If the residual is deferred, write `deferrals.json` beside this task, naming that follow-up task, and have the owner approve it
+- [ ] Name the four-suite timing command beside the table in QA report 6
+
+**Estimated Effort:** Small if the residual is deferred (documents only); Medium if T320-CR-601 is fixed (a QA cycle included)
+
+**Gap Report Generated:** 2026-11-26
+
+**Detailed Verification Log:** See `task.320.dod.2.task-319-leftover-findings.md`.
 <!-- change-log-start -->
 ## Change Log
 
@@ -600,6 +632,9 @@ Cycle 6: every gate-5 finding is fixed, and criterion 10 holds on the head. One 
 | 2026-11-25 |  | QA gate CONCERNS (90/100) — 4 findings | qa-task |
 | 2026-11-25 |  | QA cycle 5 fixes — T320-CR-501 to 504 | qa-fix |
 | 2026-11-25 |  | QA gate CONCERNS (90/100) — 3 findings | qa-task |
+| 2026-11-26 |  | QA residual accepted at the loop-limit escalation — gate 6 WAIVED | Lorien Gamaroff |
+| 2026-11-26 |  | PR review CONCERNS — 5 trail and consistency findings fixed (bugs 3–5, pr_number, updated) | review-pr |
+| 2026-11-26 |  | DoD incomplete — 3 gaps identified (criterion 1 against the waived T320-CR-601, criterion 10, security residual) | finalise |
 <!-- change-log-end -->
 
 ---

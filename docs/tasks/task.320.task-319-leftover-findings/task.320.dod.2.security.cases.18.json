@@ -1,0 +1,58 @@
+[
+  {
+    "id": "hostile-escaped-after-scalar",
+    "input": "note: |\n  text\n\"pipelin\\x65\":\n  pushRecordCommits: eager\n",
+    "direction": "hostile",
+    "why": "DoD 1: the parse stops at the block scalar",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:313"
+  },
+  {
+    "id": "hostile-near-miss-after-scalar",
+    "input": "note: |\n  text\nPipeline:\n  pushRecordCommits: eager\n",
+    "direction": "hostile",
+    "why": "DoD 1: a near miss with no escape in it",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:313"
+  },
+  {
+    "id": "hostile-lone-cr",
+    "input": "tracker: github\nnote: x\r\"pipelin\\x65\":\n  pushRecordCommits: eager\n",
+    "direction": "hostile",
+    "why": "a lone CR ends a line in YAML",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:313"
+  },
+  {
+    "id": "hostile-exact-indented-file",
+    "input": "  note: |\n    text\n  pipeline:\n    pushRecordCommits: eager\n",
+    "direction": "hostile",
+    "why": "T320-CR-502: the exact key, in a file that is indented whole",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:313"
+  },
+  {
+    "id": "hostile-exact-lone-cr",
+    "input": "tracker: github\nnote: x\rpipeline:\n  pushRecordCommits: eager\n",
+    "direction": "hostile",
+    "why": "T320-CR-502: the exact key after a lone CR",
+    "correct": "refused",
+    "spec_ref": "docs/reference/configuration.md:313"
+  },
+  {
+    "id": "legit-key-text-in-a-scalar",
+    "input": "pipeline:\n  pushRecordCommits: eager\nnote: |\n  Pipeline: x\n",
+    "direction": "legitimate",
+    "why": "the text of a block scalar holds no top-level key",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:313"
+  },
+  {
+    "id": "legit-key-under-another",
+    "input": "other:\n  Pipeline: x\npipeline:\n  pushRecordCommits: batched\n",
+    "direction": "legitimate",
+    "why": "a key under another block is not ours",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:313"
+  }
+]
