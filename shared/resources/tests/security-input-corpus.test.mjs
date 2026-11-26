@@ -600,10 +600,13 @@ test("every sink is named in each prompt's sink enumeration", () => {
   // while its Sinks: list omitted it, and a whole-file check passed on that
   // drift (task.131 QA cycle 3, TASK-131-BUG-6). Each extract is bounded by
   // two anchors, and a floor on the extract keeps a moved anchor from reading
-  // as a clean empty list.
+  // as a clean empty list. The review prompt's extract ends at "Pick by", the
+  // end of its list sentence: running on to "No sink fits" took in the sink
+  // table and the routing sentence, which also name every sink, so dropping
+  // one from the list itself passed (task.329 DoD, mutation M12).
   const ENUMERATIONS = [
     ["finalise-dod-security-prompt.md", "Sinks: ", "— pick by"],
-    ["security-review-prompt.md", "`SINKS` (", "No sink fits"],
+    ["security-review-prompt.md", "`SINKS` (", "Pick by"],
   ];
   for (const [prompt, from, to] of ENUMERATIONS) {
     const text = readFileSync(join(here, "..", prompt), "utf-8");
