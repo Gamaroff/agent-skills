@@ -396,26 +396,30 @@ A case's wording or direction.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-26
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 96/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.329.qa.2.git-name-probe-sink.md](./task.329.qa.2.git-name-probe-sink.md)
-- **Gate File**: [task.329.gate.2.git-name-probe-sink.yml](./task.329.gate.2.git-name-probe-sink.yml)
+- **Full Report**: [task.329.qa.3.git-name-probe-sink.md](./task.329.qa.3.git-name-probe-sink.md)
+- **Gate File**: [task.329.gate.3.git-name-probe-sink.yml](./task.329.gate.3.git-name-probe-sink.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 4 task tests; the cycle-2 refute pass ran isDocsPath on each claim it doubted
+- **Tests Executed**: 4 task tests; QA ran isDocsPath on each reworded claim (9 inputs)
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Two git-name `correct` texts claim more than isDocsPath does (T329-QA-4, T329-QA-5, MEDIUM), and
-three further texts are inaccurate (T329-QA-6 to T329-QA-8, LOW). The isDocsPath gaps behind them
-are identical on develop and are routed to a follow-up.
+Every gate-2 finding is fixed. Two LOW prose cleanups remain open (T329-QA-9, T329-QA-10) and are
+carried to Deferred Work by the cosmetic-residue exit.
+
+## Deferred Work
+
+- **T329-QA-9** (LOW) — carried to gate 3 `recommendations.future` (route 2b, cycle 3): the `plus-signs` glob-compiling clause is not exercised, because the sink probes with `**`
+- **T329-QA-10** (LOW) — carried to gate 3 `recommendations.future` (route 2b, cycle 3): the `IS_DOCS_LINES` comment says every refusal has two spellings, but `dotGit` and `config` have one
 
 <!-- change-log-start -->
 ## Change Log
@@ -430,6 +434,7 @@ are identical on develop and are routed to a follow-up.
 | 2026-11-26 |         | QA findings fixed — 3 LOW wording errors in the corpus prose, 1 iteration | qa-fix |
 | 2026-11-26 |         | QA gate CONCERNS (90/100) — 2 MEDIUM, 3 LOW open | qa-task |
 | 2026-11-26 |         | QA findings fixed — 5 corpus and comment texts scoped to what each case tests, 1 iteration | qa-fix |
+| 2026-11-26 |         | QA gate PASS (96/100) — 2 LOW carried to Deferred Work (cosmetic-residue exit) | qa-task |
 <!-- change-log-end -->
 
 ---
