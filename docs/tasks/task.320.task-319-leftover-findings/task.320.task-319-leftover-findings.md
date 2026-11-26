@@ -530,14 +530,14 @@ Phase 1's file and is reverted first.
 
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
-**Testing Date**: 2026-11-25
+**Testing Date**: 2026-11-26
 **Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
 
-- **Full Report**: [task.320.qa.6.task-319-leftover-findings.md](./task.320.qa.6.task-319-leftover-findings.md)
-- **Gate File**: [task.320.gate.6.task-319-leftover-findings.yml](./task.320.gate.6.task-319-leftover-findings.yml)
+- **Full Report**: [task.320.qa.7.task-319-leftover-findings.md](./task.320.qa.7.task-319-leftover-findings.md)
+- **Gate File**: [task.320.gate.7.task-319-leftover-findings.yml](./task.320.gate.7.task-319-leftover-findings.yml)
 
 ### Test Coverage Summary
 
@@ -548,7 +548,7 @@ Phase 1's file and is reverted first.
 
 ### Key Findings
 
-Cycle 6: every gate-5 finding is fixed, and criterion 10 holds on the head. One medium (T320-CR-601) and two low (T320-CR-602, T320-CR-603) remain at the edges of the cycle-5 rules.
+Cycle 7 (re-entry after DoD run 2): the `finalise.deferralApprover` key is accepted by every strict reader and the suite is green. The residual T320-CR-601/602/603 still reproduces and is deferred to task.326 by the owner; nothing is open in the queue.
 
 ## Definition of Done - Gaps Identified — run 1 (historical, superseded)
 
@@ -637,6 +637,7 @@ Cycle 6: every gate-5 finding is fixed, and criterion 10 holds on the head. One 
 | 2026-11-26 |  | PR review CONCERNS — 5 trail and consistency findings fixed (bugs 3–5, pr_number, updated) | review-pr |
 | 2026-11-26 |  | DoD incomplete — 3 gaps identified (criterion 1 against the waived T320-CR-601, criterion 10, security residual) | finalise |
 | 2026-11-26 | 1.2 | Criterion 1 amended: T320-CR-601 moved to task.326 (approved by the owner); residual T320-CR-601/602/603 to be closed there | Lorien Gamaroff |
+| 2026-11-26 |  | QA gate CONCERNS (90/100) — 0 open findings; residual deferred to task.326 | qa-task |
 <!-- change-log-end -->
 
 ---

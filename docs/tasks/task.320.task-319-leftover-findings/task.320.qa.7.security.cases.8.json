@@ -1,0 +1,154 @@
+[
+  {
+    "id": "legit-plain",
+    "input": "ci:\n  skipMarker: \"[skip ci]\"\n",
+    "direction": "legitimate",
+    "why": "the documented form",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "legit-spaces",
+    "input": "ci:\n  skipMarker: \"  [skip ci]  \"\n",
+    "direction": "legitimate",
+    "why": "spaces at the ends are dropped",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "legit-crlf",
+    "input": "ci:\r\n  skipMarker: \"[skip ci]\"\r\n",
+    "direction": "legitimate",
+    "why": "a CRLF file",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "legit-crlf-bare",
+    "input": "ci:\r\n  skipMarker: skip\r\n",
+    "direction": "legitimate",
+    "why": "a CRLF file, an unquoted value",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "legit-other-key-escape",
+    "input": "\"p\\x72d\": docs\nci:\n  skipMarker: skip\n",
+    "direction": "legitimate",
+    "why": "an escaped key that is not one of ours",
+    "correct": "accepted",
+    "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:433"
+  },
+  {
+    "id": "legit-value-escape",
+    "input": "note: \"c\\x69\"\nci:\n  skipMarker: skip\n",
+    "direction": "legitimate",
+    "why": "the escape is in a value",
+    "correct": "accepted",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-x",
+    "input": "\"c\\x69\":\n  skipMarker: skip\n",
+    "direction": "hostile",
+    "why": "ci under a \\x escape, alone",
+    "correct": "REJECT",
+    "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:433"
+  },
+  {
+    "id": "hostile-u",
+    "input": "\"\\u0063i\":\n  skipMarker: skip\n",
+    "direction": "hostile",
+    "why": "ci under a \\u escape, alone",
+    "correct": "REJECT",
+    "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:433"
+  },
+  {
+    "id": "hostile-U",
+    "input": "\"\\U00000063i\":\n  skipMarker: skip\n",
+    "direction": "hostile",
+    "why": "ci under a \\U escape, alone",
+    "correct": "REJECT",
+    "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:433"
+  },
+  {
+    "id": "hostile-beside",
+    "input": "ci:\n  skipMarker: skip\n\"c\\x69\":\n  skipMarker: other\n",
+    "direction": "hostile",
+    "why": "escaped beside the plain key",
+    "correct": "REJECT",
+    "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:433"
+  },
+  {
+    "id": "hostile-before",
+    "input": "\"c\\x69\":\n  skipMarker: other\nci:\n  skipMarker: skip\n",
+    "direction": "hostile",
+    "why": "escaped before the plain key",
+    "correct": "REJECT",
+    "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:433"
+  },
+  {
+    "id": "hostile-case",
+    "input": "\"\\x43I\":\n  skipMarker: skip\n",
+    "direction": "hostile",
+    "why": "an escape that decodes to a capital",
+    "correct": "REJECT",
+    "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:433"
+  },
+  {
+    "id": "hostile-sep",
+    "input": "\"c\\x2di\":\n  skipMarker: skip\n",
+    "direction": "hostile",
+    "why": "an escape that decodes to a hyphen: c-i",
+    "correct": "REJECT",
+    "spec_ref": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md:433"
+  },
+  {
+    "id": "hostile-marker-tab",
+    "input": "ci:\n  skipMarker: \"[skip ci]\t\"\n",
+    "direction": "hostile",
+    "why": "a tab at the end",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-marker-bom",
+    "input": "ci:\n  skipMarker: \"﻿[skip ci]\"\n",
+    "direction": "hostile",
+    "why": "a BOM at the start",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-marker-zwsp",
+    "input": "ci:\n  skipMarker: \"[skip ci]​\"\n",
+    "direction": "hostile",
+    "why": "a zero-width space at the end",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-marker-nel",
+    "input": "ci:\n  skipMarker: \"[skip ci]\"\n",
+    "direction": "hostile",
+    "why": "NEL at the end",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-marker-ls",
+    "input": "ci:\n  skipMarker: \"[skip ci] \"\n",
+    "direction": "hostile",
+    "why": "a line separator (Zl, neither Cc nor Cf) at the end: not one line",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  },
+  {
+    "id": "hostile-marker-ps-mid",
+    "input": "ci:\n  skipMarker: \"skip ci\"\n",
+    "direction": "hostile",
+    "why": "a paragraph separator inside",
+    "correct": "REJECT",
+    "spec_ref": "docs/reference/configuration.md:312"
+  }
+]

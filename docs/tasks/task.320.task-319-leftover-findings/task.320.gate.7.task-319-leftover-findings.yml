@@ -1,0 +1,72 @@
+schema: 2
+task: 'task.320.task-319-leftover-findings'
+task_title: "Task 319's leftover findings are closed"
+gate: CONCERNS
+status_reason: 'Re-entry after DoD run 2: the only code-path change is the finalise.deferralApprover key in skills-config.yaml, which every strict reader accepts; the suite is green. The probe plan still reproduces the residual T320-CR-601/602/603, which the owner deferred to task.326 (deferrals.json), so security stays CONCERNS with nothing open in the queue.'
+reviewer: 'QA Engineer'
+head: '7f22f93d213e7126c9f71f49a476416bacaae2ee'
+updated: '2026-11-26T07:10:30Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 8898
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: measured
+    probes_executed: 194
+    escaped: 0
+    boundary: true
+    boundary_signals: ["refused", "refuses"]
+    notes: 'boundary: true. DoD run 2 probe plan (22 controls) re-run at this head: 194 executed, 6 case ids reproduced (8 probes), 0 escaped; all six are the residual T320-CR-601/602/603, each deferred to task.326 in deferrals.json and matched by finalise-deferral-match.js. Nothing new reproduced. Record: task.320.qa.7.task-319-leftover-findings.security.run.json.'
+  performance:
+    status: PASS
+    notes: 'No engine changed this cycle; criterion 10 rests on QA report 6, whose command is now named.'
+  reliability:
+    status: PASS
+    notes: 'parseConfig, parsePipelineConfig and parseRerunList read the new finalise block without a refusal; read_nested_config_key returns the owner on both tiers.'
+  maintainability:
+    status: PASS
+    notes: 'Five low advisory findings (one bug, four cleanups) in the documents this cycle added; none promoted.'
+
+criteria_drift:
+  reason: drift
+  base: review-commit
+  changed:
+    - id: '#1'
+      kind: appended
+      approved: true
+      relaxes: true
+      relaxes_reason: 'It adds an exception: the HTML-block case (T320-CR-601) moves to task.326. The text carries approved by Lorien Gamaroff, so the relaxation is approved.'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Close T320-CR-601, 602 and 603 in task.326 (deferred by the owner, deferrals.json).'
+      refs: ['docs/tasks/task.326.task-320-accepted-residual/task.326.task-320-accepted-residual.md']
+      remedy: unverified
+    - action: 'CR-1: make the QA report 6 command block self-contained (the loop and the out= line), or label it one run''s body.'
+      refs: ['docs/tasks/task.320.task-319-leftover-findings/task.320.qa.6.task-319-leftover-findings.md']
+      remedy: unverified
+    - action: 'CR-2 to CR-4: task.326 wording (pre is a type-1 block; plan entries 19-21 are case files 20-22; criterion 8 has no exception).'
+      refs: ['docs/tasks/task.326.task-320-accepted-residual/task.326.task-320-accepted-residual.md']
+      remedy: unverified
+    - action: 'CR-5: write the criterion 1 amendment as approved by Lorien Gamaroff, 2026-11-26 so criteria-drift extracts exactly the owner name.'
+      refs: ['docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md']
+      remedy: unverified
+
+deployment_readiness:
+  staging: APPROVED
+  production: CONDITIONAL
+  conditions: ['task.326 closes the deferred residual']

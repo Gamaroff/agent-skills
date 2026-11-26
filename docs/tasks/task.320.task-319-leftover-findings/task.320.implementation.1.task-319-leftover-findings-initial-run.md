@@ -92,6 +92,8 @@ Close the seven low findings task 319 carried forward and its two owner points (
 - Step 5c: PR review 2 is CONCERNS, with 5 findings (1 medium, 4 low) and 0 open coverage findings. All 5 were doc-only and are fixed in the carry: bugs 3 and 4 closed against QA cycle 6, bug 5's acceptance recorded (status stays New), and `pr_number: 949` and `updated:` set on the task. They are staged to ride the next commit. `ready-for-merge`: stage-disabled
 - Finalise run 2: CI reading 1 SUCCESS @ `6501527418374178fd677c78e15673830876b5bf` (6 of 6 checks). No reading 2: not accepted
 - Finalise run 2: decision IN PROGRESS. AC 15/17: #1 FAIL (high), because T320-CR-601 sits inside the criterion's wording and the gate waiver does not amend a criterion; #10 FAIL (low), because the timing command is not named. Security FAIL: 194 probes, 8 reproduced, every one a waived T320-CR-601/602/603 shape. Fix-and-recheck not taken: #1 is high and more than one finding is open
+- DoD run 2 gaps, owner route (2026-11-26): criterion 1 amended to move T320-CR-601 to task.326 (approved by Lorien Gamaroff); task.326 filed for T320-CR-601/602/603 on this branch (owner's choice); QA report 6 names its timing command (criterion 10); `deferrals.json` defers the six probe case ids to task.326, and `finalise.deferralApprover` set in `skills-config.yaml` (owner-approved)
+- QA re-entry after finalise DoD gaps: reenter-qa: re-entered QA at step 5 / qa_phase 5a — qa_max_cycles=8 (base 6), gate_head=7cae65a149fb9bcd1c6e59e6fdad07b6d8b1a769 (`skills-config.yaml` is not documentation under ci.docsOnly)
 
 ---
 
@@ -262,6 +264,24 @@ _Track each QA review/fix cycle._
 **Traceability**: skipped (no Success Criteria table)
 **PR Review**: CONCERNS — [task.320.pr-review.2.task-319-leftover-findings.md](./task.320.pr-review.2.task-319-leftover-findings.md); 5 findings (1 medium, 4 low; 0 open coverage), all doc-only and fixed in the carry (bugs 3 and 4 closed, bug 5's acceptance recorded, `pr_number` and `updated:` set); `ready-for-merge`: stage-disabled
 **Loop exit**: residual accepted by Lorien Gamaroff on 2026-11-26 (accept-qa-residual)
+**Action**: Proceeding to 5c (PR conformance review)
+
+### QA re-entry after finalise DoD gaps — 2026-11-26
+
+DoD run 2 left three gaps. The owner closed them through two routes:
+- Document-only: criterion 1 was amended, with T320-CR-601 moved to task.326, and QA report 6 now names its timing command.
+- Policy: `deferrals.json` was written, and `finalise.deferralApprover` was set.
+
+`skills-config.yaml` is not documentation, so `reenter-qa-after-finalise.sh` lowered the lock to 5 / 5a, with `qa_max_cycles` 8.
+
+### QA Cycle 7 — 2026-11-26
+**Gate Result**: CONCERNS
+**Issues Found**: 0 open. Security is CONCERNS on the residual (T320-CR-601/602/603), which still reproduces and is deferred to task.326. Five low advisory doc findings came from the diff review (CR-1 to CR-5); none was promoted.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**Suite**: green on the LAN server (8898 tests, 8895 pass, 0 fail, 3 skipped). Probe plan re-run: 194 executed, 6 case ids reproduced (all deferred), 0 escaped.
+**Traceability**: mapped — 17 criteria (`.summaries/qa-traceability-matrix.md`, gitignored scratch)
+**PR Review**: pending — 5c not yet run
 **Action**: Proceeding to 5c (PR conformance review)
 
 ---
