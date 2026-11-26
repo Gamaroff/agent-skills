@@ -112,6 +112,18 @@ No test reaches 30 s at the median or at the maximum in any run.
 | 4 | 1.55, 1.73, 1.31 | 1.38, 1.76, 1.40 |
 | 5 | 1.38, 1.76, 1.40 | 1.97, 2.05, 1.57 |
 
+**Command** (note added 2026-11-26 for DoD run 2's criterion 10 gap; recovered from the QA cycle 6 session's script, unchanged). Each of the five runs, one after another at `7cae65a14`, was:
+
+```bash
+uptime > "$out/$n.before"
+CI=true command node --test --test-reporter=tap \
+  shared/resources/tests/finalise-rerun-at-head.test.mjs shared/resources/tests/push-policy.test.mjs \
+  shared/resources/tests/tick-pr.test.mjs shared/resources/tests/ci-tree-equivalence.test.mjs > "$out/$n.tap" 2>&1
+uptime > "$out/$n.after"
+```
+
+The per-test seconds are each test's TAP `duration_ms` across the five `.tap` files, as a median and a maximum. The summary those files gave matches the table above, row for row.
+
 ### Red before the change (criterion 11)
 
 The cycle-5 cases were run against `90aabca6c`: CR3-3, the pipeline block, T319-CR-406 and T320-CR-501, 4 tests, 4 fail.

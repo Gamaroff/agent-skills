@@ -424,6 +424,7 @@ None. T319-CR-1203 adds one lookup per untracked path.
 ### Functional
 
 - [ ] A document with no criterion the reader can find is refused when it names a listed command past a fenced `## ` line, or beside a heading that only contains "criteria" (T319-CR-1201)
+  Amendment: a comment opener inside an HTML block that hides the fenced line (T320-CR-601, bug 5) is moved to task.326 and is not graded here — approved by Lorien Gamaroff (2026-11-26)
 - [ ] A listed command that one criterion hides behind both a stray backtick and an unindented line is refused (T319-CR-1202)
 - [ ] An untracked file in a directory that differs from a submodule's only in case answers `dirty-tree` under `core.ignorecase=true` on a disk that does not fold names (T319-CR-1203)
 - [ ] `push-held.sh` refuses "could not be fetched" only when the commit is not here after the fetch (T319-CR-1302)
@@ -635,6 +636,7 @@ Cycle 6: every gate-5 finding is fixed, and criterion 10 holds on the head. One 
 | 2026-11-26 |  | QA residual accepted at the loop-limit escalation — gate 6 WAIVED | Lorien Gamaroff |
 | 2026-11-26 |  | PR review CONCERNS — 5 trail and consistency findings fixed (bugs 3–5, pr_number, updated) | review-pr |
 | 2026-11-26 |  | DoD incomplete — 3 gaps identified (criterion 1 against the waived T320-CR-601, criterion 10, security residual) | finalise |
+| 2026-11-26 | 1.2 | Criterion 1 amended: T320-CR-601 moved to task.326 (approved by the owner); residual T320-CR-601/602/603 to be closed there | Lorien Gamaroff |
 <!-- change-log-end -->
 
 ---

@@ -38,3 +38,4 @@ Start no comment block while an HTML block is open, reusing the HTML block lists
 | --- | --- | --- | --- |
 | 2026-11-25 | New | qa-task | Raised by task.320.qa.6.task-319-leftover-findings.md as T320-CR-601 |
 | 2026-11-26 | New | Lorien Gamaroff | Not fixed in task.320: residual accepted at the QA loop-limit escalation (task.320.gate.6.task-319-leftover-findings.yml waiver). Left open for a follow-up |
+| 2026-11-26 | New | Lorien Gamaroff | Deferred to task.326 (task.326.task-320-accepted-residual.md); task.320 criterion 1 amended to match |
