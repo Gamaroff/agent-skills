@@ -1,0 +1,173 @@
+{
+  "schema": 1,
+  "dod_n": 2,
+  "head": "6e0523417f034f69476ba7488cc3249da9033cb5",
+  "dirty_paths": [],
+  "document": "docs/tasks/task.325.docs-only-rule-exclusions/task.325.docs-only-rule-exclusions.md",
+  "result": {
+    "bytes": 4255,
+    "sha256": "a2027faf0725975f88bbfdfa081e6aa8857078d403f1c39425195eb38f3965db",
+    "verified": false
+  },
+  "scope": {
+    "mode": "scoped",
+    "reason": "prior-record",
+    "rejudged": 2,
+    "carried": 5
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "a35860ec481f9c9af93aa29b62d705124c2e0bb6545f2d8b4f446419356ca3ab",
+      "status": "PASS",
+      "description": "Every row of the § 8 table holds in a test",
+      "code_citation": "shared/resources/ci-tree-equivalence.js:188",
+      "test_citation": "shared/resources/tests/ci-tree-equivalence.test.mjs:515",
+      "members": [
+        {
+          "member": "each row of the § 3 table (docs/a.md docs; catalogue.md code in either order; docs/guides/x/y.md code; src/a.ts code; only !docs/b.md -> docs/a.md code)",
+          "evidence": "shared/resources/tests/ci-tree-equivalence.test.mjs:515",
+          "status": "PASS"
+        },
+        {
+          "member": "ancestor walk whose delta holds an excluded path -> code-changed",
+          "evidence": "shared/resources/tests/ci-tree-equivalence.test.mjs:556",
+          "status": "PASS"
+        },
+        {
+          "member": "push policy on a commit changing an excluded path -> push",
+          "evidence": "shared/resources/tests/push-policy.test.mjs:152",
+          "status": "PASS"
+        },
+        {
+          "member": "patterns: [\\\"!docs/b.md\\\"] -> usage error naming ci.docsOnly.patterns",
+          "evidence": "shared/resources/tests/ci-tree-equivalence.test.mjs:585",
+          "status": "PASS"
+        },
+        {
+          "member": "patterns: [\\\"docs/**\\\", \\\"!\\\"] -> usage error",
+          "evidence": "shared/resources/tests/ci-tree-equivalence.test.mjs:587",
+          "status": "PASS"
+        },
+        {
+          "member": "patterns: [] -> unchanged, nothing is docs",
+          "evidence": "shared/resources/tests/ci-tree-equivalence.test.mjs:553",
+          "status": "PASS"
+        },
+        {
+          "member": "no ! in the list -> unchanged",
+          "evidence": "shared/resources/tests/ci-tree-equivalence.test.mjs:541",
+          "status": "PASS"
+        },
+        {
+          "member": "qa.testArtifactGlobs with a ! entry matches only a literal !-named path, unchanged",
+          "evidence": "shared/resources/tests/ci-tree-equivalence.test.mjs:709",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "All 8 § 8 rows covered; both test files run per PR in npm test (test.yml, no paths filter)."
+    },
+    {
+      "id": "#2",
+      "text_hash": "be9b8b423423dff63fece3c154f6d27ed679bcdea6dbdd797cae38c6375d7beb",
+      "status": "PASS",
+      "description": "git grep matchesAnyGlob in shared/resources shows no new caller",
+      "code_citation": "shared/resources/ci-tree-equivalence.js:200",
+      "test_citation": "shared/resources/tests/ci-tree-equivalence.test.mjs:709",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Non-test callers identical on develop and HEAD; the only new call sites (:200, :206) are inside isDocsPath, replacing develop's single call."
+    },
+    {
+      "id": "#3",
+      "text_hash": "3f4840e8e5357334d3ea4640273ec8c735da15b43ebaa0dbd95a1af07d077403",
+      "status": "PASS",
+      "description": "Not applicable: no bound is claimed",
+      "code_citation": "docs/tasks/task.325.docs-only-rule-exclusions/task.325.docs-only-rule-exclusions.md:274",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Task doc § 8 Performance Tests (line 274) reads 'Not applicable.' and § 9 Performance (line 287) claims no numeric bound, so it is not a measured criterion; the criterion is met by the document stating no bound. criteria-drift.js reports clean (exit 0), no amendment."
+    },
+    {
+      "id": "#4",
+      "text_hash": "416cfaa6810f7c0b13e1c445c2a5d6155cc78f55a42ac9860bd3e7181cb72d7f",
+      "status": "PASS",
+      "description": "Every § 8 mutation recorded in QA report with test turned red",
+      "code_citation": "docs/tasks/task.325.docs-only-rule-exclusions/task.325.qa.1.docs-only-rule-exclusions.md:143",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "the exclusion removed",
+          "evidence": "docs/tasks/task.325.docs-only-rule-exclusions/task.325.qa.1.docs-only-rule-exclusions.md:145",
+          "status": "PASS"
+        },
+        {
+          "member": "the exclusion made order-dependent",
+          "evidence": "docs/tasks/task.325.docs-only-rule-exclusions/task.325.qa.1.docs-only-rule-exclusions.md:146",
+          "status": "PASS"
+        },
+        {
+          "member": "the usage error removed",
+          "evidence": "docs/tasks/task.325.docs-only-rule-exclusions/task.325.qa.1.docs-only-rule-exclusions.md:147",
+          "status": "PASS"
+        },
+        {
+          "member": "the negation moved into glob-match.js",
+          "evidence": "docs/tasks/task.325.docs-only-rule-exclusions/task.325.qa.1.docs-only-rule-exclusions.md:149",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Each mutation has a committed qa.1 line naming the test it turned red."
+    },
+    {
+      "id": "#5",
+      "text_hash": "4999c165b79021a23c9d1010200e422554cb68ede31c8b2797ca34a95f6dccd8",
+      "status": "PASS",
+      "description": "npm run test:remote and npm run bundle:check pass",
+      "code_citation": "docs/tasks/task.325.docs-only-rule-exclusions/task.325.gate.5.docs-only-rule-exclusions.yml:62",
+      "test_citation": ".github/workflows/test.yml:56",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Gate 5 records ci:fast at 3a2d45cd9, 8906 tests 0 failed; HEAD e950beb7f is tree-equivalent (finalise-delta.js docs-only, exit 0); bundle:check at HEAD: 129 skills, 0 problems."
+    },
+    {
+      "id": "#6",
+      "text_hash": "0a7fa356d87ea23349e79fddc8c5da1e5cee694f31a3a269cf3bd754cb808fda",
+      "status": "PASS",
+      "description": "Reference states syntax, exclusion wins in any order, and usage error",
+      "code_citation": "docs/reference/configuration.md:308",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "configuration.md:308 states syntax, any-order rule and the usage errors; :438 and :456 restate it."
+    },
+    {
+      "id": "#7",
+      "text_hash": "6972ea0217b0497e08123d2a44da5c2292407853b554995225d2eb31bf3ae235",
+      "status": "PASS",
+      "description": "CHANGELOG [Unreleased] names both changes of § 5",
+      "code_citation": "CHANGELOG.md:19",
+      "test_citation": "evals/shared/tests/changelog-entry-drift.test.mjs:1",
+      "members": [],
+      "non_member_fail": null,
+      "note": "After the merge of develop, task 329's entry sits at CHANGELOG.md:9 under [Unreleased] ### Added; task 325's entries remain under [Unreleased] ### Changed: :19 states a '!' entry now excludes (Breaking Change 1), :25 states an exclusions-only list or bare '!' is a usage error, exit 2 (Breaking Change 2), and also covers Breaking Change 3. The changelog guard runs per PR via npm test (test:suite includes evals/shared/tests/*.test.mjs)."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#1",
+      "note": "Carried from dod.1: the '[]' row says 'accepted'; readConfig already refuses an empty YAML patterns: by the block-list check, so only the predicate answer is pinned. Fails closed."
+    },
+    {
+      "ac_id": "#2",
+      "note": "Carried from dod.1: the test file gains direct matchesAnyGlob calls (:702-706, :712-715); they are test pins, not readers of ci.docsOnly.patterns."
+    },
+    {
+      "ac_id": "#7",
+      "note": "Carried from dod.1: deferred T325-CR-502 (low): CHANGELOG.md:25 still says 'extglob' where only @(, !( and +( are refused."
+    }
+  ]
+}

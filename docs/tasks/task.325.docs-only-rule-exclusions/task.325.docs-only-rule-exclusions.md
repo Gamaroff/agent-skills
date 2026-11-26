@@ -5,20 +5,21 @@ type: task
 description: "Let ci.docsOnly.patterns hold an exclusion (a glob that starts with an exclamation mark), so a project can keep one tested document out of the rule that lets the pipelines stop waiting for CI."
 tags: [ci, docs-only-rule, skills-config]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-11-25
 updated: 2026-11-26
 estimated_effort_hours: 4
 github_issue: 947
+completed_date: 2026-11-26
 ---
 
 # Technical Task: The docs-only CI rule can exclude a path
 
 **GitHub Issue**: [#947](https://github.com/Gamaroff/agent-skills/issues/947)
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.325.review.1.docs-only-rule-exclusions.md` implemented 2026-11-26
 
@@ -381,9 +382,11 @@ Five QA cycles. The exclusion check went through four fixes:
 
 No exclusion fails open. Two LOW findings (T325-CR-501, T325-CR-502) are carried to Deferred Work by the Cosmetic-residue exit.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified (DoD run 1 — superseded)
 
-**Status:** IN PROGRESS
+> **Superseded by DoD run 2** (`task.325.dod.2.docs-only-rule-exclusions.md`), below. Both gaps were a
+> sink mismatch: `isDocsPath` is a name classifier, and task 329 (PR #956) added the `git-name` sink
+> it is now probed under. Kept as the record of run 1.
 
 ### QA Gate Status
 
@@ -407,6 +410,30 @@ No exclusion fails open. Two LOW findings (T325-CR-501, T325-CR-502) are carried
 **Gap Report Generated:** 2026-11-26
 
 **Detailed Verification Log:** See `task.325.dod.1.docs-only-rule-exclusions.md` for the full verification evidence and timestamps.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.325.qa.5.docs-only-rule-exclusions.md`
+**Gate File**: `task.325.gate.5.docs-only-rule-exclusions.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 96/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Success Criteria:** all 7 met (DoD run 2: #3 and #7 re-judged after the develop merge, five carried)
+✅ **Tests:** CI SUCCESS @ `6e0523417` on all 6 checks; `npm run bundle:check` 129 skills, 0 problems
+✅ **PR Review:** PR #954; `task.325.pr-review.1.docs-only-rule-exclusions.md` APPROVE (the host requires no review)
+✅ **Documentation:** CHANGELOG `[Unreleased]` cites task 325; `docs/reference/configuration.md` and the CI docs-only runbook updated
+✅ **Security Review:** PASS — 40 probe candidates under the `git-name` sink, 0 reproduced
+✅ **Compliance Review:** NOT_APPLICABLE — internal CI tooling
+
+**Detailed Verification Log:** See `task.325.dod.2.docs-only-rule-exclusions.md` for complete verification evidence and timestamps.
+
+**Task marked as ACCEPTED on:** 2026-11-26
 <!-- change-log-start -->
 ## Change Log
 
@@ -426,6 +453,7 @@ No exclusion fails open. Two LOW findings (T325-CR-501, T325-CR-502) are carried
 | 2026-11-26 |         | QA findings fixed — cycle 4, 1 finding                 | qa-fix      |
 | 2026-11-26 |         | QA gate PASS (96/100) — 2 LOW carried (route 2b)        | qa-task     |
 | 2026-11-26 |  | DoD incomplete — 2 gaps identified | finalise |
+| 2026-11-26 | 1.2 | DoD passed — accepted (PR #954) | finalise |
 <!-- change-log-end -->
 
 ---

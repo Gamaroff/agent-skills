@@ -1,0 +1,54 @@
+[
+  {
+    "argv": [
+      "--sink",
+      "git-name",
+      "--entry",
+      "shared/resources/ci-tree-equivalence.js#isDocsPath",
+      "--args-json",
+      "[[\"**\"]]",
+      "--name",
+      "isDocsPath git-name corpus (widest patterns)"
+    ]
+  },
+  {
+    "argv": [
+      "--sink",
+      "git-name",
+      "--entry",
+      "shared/resources/ci-tree-equivalence.js#isDocsPath",
+      "--args-json",
+      "[[\"docs/**\",\"!docs/catalogue.md\",\"!docs/guides/**\"]]",
+      "--name",
+      "isDocsPath exclusion wins (inclusion first)"
+    ],
+    "cases_file": "task.325.dod.2.security.cases.2.json",
+    "cases_sha256": "0f3975f5cf46ed79804ba4d110b2d7f2af3557b702665415cca8fd67505b1b71"
+  },
+  {
+    "argv": [
+      "--sink",
+      "git-name",
+      "--entry",
+      "shared/resources/ci-tree-equivalence.js#isDocsPath",
+      "--args-json",
+      "[[\"!docs/guides/**\",\"!docs/catalogue.md\",\"docs/**\"]]",
+      "--name",
+      "isDocsPath exclusion wins (exclusions first)"
+    ],
+    "cases_file": "task.325.dod.2.security.cases.3.json",
+    "cases_sha256": "980ca8fe8d0ccd3e1b84be8abb491a3316383fe92d44750a9ded61f07fd1b24b"
+  },
+  {
+    "argv": [
+      "--sink",
+      "git-name",
+      "--entry",
+      "shared/resources/ci-tree-equivalence.js#parseConfig",
+      "--name",
+      "ci.docsOnly.patterns exclusion refusals"
+    ],
+    "cases_file": "task.325.dod.2.security.cases.4.json",
+    "cases_sha256": "ce39e514d9800ca4ddb97c2ae1e8530e3167a5ae27027ae3322d0ea2495f20d0"
+  }
+]
