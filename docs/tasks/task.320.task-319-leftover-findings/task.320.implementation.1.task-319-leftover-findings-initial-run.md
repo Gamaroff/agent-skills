@@ -299,7 +299,7 @@ DoD run 2 left three gaps. The owner closed them through two routes:
 
 ## Completion
 
-**Finished**: halted at Step 7, 2026-11-25T21:10Z; after the QA re-entry, halted at Step 5 (loop limit), 2026-11-25T23:06Z; after the residual was accepted, halted at Step 7 (DoD gaps), 2026-11-26T03:58Z; after the deferral to task.326, halted at Step 7 (DoD gaps), 2026-11-26T07:30Z; completed 2026-11-26T08:13Z
+**Finished**: 2026-11-26T08:13Z (earlier halts: Step 7, 2026-11-25T21:10Z; after the QA re-entry, Step 5 (loop limit), 2026-11-25T23:06Z; after the residual was accepted, Step 7 (DoD gaps), 2026-11-26T03:58Z; after the deferral to task.326, Step 7 (DoD gaps), 2026-11-26T07:30Z)
 **Final Status**: Completed
 **Branch**: feature/task.320.task-319-leftover-findings
 **PR**: https://github.com/Gamaroff/agent-skills/pull/949
