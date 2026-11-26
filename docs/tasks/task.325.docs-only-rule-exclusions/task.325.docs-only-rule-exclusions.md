@@ -149,6 +149,12 @@ are refused. An empty list is not affected. Before, it read as "nothing is docum
 
 **Migration**: write `enabled: false`, which says the same.
 
+### Breaking Change 3: an exclusion that would exclude nothing is a usage error
+
+**What Changed** (added in QA cycles 2–4): an exclusion is refused when its path is not in git's form. That covers a space after or before the `!`, `!./`, `!/`, a trailing `/`, and an empty, `.` or `..` segment. These are the forms `isDocsPath` refuses before it matches, defined once as `hasPathFormDefect`. An exclusion holding braces, a character class, `@(`, `!(`, `+(` or `|` is also refused, because this matcher reads those literally. Before, each was accepted and silently excluded nothing.
+
+**Migration**: write the path in git's form. Write a directory as `!docs/dir/**`. List each file as its own exclusion, or use `*` or `?`.
+
 ---
 
 ## 6. Implementation Plan
@@ -282,7 +288,7 @@ Not applicable.
 
 ### Code Quality
 
-- [ ] Every mutation in § 8 is recorded in the QA report with the test it turned red
+- [x] Every mutation in § 8 is recorded in the QA report with the test it turned red
 - [x] `npm run test:remote` and `npm run bundle:check` pass
 
 ### Migration
@@ -375,11 +381,37 @@ Five QA cycles. The exclusion check went through four fixes:
 
 No exclusion fails open. Two LOW findings (T325-CR-501, T325-CR-502) are carried to Deferred Work by the Cosmetic-residue exit.
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**Gate File**: `task.325.gate.5.docs-only-rule-exclusions.yml`. **Gate Status**: ✅ PASS (96/100). **PR review**: `task.325.pr-review.1.docs-only-rule-exclusions.md`, APPROVE. **CI**: SUCCESS @ `e950beb7f`.
+
+### Missing Criteria:
+
+1. **Security Review:**
+   - [ ] The probe `0:path.encoded-traversal` (`..%2f..%2fetc%2fpasswd`) reproduced on `isDocsPath`: it was accepted as documentation under `["**","!secret/**"]`. Severity low. It is pre-existing, because origin/develop accepts it too. No owner deferral exists (`no-match`).
+   - [ ] The probe `0:path.symlink-escape` (`uploads/link-to-etc/passwd`) reproduced on `isDocsPath`. Severity low. It is pre-existing. No owner deferral exists (`no-match`).
+
+### Next Steps:
+
+- [ ] Do one of these, as the owner:
+  - Defer both cases to a follow-up task in `deferrals.json` beside this document. `isDocsPath` classifies git-form names, so it never decodes and never resolves symlinks; the path-sink corpus does not fit it.
+  - Make the probe fit the sink.
+- [ ] Re-run `/finalise`. This is a document-only change, so it does not re-enter QA.
+
+**Estimated Effort:** Small
+
+**Gap Report Generated:** 2026-11-26
+
+**Detailed Verification Log:** See `task.325.dod.1.docs-only-rule-exclusions.md` for the full verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                           | Author      |
-| ---------- | ------- | ----------------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-25 | 1.0     | Initial draft — split from a CI adoption handoff      | create-task |
 | 2026-11-26 | 1.1     | Review passed (8/10) — fixed a false `!`-path clarification, scoped the usage error to non-empty lists, refreshed line anchors | review-task |
 | 2026-11-26 |         | Status → ready-for-development                        | review-task |
@@ -393,6 +425,7 @@ No exclusion fails open. Two LOW findings (T325-CR-501, T325-CR-502) are carried
 | 2026-11-26 |         | QA gate CONCERNS (90/100) — 1 medium (cycle 4)          | qa-task     |
 | 2026-11-26 |         | QA findings fixed — cycle 4, 1 finding                 | qa-fix      |
 | 2026-11-26 |         | QA gate PASS (96/100) — 2 LOW carried (route 2b)        | qa-task     |
+| 2026-11-26 |  | DoD incomplete — 2 gaps identified | finalise |
 <!-- change-log-end -->
 
 ---
@@ -428,6 +461,11 @@ non-empty list of exclusions only, each naming `ci.docsOnly.patterns`. `glob-mat
 Beyond the plan: a `push-policy.test.mjs` case for § 8's push-policy row (its file was not in § 7), and
 a sibling control beside the `reenter-qa-after-finalise.test.sh` case. The `p.length > 0` guard cannot
 be reached from YAML: an empty `patterns:` is already refused by the block-list check.
+
+QA cycles 2–4 added the refusals in Breaking Change 3:
+- `hasPathFormDefect` holds `isDocsPath`'s pre-match path-form refusals, defined once. `interpretConfig` now asks it about each exclusion's remainder.
+- A dialect-syntax refusal covers braces, classes, `@(`, `!(`, `+(` and `|`.
+- The reference now states the glob grammar: `*`, `**` and `?` are the only wildcards.
 
 **Testing Results**: `npm run test:remote` (`ci:fast` on the LAN server): 8904 tests, 8901 pass, 0 fail,
 3 skipped. The four engine suites: 235 of 235. `reenter-qa-after-finalise.test.sh`: 85 of 85.
