@@ -139,6 +139,17 @@ _Track each QA review/fix cycle._
 - CR-3 (advisory cleanup) applied: the module header now says usage answers leave `--out` in place and a symlink `--out` is removed, not followed.
 - Mutations: (j) never clear → QA-4 red; (k) every user line clears → 4 tests red (hand-back-only, same-message tie, hand-back-after-text, QA-4); (l) every lstat error absent → QA-5 red. Each reverted.
 - Probe: phrase "SubagentHandback" + "final turn" across SKILL.md and shared resources: `skills/finalise/SKILL.md` names the reply field and does not state the turn rule (unaffected); CHANGELOG bullet updated. Population 1 code site.
+- Fast gate: ci:fast on the LAN test server → 8923 pass, 0 fail. Commit `53bcb574e` (fix, gate 2, QA report 2, this report); push-policy qa-cycle → push.
+
+### QA Cycle 3 — 2026-11-26
+**Gate Result**: PASS
+**Issues Found**: 0 gating. 3 advisory cleanups (CR-1 mixed prompt-line test, CR-2 non-array user content, CR-3 JSDoc placement), recorded under gate 3 `recommendations.future`. Real host transcript re-extracted: sha256 unchanged.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**Traceability**: skipped (not re-run — cycle 3)
+**PR Review**: pending — Step 5c next
+**Loop exit**: gate PASS → Step 5c
+**Action**: Running review-pr (Step 5c)
 
 ---
 

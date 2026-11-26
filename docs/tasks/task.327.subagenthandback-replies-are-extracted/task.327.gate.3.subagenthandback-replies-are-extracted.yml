@@ -1,0 +1,74 @@
+schema: 2
+task: 'task.327.subagenthandback-replies-are-extracted'
+task_title: 'SubagentHandback replies are extracted, not hand-copied'
+gate: PASS
+status_reason: 'Both cycle-2 findings are fixed and mutation-held. The scoped re-review found no bug, only three low cleanups. The real host transcript still extracts byte-identically, and the turn rule matches every user-line shape found after a hand-back on this host.'
+reviewer: 'QA Engineer'
+head: '53bcb574e1f2cbc45f5a22b88367d0e549b88229'
+updated: '2026-11-26T21:16:30Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 92
+
+evidence:
+  tests_reviewed: 85
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: ["never"]
+    boundary_reason: 'Unchanged from cycle 1: replyText reads only harness-written transcript JSONL (boundary: internal); sameFile and clearOut are identity and path guards held by named tests and mutations.'
+    notes: 'The --out identity guard and the non-ENOENT refusal both fail closed.'
+  performance:
+    status: PASS
+    notes: 'One pass over the transcript; isPrompt is per user line.'
+  reliability:
+    status: PASS
+    notes: 'A new prompt drops an earlier hand-back (T327-QA-4 verified); an lstat that cannot look is a named refusal (T327-QA-5 verified).'
+  maintainability:
+    status: PASS
+    notes: 'Advisory cleanups CR-1..CR-3 recorded below; none gates.'
+
+criteria_drift:
+  reason: drift
+  base: review-commit
+  changed:
+    - id: '#7'
+      kind: added
+      approved: true
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Add a QA-4 case with a mixed tool_result + text prompt line, the one shape that tells some() from every() (CR-1).'
+      refs: ['shared/resources/tests/agent-reply-block.test.mjs']
+      remedy: unverified
+    - action: 'Give a user line with missing or non-array content one meaning for both reply shapes (CR-2; no such line on this host).'
+      refs: ['shared/resources/agent-reply-block.js']
+      remedy: unverified
+    - action: 'Move isPrompt above the replyText JSDoc so the doc attaches to replyText (CR-3).'
+      refs: ['shared/resources/agent-reply-block.js']
+      remedy: unverified
+
+bug_resolution:
+  bugs_fixed: 6
+  bugs_remaining: 0
+  fix_date: '2026-11-26'
+  total_iterations: 2
+  verification_method: 'Named tests, mutations g-l, real host transcript re-extracted (sha256 unchanged), ci:fast 8923/0'
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: ['CI green on 53bcb574e (pending at gate time; the merge gate re-checks it)']

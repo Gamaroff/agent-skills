@@ -282,24 +282,24 @@ agent's block, or a text-reply transcript answers differently from before. Steps
 
 ## QA Testing Results
 
-**QA Status**: FAIL
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-26
-**Quality Score**: 70/100
-**Gate Decision**: FAIL
+**Quality Score**: 92/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.327.qa.2.subagenthandback-replies-are-extracted.md](./task.327.qa.2.subagenthandback-replies-are-extracted.md)
-- **Gate File**: [task.327.gate.2.subagenthandback-replies-are-extracted.yml](./task.327.gate.2.subagenthandback-replies-are-extracted.yml)
+- **Full Report**: [task.327.qa.3.subagenthandback-replies-are-extracted.md](./task.327.qa.3.subagenthandback-replies-are-extracted.md)
+- **Gate File**: [task.327.gate.3.subagenthandback-replies-are-extracted.yml](./task.327.gate.3.subagenthandback-replies-are-extracted.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 83 (18 + 65), plus ci:fast 8921/0
+- **Tests Executed**: 85 (20 + 65), plus ci:fast 8923/0
 - **Phases Verified**: 4/4
-- **Critical Issues**: 1
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: FAIL, Maintainability: PASS
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-Cycle-1 findings fixed. A hand-back from an earlier turn is still extracted after a new prompt (T327-QA-4, high, reproduced). An lstat error is read as "nothing there" (T327-QA-5, low).
+All six findings across cycles 1-2 are fixed and mutation-held. The real host hand-back transcript still extracts byte-identically. Three advisory cleanups are recorded in gate 3.
 
 <!-- change-log-start -->
 ## Change Log
@@ -314,6 +314,7 @@ Cycle-1 findings fixed. A hand-back from an earlier turn is still extracted afte
 | 2026-11-26 |  | QA findings fixed (4 of 4) — gate 1 CONCERNS, 1 iteration | qa-fix |
 | 2026-11-26 |  | QA gate FAIL (70/100) — 2 findings | qa-task |
 | 2026-11-26 |  | QA findings fixed (2 of 2) — gate 2 FAIL, 2 iterations | qa-fix |
+| 2026-11-26 |  | QA gate PASS (92/100) — 0 findings | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking
