@@ -1,0 +1,443 @@
+{
+  "schema": 1,
+  "dod_n": 4,
+  "head": "aa1c04f98d459b7cdfeae792dfe54029df1b1280",
+  "dirty_paths": [],
+  "document": "docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md",
+  "result": {
+    "bytes": 17900,
+    "sha256": "77072d335c5e3efee8b7192872d87b047c51a7fe5398afd668f0f8f602a970c9",
+    "verified": false
+  },
+  "scope": {
+    "mode": "scoped",
+    "reason": "prior-record",
+    "rejudged": 3,
+    "carried": 14
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "885c82658f6011563b98816667329816bd29048c6529f73659ec88c805d1aacc",
+      "status": "PASS",
+      "description": "Listed command past a fenced heading or beside a criteria-like heading is refused (T319-CR-1201)",
+      "code_citation": "shared/resources/finalise-rerun-at-head.js:1004",
+      "test_citation": "shared/resources/tests/finalise-rerun-at-head.test.mjs:1246",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The prior non-member FAIL (T320-CR-601) no longer holds against the criterion as amended. criteria-drift.js (base review commit 601134810, exit 0) reports #1 kind appended, approved true, approver 'Lorien Gamaroff (2026-11-26)'. The appended line adds an exception: the comment opener inside an HTML block (T320-CR-601, bug 5) moves to task.326 and is not graded here. That relaxes the criterion, but it is approved, so the amendment rule does not fail it. task.326 names T320-CR-601 (task.326.task-320-accepted-residual.md:31, :45). Gate 7 is CONCERNS with top_issues [], and its criteria_drift block records the same approved relaxation. The rest of the criterion: lines 1000-1008 refuse a command found under a criteria part. Test lines 1246-1250 cover a fenced `## x` line, the CRLF/`~~~` form, `# x`, and beside `## Rollback criteria`. Tests run in npm test (.github/workflows/test.yml:58) on every PR. The engine and tests are unchanged since head 650152741: the delta is docs plus skills-config.yaml only. T320-CR-603 fails closed and is not a reason to fail."
+    },
+    {
+      "id": "#2",
+      "text_hash": "e5b9da3445e93ba82f46f6f1a7e39ae09eb2a943a3bed09ad2ffdc1354ac111a",
+      "status": "PASS",
+      "description": "Command hidden by a stray backtick and an unindented line is refused (T319-CR-1202)",
+      "code_citation": "shared/resources/finalise-rerun-at-head.js:1033",
+      "test_citation": "shared/resources/tests/finalise-rerun-at-head.test.mjs:1354",
+      "members": [],
+      "non_member_fail": null,
+      "note": "shows(joined[i], c) at line 1033 applies the backtick check to the lazily joined text. The cases at test lines 1355-1356 expect scan-broken, with a none-named control at 1357. The code is unchanged since DoD run 1; only the line numbers moved. npm test runs it on every PR."
+    },
+    {
+      "id": "#3",
+      "text_hash": "9297081a05910c03752be6443e1b4d97451d87b54697969822d7c90880eca448",
+      "status": "PASS",
+      "description": "Untracked file beside a submodule, differing only in case, answers dirty-tree (T319-CR-1203)",
+      "code_citation": "shared/resources/finalise-rerun-at-head.js:754",
+      "test_citation": "shared/resources/tests/finalise-rerun-at-head.test.mjs:1382",
+      "members": [],
+      "non_member_fail": null,
+      "note": "besideSub (line 754) compares the device and inode of the folded parent. The control 'a second spelling of a submodule's directory is the submodule' is at test line 1434. The code is unchanged since DoD run 1 (lines moved). The per-PR runner (ubuntu-latest, test.yml:10) has a case-sensitive disk, so these rows run there."
+    },
+    {
+      "id": "#4",
+      "text_hash": "9403aab883d170f8afa8d39795c131fd6de4c782ce05c6b79b4b227ff3534ce9",
+      "status": "PASS",
+      "description": "push-held.sh says could not be fetched only when the commit is absent (T319-CR-1302)",
+      "code_citation": "shared/resources/push-held.sh:161",
+      "test_citation": "shared/resources/tests/push-policy.test.mjs:1429",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Line 161 refuses only when cat-file -e still fails after the fetch. The test at 1429 covers a fetch that brought the commit and then failed, and no submodule asked (--no-recurse-submodules). The kept refusal when the commit is absent is asserted at push-policy.test.mjs:1565. push-held.sh has not changed since DoD run 1; only the test lines moved."
+    },
+    {
+      "id": "#5",
+      "text_hash": "d72a77ef4de2b8ab63eb58ee73cee9849f21e7e6e10fc8b0f8f3bfb7d68109d1",
+      "status": "PASS",
+      "description": "push-held.sh stopped past its bound answers pushed; killed inside it, failed (T319-CR-1303)",
+      "code_citation": "shared/resources/push-held.sh:101",
+      "test_citation": "shared/resources/tests/push-policy.test.mjs:1322",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Line 101 maps 137 to 124 only when SECONDS is past the bound. One test asserts both halves. The code is unchanged since DoD run 1 (the test line moved). npm test runs it on every PR."
+    },
+    {
+      "id": "#6",
+      "text_hash": "e772f1567f898365c2c8b192bf1e0d889cddb231f19f70a71c4af776f16aa37a",
+      "status": "PASS",
+      "description": "tick-pr.sh start answers the same from a subdirectory (T319-CR-1304)",
+      "code_citation": "shared/resources/tick-pr.sh:120",
+      "test_citation": "shared/resources/tests/tick-pr.test.mjs:647",
+      "members": [],
+      "non_member_fail": null,
+      "note": "landed and resume each compared from the top, docs, and a directory with a space. The cd reverted: red (run by me)."
+    },
+    {
+      "id": "#7",
+      "text_hash": "801c33a750ab181b5ef09dd7d3386c29dcc41c4cf5122b33908736f587c5a02c",
+      "status": "PASS",
+      "description": "Limit of T319-CR-1301 stated in tick-pr.sh, develop-next SKILL.md and configuration.md",
+      "code_citation": "shared/resources/tick-pr.sh:102",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [
+        {
+          "member": "shared/resources/tick-pr.sh",
+          "evidence": "shared/resources/tick-pr.sh:102",
+          "status": "PASS"
+        },
+        {
+          "member": "skills/develop-next/SKILL.md",
+          "evidence": "skills/develop-next/SKILL.md:659",
+          "status": "PASS"
+        },
+        {
+          "member": "docs/reference/configuration.md",
+          "evidence": "docs/reference/configuration.md:320",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "I read all three. Each says that a tick whose conflict was resolved on the forge, then squashed with its branch deleted, reads resume, that the second PR conflicts, and that the owner decides. configuration.md:320 (the developNext.tickVia row) adds the recovery steps."
+    },
+    {
+      "id": "#8",
+      "text_hash": "f96abeb81e164dc0d738c26e279c140d7370818f7e8d9fa1a40d3feb00447130",
+      "status": "PASS",
+      "description": "Escaped top-level ci, pipeline or finalise key is refused, alone and beside plain",
+      "code_citation": "shared/resources/ci-tree-equivalence.js:400",
+      "test_citation": "shared/resources/tests/ci-tree-equivalence.test.mjs:1479",
+      "members": [
+        {
+          "member": "ci, alone and beside the plain key",
+          "evidence": "shared/resources/tests/ci-tree-equivalence.test.mjs:1479",
+          "status": "PASS"
+        },
+        {
+          "member": "pipeline, alone and beside the plain key",
+          "evidence": "shared/resources/tests/push-policy.test.mjs:395",
+          "status": "PASS"
+        },
+        {
+          "member": "finalise, alone and beside the plain key",
+          "evidence": "shared/resources/tests/finalise-rerun-at-head.test.mjs:847",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "normKey (line 400) decodes the escape. Since run 1, every near-miss reader looks through topLevelKeys(text, parsed) (ci-tree-equivalence.js:471, used at :578, :650 and finalise-rerun-at-head.js:194), so the source's written keys are checked too, after a block scalar included. The three tests gained those cases (CR3-3 at +1496, T319-CR-406 at +876, the pipeline block at +406), and npm test runs them on every PR. T320-CR-602 (low, waived at gate 6) is the exact key `ci` or `pipeline` behind `?` with a comment, or an alias key, read as the defaults. That is not an escaped spelling, so it is outside this criterion's wording. It belongs to Breaking Change 1's wider claim."
+    },
+    {
+      "id": "#9",
+      "text_hash": "96acedce2a3669819632ed5067127b0d148f319e295c4dc972612c513062a52b",
+      "status": "PASS",
+      "description": "skipMarker edge control or format character refused; spaces and CRLF accepted",
+      "code_citation": "shared/resources/ci-tree-equivalence.js:622",
+      "test_citation": "shared/resources/tests/push-policy.test.mjs:214",
+      "members": [],
+      "non_member_fail": null,
+      "note": "skipMarkerOf (lines 622-630) takes what trim() dropped and refuses anything there that is not U+0020. The test at 214 refuses control and format characters at the edges, including BOM 0xfeff (line 228). At line 253, spaces at the ends and a CRLF file stay accepted. Unchanged since DoD run 1 apart from line moves."
+    },
+    {
+      "id": "#10",
+      "text_hash": "cd5386e3874b340d7cd5940622906cf308e4456c92c9c19d95ac7f98c416e06c",
+      "status": "PASS",
+      "description": "No new test in the four suites waits longer than 30 s",
+      "code_citation": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.7.task-319-leftover-findings.md:102",
+      "test_citation": "NOT_APPLICABLE: measured criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Measured criterion. Bound: 30 s per test. Measured on 5c9044f38, tree-equivalent to head: command node .agents/skills/finalise/references/finalise-delta.js docs-only --base 5c9044f38 --head HEAD --json answers reason tree-equivalent, exit 0, and the one changed path is the QA 7 report. QA report 7:102-140, committed in aa1c04f98 (the PR head), records five runs in a row. Each run had uptime before and after (load 2.14-3.60, table at :119-125) and 235 of 235 tests passing. The command loop is shown in full at :129-138: uptime, then CI=true command node --test --test-reporter=tap over the four suites, with per-test seconds from TAP duration_ms. All five exit codes were 0. Slowest test (T319-CR-904/905, not new): median 25.5 s, max 26.0 s. New SIGSTOP case (T319-CR-1303): median 13.5 s, max 13.6 s. No test reaches 30 s at the median or the max. Run 3's non-member FAIL (figures from 7cae65a14, code-changed) no longer holds: the figure is now taken on a commit tree-equivalent to the head. This also covers run 3's advisory (CR-1): the loop now sets $out and $n."
+    },
+    {
+      "id": "#11",
+      "text_hash": "0f667512e4eb11df737d304608c157f0f91574e21c93e04301c0d5b45c62a2ab",
+      "status": "PASS",
+      "description": "Every new test was red before its change; red runs in the QA report",
+      "code_citation": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:103",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "CR3-3, escaped ci (extended)",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:107",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-406, escaped finalise (extended)",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:108",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-805, refused",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:109",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-805, read past",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.4.task-319-leftover-findings.md:138",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1005 with the T319-CR-1202 cases",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:109",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1203, a file beside a submodule",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:110",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1203, a second spelling is the submodule (control)",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:127",
+          "status": "PASS"
+        },
+        {
+          "member": "ci.skipMarker is one printable line (extended)",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:111",
+          "status": "PASS"
+        },
+        {
+          "member": "the pipeline block refuses (extended)",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:112",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1303",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:113",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1302",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:114",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1304",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:115",
+          "status": "PASS"
+        },
+        {
+          "member": "DoD gap-1/2 fix cases (CR3-3, pipeline block, T319-CR-406, T319-CR-805 read past, lone CR)",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.5.task-319-leftover-findings.md:94",
+          "status": "PASS"
+        },
+        {
+          "member": "cycle-5 cases (CR3-3, pipeline block, T319-CR-406, new T320-CR-501 test at finalise-rerun-at-head.test.mjs:1308)",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.6.task-319-leftover-findings.md:129",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Evidence changed only by line moves. QA report 6 was edited, so the cycle-5 red-before line moved from :117 to :129. It reads: run against 90aabca6c, 4 tests, 4 fail. QA reports 1, 4 and 5 are unchanged since head 650152741. No test was added since then: the delta is docs plus skills-config.yaml, and QA report 7:76 says no new test this cycle."
+    },
+    {
+      "id": "#12",
+      "text_hash": "53156fb905a4d1612728d6e37cc4842b56bfd3e7340e019ed2872ce23cb1b34a",
+      "status": "PASS",
+      "description": "Reverting any one remedy turns a named test red; table in QA report",
+      "code_citation": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:123",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "T319-CR-1201",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:125",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1202",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:126",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1203",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:127",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1302",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:129",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1303",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:130",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1304",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:131",
+          "status": "PASS"
+        },
+        {
+          "member": "escapes in normKey",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:132",
+          "status": "PASS"
+        },
+        {
+          "member": "escapes in listKeyRows",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:133",
+          "status": "PASS"
+        },
+        {
+          "member": "marker edge",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.1.task-319-leftover-findings.md:134",
+          "status": "PASS"
+        },
+        {
+          "member": "fixes of QA cycle 1",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.2.task-319-leftover-findings.md:118",
+          "status": "PASS"
+        },
+        {
+          "member": "fixes of QA cycle 2",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.3.task-319-leftover-findings.md:143",
+          "status": "PASS"
+        },
+        {
+          "member": "fixes of QA cycle 3",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.4.task-319-leftover-findings.md:145",
+          "status": "PASS"
+        },
+        {
+          "member": "DoD gap-1/2 fix (90aabca6c): source keys, indent filter, column 0, fence split, closedOnly, lone CR",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.5.task-319-leftover-findings.md:96",
+          "status": "PASS"
+        },
+        {
+          "member": "DoD gap-1/2 fix: parsed keys in the union (QA 5 no-red-untested row)",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.6.task-319-leftover-findings.md:137",
+          "status": "PASS"
+        },
+        {
+          "member": "cycle-5 fix (7cae65a14): 20 mutations, comment blocks and keys the parse never reads",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.6.task-319-leftover-findings.md:133",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Evidence changed only by line moves in QA report 6. The 20-of-20 statement is now at :133, with its table at :135-144. 'written keys, parsed keys dropped from the union (2)' is at :137, where CR3-3, T319-CR-406 and the pipeline block go red. No remedy was added since head 650152741. The only non-doc change is the finalise.deferralApprover value in skills-config.yaml: a configuration value, not a code remedy for a finding. FINALISE_KEYS already held the key (finalise-rerun-at-head.js:125)."
+    },
+    {
+      "id": "#13",
+      "text_hash": "e37c3c73f046c53e0038bd159f2188d8777e87237688f2b8bcaee933df622b24",
+      "status": "PASS",
+      "description": "npm test passes under CI=true; npm run bundle leaves no diff",
+      "code_citation": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.7.task-319-leftover-findings.md:185",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "npm test under CI=true",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.7.task-319-leftover-findings.md:185",
+          "status": "PASS"
+        },
+        {
+          "member": "npm run bundle leaves no diff",
+          "evidence": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.7.task-319-leftover-findings.md:187",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Evidence moved only by line numbers. aa1c04f98 added 41 lines to QA report 7, so the old :146/:148 are now :185/:187, and the summary row is at :77. QA report 7:185 reads 'npm run test:remote  # 8898 tests, 8895 pass, 0 fail, 3 skipped' (the CI-parity container). :187 reads 'npm run -s bundle:check  # 129 skill(s), 0 problems'. Both were recorded at 7f22f93d2. finalise-delta.js docs-only --base 7f22f93d2 --head HEAD --json answers tree-equivalent, exit 0, and 5c9044f38 to HEAD is likewise tree-equivalent, so the figures hold at the head. The PR's own test check (npm test) is still pending on head aa1c04f98. I did not run the suite myself."
+    },
+    {
+      "id": "#14",
+      "text_hash": "416246872aceb5aeb5c9decd4d07391977cc981580270a7eb610f343fcd49135",
+      "status": "PASS",
+      "description": "npm run validate for skills/develop-next/ passes",
+      "code_citation": "docs/tasks/task.320.task-319-leftover-findings/task.320.qa.7.task-319-leftover-findings.md:186",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Evidence moved only by line number (old :147, now :186). QA report 7:186 reads 'npm run -s validate -- skills/develop-next/   # ✓ develop-next', and the summary row :78 says PASS. It was recorded at 7f22f93d2, which is tree-equivalent to head (finalise-delta.js exit 0). The PR's validate check passes on PR 949 (gh pr checks)."
+    },
+    {
+      "id": "#15",
+      "text_hash": "ad2d88f3751f44a2166e5ec8791103f7b2dee5a1b512ee0f270393dab52311de",
+      "status": "PASS",
+      "description": "CHANGELOG Unreleased cites (task 320) and names the two new refusals",
+      "code_citation": "CHANGELOG.md:16",
+      "test_citation": "evals/shared/tests/changelog-entry-drift.test.mjs:304",
+      "members": [],
+      "non_member_fail": null,
+      "note": "I read CHANGELOG.md:16-23. It cites (task 320) and names both refusals: a ci/pipeline/finalise key with a YAML escape (now also a near miss after a block scalar, and the key in an indented, lone-CR, anchor, tag or `?` form), and a control or format character, or a non-plain space, at either end of ci.skipMarker. The changelog corpus guard checks the citation post-merge, once the task is accepted."
+    },
+    {
+      "id": "#16",
+      "text_hash": "2e9baf0322810c9de45dc937ee035daf99d8ccf50152e929b6a002f12d5b0d1f",
+      "status": "PASS",
+      "description": "Configuration reference says what ci.skipMarker drops and refuses",
+      "code_citation": "docs/reference/configuration.md:312",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "I read line 312. It says plain spaces at the ends, and a tab outside the quotes, are dropped. Any other space at the ends is refused, and so is a control or format character in the value or anywhere on the key's row, its comment included. This matches skipMarkerOf at ci-tree-equivalence.js:622-630."
+    },
+    {
+      "id": "#17",
+      "text_hash": "fe353eaeb638201dba61374b425caa7adc5587e6c61dcebf059762e42dd12175",
+      "status": "PASS",
+      "description": "Each Deferred Work entry of task 319 names task 320",
+      "code_citation": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:483",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [
+        {
+          "member": "T319-CR-1201",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:483",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1202",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:484",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1203",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:485",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1301",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:486",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1302",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:487",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1303",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:488",
+          "status": "PASS"
+        },
+        {
+          "member": "T319-CR-1304",
+          "evidence": "docs/tasks/task.319.ci-runs-only-where-needed/task.319.ci-runs-only-where-needed.md:489",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "All seven entries end with Closed by task 320; T319-CR-1301 as a stated limit."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#10",
+      "note": "QA report 7:104 calls 5c9044f38 'the head'. It was the head when measured, but the PR head is now aa1c04f98. The figure counts only through the tree-equivalence result (finalise-delta.js docs-only --base 5c9044f38 --head HEAD: tree-equivalent, exit 0), not because it was taken on the head. Not a fail."
+    },
+    {
+      "ac_id": "#1",
+      "note": "Run 3's advisory still stands. criteria-drift.js extracts the approver as 'Lorien Gamaroff (2026-11-26)', not the bare configured name in finalise.deferralApprover. It still reports approved: true."
+    }
+  ]
+}

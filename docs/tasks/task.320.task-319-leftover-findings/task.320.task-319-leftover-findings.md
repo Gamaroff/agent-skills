@@ -5,11 +5,12 @@ type: task
 description: "Close the seven low findings task 319 carried forward and the two points its Definition of Done left to the owner: three in the re-run engine, two in push-held.sh, two in tick-pr.sh, escaped configuration keys, and the edge characters of ci.skipMarker."
 tags: [ci, push-policy, finalise, develop-next, skills-config]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Low
 risk_level: low
 created: 2026-11-25
 updated: 2026-11-26
+completed_date: 2026-11-26
 estimated_effort_hours: 8
 github_issue: 938
 pr_number: 949
@@ -19,7 +20,7 @@ pr_number: 949
 
 **GitHub Issue**: [#938](https://github.com/Gamaroff/agent-skills/issues/938)
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.320.review.1.task-319-leftover-findings.md` implemented 2026-11-25
 
@@ -612,7 +613,7 @@ Cycle 7 (re-entry after DoD run 2): the `finalise.deferralApprover` key is accep
 
 **Detailed Verification Log:** See `task.320.dod.2.task-319-leftover-findings.md`.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 3 (historical, superseded)
 
 **Status:** IN PROGRESS
 
@@ -637,6 +638,28 @@ Cycle 7 (re-entry after DoD run 2): the `finalise.deferralApprover` key is accep
 **Gap Report Generated:** 2026-11-26
 
 **Detailed Verification Log:** See `task.320.dod.3.task-319-leftover-findings.md`.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.320.qa.7.task-319-leftover-findings.md`
+**Gate File**: `task.320.gate.7.task-319-leftover-findings.yml`
+**Gate Status**: ⚠️ CONCERNS (90/100). `top_issues` is empty, and the residual T320-CR-601/602/603 is deferred to task.326 with the owner's approval.
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 17 of 17. Criterion 1 passes under its approved amendment, and criterion 10 was re-measured at a head tree-equivalent to the acceptance head (slowest test median 25.5 s, max 26.0 s, against a 30 s bound)
+✅ **PR Review & Tests:** PR #949. 5c PR review 3 APPROVE. CI reading 1 SUCCESS at `aa1c04f98` over 6 checks
+✅ **Documentation:** CHANGELOG cites (task 320). The configuration reference and the develop-next and finalise SKILL.md files are updated
+✅ **Security Review:** PASS. 194 probes executed, 0 escaped, and all 8 reproductions (6 case ids) are deferred to task.326 through `deferrals.json`
+✅ **Compliance Review:** not applicable (internal tooling, no personal, payment, UI or health data)
+
+**Task marked as ACCEPTED on:** 2026-11-26
+
+**Detailed Verification Log:** See `task.320.dod.4.task-319-leftover-findings.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
@@ -665,6 +688,7 @@ Cycle 7 (re-entry after DoD run 2): the `finalise.deferralApprover` key is accep
 | 2026-11-26 | 1.2 | Criterion 1 amended: T320-CR-601 moved to task.326 (approved by the owner); residual T320-CR-601/602/603 to be closed there | Lorien Gamaroff |
 | 2026-11-26 |  | QA gate CONCERNS (90/100) — 0 open findings; residual deferred to task.326 | qa-task |
 | 2026-11-26 |  | DoD incomplete — 1 gap identified (criterion 10 timings measured off a tree-equivalent head) | finalise |
+| 2026-11-26 | 1.3 | DoD passed — accepted (PR #949) | finalise |
 <!-- change-log-end -->
 
 ---
