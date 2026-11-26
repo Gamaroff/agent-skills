@@ -2032,6 +2032,112 @@ test("extract: the AC block is written byte for byte, its hash recorded, and a c
   }
 });
 
+test("extract: a SubagentHandback reply is extracted, and merge with its sha256 records verified: true (CLI, task 327)", () => {
+  const dir = mkRepo();
+  try {
+    const yaml = ac4();
+    // The measured host shape: thinking, the hand-back tool call, its tool_result, an attachment.
+    const d = join(dir, "projects", "proj", "sess", "subagents");
+    mkdirSync(d, { recursive: true });
+    const lines = [
+      { type: "user", message: { role: "user", content: "go" } },
+      {
+        type: "assistant",
+        message: {
+          role: "assistant",
+          content: [{ type: "thinking", thinking: "…" }],
+        },
+      },
+      {
+        type: "assistant",
+        message: {
+          role: "assistant",
+          content: [
+            {
+              type: "tool_use",
+              name: "SubagentHandback",
+              input: {
+                message: "Done.\n```finalise-ac-yaml\n" + yaml + "```\n",
+              },
+            },
+          ],
+        },
+      },
+      {
+        type: "user",
+        message: { role: "user", content: [{ type: "tool_result" }] },
+      },
+      { type: "attachment", attachment: { type: "x" } },
+    ];
+    writeFileSync(
+      join(d, "agent-hb12.jsonl"),
+      lines.map((l) => JSON.stringify(l)).join("\n") + "\n",
+    );
+    const e = JSON.parse(
+      cli(dir, [
+        "extract",
+        "--agent-id",
+        "hb12",
+        "--projects-root",
+        "projects",
+        "--out",
+        "ac.yaml",
+        "--json",
+      ]).stdout,
+    );
+    assert.equal(e.reason, "extracted");
+    assert.equal(e.reply, "handback");
+    assert.equal(readFileSync(join(dir, "ac.yaml"), "utf8"), yaml);
+    writeFileSync(join(dir, "scope.json"), JSON.stringify(scopeAt(dir, null)));
+    const rec = "docs/tasks/task.9.demo/task.9.dod.1.ac.json";
+    const ok = JSON.parse(
+      cli(dir, [
+        "merge",
+        "--scope",
+        "scope.json",
+        "--result",
+        "ac.yaml",
+        "--sha256",
+        e.sha256,
+        "--dod-n",
+        "1",
+        "--record-out",
+        rec,
+        "--json",
+      ]).stdout,
+    );
+    assert.equal(ok.reason, "merged");
+    assert.equal(ok.record.result.verified, true);
+    assert.equal(ok.record.result.sha256, e.sha256);
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("extract: a failed extract removes a stale --out file (CLI, task 327)", () => {
+  const dir = mkRepo();
+  try {
+    writeFileSync(join(dir, "ac.yaml"), "an earlier run's AC YAML\n");
+    writeTranscript(dir, "st12", "no block here\n");
+    const e = JSON.parse(
+      cli(dir, [
+        "extract",
+        "--agent-id",
+        "st12",
+        "--projects-root",
+        "projects",
+        "--out",
+        "ac.yaml",
+        "--json",
+      ]).stdout,
+    );
+    assert.equal(e.reason, "no-block");
+    assert.equal(existsSync(join(dir, "ac.yaml")), false);
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test("extract: a reply it cannot take a block from writes nothing and says why (CLI)", () => {
   const dir = mkRepo();
   try {

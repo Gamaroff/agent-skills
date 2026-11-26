@@ -56,6 +56,15 @@ All notable changes to this project will be documented in this file. Format foll
   reached the server while the script was stopped. `tick-pr.sh start` answers the same from a
   subdirectory. The reference on `developNext.tickVia` says how to settle a tick PR that conflicts.
 
+- **`/finalise` extracts a subagent reply sent through `SubagentHandback` (task 327).** An async agent
+  that replies with a `SubagentHandback` tool call leaves no final assistant text, so both extracts
+  (the probe plan and the AC YAML) answered `transcript-unreadable` and every DoD run fell back to an
+  unverified hand copy. The reader now takes the later of the final-turn text and the last
+  `SubagentHandback` message, and says which in a new `reply` field (`text` or `handback`). Only that
+  tool name with a non-empty string `message` counts. A failed extract now also removes any earlier
+  file at `--out`, so a stale plan can no longer be read as its output, and an `--out` that names the
+  `--transcript` file is a usage error.
+
 ## [v0.69.0] - 2026-11-25
 
 ### Changed

@@ -12,7 +12,8 @@
  *
  * The host writes each subagent's transcript to
  *   <config-dir>/projects/<project>/<session>/subagents/agent-<agentId>.jsonl
- * and the reply is the trailing assistant text in it, byte-exact. The agent id is in the Agent tool's
+ * and the reply is the trailing assistant text in it, or the last `SubagentHandback` tool call's
+ * `input.message`, whichever is later (task 327), byte-exact. The agent id is in the Agent tool's
  * result, so the file is addressable without the orchestrator copying one character of the reply.
  * That layout is a host internal and not a contract, so every path out of here that cannot find it is a
  * NAMED answer (`transcript-not-found`), never a guess: the caller then falls back to the hand copy and
@@ -23,10 +24,12 @@
  *        --out <path> [--projects-root <dir>] [--json]
  *
  * `reason` (every answer exits 0 except a usage error, which exits 2):
- *   extracted             the block was written to --out; `bytes` and `sha256` describe the written file
+ *   extracted             the block was written to --out; `bytes` and `sha256` describe the written file,
+ *                         and `reply` says which shape held it (`text` or `handback`)
  *   transcript-not-found  no transcript for that agent id (or --transcript is not a file)
  *   transcript-ambiguous  several transcripts carry that agent id; nothing is written
- *   transcript-unreadable the transcript cannot be read or holds no assistant text
+ *   transcript-unreadable the transcript cannot be read, or holds neither assistant text nor a
+ *                         `SubagentHandback` message
  *   no-block              the reply has no fenced block with that info string
  *   empty-block           the block is empty
  *   entity-escaped        the block carries an HTML entity and no literal `<`, `>` or `&` anywhere: an
@@ -34,6 +37,10 @@
  *
  * The block taken is the LAST one with the info string: an agent that quotes its own format earlier in
  * the reply must not have the quotation run.
+ *
+ * `extract` removes --out before it reads anything, so every answer but `extracted` leaves no file
+ * there: an earlier run's file cannot be read as this run's output (task 327). An --out that names the
+ * --transcript file is a usage error for that reason.
  */
 "use strict";
 
@@ -113,31 +120,60 @@ function findTranscripts(agentId, root) {
  * neither a turn boundary nor reply text, so they are skipped, not treated as a reset (T269-QA-5).
  * Separate text blocks are joined with a newline, so one block's closing fence can never fuse with the
  * next block's opening line.
+ *
+ * An async agent can instead reply through a `SubagentHandback` tool call, whose `input.message` is the
+ * reply; its `tool_result` line then empties the text tail (task 327). So there are two candidates, and
+ * the LATER one in the transcript is the reply: a resumed agent answers with its newest message, in
+ * either shape. Only that exact tool name with a non-empty string `message` counts. Returns
+ * `{ text, reply: "text" | "handback" }`, or `null` when neither exists or a line does not parse.
  */
 function replyText(jsonl) {
   const lines = jsonl.split("\n").filter((l) => l.trim() !== "");
-  let tail = [];
-  for (const l of lines) {
+  // Positions are [line, block] pairs, compared in order: of the two reply shapes, the later wins.
+  const later = (a, b) => a[0] > b[0] || (a[0] === b[0] && a[1] > b[1]);
+  let tail = []; // [{ text, at }] for the final turn's text blocks
+  let handback = null; // { text, at } for the last SubagentHandback carrying a usable message
+  for (let i = 0; i < lines.length; i++) {
     let o;
     try {
-      o = JSON.parse(l);
+      o = JSON.parse(lines[i]);
     } catch {
       return null;
     }
-    if (o && o.type === "assistant" && o.message) tail.push(o.message);
-    else if (o && o.type === "user") tail = [];
+    if (o && o.type === "user") {
+      tail = [];
+      continue;
+    }
+    if (!(o && o.type === "assistant" && o.message)) continue;
+    const c = o.message.content;
+    if (typeof c === "string") {
+      tail.push({ text: c, at: [i, 0] });
+      continue;
+    }
+    if (!Array.isArray(c)) continue;
+    c.forEach((b, j) => {
+      if (!b) return;
+      if (b.type === "text" && typeof b.text === "string")
+        tail.push({ text: b.text, at: [i, j] });
+      // Only the exact tool name, and only a non-empty string message, is a reply (task 327).
+      else if (
+        b.type === "tool_use" &&
+        b.name === "SubagentHandback" &&
+        b.input &&
+        typeof b.input.message === "string" &&
+        b.input.message !== ""
+      )
+        handback = { text: b.input.message, at: [i, j] };
+    });
   }
-  const parts = [];
-  for (const m of tail) {
-    const c = m.content;
-    if (typeof c === "string") parts.push(c);
-    else if (Array.isArray(c))
-      for (const b of c)
-        if (b && b.type === "text" && typeof b.text === "string")
-          parts.push(b.text);
-  }
-  const text = parts.join("\n");
-  return text === "" ? null : text;
+  const text = tail.map((p) => p.text).join("\n");
+  if (
+    text !== "" &&
+    (!handback || later(tail[tail.length - 1].at, handback.at))
+  )
+    return { text, reply: "text" };
+  if (handback) return { text: handback.text, reply: "handback" };
+  return null;
 }
 
 /**
@@ -169,6 +205,17 @@ function lastBlock(text, info) {
  * Returns { reason, exitCode: 0, ... }.
  */
 function extract(opts) {
+  // A failed extract must never leave an earlier run's file to be read as its output (task 327). The
+  // usage checks run first (main, finalise-rerun-scope.js), and they refuse an --out that IS the
+  // --transcript; the same test here keeps a direct caller from deleting its own input.
+  if (
+    opts.out &&
+    !(
+      opts.transcript &&
+      path.resolve(opts.out) === path.resolve(opts.transcript)
+    )
+  )
+    fs.rmSync(opts.out, { force: true });
   let file = opts.transcript || null;
   if (!file) {
     const root = opts.projectsRoot || defaultProjectsRoot();
@@ -207,14 +254,15 @@ function extract(opts) {
       message: String(e && e.message),
     };
   }
-  const text = replyText(raw);
-  if (text === null)
+  const reply = replyText(raw);
+  if (reply === null)
     return {
       reason: "transcript-unreadable",
       exitCode: 0,
-      message: "the transcript holds no final assistant text",
+      message:
+        "the transcript holds no final assistant text and no SubagentHandback message",
     };
-  const body = lastBlock(text, opts.block);
+  const body = lastBlock(reply.text, opts.block);
   if (body === null)
     return {
       reason: "no-block",
@@ -247,6 +295,7 @@ function extract(opts) {
     bytes: buf.length,
     sha256: sha256(buf),
     source: file,
+    reply: reply.reply,
   };
 }
 
@@ -284,6 +333,12 @@ function extractUsageError(opts) {
     return `--agent-id is not an agent id: ${opts.agentId}`;
   if (!opts.block) return "extract needs --block";
   if (!opts.out) return "extract needs --out";
+  // extract removes --out before reading (task 327): the same file would be the input it deletes.
+  if (
+    opts.transcript &&
+    path.resolve(opts.out) === path.resolve(opts.transcript)
+  )
+    return "extract --out must not be the --transcript file";
   return null;
 }
 
