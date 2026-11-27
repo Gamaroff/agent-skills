@@ -17,6 +17,27 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **`/finalise`'s AC merge can no longer skip a document check by leaving something out (task
+  332).** Three breaking changes. `finalise-rerun-scope.js merge` now requires `--doc`; without it
+  the call is a usage error (exit 2) and writes nothing. A result that names no document
+  (`ac_traceability.story_file`, or a root `story_file`, missing) is refused as
+  `result-document-unnamed` and writes nothing. Task 331 merged it, leaving only the optional
+  `--sha256` to guard it. A result whose parse holds no `acs` list still answers `result-unparseable`.
+  And Step 3a's scope file and the extract's output are now
+  `.claude/state/finalise-rerun-scope-{stem}-{N}.json` and `finalise-ac-extract-{stem}-{N}.json`,
+  so no state file of the AC merge is shared by two items finalised in one checkout. In tinker-city,
+  task.163's DoD run 1 merged the result task.162 had left at `finalise-ac-result-1.yaml`. Also:
+  a scope with no document answers `scope-document-missing` (re-run Step 3a), apart from
+  `scope-document-mismatch` (another document's scope); a `story_file` naming a file that does not
+  exist says so; Step 3c has an arm and a remedy for each; and the AC prompt says `story_file` is the
+  exact path it was given, because a basename or a re-cased spelling is refused. A run resumed
+  across the upgrade: before Step 3c, re-run Step 3a, the AC agent and the extract, then Step 3c
+  (the old scope and extract paths are not read, and an answer written to the old prompt may name
+  no document). Between Step 3c and Step 3d, and after Step 3d, nothing more is needed: only Step 3c
+  reads the renamed files, and its merged file was already stem-keyed. A run that stopped on a
+  pre-upgrade `result-unparseable` answer wrote no record: re-run Step 3a, the AC agent, the extract
+  and Step 3c.
+
 - **`/finalise`'s AC merge refuses another document's result, and its AC state files carry the work
   item's stem (task 331).** `finalise-rerun-scope.js merge` now answers `result-document-mismatch`
   and writes no record when the result's `ac_traceability.story_file` names another document than

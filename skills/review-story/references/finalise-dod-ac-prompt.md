@@ -151,6 +151,8 @@ ac_traceability:
   summary: "one-line summary of AC traceability results"
 ```
 
+**`story_file` rule**: `story_file` is the exact `<STORY_FILE>` path you were given, unchanged — not a basename, not re-cased. `/finalise` refuses an answer that leaves it out or spells it any other way.
+
 **Citation rule**: `status: PASS` requires a non-null citation. Null citation → `status: FAIL`. `NOT_APPLICABLE` must have a `note`.
 
 **Execution rule**: for acceptance criteria with a test citation, `status: PASS` additionally requires `test_runs_per_pr: true`. A cited test in a lane the PR does not run is a citation, not evidence → `status: FAIL` with the lane named in `note`. The `NOT_APPLICABLE` kinds in Step 3 carry `null` here and are judged by their own rules.
