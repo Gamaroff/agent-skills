@@ -279,11 +279,41 @@ preflight fails. Steps: revert the phase's commit, run `npm run bundle`, re-run 
 ### Key Findings
 Every success criterion is met, with criterion 4 met again after cycle 6. One advisory low-confidence finding is recorded for future work.
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.328.qa.7.measured-criterion-re-measured-when-head-moves.md`
+**Gate File**: `task.328.gate.7.measured-criterion-re-measured-when-head-moves.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+The gate passed; the DoD's acceptance-criteria check found three records the criteria ask for that are missing or stale.
+
+### Missing Criteria:
+
+- [ ] #5 (low): the corpus count in `task.328.qa.1…md` (375 → 376, one example, given as a glob) predates the cycle 3–5 widening of NUMERIC_BOUND. At head the engine newly lists 4: task.320 #10, task.59 #6, task.76 #10, task.94 #11. The owner-approved amendment rested on "only one newly listed criterion exists".
+- [ ] #6 (medium): 13 calibration tests in `evals/shared/tests/qa-measured-figure-parity.test.mjs` (:214–:318) have no red-first record.
+- [ ] #7 (medium): no mutation record for three remedies: bundling `finalise-delta.js` into qa-task/qa-story, CR4-4 (locate by lead), CR6-1 ("unverified on purpose").
+
+### Next Steps:
+
+- Owner decision: one more evidence-only fix cycle (recount, red-first runs, three reverts), or reword #6 to exclude calibration tests
+- Record the head-engine corpus count (4) and all four paths in a committed QA report
+- Record red-first runs for the calibration tests and revert-red runs for the three unmapped remedies
+
+**Estimated Effort:** Small–Medium (evidence only; no code change expected)
+
+**Gap Report Generated:** 2026-11-27
+
+**Detailed Verification Log:** See `task.328.dod.1.measured-criterion-re-measured-when-head-moves.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
 | Date | Version | Description | Author |
-| --- | --- | --- | --- |
+|------|---------|-------------|--------|
 | 2026-11-26 | 1.0 | Initial draft — cut from observation #186 | create-task |
 | 2026-11-27 | 1.1 | Review passed (8/10) — named the two other tests that pin the engine; parity test keyed on the measured-figure paragraph, not the citation; cite form stated | review-task |
 | 2026-11-27 |  | Status → ready-for-development | review-task |
@@ -303,6 +333,7 @@ Every success criterion is met, with criterion 4 met again after cycle 6. One ad
 | 2026-11-27 |  | QA gate CONCERNS (80/100) — criterion 4 unmet ("re-measure" removed in cycle 3); escalated to the owner | qa-task |
 | 2026-11-27 |  | QA findings fixed — cycle 6 (further cycle approved by the owner): "re-measure" restored for a rejected figure, other notes deferred to Step 3 (QA6-1); unverified mapping stated as deliberate (CR6-1); "whatever its value" held (CR6-2); one locator (CR6-3) | qa-fix |
 | 2026-11-27 |  | QA gate PASS (100/100) | qa-task |
+| 2026-11-27 |  | DoD incomplete — 3 gaps identified | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking

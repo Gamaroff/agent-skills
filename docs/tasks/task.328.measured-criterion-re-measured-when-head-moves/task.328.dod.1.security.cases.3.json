@@ -1,0 +1,30 @@
+[
+  {
+    "id": "b.docs",
+    "input": "HEAD~1",
+    "direction": "legitimate",
+    "why": "delta HEAD~1..HEAD is docs/n.md only, so the earlier figure counts",
+    "spec_ref": "docs/tasks/task.328.measured-criterion-re-measured-when-head-moves/task.328.measured-criterion-re-measured-when-head-moves.md:106"
+  },
+  {
+    "id": "b.code",
+    "input": "HEAD~2",
+    "direction": "hostile",
+    "why": "delta includes src/a.js and tests/real.test.js (code changed), so the figure must not count",
+    "spec_ref": "docs/tasks/task.328.measured-criterion-re-measured-when-head-moves/task.328.measured-criterion-re-measured-when-head-moves.md:106"
+  },
+  {
+    "id": "b.norev",
+    "input": "no-such-rev",
+    "direction": "hostile",
+    "why": "an unresolvable base must not be read as docs-only",
+    "spec_ref": "docs/tasks/task.328.measured-criterion-re-measured-when-head-moves/task.328.measured-criterion-re-measured-when-head-moves.md:106"
+  },
+  {
+    "id": "b.flag",
+    "input": "--head",
+    "direction": "hostile",
+    "why": "a flag given as the base value must not be read as docs-only",
+    "spec_ref": "docs/tasks/task.328.measured-criterion-re-measured-when-head-moves/task.328.measured-criterion-re-measured-when-head-moves.md:106"
+  }
+]
