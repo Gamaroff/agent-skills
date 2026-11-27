@@ -60,7 +60,7 @@ const RECORD_WORDS = Object.freeze([
 // and QA classifies each entry by finalise Step 3, so a false positive costs one look, while a unit
 // list would miss bounds written in any unit it does not name.
 const NUMERIC_BOUND =
-  /(?:\b(?:under|within|below|above|over|at most|at least|no more than|no fewer than|fewer than|less than|more than)\s+(?:or\s+equal\s+to\s+)?\d|\b(?:no\s+)?(?:longer|shorter|faster|slower|larger|smaller|greater)\s+than\s+(?:or\s+equal\s+to\s+)?\d|[<>]=?\s*\d|≤\s*\d|≥\s*\d)/i;
+  /(?:\b(?:under|within|below|above|over|at most|at least|no more than|no fewer than|fewer than|less than|more than)\s+(?:or\s+equal\s+to\s+)?\d|\b(?:no\s+)?(?:longer|shorter|faster|slower|larger|smaller|greater|lower|higher|bigger)\s+than\s+(?:or\s+equal\s+to\s+)?\d|[<>]=?\s*\d|≤\s*\d|≥\s*\d)/i;
 
 const STATES = Object.freeze([
   "ok",
@@ -130,8 +130,9 @@ function classify(criteria, { tracked = [], changed = [] } = {}) {
       index: i + 1,
       criterion: text,
       locations: named.map((l) => l.key),
-      // A stated numeric bound: QA grades its figure by finalise's tree-equivalence rule
-      // (finalise-dod-ac-prompt.md Step 3) before passing or carrying it (task 328).
+      // A stated numeric bound: a candidate, not Step 3's classification. QA classifies it by
+      // finalise-dod-ac-prompt.md Step 3 (a bound a per-PR test could assert is a behaviour
+      // criterion) and grades only a measured one by that rule (task 328, QA-3 CR3-2).
       measured: NUMERIC_BOUND.test(text),
     };
     if (named.length === 0) {

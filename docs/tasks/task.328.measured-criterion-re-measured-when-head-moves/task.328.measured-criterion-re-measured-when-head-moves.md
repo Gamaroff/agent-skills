@@ -295,6 +295,7 @@ The cycle-2 fixes hold, and criterion 5 is amended with owner approval. Two MEDI
 | 2026-11-27 |  | Criterion 5 amended to "every newly listed example by path (up to five)". The corpus has one newly listed criterion. Approved by the owner in session (T328-QA-1) | Lorien Gamaroff |
 | 2026-11-27 |  | QA findings fixed — cycle 2, 1 iteration: "or equal to" bounds listed (CR2-2); QA paragraph cites Step 3 whole and says to run from the repository root (CR2-3); id-after-"than" false positive accepted and documented (CR2-4) | qa-fix |
 | 2026-11-27 |  | QA gate CONCERNS (80/100) — 4 findings | qa-task |
+| 2026-11-27 |  | QA findings fixed — cycle 3, 1 iteration (consolidate move): the QA paragraph defers the outcome note to Step 3 (CR3-1); `measured: true` is a candidate that Step 3 classifies (CR3-2); lower/higher/bigger comparatives (CR3-3); broader paraphrase guard (CR3-4) | qa-fix |
 <!-- change-log-end -->
 
 ## Progress Tracking

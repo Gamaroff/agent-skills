@@ -225,6 +225,9 @@ test("each comparative bound, with and without a leading no, makes a criterion a
     "larger",
     "smaller",
     "greater",
+    "lower",
+    "higher",
+    "bigger",
   ];
   for (const w of words) {
     for (const lead of ["", "no "]) {
