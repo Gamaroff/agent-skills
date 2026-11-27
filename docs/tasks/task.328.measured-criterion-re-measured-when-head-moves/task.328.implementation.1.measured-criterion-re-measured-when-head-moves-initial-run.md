@@ -114,6 +114,8 @@ _Track each QA review/fix cycle._
 
 ### QA Cycle 1
 
+**Traceability**: skipped (mapper not dispatched — criteria mapped inline by qa-task)
+
 - **Gate**: CONCERNS 80/100 (`task.328.gate.1…yml`, head `04827b92a`). The diff reviewer returned in 52315 ms with 2 bugs and 1 cleanup.
 - **Findings**:
   - T328-CR-1 (MEDIUM): the qa-task `code_review_blocking=true` bullet is merged into `record_criteria`. Reproduced by QA.
@@ -122,6 +124,8 @@ _Track each QA review/fix cycle._
 - **Comments**: PR comment posted. Tracker `qa-gate-1` posted.
 - **qa-fix cycle 1** (`4fc09e876`): CR-1 fixed, CR-2 assertion added and mutation-proven (merged line put back → `qa-task's record_criteria token…` red; restored, `cmp` clean), criterion 5 reverted to the reviewed wording. Findings ingester not dispatched — findings were in context (independence loss). PR + tracker `qa-fix-1` comments posted.
 ### QA Cycle 2
+
+**Traceability**: skipped (not re-run — cycle 2)
 
 - **Gate**: CONCERNS 70/100 (`task.328.gate.2…yml`, head `4fc09e876`). Refute pass over the whole branch diff; the reviewer returned in 111075 ms. Fast gate: 8938 tests, 0 failed.
 - **CI**: Test job red once on `lockctl take is atomic` (tests/test-remote-runner.test.js, outside the change set). Green on rerun; recorded as a flake.
