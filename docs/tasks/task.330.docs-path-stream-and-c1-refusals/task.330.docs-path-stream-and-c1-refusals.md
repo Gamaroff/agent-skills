@@ -406,6 +406,27 @@ Wording of the message, the runbook or the CHANGELOG.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-27
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.330.qa.1.docs-path-stream-and-c1-refusals.md](./task.330.qa.1.docs-path-stream-and-c1-refusals.md)
+- **Gate File**: [task.330.gate.1.docs-path-stream-and-c1-refusals.yml](./task.330.gate.1.docs-path-stream-and-c1-refusals.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 8955
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+No critical issues identified. All three § 8 mutations are covered. The `git-name` probe engages: 26 cases, 0 escaped.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -415,6 +436,7 @@ Wording of the message, the runbook or the CHANGELOG.
 | 2026-11-27 | 1.1     | Review passed (9/10) — § 8 mutation list reconciled with the plan (new `dotGitStream` row), one anchor corrected | review-task |
 | 2026-11-27 |         | Status → ready-for-development | review-task |
 | 2026-11-27 |         | Implemented — 10 source files (+ 16 bundled copies), 4 new tests, 4 corpus cases | develop |
+| 2026-11-27 |  | QA gate PASS (100/100) — 0 findings | qa-task |
 <!-- change-log-end -->
 
 ---
