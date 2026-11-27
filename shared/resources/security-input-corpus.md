@@ -108,7 +108,7 @@ behaviour a probe compares against.
 **Reading the Input column.** Inputs are rendered literally — the bytes the module
 supplies, not a JSON-escaped rewrite of them. Only `|` is escaped, and control
 characters are shown with a visible glyph: `␊` newline, `␍` carriage return,
-`␉` tab, `␀` NUL, `␁` U+0001. Take the bytes from the module, not from this table.
+`␉` tab, `␀` NUL, `␁` U+0001, `␤` U+0085 (C1 next line). Take the bytes from the module, not from this table.
 
 **Materialised sinks.** A sink listed in the module's `MATERIALISED_SINKS` (today:
 `filename`) is not passed to a function as a value — each case is written into a
@@ -260,7 +260,7 @@ A filesystem API deciding **which file to open**. Note how many of the hostile c
 
 A classifier deciding **which class a repository-relative name belongs to**, such as documentation, generated output or config, from the name git prints, without opening the file. Choose it over `path` when the name is only compared against patterns: git never decodes `%2f` and a name is never resolved, so `path`'s decoding and symlink cases describe a filesystem call such a classifier never makes. The hostile cases are names no class may admit, whatever the patterns: the repository's internals, names not in git's canonical form, control characters, and the pipeline's own config file. The legitimate cases are literal names that a filesystem-minded check would refuse. Probe with the classifier's widest patterns, e.g. `ci-tree-equivalence.js#isDocsPath` with `--args-json '[["**"]]'`, so a refusal is the classifier's own and not a pattern miss.
 
-**14 hostile, 8 legitimate.**
+**17 hostile, 9 legitimate.**
 
 #### Hostile — must not be accepted
 
@@ -270,12 +270,15 @@ A classifier deciding **which class a repository-relative name belongs to**, suc
 | `.git` | The directory itself, as one segment. A check written as `startsWith('.git/')` misses it. | Refuse: compare whole segments, not a prefix. |
 | `docs/.git/x.md` | A `.git` segment below the root is a nested repository's internals. A check on the first segment alone lets it through under `docs/**`. | Refuse: test every segment, not only the first. |
 | `docs/.GIT/x.md` | On a case-insensitive filesystem `.GIT` is the repository's directory, so a case-sensitive check is defeated by a spelling. | Refuse: compare `.git` segments case-insensitively. |
+| `docs/.git::$INDEX_ALLOCATION/x.md` | On NTFS `.git::$INDEX_ALLOCATION` names the `.git` directory's own index stream, so the path is inside the repository's internals. git refuses such a path for that reason. | Refuse: fold a `.git` segment at its first `:`, as git's NTFS check does for an alternate data stream. |
+| `docs/.git:x/y.md` | On NTFS `.git:x` is a named stream of the `.git` directory, not another file. A check that compares the whole segment with `.git` misses it. | Refuse: compare only what comes before the first `:`. |
 | `docs/../x.md` | git never prints a `..` segment. The name matches `docs/**` lexically and names a file outside `docs/`. | Refuse any `..` segment: the name is not in git's form. |
 | `/docs/a.md` | git's names are repository-relative. A leading `/` is an absolute path from somewhere else, and `**` matches it if the matcher ignores the empty first segment. | Refuse: a name git printed never starts with `/`. |
 | `./docs/a.md` | Not git's spelling. A `.` segment means a check and a matcher can disagree about what the name is. | Refuse a `.` segment, or any name that normalising would change. |
 | `docs//a.md` | git never prints `//`. A matcher that collapses it and a check that does not can read two different names. | Refuse an empty segment. |
 | `docs/guides/` | A directory, not a file git lists as changed. Under `docs/**` it matches the whole subtree. | Refuse: a trailing `/` is an empty last segment. |
-| `docs/a␁.md` | git always quotes a name that holds a control character, whatever `core.quotePath` says. Only `-z` output carries one raw, so a raw one anywhere else has been decoded or forged on the way. | Refuse any character below U+0020, and U+007F. |
+| `docs/a␁.md` | git always quotes a name that holds a control character, whatever `core.quotePath` says. Only `-z` output carries one raw, so a raw one anywhere else has been decoded or forged on the way. | Refuse every control character: C0 (below U+0020), U+007F, and C1 (U+0080–U+009F). |
+| `docs/a␤.md` | U+0085 (next line) is a C1 control character. git quotes a name that holds one, so a raw one has been decoded or forged on the way, as with a C0 control. | Refuse: a C1 control is a control character. |
 | `docs/a␉b.md` | A tab splits a field in tab-separated git output (`--name-status`, `ls-tree`), so a name that holds one is read as two fields by the next consumer. | Refuse: a tab is a control character. |
 | `docs/a␀.md` | NUL is git's record separator under `-z`. A name that holds one has crossed a record boundary, and the halves name different files. | Refuse: never strip it and continue. |
 | `skills-config.yaml` | This repository's pipeline config. A change to it changes how the pipeline behaves, so it is never documentation, even under `**`. | Refuse: the config basename is never in a permissive class. |
@@ -289,7 +292,8 @@ A classifier deciding **which class a repository-relative name belongs to**, suc
 | `..%2f..%2fetc%2fpasswd` | The same input is hostile under `path`, where a later decode re-introduces the traversal. In a git name nothing decodes it: it is one segment, and that segment is not `..`. | Accept: the name is literal, and decoding it is the defect. |
 | `uploads/link-to-etc/passwd` | A name classifier never opens the file, so whether `link-to-etc` is a symlink in some worktree decides nothing. `path.symlink-escape` is about the kernel, and no kernel is involved here. | Accept under `**`: decide on the name. |
 | `docs/notes (draft).md` | Spaces and parentheses are ordinary in names. A check written for a shell word refuses a real document. | Accept. |
-| `docs/c++.md` | `+` is a regex quantifier. A matcher that treats the name as a pattern, or compiles a glob to a regex without escaping its literal parts, refuses or mismatches a real file. | Accept: match the name literally. |
+| `docs/c++.md` | `+` is a regex quantifier. A matcher that treats the name as a pattern refuses or mismatches a real file. One that compiles a glob to a regex without escaping its literal parts lets the pattern `docs/c++.md` match `docs/cc.md`. This sink probes with `**`, so that second case is pinned in `ci-tree-equivalence.test.mjs` (task 330). | Accept: match the name literally. |
+| `docs/a:b.md` | A colon is legal in a git name. Only a `.git` segment is folded at its first `:`; folding every segment would refuse a real document. | Accept: fold at `:` only inside the `.git` comparison. |
 | `docs/café.md` | Non-ASCII names are legal, and git prints them raw with `core.quotePath=false`. A check that refuses every byte above 0x7F refuses them. | Accept: a character above 0x7F is not refused for being non-ASCII. |
 | `docs/.gitkeep` | It begins with `.git` and is not `.git`. A prefix check written to stop the repository's internals takes it with them. | Accept: a name that merely begins with `.git` is not the repository's internals. What counts as `.git` itself (case, trailing dots, `git~1`) is a separate question that this case does not settle. |
 | `docs/archive..2026.md` | `..` inside a segment is not traversal. A substring check refuses a real name. | Accept: only a whole `..` segment is refused. |

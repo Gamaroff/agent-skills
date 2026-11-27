@@ -5,11 +5,11 @@ type: task
 description: "Close the two isDocsPath gaps task 329's QA found (a .git: alternate-stream segment and a C1 control are read as documentation), and clear the four LOW findings tasks 325 and 329 deferred to it."
 tags: [ci, docs-only-rule, security-probe]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: Medium
 risk_level: low
 created: 2026-11-26
-updated: 2026-11-26
+updated: 2026-11-27
 estimated_effort_hours: 8
 github_issue: 957
 ---
@@ -18,7 +18,8 @@ github_issue: 957
 
 **GitHub Issue**: [#957](https://github.com/Gamaroff/agent-skills/issues/957)
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.330.review.1.docs-path-stream-and-c1-refusals.md` implemented 2026-11-27
 
 ---
 
@@ -79,7 +80,7 @@ Every result below was run on 2026-11-26 at `ba0882a1f` (develop, after task 325
   removes `DOTGIT_IGNORABLE` code points, strips trailing dots and spaces, lowercases, and compares to
   `.git` or `git~1`. Its only caller is `isDocsPath`, at `:192` *(`some(isDotGitSegment)`)*
   (`git grep -n isDotGitSegment -- shared/resources ':!shared/resources/tests'`).
-- **The control refusal.** `:182` *(`function hasPathFormDefect`)*:
+- **The control refusal.** `:181` *(`function hasPathFormDefect`)*, line `:182`:
   `if (/[\u0000-\u001f\u007f]/.test(p)) return true;`. `hasPathFormDefect` is also asked about each
   exclusion's remainder by `interpretConfig` (task 325).
 - **The precedent.** `:109` *(`const UNPRINTABLE = /[\p{Cc}\p{Cf}\p{Cs}]/u`)* refuses C1 in
@@ -212,9 +213,9 @@ holding a C0 control.
   `ci-tree-equivalence.test.mjs`
 
 **Changes**:
-- [ ] Write the failing cases first: the § 8 rows, as `git-name` corpus cases and unit cases
-- [ ] Fold a `.git` segment at its first `:`, and refuse `\p{Cc}`
-- [ ] Update `IS_DOCS_LINES` to the one spelling of each refusal, correct its comment (T329-QA-10), and add the mutation rows
+- [x] Write the failing cases first: the § 8 rows, as `git-name` corpus cases and unit cases
+- [x] Fold a `.git` segment at its first `:`, and refuse `\p{Cc}`
+- [x] Update `IS_DOCS_LINES` to the one spelling of each refusal, correct its comment (T329-QA-10), and add the mutation rows
 
 **Dependencies**: none (tasks 325 and 329 are merged)
 
@@ -226,8 +227,8 @@ holding a C0 control.
 - the corpus module and tables, and the tests of Phase 1
 
 **Changes**:
-- [ ] Make the `plus-signs` clause true with a case that holds a literal `+` in the pattern (T329-QA-9)
-- [ ] Bring the `control-char` case's `correct` text into line with the new class
+- [x] Make the `plus-signs` clause true with a case that holds a literal `+` in the pattern (T329-QA-9)
+- [x] Bring the `control-char` case's `correct` text into line with the new class
 
 **Dependencies**: Phase 1
 
@@ -241,9 +242,9 @@ holding a C0 control.
 - Generated copies under `skills/*/references/`
 
 **Changes**:
-- [ ] The bracket message, the runbook and the CHANGELOG say to write each `[` or `]` as `?` for a literal bracketed name (T325-CR-501)
-- [ ] The CHANGELOG and the runbook name the three refused openers `@(`, `!(` and `+(`, as `configuration.md` does (T325-CR-502)
-- [ ] Write the CHANGELOG entry for § 5; run `npm run bundle`, then `npm run bundle:check`
+- [x] The bracket message, the runbook and the CHANGELOG say to write each `[` or `]` as `?` for a literal bracketed name (T325-CR-501)
+- [x] The CHANGELOG and the runbook name the three refused openers `@(`, `!(` and `+(`, as `configuration.md` does (T325-CR-502)
+- [x] Write the CHANGELOG entry for § 5; run `npm run bundle`, then `npm run bundle:check`
 
 **Dependencies**: Phases 1 and 2
 
@@ -305,8 +306,16 @@ Each alone turns a named test red. The QA report records each one with the test 
 - the control class narrowed back to C0 and DEL: the C1 case reproduces;
 - the fold applied to every segment, not only `.git`: the `docs/a:b.md` legitimate case is refused.
 
-`GIT_NAME_MUTATIONS` already proves each refusal line by removing it, so the first two are new rows
-there.
+`GIT_NAME_MUTATIONS` proves a refusal by removing one anchored source line, so only a mutation that is
+a removal can be a row there:
+
+- the `:` fold is its own line in `isDotGitSegment`, so it gets a new `IS_DOCS_LINES` anchor
+  (`dotGitStream`) and a new row that reproduces exactly the two `.git:` stream cases;
+- the existing `dotGit` row (the `some(isDotGitSegment)` line removed) also reproduces the two stream
+  cases, and the existing `control` row also reproduces the C1 case;
+- narrowing the class back to C0 and DEL is a replacement, not a removal, and folding every segment is
+  an edit outside `isDotGitSegment`: both are run by hand and recorded in the QA report with the test
+  each turned red.
 
 ### Consumer Tests
 
@@ -403,6 +412,9 @@ Wording of the message, the runbook or the CHANGELOG.
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-11-26 | 1.0     | Initial draft — from task 329 gate 3 and task 325 gate 5 deferred findings | create-task |
+| 2026-11-27 | 1.1     | Review passed (9/10) — § 8 mutation list reconciled with the plan (new `dotGitStream` row), one anchor corrected | review-task |
+| 2026-11-27 |         | Status → ready-for-development | review-task |
+| 2026-11-27 |         | Implemented — 10 source files (+ 16 bundled copies), 4 new tests, 4 corpus cases | develop |
 <!-- change-log-end -->
 
 ---
@@ -411,20 +423,20 @@ Wording of the message, the runbook or the CHANGELOG.
 
 ### Phase 1: The predicate and its corpus
 
-- [ ] Failing cases
-- [ ] Fold and control class
-- [ ] Anchors and mutation rows
+- [x] Failing cases
+- [x] Fold and control class
+- [x] Anchors and mutation rows
 
 ### Phase 2: Corpus and test claims
 
-- [ ] `plus-signs`
-- [ ] `control-char` text
+- [x] `plus-signs`
+- [x] `control-char` text
 
 ### Phase 3: Wording and records
 
-- [ ] Bracket advice
-- [ ] Extglob openers
-- [ ] CHANGELOG and bundle
+- [x] Bracket advice
+- [x] Extglob openers
+- [x] CHANGELOG and bundle
 
 ---
 

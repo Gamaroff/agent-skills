@@ -705,6 +705,21 @@ const GIT_NAME = sinkCases("git-name", [
     correct: "Refuse: compare `.git` segments case-insensitively.",
   },
   {
+    id: "dot-git-stream",
+    direction: "hostile",
+    input: "docs/.git::$INDEX_ALLOCATION/x.md",
+    why: "On NTFS `.git::$INDEX_ALLOCATION` names the `.git` directory's own index stream, so the path is inside the repository's internals. git refuses such a path for that reason.",
+    correct:
+      "Refuse: fold a `.git` segment at its first `:`, as git's NTFS check does for an alternate data stream.",
+  },
+  {
+    id: "dot-git-stream-name",
+    direction: "hostile",
+    input: "docs/.git:x/y.md",
+    why: "On NTFS `.git:x` is a named stream of the `.git` directory, not another file. A check that compares the whole segment with `.git` misses it.",
+    correct: "Refuse: compare only what comes before the first `:`.",
+  },
+  {
     id: "dot-dot-segment",
     direction: "hostile",
     input: "docs/../x.md",
@@ -744,7 +759,15 @@ const GIT_NAME = sinkCases("git-name", [
     direction: "hostile",
     input: "docs/a\u0001.md",
     why: "git always quotes a name that holds a control character, whatever `core.quotePath` says. Only `-z` output carries one raw, so a raw one anywhere else has been decoded or forged on the way.",
-    correct: "Refuse any character below U+0020, and U+007F.",
+    correct:
+      "Refuse every control character: C0 (below U+0020), U+007F, and C1 (U+0080–U+009F).",
+  },
+  {
+    id: "c1-control",
+    direction: "hostile",
+    input: "docs/a\u0085.md",
+    why: "U+0085 (next line) is a C1 control character. git quotes a name that holds one, so a raw one has been decoded or forged on the way, as with a C0 control.",
+    correct: "Refuse: a C1 control is a control character.",
   },
   {
     id: "tab",
@@ -806,8 +829,15 @@ const GIT_NAME = sinkCases("git-name", [
     id: "plus-signs",
     direction: "legitimate",
     input: "docs/c++.md",
-    why: "`+` is a regex quantifier. A matcher that treats the name as a pattern, or compiles a glob to a regex without escaping its literal parts, refuses or mismatches a real file.",
+    why: "`+` is a regex quantifier. A matcher that treats the name as a pattern refuses or mismatches a real file. One that compiles a glob to a regex without escaping its literal parts lets the pattern `docs/c++.md` match `docs/cc.md`. This sink probes with `**`, so that second case is pinned in `ci-tree-equivalence.test.mjs` (task 330).",
     correct: "Accept: match the name literally.",
+  },
+  {
+    id: "colon-name",
+    direction: "legitimate",
+    input: "docs/a:b.md",
+    why: "A colon is legal in a git name. Only a `.git` segment is folded at its first `:`; folding every segment would refuse a real document.",
+    correct: "Accept: fold at `:` only inside the `.git` comparison.",
   },
   {
     id: "non-ascii",
@@ -1310,6 +1340,7 @@ const CONTROL = Object.freeze({
   "\t": "␉",
   "\0": "␀",
   "\u0001": "␁", // task.329's git-name control-char case
+  "\u0085": "␤", // task.330's git-name c1-control case (U+0085, next line)
 });
 
 /**

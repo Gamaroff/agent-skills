@@ -202,9 +202,10 @@ DOCS_PATTERNS: "docs/tasks/* docs/prd/* docs/bugs/*"
   the pipelines wait for CI when it changes. Only `*`, `**` and `?` are wildcards there; every
   other character matches itself. A list of exclusions only, a bare `!`, an exclusion whose path is
   not in git's form (`! docs/x.md`, `!./docs/x.md`, `!/docs/x.md`, `!docs/dir/`, a leading space)
-  and an exclusion with braces, a character class or extglob (`!docs/{a,b}.md`, `!@(x)`, a `|`)
-  are refused. Write a directory
-  as `!docs/dir/**`, and list several files one exclusion each.
+  and an exclusion with braces, a character class, an extglob group (`@(`, `!(` or `+(`) or a `|`
+  (`!docs/{a,b}.md`, `!@(x)`) are refused. Write a directory
+  as `!docs/dir/**`, and list several files one exclusion each. For a file whose name holds a
+  bracket, write each literal `[` or `]` as `?`: `!docs/blog/?slug?.md` excludes `docs/blog/[slug].md`.
 
 Look again when a test starts to read a new file. Nothing in this template notices that for you.
 

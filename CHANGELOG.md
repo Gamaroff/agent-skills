@@ -9,9 +9,9 @@ All notable changes to this project will be documented in this file. Format foll
 - **A `git-name` security-probe sink, for classifiers of repository names.** A function that only
   compares a git-printed name against patterns, such as `ci-tree-equivalence.js#isDocsPath`, was
   probed under `path`. The decoding and symlink cases then "reproduced", although such a function
-  never decodes or opens anything (task 325's DoD run 1). The new sink has 14 hostile names (the
-  repository's internals, non-canonical forms, control characters, the config file) and 8 legitimate
-  literal ones. A test removes each `isDocsPath` refusal line in a scratch copy and asserts which
+  never decodes or opens anything (task 325's DoD run 1). The new sink has 17 hostile names (the
+  repository's internals, including their NTFS stream spellings, non-canonical forms, C0 and C1
+  control characters, the config file) and 9 legitimate literal ones (task 330 added three and one). A test removes each `isDocsPath` refusal line in a scratch copy and asserts which
   cases then reproduce. The DoD and review prompts and the probe boundary rule say when to choose
   `git-name` over `path` (task 329).
 
@@ -28,8 +28,17 @@ All notable changes to this project will be documented in this file. Format foll
   documentation". Write `ci.docsOnly.enabled: false`, which says the same. Two kinds of
   exclusion that would silently exclude nothing are refused too: one whose path is not in git's
   form (a space after the `!` or before it, `!./`, `!/`, a trailing `/`, an empty, `.` or `..`
-  segment; write a directory as `!docs/dir/**`), and one holding braces, a character class, extglob
-  or a `|`, which this matcher reads literally (only `*`, `**` and `?` are wildcards; list each path instead).
+  segment; write a directory as `!docs/dir/**`), and one holding braces, a character class, an
+  extglob group (`@(`, `!(` or `+(`) or a `|`, which this matcher reads literally (only `*`, `**` and
+  `?` are wildcards; list each path instead, and write each literal `[` or `]` of a bracketed file
+  name as `?`).
+
+- **`isDocsPath` reads two more spellings as code (task 330).** A path with an NTFS alternate-stream
+  segment of `.git` (`.git::$INDEX_ALLOCATION`, `.git:x`), which NTFS reads as the repository's `.git`
+  directory, and a path holding a C1 control character (U+0080–U+009F) are no longer documentation:
+  the pipelines wait for CI on such a change. They wait more, never less. A colon in any other name
+  (`docs/a:b.md`) is unchanged. In `ci.docsOnly.patterns`, an exclusion holding a C1 control is now a
+  usage error naming the key (exit 2), as one holding a C0 control already was; remove the character.
 
 - **The docs-only CI skip runbook covers one run per push, unsafe docs sets and adoption.**
   [`ci-docs-only-skip.md`](./docs/runbooks/ci-docs-only-skip.md) now says how to remove a duplicate
