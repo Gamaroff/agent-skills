@@ -147,6 +147,8 @@ _Track each QA review/fix cycle._
 - **Gate 5**: CONCERNS 90/100. Fast gate: 8947 tests, 0 failed; CI green. T328-CR5-1 (medium) is open: the FAIL branch is ordered before provenance.
 - **HALT**: the QA budget is exhausted (5 gates, 4 fixes). The loop ends on gate 5, with no ungated fix applied. Escalated to the owner.
 
+- **Half-cycle**: none. The owner approved a further fix cycle after the escalation. qa-fix cycle 5 fixed CR5-1 (provenance before the bound) and CR5-2 (same-length drift calibration), both mutation-proven, and gate 6 judges the fix.
+
 - **Correction to the Issues Log**: amending criterion 5 during develop was wrong. It was an unapproved rewording, and the qa-fix restores the reviewed text.
 
 ---

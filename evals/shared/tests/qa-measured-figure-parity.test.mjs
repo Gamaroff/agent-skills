@@ -57,9 +57,20 @@ export function measuredFigureProblems(text) {
   const problems = [];
   if (!p.includes("finalise-delta.js docs-only"))
     problems.push("the paragraph does not run finalise-delta.js docs-only");
-  // A figure that misses its bound is a FAIL in Step 3, not an unverified one (QA-4, CR4-1).
-  if (!/misses\s+the\s+criterion's\s+bound\s+fails\s+the\s+criterion/.test(p))
+  // A counted figure that misses its bound is a FAIL in Step 3, not an unverified one (QA-4,
+  // CR4-1), and only a counted one: provenance is decided first (QA-5, CR5-1).
+  if (
+    !/Only\s+a\s+figure\s+the\s+rule\s+accepts\s+that\s+misses\s+the\s+criterion's\s+bound\s+fails\s+the\s+criterion/.test(
+      p,
+    )
+  )
     problems.push("the paragraph does not fail a figure that misses its bound");
+  if (
+    !/Decide\s+whether\s+the\s+figure\s+counts\s+before\s+reading\s+it\s+against\s+the\s+bound/.test(
+      p,
+    )
+  )
+    problems.push("the paragraph does not decide provenance before the bound");
   if (!/\*\*MEDIUM\*\* entry in `top_issues\[\]`/.test(p))
     problems.push("the paragraph does not raise a MEDIUM top_issues entry");
   if (!p.includes(CITATION))
@@ -109,20 +120,32 @@ for (const skill of SKILLS) {
   });
 }
 
+/** True when two skills' paragraphs match once each one's own bundled path is normalised. */
+export function sameParagraph(a, aSkill, b, bSkill) {
+  const norm = (p, s) => p?.replaceAll(`.agents/skills/${s}/`, "<skill>/");
+  const x = norm(a, aSkill);
+  return Boolean(x) && x === norm(b, bSkill);
+}
+
 test("qa-task and qa-story hold the same measured-figure paragraph (QA-4, CR4-5)", () => {
-  const [a, b] = SKILLS.map((s) =>
-    measuredFigureParagraph(read(s))?.replaceAll(
-      `.agents/skills/${s}/`,
-      "<skill>/",
-    ),
-  );
+  const [a, b] = SKILLS.map((s) => measuredFigureParagraph(read(s)));
   assert.ok(a && b, "both skills hold the paragraph");
-  assert.equal(a, b);
+  assert.ok(
+    sameParagraph(a, "qa-task", b, "qa-story"),
+    "the paragraphs differ",
+  );
 });
 
-test("calibration: the identity check sees a one-word drift", () => {
-  const p = measuredFigureParagraph(read("qa-task"));
-  assert.notEqual(p, p.replace("applied", "used"));
+test("calibration: the identity check sees a one-word drift and passes a match (QA-5, CR5-2)", () => {
+  const a = measuredFigureParagraph(read("qa-task"));
+  const b = measuredFigureParagraph(read("qa-story"));
+  // Same length, one word changed: a length or substring comparison cannot see it.
+  const drifted = b.replace("applied", "applies");
+  assert.equal(drifted.length, b.length);
+  assert.notEqual(drifted, b, "the drift changes the copy");
+  assert.equal(sameParagraph(a, "qa-task", drifted, "qa-story"), false);
+  assert.equal(sameParagraph(a, "qa-task", a, "qa-task"), true);
+  assert.equal(sameParagraph(null, "qa-task", null, "qa-story"), false);
 });
 
 test("qa-task's record_criteria token sends a measured entry through the rule", () => {
@@ -158,8 +181,10 @@ const GOOD = [
   "",
   `**A measured figure counts for this head only as finalise grades it**. A figure carried or new`,
   `counts only as ${CITATION} grades it, via`,
-  "`finalise-delta.js docs-only` run from the repository root. A figure that misses the criterion's",
-  "bound fails the criterion; otherwise **unverified** with Step 3's note, and a **MEDIUM** entry in `top_issues[]`.",
+  "`finalise-delta.js docs-only` run from the repository root. Decide whether the figure counts before reading it against the bound.",
+  "A figure not accepted is **unverified** with Step 3's note, and a **MEDIUM** entry in `top_issues[]`.",
+  "Only a figure the rule accepts that misses the criterion's",
+  "bound fails the criterion.",
   "",
   `Elsewhere ${CITATION} is cited again.`,
 ].join("\n");
@@ -187,9 +212,10 @@ test("calibration: the paragraph losing its citation fails, though the file cite
 
 test("calibration: a restated reason list fails", () => {
   const text = GOOD.replace(
-    "otherwise",
-    "on code-changed, disabled or unverifiable",
+    "A figure not accepted",
+    "A figure on code-changed, disabled or unverifiable",
   );
+  assert.notEqual(text, GOOD);
   assert.match(measuredFigureProblems(text).join("\n"), /restates the reason/);
 });
 
@@ -219,11 +245,22 @@ test('calibration: "re-measure" as the note for every rejection fails', () => {
 
 test("calibration: a missed bound called unverified fails (QA-4, CR4-1)", () => {
   const text = GOOD.replace(
-    "A figure that misses the criterion's\nbound fails the criterion; otherwise",
-    "Otherwise",
+    "\nOnly a figure the rule accepts that misses the criterion's\nbound fails the criterion.",
+    "",
   );
   assert.notEqual(text, GOOD);
   assert.match(measuredFigureProblems(text).join("\n"), /misses its bound/);
+});
+
+test("calibration: a FAIL branch that ignores provenance fails (QA-5, CR5-1)", () => {
+  const text = GOOD.replace(
+    "Decide whether the figure counts before reading it against the bound.",
+    "",
+  ).replace("Only a figure the rule accepts that", "A figure that");
+  assert.notEqual(text, GOOD);
+  const problems = measuredFigureProblems(text).join("\n");
+  assert.match(problems, /provenance before the bound/);
+  assert.match(problems, /misses its bound/);
 });
 
 test("calibration: a dropped **unverified** is caught by its own check (QA-4, CR4-4)", () => {

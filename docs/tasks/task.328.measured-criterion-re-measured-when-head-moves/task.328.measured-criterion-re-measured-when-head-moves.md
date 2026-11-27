@@ -299,6 +299,7 @@ The cycle-4 fixes hold. One MEDIUM remains: the missed-bound FAIL branch is orde
 | 2026-11-27 |  | QA gate CONCERNS (90/100) — 6 findings | qa-task |
 | 2026-11-27 |  | QA findings fixed — cycle 4, 1 iteration: a missed bound fails the criterion (CR4-1); later/earlier and hedged bounds (CR4-2); `measured` listed, false rules nothing out (CR4-3); paragraph located by its lead (CR4-4); qa-task and qa-story paragraphs held identical (CR4-5); dead `no` group dropped (CR4-6) | qa-fix |
 | 2026-11-27 |  | QA gate CONCERNS (90/100) — 2 findings; QA budget exhausted (5 gates), escalated to the owner | qa-task |
+| 2026-11-27 |  | QA findings fixed — cycle 5 (one further cycle approved by the owner): provenance decided before the bound (CR5-1); identity check calibrated on a same-length drift (CR5-2) | qa-fix |
 <!-- change-log-end -->
 
 ## Progress Tracking
