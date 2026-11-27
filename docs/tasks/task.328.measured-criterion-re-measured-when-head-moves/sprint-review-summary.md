@@ -61,7 +61,7 @@ The QA skills cite finalise's rule and do not copy it, so there is still only on
 
 - **Tests:** engine tests in `shared/resources/tests/finalise-record-preflight.test.mjs` (21) and parity tests in `evals/shared/tests/qa-measured-figure-parity.test.mjs` (21)
 - **QA:** 7 gates, the last PASS 100/100. Gates 6 and 7 were owner-approved extra cycles.
-- **PR review:** `task.328.pr-review.1…md`, APPROVE
+- **PR review:** `task.328.pr-review.1…md`, CONCERNS (two doc-only trail findings, fixed; no open coverage finding)
 - **DoD:** run 1 found 3 evidence gaps; an owner-approved evidence-only cycle closed them, and run 2 accepted.
 
 ---

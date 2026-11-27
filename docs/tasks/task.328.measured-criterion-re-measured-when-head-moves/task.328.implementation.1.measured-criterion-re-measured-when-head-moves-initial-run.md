@@ -38,8 +38,8 @@ Widen the record preflight's numeric-bound phrasings, flag measured criteria, an
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; fast gate green on iter 2 (iter 1 red on prettier only) | —                    | 2026-11-27T04:09Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #960: https://github.com/Gamaroff/agent-skills/pull/960 | —                    | 2026-11-27T04:20Z |
 | 5–6. qa-task / qa-fix loop | ✅ Done    | `task.328.qa.{N}.*.md`; `task.328.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 7 gates (5 + 2 owner-approved); gate.7 PASS 100/100; 5c CONCERNS, 0 open coverage | —                    | 2026-11-27T08:39Z |
-| 7. finalise                | ⏳ Pending | `task.328.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 7. finalise                | ✅ Done    | `task.328.dod.{N}.*.md`; task `status: accepted`                      | dod.1 GAPS (3), then the evidence cycle; dod.2 ACCEPTED, acceptance commit `40232151d` | —                    | 2026-11-27T10:05Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Implementation report and post-6a APPROVE→CONCERNS correction | —                    | 2026-11-27T10:12Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -94,6 +94,19 @@ Widen the record preflight's numeric-bound phrasings, flag measured criteria, an
 - PR created: https://github.com/Gamaroff/agent-skills/pull/960 (base develop, Closes #953). Leak check OK.
 - Issue comment in-review: `posted`. GitHub board: in-review → stage-disabled.
 - Post-PR state check: PR #960 state = OPEN (checked inline with `gh pr view`). errors = 0.
+
+### Step 7 — finalise
+
+- dod.1: GAPS on #5/#6/#7 (Issues Log). Resumed at step 7 after the docs-only evidence cycle (`reenter-qa-after-finalise.sh` → `no-code-moved`; `--restore --allow-dod-gaps`).
+- dod.2:
+  - Re-run scope: scoped, 4 re-judged (#5–#8), 5 carried. `rerunAtHead` is not configured. The AC YAML was extracted from the agent's handback, with its hash verified.
+  - The AC agent reproduced the recount and every mutation in memory. #7's copy-only deletion was passed: the copy is bundler output of a citation whose revert reds named tests.
+  - Security: the plan was reused from dod.1 (`reusable`, engine files unchanged). 48 executed, 0 reproduced, 0 escapes. Compliance N/A. Docs PASS.
+- CI reading 1: SUCCESS @ `8a2b23243c32` over 6 checks. #8 was graded PASS from it, which re-folded AC_OVERALL to PASS.
+- CI reading 2: SUCCESS (tree-equivalent to `5c3d00e4215a`) @ `40232151d7fd` over 6 checks, after 30s.
+- Acceptance commit `40232151d` (registry ticked, staged by `registry-tick.js`). 6b assertions ok. 6d: cites (task 328).
+- PR canonical comment: https://github.com/Gamaroff/agent-skills/pull/960#issuecomment-7215579788. Tracker `done`: `posted`. Issue #953: CLOSED (confirmed). Board `done`: `already`. The document link already pointed at develop.
+- **Correction:** the dod.2 summary, the task's DoD section and the sprint review said pr-review.1 was "APPROVE". Its verdict is CONCERNS (PC-1/PC-2 doc-only, fixed; no open coverage finding), which still satisfies the PR column. The text was corrected in the Step 8 commit. The tracker `done` comment on #953 carries the same mis-statement. A corrected re-post returned `already`: the comment is idempotent by marker and is not updated in place. So #953 still reads "APPROVE", and that line was not corrected.
 
 ---
 
@@ -206,10 +219,16 @@ _Track each QA review/fix cycle._
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-11-27 10:12
+**Final Status**: Completed
 **Branch**: feature/task.328.measured-criterion-re-measured-when-head-moves
 **PR**: https://github.com/Gamaroff/agent-skills/pull/960
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 7 (5 budgeted, plus 2 owner-approved), plus 1 evidence-only DoD cycle
+**DoD Summary**: `task.328.dod.2.measured-criterion-re-measured-when-head-moves.md` — ACCEPTED (dod.1 GAPS)
+**Tracker debt**: none
+
+**Completion Summary**: Implemented the measured-bound detection in `finalise-record-preflight.js`: comparatives, "or equal to", later/earlier and hedges, plus a `measured` field. qa-task and qa-story now grade a measured figure by finalise's Step 3 rule. They cite the rule rather than restating it, and are held identical by a calibrated parity test. Both bundle `finalise-delta.js`. Seven QA gates were needed, two of them owner-approved past the budget. Cycle 3's fix removed the "re-measure" wording that criterion 4 names, and cycle 6 restored it. Notable decisions:
+- The criterion-5 amendment was approved by the owner, on a premise the shipped engine later disproved (4 newly listed, not 1).
+- DoD run 1 stopped on missing evidence, and an evidence-only cycle closed it with no code change.
+
+**CI reading 1**: SUCCESS @ `8a2b23243c32`; **CI reading 2**: SUCCESS (tree-equivalent to `5c3d00e4215a`) @ `40232151d7fd`

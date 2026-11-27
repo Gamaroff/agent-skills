@@ -17,7 +17,7 @@ _DoD results will be appended here in 4 consolidated sections after parallel age
 **Gate File:** `task.328.gate.7.measured-criterion-re-measured-when-head-moves.yml`
 **Gate Status:** ✅ PASS
 **Quality Score:** 100/100
-**PR Review:** `task.328.pr-review.1.measured-criterion-re-measured-when-head-moves.md` (APPROVE). The host requires no review (`reviewDecision` null), so this report satisfies the PR column.
+**PR Review:** `task.328.pr-review.1.measured-criterion-re-measured-when-head-moves.md` (CONCERNS; PC-1 and PC-2 were doc-only trail findings, fixed in the implementation report; no open coverage finding). The host requires no review (`reviewDecision` null), so this report satisfies the PR column. _Corrected after the 6a commit: that commit read "APPROVE" here in error._
 **Run context:** DoD run 2, after the owner-approved evidence-only cycle ("Go ahead with one more fix cycle"). Run 1 (`task.328.dod.1.*`) found 3 gaps (#5, #6, #7). The only commits since are `5c3d00e42` and `8a2b23243`, both inside the task directory.
 **Re-run at head:** `not-configured` (no `finalise.rerunAtHead`).
 **Record preflight:** ok. #5 and #6 both have a committed QA report, and the addendum holds both records (confirmed).
@@ -29,7 +29,7 @@ _DoD results will be appended here in 4 consolidated sections after parallel age
 **Overall AC Status:** ✅ PASS (Step 3c's PARTIAL, re-folded after CI reading 1 graded #8)
 **CI-state criteria:** #8 → PASS (CI reading 1: SUCCESS @ `8a2b23243`) — AC_OVERALL re-folded: PASS
 **PR Status:** OPEN (PR #960, source: branch)
-**PR Review Decision:** null; satisfied by the pr-review.1 report (APPROVE)
+**PR Review Decision:** null; satisfied by the pr-review.1 report (CONCERNS, no open coverage finding)
 **Re-run scope:** scoped (prior-record) — 4 re-judged, 5 carried
 
 ### Acceptance Criteria
@@ -196,7 +196,7 @@ _DoD results will be appended here in 4 consolidated sections after parallel age
 
 - QA Report: ✅ PASS (Quality Score: 100/100, gate 7, with the dod.1-gaps addendum)
 - Acceptance Criteria: ✅ 9/9 (4 re-judged, 5 carried; #8 graded from CI reading 1)
-- PR Review & Tests: ✅ pr-review.1 APPROVE; the host requires no review
+- PR Review & Tests: ✅ pr-review.1 CONCERNS with no open coverage finding; the host requires no review
 - CI reading 1: SUCCESS @ `8a2b23243c32` over 6 checks: allowed-branch, link-check, secret-scan, shellcheck, test, validate
 - Documentation: ✅ CHANGELOG and both QA skills
 - Security Review: ✅ PASS (48 probes executed, 0 reproduced)

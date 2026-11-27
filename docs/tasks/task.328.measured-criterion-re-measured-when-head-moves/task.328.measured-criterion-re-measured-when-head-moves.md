@@ -326,7 +326,7 @@ The gate passed; the DoD's acceptance-criteria check found three records the cri
 All Definition of Done criteria have been verified:
 
 ✅ **Acceptance Criteria:** 9/9 met. #5, #6 and #7 were re-judged on the addendum, and #8 was graded from CI reading 1 (SUCCESS @ `8a2b23243`).
-✅ **PR Review:** PR #960. `task.328.pr-review.1…md` APPROVE; the host requires no review.
+✅ **PR Review:** PR #960. `task.328.pr-review.1…md` CONCERNS, with no open coverage finding; the host requires no review.
 ✅ **Documentation:** CHANGELOG `[Unreleased]` cites (task 328); qa-task and qa-story document the rule.
 ✅ **Security Review:** ✅ PASS. The boundary was probed: 48 executed, 0 reproduced.
 ✅ **Compliance Review:** N/A. Internal skill tooling.
