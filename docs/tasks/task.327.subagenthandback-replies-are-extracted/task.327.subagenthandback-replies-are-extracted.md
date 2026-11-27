@@ -249,7 +249,7 @@ command and its `reason` and `sha256` in the QA report.
 
 **Code quality:**
 
-- [ ] Every new test was red before its change; the red runs are in the QA report
+- [ ] Every new test was red before its change, or, for a test that guards a rule which already held before the change, red under a named mutation of that rule; the red runs and mutations are in the QA report — amended after DoD 1 (a guard of a pre-existing rule cannot be red before the change), approved by the owner, 2026-11-27
 - [ ] Reverting any one remedy turns a named test red; the mutation table is in the QA report
 - [ ] `npm test` passes under `CI=true`; `npm run bundle` leaves no diff
 

@@ -471,7 +471,39 @@ test("task 327: after any answer but extracted, no file is left at --out, even a
           return { transcript: f };
         },
       ],
+      [
+        "transcript-ambiguous",
+        () => {
+          transcript(dir, "dup", fenced("a: 1"), { session: "s1" });
+          transcript(dir, "dup", fenced("a: 1"), { session: "s2" });
+          return { agentId: "dup" };
+        },
+      ],
+      [
+        "empty-block",
+        () => {
+          transcript(dir, "em", "```finalise-ac-yaml\n\n```\n");
+          return { agentId: "em" };
+        },
+      ],
+      [
+        "entity-escaped",
+        () => {
+          transcript(dir, "esc", fenced('i: "&lt;!-- x --&gt;"'));
+          return { agentId: "esc" };
+        },
+      ],
     ];
+    // Every non-extracted reason in REASONS is seeded here (criterion #6); a new reason that is
+    // not added to this list fails the coverage check below.
+    const covered = new Set(cases.map(([w]) => w));
+    assert.ok(arb.REASONS.length >= 7, "REASONS is exported and non-empty");
+    for (const reason of arb.REASONS) {
+      if (reason !== "extracted") {
+        assert.ok(covered.has(reason), `stale --out case for ${reason}`);
+      }
+    }
+    const leaked = [];
     for (const [want, setup] of cases) {
       writeFileSync(out, "run 1's 7-entry plan\n");
       const r = arb.extract({
@@ -481,8 +513,10 @@ test("task 327: after any answer but extracted, no file is left at --out, even a
         ...setup(),
       });
       assert.equal(r.reason, want);
-      assert.equal(existsSync(out), false, `${want} leaves no --out file`);
+      if (existsSync(out)) leaked.push(want);
     }
+    // Every reason is run before the verdict, so a regression names each reason it reaches.
+    assert.deepEqual(leaked, [], "these answers left a stale --out file");
   }));
 
 test("task 327: an --out that names the --transcript file is a usage error and the transcript survives", () =>
