@@ -1635,8 +1635,10 @@ each must record, and the note each failure carries; this file restates none of 
 lets a figure from an earlier commit M count, run its check from the repository root,
 `command node .agents/skills/qa-story/references/finalise-delta.js docs-only --base <M> --head HEAD --json`,
 and read the answer as Step 3 reads it. "No engine changed" is not that answer: run the command. A
-figure the rule does not accept leaves the criterion **unverified**, with the note Step 3 gives it,
-and a **MEDIUM** entry in `top_issues[]`, so it enters the fix loop rather than halting at finalise.
+figure that misses the criterion's bound fails the criterion, graded as any failed criterion is. Any
+other figure the rule does not accept leaves the criterion **unverified**, with the note Step 3
+gives it, and a **MEDIUM** entry in `top_issues[]`, so it enters the fix loop rather than halting at
+finalise.
 
 **A "tool X passes on files Y" criterion is confirmed by one probe that X processes Y, before PASS is
 recorded** (obs #78). A formatter, linter or checker skips what its ignore file excludes and exits 0

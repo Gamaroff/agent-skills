@@ -35,12 +35,19 @@ const CITATION = "`finalise-dod-ac-prompt.md` Step 3";
 const REASONS = ["code-changed", "disabled", "unverifiable"];
 
 /** The problems with one skill's measured-figure paragraph; an empty list means it holds. */
+// The paragraph's bold lead. Locating by it keeps every content check below live: a check on
+// a string the locator also requires can never fail on its own (QA-4, CR4-4).
+export const LEAD =
+  "**A measured figure counts for this head only as finalise grades it**";
+
+/** The measured-figure paragraph of a skill file, or null when not exactly one exists. */
+export function measuredFigureParagraph(text) {
+  const hits = text.split(/\n\s*\n/).filter((p) => p.includes(LEAD));
+  return hits.length === 1 ? hits[0] : null;
+}
+
 export function measuredFigureProblems(text) {
-  const paragraphs = text.split(/\n\s*\n/);
-  const hits = paragraphs.filter(
-    (p) =>
-      p.includes("finalise-delta.js docs-only") && p.includes("**unverified**"),
-  );
+  const hits = text.split(/\n\s*\n/).filter((p) => p.includes(LEAD));
   if (hits.length !== 1) {
     return [
       `expected exactly one measured-figure paragraph, found ${hits.length}`,
@@ -48,6 +55,13 @@ export function measuredFigureProblems(text) {
   }
   const [p] = hits;
   const problems = [];
+  if (!p.includes("finalise-delta.js docs-only"))
+    problems.push("the paragraph does not run finalise-delta.js docs-only");
+  // A figure that misses its bound is a FAIL in Step 3, not an unverified one (QA-4, CR4-1).
+  if (!/misses\s+the\s+criterion's\s+bound\s+fails\s+the\s+criterion/.test(p))
+    problems.push("the paragraph does not fail a figure that misses its bound");
+  if (!/\*\*MEDIUM\*\* entry in `top_issues\[\]`/.test(p))
+    problems.push("the paragraph does not raise a MEDIUM top_issues entry");
   if (!p.includes(CITATION))
     problems.push(`the paragraph does not cite ${CITATION}`);
   if (!/carried/.test(p))
@@ -95,6 +109,22 @@ for (const skill of SKILLS) {
   });
 }
 
+test("qa-task and qa-story hold the same measured-figure paragraph (QA-4, CR4-5)", () => {
+  const [a, b] = SKILLS.map((s) =>
+    measuredFigureParagraph(read(s))?.replaceAll(
+      `.agents/skills/${s}/`,
+      "<skill>/",
+    ),
+  );
+  assert.ok(a && b, "both skills hold the paragraph");
+  assert.equal(a, b);
+});
+
+test("calibration: the identity check sees a one-word drift", () => {
+  const p = measuredFigureParagraph(read("qa-task"));
+  assert.notEqual(p, p.replace("applied", "used"));
+});
+
 test("qa-task's record_criteria token sends a measured entry through the rule", () => {
   const line = read("qa-task")
     .split("\n")
@@ -106,8 +136,11 @@ test("qa-task's record_criteria token sends a measured entry through the rule", 
   assert.match(line, /candidate, not a classification/);
   assert.match(
     line,
-    /Classify it by `finalise-dod-ac-prompt\.md` Step 3 first/,
+    /Classify every listed entry by `finalise-dod-ac-prompt\.md` Step 3 first/,
   );
+  // The flag is listed, and false rules nothing out (QA-4, CR4-3).
+  assert.match(line, /`state` and `measured`/);
+  assert.match(line, /`measured: false` rules nothing out/);
   // The sentence ends the bullet: the next args token keeps its own list item (task 328 QA-1, CR-1).
   assert.doesNotMatch(line, /`code_review_blocking=true`/);
   assert.ok(
@@ -123,8 +156,10 @@ test("qa-task's record_criteria token sends a measured entry through the rule", 
 const GOOD = [
   "Intro.",
   "",
-  `**A measured figure** carried or new counts only as ${CITATION} grades it, via`,
-  "`finalise-delta.js docs-only` run from the repository root; otherwise **unverified** with Step 3's note.",
+  `**A measured figure counts for this head only as finalise grades it**. A figure carried or new`,
+  `counts only as ${CITATION} grades it, via`,
+  "`finalise-delta.js docs-only` run from the repository root. A figure that misses the criterion's",
+  "bound fails the criterion; otherwise **unverified** with Step 3's note, and a **MEDIUM** entry in `top_issues[]`.",
   "",
   `Elsewhere ${CITATION} is cited again.`,
 ].join("\n");
@@ -180,6 +215,20 @@ test('calibration: "re-measure" as the note for every rejection fails', () => {
     measuredFigureProblems(text).join("\n"),
     /restates the note a failure carries/,
   );
+});
+
+test("calibration: a missed bound called unverified fails (QA-4, CR4-1)", () => {
+  const text = GOOD.replace(
+    "A figure that misses the criterion's\nbound fails the criterion; otherwise",
+    "Otherwise",
+  );
+  assert.notEqual(text, GOOD);
+  assert.match(measuredFigureProblems(text).join("\n"), /misses its bound/);
+});
+
+test("calibration: a dropped **unverified** is caught by its own check (QA-4, CR4-4)", () => {
+  const text = GOOD.replace("**unverified**", "unverified");
+  assert.match(measuredFigureProblems(text).join("\n"), /\*\*unverified\*\*/);
 });
 
 test("calibration: a check with no repository-root cwd fails", () => {

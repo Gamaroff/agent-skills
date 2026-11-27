@@ -55,12 +55,14 @@ const RECORD_WORDS = Object.freeze([
 // Check 22's second trigger: "a numeric bound graded by a measurement". The comparative
 // alternation ("longer than 30 s", "no larger than 200 KB") is task 328: task 320's criterion 10
 // bounded a wait with "longer than" and was never listed (obs #186). "or equal to" may sit between
-// the comparative and the number ("greater than or equal to 5"). No unit is required after the
+// the comparative and the number ("greater than or equal to 5"), and so may a hedge ("longer than
+// about 30 s", "~30 s"). A leading "no" needs no group of its own: the pattern is unanchored, so
+// "no later than 5 days" matches through "later than 5" (QA-4, CR4-2/CR4-6). No unit is required after the
 // number, so a comparative before an id ("faster than 319 was") also lists: the listing is advisory
 // and QA classifies each entry by finalise Step 3, so a false positive costs one look, while a unit
 // list would miss bounds written in any unit it does not name.
 const NUMERIC_BOUND =
-  /(?:\b(?:under|within|below|above|over|at most|at least|no more than|no fewer than|fewer than|less than|more than)\s+(?:or\s+equal\s+to\s+)?\d|\b(?:no\s+)?(?:longer|shorter|faster|slower|larger|smaller|greater|lower|higher|bigger)\s+than\s+(?:or\s+equal\s+to\s+)?\d|[<>]=?\s*\d|≤\s*\d|≥\s*\d)/i;
+  /(?:\b(?:under|within|below|above|over|at most|at least|no more than|no fewer than|fewer than|less than|more than)\s+(?:or\s+equal\s+to\s+)?(?:(?:about|around|roughly|approximately)\s+|~\s*)?\d|\b(?:longer|shorter|faster|slower|larger|smaller|greater|lower|higher|bigger|later|earlier)\s+than\s+(?:or\s+equal\s+to\s+)?(?:(?:about|around|roughly|approximately)\s+|~\s*)?\d|[<>]=?\s*\d|≤\s*\d|≥\s*\d)/i;
 
 const STATES = Object.freeze([
   "ok",

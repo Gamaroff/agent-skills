@@ -297,6 +297,7 @@ The cycle-3 fixes hold. One MEDIUM remains: a figure that misses its bound is ca
 | 2026-11-27 |  | QA gate CONCERNS (80/100) — 4 findings | qa-task |
 | 2026-11-27 |  | QA findings fixed — cycle 3, 1 iteration (consolidate move): the QA paragraph defers the outcome note to Step 3 (CR3-1); `measured: true` is a candidate that Step 3 classifies (CR3-2); lower/higher/bigger comparatives (CR3-3); broader paraphrase guard (CR3-4) | qa-fix |
 | 2026-11-27 |  | QA gate CONCERNS (90/100) — 6 findings | qa-task |
+| 2026-11-27 |  | QA findings fixed — cycle 4, 1 iteration: a missed bound fails the criterion (CR4-1); later/earlier and hedged bounds (CR4-2); `measured` listed, false rules nothing out (CR4-3); paragraph located by its lead (CR4-4); qa-task and qa-story paragraphs held identical (CR4-5); dead `no` group dropped (CR4-6) | qa-fix |
 <!-- change-log-end -->
 
 ## Progress Tracking

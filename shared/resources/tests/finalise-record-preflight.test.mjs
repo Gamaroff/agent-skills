@@ -228,6 +228,8 @@ test("each comparative bound, with and without a leading no, makes a criterion a
     "lower",
     "higher",
     "bigger",
+    "later",
+    "earlier",
   ];
   for (const w of words) {
     for (const lead of ["", "no "]) {
@@ -244,6 +246,15 @@ test('an "or equal to" bound is a record criterion and measured (task 328 QA-2, 
     "The suite is greater than or equal to 5 tests.",
     "The step takes less than or equal to 30 s.",
     "The bundle is no larger than or equal to 200 KB.",
+  ]) {
+    assert.equal(eng.isRecordCriterion(text), true, text);
+    assert.equal(eng.classify([text])[0]?.measured, true, text);
+  }
+  // A hedge before the number keeps the bound (QA-4, CR4-2).
+  for (const text of [
+    "The wait is longer than about 30 s.",
+    "The step finishes within ~2 s.",
+    "The run takes less than roughly 5 minutes.",
   ]) {
     assert.equal(eng.isRecordCriterion(text), true, text);
     assert.equal(eng.classify([text])[0]?.measured, true, text);
