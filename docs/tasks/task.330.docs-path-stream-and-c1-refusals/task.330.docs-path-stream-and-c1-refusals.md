@@ -5,11 +5,13 @@ type: task
 description: "Close the two isDocsPath gaps task 329's QA found (a .git: alternate-stream segment and a C1 control are read as documentation), and clear the four LOW findings tasks 325 and 329 deferred to it."
 tags: [ci, docs-only-rule, security-probe]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-11-26
 updated: 2026-11-27
+completed_date: 2026-11-27
+pr_number: 961
 estimated_effort_hours: 8
 github_issue: 957
 ---
@@ -18,7 +20,7 @@ github_issue: 957
 
 **GitHub Issue**: [#957](https://github.com/Gamaroff/agent-skills/issues/957)
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.330.review.1.docs-path-stream-and-c1-refusals.md` implemented 2026-11-27
 
 ---
@@ -427,6 +429,31 @@ Wording of the message, the runbook or the CHANGELOG.
 ### Key Findings
 No critical issues identified. All three § 8 mutations are covered. The `git-name` probe engages: 26 cases, 0 escaped.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.330.qa.1.docs-path-stream-and-c1-refusals.md`
+**Gate File**: `task.330.gate.1.docs-path-stream-and-c1-refusals.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Review (5c)**: `task.330.pr-review.1.docs-path-stream-and-c1-refusals.md` — ✅ APPROVE
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 7/7 success criteria met
+✅ **Tests:** § 8 rows pinned by per-PR tests; `ci:fast` 8955 tests, 0 fail; all three mutations recorded
+✅ **PR Review:** PR #961 — 5c conformance review APPROVE; CI SUCCESS on `9c1a872a0e8a` (6 checks)
+✅ **Documentation:** CHANGELOG `[Unreleased]` entry, runbook, regenerated corpus tables
+✅ **Security Review:** ✅ PASS — `isDocsPath` probed through `git-name`: 26 executed, 0 reproduced, 0 escaped
+⚠️ **Compliance Review:** not applicable — internal CI tooling
+
+**Task marked as ACCEPTED on:** 2026-11-27
+
+**Detailed Verification Log:** See `task.330.dod.1.docs-path-stream-and-c1-refusals.md` for complete verification evidence and timestamps.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -437,6 +464,7 @@ No critical issues identified. All three § 8 mutations are covered. The `git-na
 | 2026-11-27 |         | Status → ready-for-development | review-task |
 | 2026-11-27 |         | Implemented — 10 source files (+ 16 bundled copies), 4 new tests, 4 corpus cases | develop |
 | 2026-11-27 |  | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-11-27 | 1.2 | DoD passed — accepted (PR #961) | finalise |
 <!-- change-log-end -->
 
 ---
