@@ -137,6 +137,16 @@ _Track each QA review/fix cycle._
 - **Comments**: PR and tracker `qa-gate-2` comments posted.
 - **HALT** after gate 2: T328-QA-1 can only be settled by the owner, and with criterion 5 unmet, `/finalise` must fail. Further fix cycles cannot make the run pass, so the loop stops on this gate rather than spending cycles. Resume after the decision with `/develop-task` (qa-fix for CR2-2/CR2-3/CR2-4, then QA cycle 3).
 
+### Resume after the owner decision (cycles 3–5)
+
+**Traceability**: skipped (not re-run — cycles 3-5)
+
+- **Resume**: the owner approved the criterion-5 rewording. qa-fix cycle 2 then fixed CR2-2/3/4 (77c4e7dcc).
+- **Gate 3**: CONCERNS 80/100. The LAN fast gate timed out (exit 124) under host load, and CI was green. Fixed in cycle 3 (f81ac7546), with the consolidate move after three gates named qa-task/SKILL.md.
+- **Gate 4**: CONCERNS 90/100, with 1 medium (a missed bound was called unverified). Fixed in cycle 4 (e9c20b2b3).
+- **Gate 5**: CONCERNS 90/100. Fast gate: 8947 tests, 0 failed; CI green. T328-CR5-1 (medium) is open: the FAIL branch is ordered before provenance.
+- **HALT**: the QA budget is exhausted (5 gates, 4 fixes). The loop ends on gate 5, with no ungated fix applied. Escalated to the owner.
+
 - **Correction to the Issues Log**: amending criterion 5 during develop was wrong. It was an unapproved rewording, and the qa-fix restores the reviewed text.
 
 ---

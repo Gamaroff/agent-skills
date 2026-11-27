@@ -1,0 +1,81 @@
+schema: 2
+task: 'task.328.measured-criterion-re-measured-when-head-moves'
+task_title: 'A measured criterion is re-measured when the head moves'
+gate: CONCERNS
+status_reason: 'The cycle-4 fixes hold. One MEDIUM remains: the new fail branch is read before provenance, so a figure Step 3 rejects (single run, no load, code-changed M) still fails outright when it misses the bound, instead of being unverified with re-measure. This is the last gate in the budget (5 gates, 4 fixes); escalated to the owner.'
+reviewer: 'QA Engineer'
+head: 'e9c20b2b3b9823833ad26e122201afe0be6610ad'
+updated: '2026-11-27T06:26:16Z'
+
+top_issues:
+  - id: 'T328-CR5-1'
+    severity: medium
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'Line 1103: "figure that misses the criterion''s bound fails the criterion". It applies before the rule decides whether the figure counts for this head. Step 3 (finalise-dod-ac-prompt.md, wall-clock bullet) gives a figure off the head, with no load, or from a single run "FAIL with note: re-measure", which is not a verdict on the bound. The same sentence is in skills/qa-story/SKILL.md. Checked against the source.'
+    suggested_action: 'Limit the fail branch to a figure the rule otherwise accepts ("A figure the rule accepts that misses the bound fails the criterion"). Every other rejection, including one that also misses the bound, is unverified. Add a calibration for the order.'
+    suggested_owner: dev
+    status: open
+  - id: 'T328-CR5-2'
+    severity: low
+    file: 'evals/shared/tests/qa-measured-figure-parity.test.mjs'
+    finding: 'Line 131: the identity calibration never runs the parity comparison on a drifted pair; it only proves the word "applied" is present.'
+    suggested_action: 'Put the comparison in a helper, and calibrate the helper on a drifted pair and on an identical pair.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 8947
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: false
+    boundary_signals: []
+    notes: 'Unchanged: advisory listing, exits 0; no predicate prevents an action.'
+  performance:
+    status: PASS
+    notes: 'No nested quantifiers.'
+  reliability:
+    status: PASS
+    notes: 'LAN fast gate: 8947 tests, 0 failed (TEST_EXIT=0). GitHub CI green at e9c20b2b3.'
+  maintainability:
+    status: CONCERNS
+    notes: 'CR5-1.'
+
+criteria_drift:
+  reason: drift
+  base: review-commit
+  changed:
+    - id: '#5'
+      kind: reworded
+      approved: true
+  note: 'Owner-approved amendment (Lorien Gamaroff, 2026-11-27).'
+
+recommendations:
+  immediate:
+    - action: 'Order the outcome: provenance first, then the bound (CR5-1)'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+  future:
+    - action: 'review-task stamps a reviewed_blob it never writes (obs #193)'
+      refs: ['shared/resources/criteria-drift.js']
+      remedy: unverified
+    - action: 'CI flake: lockctl take is atomic (tests/test-remote-runner.test.js:1047)'
+      refs: ['tests/test-remote-runner.test.js']
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR5-1 fixed, or waived by the owner']

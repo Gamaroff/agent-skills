@@ -267,17 +267,17 @@ preflight fails. Steps: revert the phase's commit, run `npm run bundle`, re-run 
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.328.qa.4.measured-criterion-re-measured-when-head-moves.md](./task.328.qa.4.measured-criterion-re-measured-when-head-moves.md)
-- **Gate File**: [task.328.gate.4.measured-criterion-re-measured-when-head-moves.yml](./task.328.gate.4.measured-criterion-re-measured-when-head-moves.yml)
+- **Full Report**: [task.328.qa.5.measured-criterion-re-measured-when-head-moves.md](./task.328.qa.5.measured-criterion-re-measured-when-head-moves.md)
+- **Gate File**: [task.328.gate.5.measured-criterion-re-measured-when-head-moves.yml](./task.328.gate.5.measured-criterion-re-measured-when-head-moves.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 8943 (fast gate, 0 failed); CI green at f81ac7546
+- **Tests Executed**: 8947 (fast gate, 0 failed); CI green at e9c20b2b3
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-The cycle-3 fixes hold. One MEDIUM remains: a figure that misses its bound is called unverified, but Step 3 grades it FAIL (T328-CR4-1). Five LOW findings are open (CR4-2 to CR4-6).
+The cycle-4 fixes hold. One MEDIUM remains: the missed-bound FAIL branch is ordered before provenance, so a figure Step 3 rejects fails outright instead of being unverified (T328-CR5-1). One LOW is also open (CR5-2). This is the last gate in the budget, so the run is escalated to the owner.
 
 <!-- change-log-start -->
 ## Change Log
@@ -298,6 +298,7 @@ The cycle-3 fixes hold. One MEDIUM remains: a figure that misses its bound is ca
 | 2026-11-27 |  | QA findings fixed — cycle 3, 1 iteration (consolidate move): the QA paragraph defers the outcome note to Step 3 (CR3-1); `measured: true` is a candidate that Step 3 classifies (CR3-2); lower/higher/bigger comparatives (CR3-3); broader paraphrase guard (CR3-4) | qa-fix |
 | 2026-11-27 |  | QA gate CONCERNS (90/100) — 6 findings | qa-task |
 | 2026-11-27 |  | QA findings fixed — cycle 4, 1 iteration: a missed bound fails the criterion (CR4-1); later/earlier and hedged bounds (CR4-2); `measured` listed, false rules nothing out (CR4-3); paragraph located by its lead (CR4-4); qa-task and qa-story paragraphs held identical (CR4-5); dead `no` group dropped (CR4-6) | qa-fix |
+| 2026-11-27 |  | QA gate CONCERNS (90/100) — 2 findings; QA budget exhausted (5 gates), escalated to the owner | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking
