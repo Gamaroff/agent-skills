@@ -1,0 +1,53 @@
+[
+  {
+    "id": "agentid-out-is-transcript",
+    "direction": "hostile",
+    "input": "p/s/subagents/agent-abc.jsonl",
+    "why": "on the --agent-id route the found transcript would be removed before it is read",
+    "correct": "usage, exit 2, transcript kept",
+    "expected": {
+      "exit": 2,
+      "stdout": "usage: extract --out must not be the transcript file\n"
+    },
+    "fixture": {
+      "files": {
+        "p/s/subagents/agent-abc.jsonl": "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"thinking\",\"thinking\":\"x\"}]}}\n{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"t1\",\"name\":\"SubagentHandback\",\"input\":{\"message\":\"```finalise-ac-yaml\\nok: true\\n```\"}}]}}\n{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"t1\",\"content\":\"ok\"}]}}\n{\"type\":\"attachment\"}\n"
+      }
+    },
+    "spec_ref": "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md:246"
+  },
+  {
+    "id": "agentid-out-is-transcript-dotdot",
+    "direction": "hostile",
+    "input": "p/s/../s/subagents/agent-abc.jsonl",
+    "why": "alternative spelling of the found transcript",
+    "correct": "usage, exit 2",
+    "expected": {
+      "exit": 2,
+      "stdout": "usage: extract --out must not be the transcript file\n"
+    },
+    "fixture": {
+      "files": {
+        "p/s/subagents/agent-abc.jsonl": "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"thinking\",\"thinking\":\"x\"}]}}\n{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"t1\",\"name\":\"SubagentHandback\",\"input\":{\"message\":\"```finalise-ac-yaml\\nok: true\\n```\"}}]}}\n{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"t1\",\"content\":\"ok\"}]}}\n{\"type\":\"attachment\"}\n"
+      }
+    },
+    "spec_ref": "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md:246"
+  },
+  {
+    "id": "agentid-fresh-out",
+    "direction": "legitimate",
+    "input": "ac.yaml",
+    "why": "the ordinary --agent-id call",
+    "correct": "extracted, exit 0",
+    "expected": {
+      "exit": 0,
+      "stdout": "extracted 9 bytes sha256=e4959e64276da4756978788e4a473eb17435c52f6dc936fe551cbb310e2e00d0 -> ac.yaml\n"
+    },
+    "fixture": {
+      "files": {
+        "p/s/subagents/agent-abc.jsonl": "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"thinking\",\"thinking\":\"x\"}]}}\n{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"t1\",\"name\":\"SubagentHandback\",\"input\":{\"message\":\"```finalise-ac-yaml\\nok: true\\n```\"}}]}}\n{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"t1\",\"content\":\"ok\"}]}}\n{\"type\":\"attachment\"}\n"
+      }
+    },
+    "spec_ref": "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md:240"
+  }
+]

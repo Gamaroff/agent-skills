@@ -5,7 +5,7 @@ type: task
 description: "Teach both extractors to read the `SubagentHandback` tool_use's `input.message` as the agent's reply when no final assistant text exists."
 tags: [finalise, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-11-26
@@ -13,11 +13,12 @@ updated: 2026-11-27
 estimated_effort_hours: 8
 github_issue: 952
 pr_number: 959
+completed_date: 2026-11-27
 ---
 
 # Technical Task: SubagentHandback replies are extracted, not hand-copied
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.327.review.1.subagenthandback-replies-are-extracted.md` implemented 2026-11-26
 **GitHub Issue**: [#952](https://github.com/Gamaroff/agent-skills/issues/952)
 
@@ -302,9 +303,11 @@ agent's block, or a text-reply transcript answers differently from before. Steps
 ### Key Findings
 Both DoD 1 gaps are closed. #6 has a stale `--out` case for every non-extracted reason. #10 was amended with an approver and is met by named mutations. Two advisory items are recorded in gate 4.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded)
 
-**Status:** IN PROGRESS
+> Superseded by DoD run 2 (`task.327.dod.2.subagenthandback-replies-are-extracted.md`), which closed both gaps below: #6 by commit 1d914ac8e, and #10 by the owner-approved amendment plus the mutation evidence in QA cycle 4.
+
+**Status (run 1):** IN PROGRESS
 
 ### QA Gate Status
 
@@ -327,6 +330,30 @@ Both DoD 1 gaps are closed. #6 has a stale `--out` case for every non-extracted 
 **Gap Report Generated:** 2026-11-26
 
 **Detailed Verification Log:** See `task.327.dod.1.subagenthandback-replies-are-extracted.md` for the complete verification evidence and timestamps.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.327.qa.4.subagenthandback-replies-are-extracted.md`
+**Gate File**: `task.327.gate.4.subagenthandback-replies-are-extracted.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified (DoD run 2):
+
+✅ **Success Criteria:** 14/14 met. #6 and #10, the run 1 gaps, are closed. #12 was graded from CI reading 1, SUCCESS @ `24ce5725c001`.
+✅ **Tests:** `shared/resources/tests/agent-reply-block.test.mjs` (20 tests) and `finalise-rerun-scope.test.mjs`. Every new test was red before its change or red under a named mutation (qa.1, qa.4).
+✅ **PR Review:** PR #959. pr-review.2 is CONCERNS with no coverage finding, and both its findings are closed.
+✅ **Documentation:** `skills/finalise/SKILL.md` fallback prose updated; CHANGELOG cites (task 327).
+✅ **Security Review:** ✅ PASS. 23 probes executed, 0 reproduced, 0 escaped (`task.327.dod.2.security.run.json`).
+✅ **Compliance Review:** not applicable (internal tooling).
+
+**Task marked as ACCEPTED on:** 2026-11-27
+
+**Detailed Verification Log:** See `task.327.dod.2.subagenthandback-replies-are-extracted.md` for the complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
@@ -343,6 +370,7 @@ Both DoD 1 gaps are closed. #6 has a stale `--out` case for every non-extracted 
 | 2026-11-26 |  | QA gate PASS (92/100) — 0 findings | qa-task |
 | 2026-11-26 |  | DoD incomplete — 2 gaps identified | finalise |
 | 2026-11-27 |  | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-11-27 | 1.2 | DoD passed — accepted (PR #959) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
