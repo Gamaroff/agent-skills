@@ -1,0 +1,79 @@
+schema: 2
+task: 'task.331.ac-merge-refuses-another-documents-result'
+task_title: "The AC merge refuses another document's result"
+gate: PASS
+status_reason: 'Gate 2 findings T331-CR-1 to -3 fixed in f35403b82 and verified. The cycle-3 refute pass found four medium-confidence findings, none reproduced; all are advisory and recorded as one follow-up. The fast gate on the head is green.'
+reviewer: 'QA Engineer'
+head: 'f35403b82a8d326f4edf72ed4929711c6158bc93'
+updated: '2026-11-27T16:25:19Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 74
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary: internal
+    internal_reason: 'shared/resources/finalise-rerun-scope.js#sameDocument (module-private, reached through the merge CLI): its inputs are ac_traceability.story_file from the AC agent YAML that /finalise Step 3c extracts from its own subagent transcript, the scope JSON document Step 3a wrote, and the --doc path Step 3c substitutes; no corpus sink has legitimate cases that are documents it accepts. Behaviour held by nine committed CLI tests and three mutations.'
+    notes: 'Both refusals fail closed (HALT, nothing written).'
+  performance:
+    status: PASS
+    notes: 'Up to two extra realpathSync calls per merge.'
+  reliability:
+    status: PASS
+    notes: 'A stale scope no longer merges into the wrong record. Concurrent finalises of two items at one DOD_N in one checkout remain unsupported (CR-1 below); develop merges that case silently, so this branch is strictly safer there.'
+  maintainability:
+    status: PASS
+    notes: 'Advisories below.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+bug_resolution:
+  bugs_fixed: 3
+  bugs_remaining: 0
+  fixed:
+    - 'T331-CR-1 (gate 2) — merge --doc answers scope-document-mismatch; Step 3c HALT arm with its own remedy; mutation (check disabled) turned 5 named tests red'
+    - 'T331-CR-2 (gate 2) — CHANGELOG resume sentence names both resume points'
+    - 'T331-CR-3 (gate 2) — Step 6 action 2a prose names the stem and DOD_N key'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Follow-up task: key finalise-rerun-scope-{N}.json and finalise-ac-extract-{N}.json by stem as well (cycle-3 CR-1, medium/medium: with two items finalising at one DOD_N, each item''s scope-document-mismatch remedy overwrites the other''s scope); this also simplifies the resume story (cycle-3 CR-3)'
+      refs: ['skills/finalise/SKILL.md']
+      remedy: unverified
+    - action: 'Cycle-3 CR-2 (low/medium): scope-document-mismatch covers three states (overwritten scope, scope with no document, --doc not resolving to Step 3a''s document); split the reasons so each HALT names its own remedy'
+      refs: ['shared/resources/finalise-rerun-scope.js']
+      remedy: unverified
+    - action: 'Cycle-3 CR-3 (low/medium, not verified by reading): the CHANGELOG resume sentence does not cover a pre-upgrade result-unparseable answer, or a resume between Step 3c and 3d'
+      refs: ['CHANGELOG.md']
+      remedy: unverified
+    - action: 'Cycle-3 CR-4 (cleanup): make merge --doc required so a future CLI caller cannot skip the scope check by omission'
+      refs: ['shared/resources/finalise-rerun-scope.js']
+      remedy: unverified
+    - action: 'Earlier advisories still stand: gate 1 CR-2 to CR-5 and gate 2 CR-4 (basename / case-variant story_file)'
+      refs: ['shared/resources/finalise-rerun-scope.js', 'shared/resources/tests/finalise-rerun-scope.test.mjs']
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CI green on the pushed head']

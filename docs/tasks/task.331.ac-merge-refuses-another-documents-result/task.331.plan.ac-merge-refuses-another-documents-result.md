@@ -19,7 +19,7 @@ paths in `/finalise`. Tests first.
 ### Phase 1: The refusal
 
 **Failing cases first**, in `shared/resources/tests/finalise-rerun-scope.test.mjs`, beside the
-`result-hash-mismatch` tests. Build each result from `agentDoc(...)` (`:2153`), replacing its
+`result-hash-mismatch` tests. Build each result from `agentDoc(...)` (`:2259` at `92ed119de`), replacing its
 `story_file` line:
 
 - `story_file: "docs/tasks/task.8.other/task.8.other.md"` against a scope for `DOC` →
@@ -48,13 +48,21 @@ module's list of reasons, if one is enumerated, and to `USAGE` where the reasons
 
 ### Phase 2: The state paths
 
-In `skills/finalise/SKILL.md` (`:1020`, `:1043`, `:1048`, `:1657`), the paths become
+In `skills/finalise/SKILL.md` (`:1021`, `:1045`, `:1050`, `:1659` at `92ed119de`), the paths become
 `.claude/state/finalise-ac-result-${STEM}-${DOD_N}.yaml` and
 `.claude/state/finalise-ac-merged-${STEM}-${DOD_N}.json`. Each block that uses them re-binds `STEM`
-as a substituted input with the same placeholder guard the 7.7 block uses. No block inherits another's
-variables. In Step 3c's reason table, add `result-document-mismatch`:
-**NEEDS_MANUAL_REVIEW**, re-run the extract or hand-copy the right agent's answer, never merge.
-Update the seven paths in `shared/resources/tests/finalise-deferred-ci.test.mjs`.
+as a substituted input with the same placeholder guard the merge block uses; the extract block
+(`:1016`) binds none today and gains one. No block inherits another's variables. In Step 3c's `case`,
+add a `result-document-mismatch` arm that **HALTs** (as `result-hash-mismatch` does through `*)`),
+naming the remedy: re-run the extract, or hand-copy this item's agent answer; never merge. Rewrite the
+Step 6 action 2a comment at `:1661` ("keyed by DOD_N alone") and keep its `OWN_DOC` guard.
+Update the seven paths in `shared/resources/tests/finalise-deferred-ci.test.mjs` and the two in
+`evals/shared/tests/finalise-rerun-scope-blocks.test.mjs` (`:240`, `:273`), which write the result
+file before running the Step 3c block (`finalise-ac-result-task.9-1.yaml`).
+
+> **Review 1 decision**: the plan first said `NEEDS_MANUAL_REVIEW` here while task § 5 said "as it
+> routes `result-hash-mismatch`", which is a HALT. The task's wording wins: both refusals mean the
+> file `merge` read is not this run's answer, and both stop the same way.
 
 ### Phase 3: Records and bundle
 

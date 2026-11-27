@@ -1,0 +1,80 @@
+schema: 2
+task: 'task.331.ac-merge-refuses-another-documents-result'
+task_title: "The AC merge refuses another document's result"
+gate: CONCERNS
+status_reason: 'Engine refusal, stem-keyed paths and both § 8 mutations verified; one MEDIUM: CI link-check is red on the head because the implementation report autolinks the LAN server address as a mailto link.'
+reviewer: 'QA Engineer'
+head: 'b4a0158c4130885dd161a946130077effef0e55d'
+updated: '2026-11-27T15:20:25Z'
+
+top_issues:
+  - id: 'T331-CI-1'
+    severity: medium
+    file: 'docs/tasks/task.331.ac-merge-refuses-another-documents-result/task.331.implementation.1.ac-merge-refuses-another-documents-result-initial-run.md'
+    finding: 'CI check link-check failed on b4a0158c4130 (https://github.com/Gamaroff/agent-skills/actions/runs/46023318088/job/140588208305); green on develop (run 46016584190). The Step 3 Decisions Log entry names the server as user-at-address, which the link checker reads as mailto:ci@192.168.1.249 and reports dead (Status 400).'
+    suggested_action: 'Reword the entry to name the server without the user-at-address form (e.g. "the LAN CI server"), then re-run doc-links on the report'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 69
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary: internal
+    internal_reason: 'shared/resources/finalise-rerun-scope.js#sameDocument (module-private, reached through the merge CLI): its only inputs are ac_traceability.story_file from the AC agent YAML that /finalise Step 3c extracts from its own subagent transcript, and the scope JSON document Step 3a wrote; no corpus sink has legitimate cases that are documents it accepts (the path sink literals would all read as other documents). Behaviour held by four committed CLI tests and two mutations.'
+    notes: 'The refusal fails closed (HALT, nothing written); a result naming no document merges, as § 5 specifies.'
+  performance:
+    status: PASS
+    notes: 'One extra YAML parse and up to two realpath calls per merge.'
+  reliability:
+    status: PASS
+    notes: 'Refusal writes nothing; hash check still first; resumed runs re-run Step 3c (CHANGELOG states it).'
+  maintainability:
+    status: PASS
+    notes: 'Two advisory cleanups (orphaned merge() JSDoc; realpath branch untested) recorded under recommendations.future.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix the dead mailto autolink in the implementation report (T331-CI-1)'
+      refs: ['docs/tasks/task.331.ac-merge-refuses-another-documents-result/task.331.implementation.1.ac-merge-refuses-another-documents-result-initial-run.md']
+  future:
+    - action: 'CR-1: the extract output and rerun-scope JSON are still keyed by DOD_N alone (out of scope per § 4); stem them in a follow-up, or keep the CHANGELOG claim scoped to the two renamed files as it is'
+      refs: ['skills/finalise/SKILL.md']
+      remedy: unverified
+    - action: 'CR-2: a story_file naming no existing file reports as another document; a distinct message would point the operator at the answer rather than the file'
+      refs: ['shared/resources/finalise-rerun-scope.js']
+      remedy: unverified
+    - action: 'CR-3: a story_file at the YAML root beside ac_traceability goes unchecked (not the shape the AC prompt writes); consider a root fallback'
+      refs: ['shared/resources/finalise-rerun-scope.js']
+      remedy: unverified
+    - action: 'CR-4: move storyFileOf/sameDocument above the merge() JSDoc block so it documents merge again'
+      refs: ['shared/resources/finalise-rerun-scope.js']
+      remedy: unverified
+    - action: 'CR-5: add a symlinked-path case and a nonexistent-path case so the realpath fallback is held by a test'
+      refs: ['shared/resources/tests/finalise-rerun-scope.test.mjs']
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CI link-check green on the head']

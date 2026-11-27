@@ -17,7 +17,11 @@
  *                carry every other verdict). Every doubt fails toward `full`.
  *   merge      — enforce the scope on the agent's YAML: restore every carried verdict
  *                whatever the agent said, send a differing verdict to `advisories[]`,
- *                recompute `overall`, and build this run's record.
+ *                recompute `overall`, and build this run's record. A result whose
+ *                `story_file` names another document than the scope's is refused
+ *                (`result-document-mismatch`, nothing written; task 331). With `--doc`,
+ *                a scope that is not that document's is refused first
+ *                (`scope-document-mismatch`, nothing written; task 331, T331-CR-1).
  *   resolve-ci — at Step 6, grade every `DEFERRED-CI` criterion from CI reading 1
  *                (SUCCESS → PASS, FAILURE → FAIL, anything else stays deferred),
  *                rewrite the merged result and the record, and return the
@@ -722,6 +726,39 @@ function mergeReportedGap(r, agentAc, io, advisories) {
  * @param {object} opts        { dodN, document }
  * @param {object} io          { tracked } — the CLI passes gitIo(cwd)
  */
+/**
+ * The document the agent's answer says it is for: `ac_traceability.story_file`, read with the same
+ * parser and the same root `merge()` uses. `null` when absent, empty or unparseable — an unparseable
+ * answer is `merge()`'s to report, not this check's (task 331).
+ */
+function storyFileOf(agentYaml) {
+  let parsed;
+  try {
+    parsed = parseYamlSubset(String(agentYaml));
+  } catch {
+    return null;
+  }
+  const ac = parsed && (parsed.ac_traceability ?? parsed);
+  const named = ac && typeof ac === "object" ? ac.story_file : null;
+  return typeof named === "string" && named.trim() !== "" ? named.trim() : null;
+}
+
+/**
+ * Whether two spellings name one document: resolved against the repository root, so an absolute
+ * and a relative path to the same file agree; then, when they still differ, by real path, so a
+ * symlinked checkout or temp directory does not refuse a correct answer (task 331).
+ */
+function sameDocument(cwd, a, b) {
+  const ra = path.resolve(cwd, a);
+  const rb = path.resolve(cwd, b);
+  if (ra === rb) return true;
+  try {
+    return fs.realpathSync(ra) === fs.realpathSync(rb);
+  } catch {
+    return false;
+  }
+}
+
 function merge(s, agentYaml, opts, io) {
   let parsed;
   try {
@@ -997,7 +1034,7 @@ const USAGE = [
   "usage:",
   "  finalise-rerun-scope.js scope --doc <document> --head <rev> [--prior <record.ac.json>] [--rerun-at-head <run.json|none>] [--json]",
   "  finalise-rerun-scope.js extract (--agent-id <id> | --transcript <file>) --out <path> [--block <info-string>] [--projects-root <dir>] [--json]",
-  "  finalise-rerun-scope.js merge --scope <scope.json> --result <agent.yaml> [--sha256 <hex>] [--dod-n <N>] [--record-out <path>] [--json]",
+  "  finalise-rerun-scope.js merge --scope <scope.json> --result <agent.yaml> [--doc <document>] [--sha256 <hex>] [--dod-n <N>] [--record-out <path>] [--json]",
   "  finalise-rerun-scope.js resolve-ci --merged <merged.json> --rollup <CI_ROLLUP> [--ci-head <sha>] [--tree-eq <sha>] [--record <record.ac.json>] [--json]",
 ].join("\n");
 
@@ -1172,6 +1209,22 @@ function main(argv) {
       return usage(opts.json, "--dod-n must be a number");
     if (opts.sha256 !== undefined && !/^[0-9a-f]{64}$/.test(opts.sha256))
       return usage(opts.json, "--sha256 must be 64 lowercase hex digits");
+    if (opts.doc !== undefined && opts.doc === "")
+      return usage(opts.json, "--doc must name the document this merge is for");
+    // The scope must be THIS document's. The scope file is keyed by run number alone, so another
+    // work item finalised in the same checkout can overwrite it. Merged, its criteria and carried
+    // verdicts would become this item's record; and a result naming this document would be refused
+    // as another document's answer, which no re-extract can clear (task 331, T331-CR-1).
+    if (
+      opts.doc !== undefined &&
+      !(s.document && sameDocument(cwd, opts.doc, s.document))
+    )
+      return emit(opts.json, {
+        reason: "scope-document-mismatch",
+        exitCode: 0,
+        mode: s.mode,
+        message: `--scope is the re-run scope of ${s.document || "no document"}, not ${opts.doc}`,
+      });
     // The file the merge reads must be the file `extract` wrote. A different hash is a refusal that
     // writes nothing, so a file edited between the two steps never becomes the acceptance record.
     const resultSha = agentReplyBlock.sha256(resultBuf);
@@ -1181,6 +1234,17 @@ function main(argv) {
         exitCode: 0,
         mode: s.mode,
         message: `--result hashes to ${resultSha}, not the ${opts.sha256} extract recorded`,
+      });
+    // The file must be an answer for THIS document. A result another work item left in
+    // .claude/state is refused and writes nothing, so its verdicts never become this item's record
+    // (task 331). A result that names no document merges as before: only a known-wrong one is refused.
+    const named = storyFileOf(agentYaml);
+    if (named && s.document && !sameDocument(cwd, named, s.document))
+      return emit(opts.json, {
+        reason: "result-document-mismatch",
+        exitCode: 0,
+        mode: s.mode,
+        message: `--result is for ${named}, not ${s.document}: it is another document's answer`,
       });
     const r = merge(
       s,

@@ -1,0 +1,178 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "63a3d161e1c4119a700fe7615a55398f8cdfafe4",
+  "dirty_paths": [
+    "docs/tasks/task.331.ac-merge-refuses-another-documents-result/task.331.ac-merge-refuses-another-documents-result.md",
+    "docs/tasks/task.331.ac-merge-refuses-another-documents-result/task.331.implementation.1.ac-merge-refuses-another-documents-result-initial-run.md",
+    "docs/tasks/task.331.ac-merge-refuses-another-documents-result/task.331.pr-review.1.ac-merge-refuses-another-documents-result.md"
+  ],
+  "document": "docs/tasks/task.331.ac-merge-refuses-another-documents-result/task.331.ac-merge-refuses-another-documents-result.md",
+  "result": {
+    "bytes": 9776,
+    "sha256": "b38d8bdf16c7d3500493c0d79152969f282d9e63cb634458c645a1b9197651b5",
+    "verified": true
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 8,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "5b141a910ca8b1b6612b4b6d6d329f8ee6bfca43836414d2db874e17448eef8d",
+      "status": "PASS",
+      "description": "Every row of the section 8 table holds in a finalise-rerun-scope test",
+      "code_citation": "shared/resources/finalise-rerun-scope.js:1242",
+      "test_citation": "shared/resources/tests/finalise-rerun-scope.test.mjs:2328",
+      "members": [
+        {
+          "member": "another document story_file -> result-document-mismatch, nothing written",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:2328",
+          "status": "PASS"
+        },
+        {
+          "member": "same document, story_file absolute and scope relative -> merged",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:2339",
+          "status": "PASS"
+        },
+        {
+          "member": "no story_file -> merged",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:2347",
+          "status": "PASS"
+        },
+        {
+          "member": "mismatched story_file and wrong --sha256 -> result-hash-mismatch (hash first)",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:2353",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "All four rows of the section 8 table (task doc :293-:296) map to a CLI test via mergeDocCase (:2281). Each test asserts the reason and whether the record exists. The engine checks the hash at :1233 before story_file at :1241-:1248, and sameDocument (:751) resolves both paths. shared/resources/tests/*.test.mjs is in npm test (test:suite). .github/workflows/test.yml:58 runs it on every pull_request with no paths filter."
+    },
+    {
+      "id": "#2",
+      "text_hash": "b475a8da0aee00e872ea3356ca2ca4140b930a1aff3985cbdb9d9d35f75a1820",
+      "status": "PASS",
+      "description": "Step 3c merge and Step 6 action 2a blocks, run substituted, read stem-keyed paths",
+      "code_citation": "skills/finalise/SKILL.md:1063",
+      "test_citation": "evals/shared/tests/finalise-rerun-scope-blocks.test.mjs:273",
+      "members": [
+        {
+          "member": "Step 3c merge block reads finalise-ac-result-task.9-1.yaml and merges it",
+          "evidence": "evals/shared/tests/finalise-rerun-scope-blocks.test.mjs:273",
+          "status": "PASS"
+        },
+        {
+          "member": "Step 6 action 2a block reads finalise-ac-merged-task.9-1.json",
+          "evidence": "shared/resources/tests/finalise-deferred-ci.test.mjs:453",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Eval :272-:282 writes .claude/state/finalise-ac-result-task.9-1.yaml, runs the substituted STEP_3C fence and asserts AC_OVERALL=PASS and the task.9.dod.1.ac.json record. With the old DOD_N-only path the merge would find no result. finalise-deferred-ci.test.mjs:368-:395 pulls the one fence that names Step 6 action 2a out of SKILL.md. stage() (:418) writes finalise-ac-merged-task.9-1.json, and the fence tests from :453 (SUCCESS rebinds AC_OVERALL and rewrites the merged result) only pass if the fence reads that stem-keyed file (SKILL.md:1677). Both files are in test:suite globs (evals/shared/tests/*.test.mjs, shared/resources/tests/*.test.mjs), run per PR by test.yml:58."
+    },
+    {
+      "id": "#3",
+      "text_hash": "673c349931554c9c9e6cf0c38808ef62a50c3a5af878e45531f4b8cdf267aabd",
+      "status": "PASS",
+      "description": "SKILL.md names every AC result and merged path with the STEM",
+      "code_citation": "skills/finalise/SKILL.md:1024",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [
+        {
+          "member": "extract --out result path",
+          "evidence": "skills/finalise/SKILL.md:1024",
+          "status": "PASS"
+        },
+        {
+          "member": "Step 3c AC_MERGED_FILE",
+          "evidence": "skills/finalise/SKILL.md:1058",
+          "status": "PASS"
+        },
+        {
+          "member": "Step 3c merge --result",
+          "evidence": "skills/finalise/SKILL.md:1063",
+          "status": "PASS"
+        },
+        {
+          "member": "Step 6 action 2a AC_MERGED_FILE",
+          "evidence": "skills/finalise/SKILL.md:1677",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "I read all four lines. Each reads finalise-ac-result-STEM-DOD_N.yaml or finalise-ac-merged-STEM-DOD_N.json. The calibrated git grep -c for the DOD_N-only spelling, run at head 63a3d161e, prints nothing and exits 1, so the count is 0. No test runs the extract line (:1024) because the eval writes the result file directly. Lines :1063 and :1677 are also run by the #2 tests."
+    },
+    {
+      "id": "#4",
+      "text_hash": "3f4840e8e5357334d3ea4640273ec8c735da15b43ebaa0dbd95a1af07d077403",
+      "status": "PASS",
+      "description": "Performance: not applicable, no bound is claimed",
+      "code_citation": "docs/tasks/task.331.ac-merge-refuses-another-documents-result/task.331.ac-merge-refuses-another-documents-result.md:333",
+      "test_citation": "NOT_APPLICABLE: no bound is claimed; section 8 Performance Tests reads Not applicable (:312)",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The criterion claims no bound and nothing to measure. The task says so explicitly at :333, and section 8 Performance Tests at :312 agrees. The diff makes no performance claim. Graded PASS under the explicit not-applicable kind."
+    },
+    {
+      "id": "#5",
+      "text_hash": "416cfaa6810f7c0b13e1c445c2a5d6155cc78f55a42ac9860bd3e7181cb72d7f",
+      "status": "PASS",
+      "description": "Every section 8 mutation recorded in QA report with test turned red",
+      "code_citation": "docs/tasks/task.331.ac-merge-refuses-another-documents-result/task.331.qa.1.ac-merge-refuses-another-documents-result.md:146",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "the refusal removed",
+          "evidence": "docs/tasks/task.331.ac-merge-refuses-another-documents-result/task.331.qa.1.ac-merge-refuses-another-documents-result.md:146",
+          "status": "PASS"
+        },
+        {
+          "member": "the comparison made on raw strings (absolute vs relative differ)",
+          "evidence": "docs/tasks/task.331.ac-merge-refuses-another-documents-result/task.331.qa.1.ac-merge-refuses-another-documents-result.md:147",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Section 8 Mutation Tests (task doc :300-:303) names two mutations. qa.1 :146 records the refusal disabled (if (false)) and names the test that went red. :147 records named !== s.document and names the absolute-path test that went red. :149 gives the command and 68 pass / 1 fail for each mutation. qa.1 is committed (7e55819c9). qa.3:54 also records a mutation of the T331-CR-1 scope check, which is outside section 8."
+    },
+    {
+      "id": "#6",
+      "text_hash": "4999c165b79021a23c9d1010200e422554cb68ede31c8b2797ca34a95f6dccd8",
+      "status": "PASS",
+      "description": "npm run test:remote and npm run bundle:check pass",
+      "code_citation": ".github/workflows/test.yml:58",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 63a3d161e1c4119a700fe7615a55398f8cdfafe4 — RERUN_AT_HEAD is none, so no command was re-run at the head. The criterion asks that the full suite and bundle freshness pass. CI runs both on the head: test.yml:55 format:check and :58 npm test (together ci:fast, which test:remote runs) on every pull_request, and validate.yml:128 bundle_skill.py --check, triggered by skills/** and shared/resources/**, which this PR touches. Supporting facts for Step 6: qa.3:32 records test:remote at f35403b82 as 8966 tests, 8963 pass, 0 fail. finalise-delta docs-only from f35403b82 to HEAD 63a3d161e answered tree-equivalent (exit 0, 3 docs-only paths). A local bundle_skill.py --check at the head reported 129 skills, 0 problems.",
+      "ci_reading": "CI reading 1: SUCCESS @ 63a3d161e1c4119a700fe7615a55398f8cdfafe4"
+    },
+    {
+      "id": "#7",
+      "text_hash": "12deae0b3816771084e726c26b6d3c9b7e2200bfe3fc13817e22b79452e18fc6",
+      "status": "FAIL",
+      "description": "Step 3c case has a result-document-mismatch arm that HALTs, names remedy",
+      "code_citation": "skills/finalise/SKILL.md:1074",
+      "test_citation": null,
+      "members": [],
+      "non_member_fail": null,
+      "note": "The arm is at SKILL.md:1074-:1075. It echoes HALT with the merge message and the remedy (re-run the extract above, or hand-copy THIS item's AC agent answer, never merge it) and exits 1. That reads correctly and fails closed: without it, the *) arm would HALT anyway. No test reaches the arm. The engine test (finalise-rerun-scope.test.mjs:2328) covers only the engine reason. The eval Step 3c test (finalise-rerun-scope-blocks.test.mjs:300-:340) drives the scope-document-mismatch arm and asserts doesNotMatch on the result-mismatch message. A per-PR test could assert this arm with the same harness: write a result naming task.8.other under a correct scope, run STEP_3C, and assert the HALT and remedy text."
+    },
+    {
+      "id": "#8",
+      "text_hash": "6972ea0217b0497e08123d2a44da5c2292407853b554995225d2eb31bf3ae235",
+      "status": "PASS",
+      "description": "CHANGELOG [Unreleased] names both changes of section 5",
+      "code_citation": "CHANGELOG.md:20",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "I read CHANGELOG.md :5 ([Unreleased]) and :18-:33 (Changed). The entry at :20-:33 names Breaking Change 1 (merge answers result-document-mismatch and writes no record when story_file names another document, :21-:24) and Breaking Change 2 (the result and merged files become finalise-ac-result-{stem}-{N}.yaml and finalise-ac-merged-{stem}-{N}.json, :28-:30). It also names 1b (scope-document-mismatch via --doc, :25-:27) and the resume migration (:30-:33). Section 5 now holds three changes against the criterion's both, and the entry covers all of them. criteria-drift is clean. changelog-cites.test.mjs tests fixtures and does not pin this text."
+    }
+  ],
+  "advisories": []
+}

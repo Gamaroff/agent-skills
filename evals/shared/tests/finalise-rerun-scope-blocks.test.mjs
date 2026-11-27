@@ -237,7 +237,7 @@ for (const shell of SHELLS) {
       assert.match(a1.stdout, /re-run at head: ran/);
       assert.match(a1.stdout, /sh check\.sh -> exit 0/);
       writeFileSync(
-        path.join(dir, ".claude/state/finalise-ac-result-1.yaml"),
+        path.join(dir, ".claude/state/finalise-ac-result-task.9-1.yaml"),
         AGENT_ALL_PASS, // the citation says nothing of a re-run
       );
       const c1 = run(shell, dir, substitute(STEP_3C, { dodN: 1 }));
@@ -270,7 +270,7 @@ for (const shell of SHELLS) {
       assert.match(a1.stdout, /re-run scope: full \(no-prior-record\)/);
 
       writeFileSync(
-        path.join(dir, ".claude/state/finalise-ac-result-1.yaml"),
+        path.join(dir, ".claude/state/finalise-ac-result-task.9-1.yaml"),
         AGENT_ALL_PASS,
       );
       const c1 = run(shell, dir, substitute(STEP_3C, { dodN: 1 }));
@@ -289,6 +289,104 @@ for (const shell of SHELLS) {
       assert.match(
         a2.stdout,
         /re-run scope: scoped \(prior-record\) — 0 to re-judge, 3 carried/,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test(`[${shell}] Step 3c refuses a scope another item's Step 3a overwrote, and names the scope, not this item's answer (T331-CR-1)`, () => {
+    const dir = repo();
+    try {
+      const a1 = step3a(shell, dir, 1);
+      assert.equal(a1.status, 0, a1.stdout + a1.stderr);
+      const scopeFile = path.join(
+        dir,
+        ".claude/state/finalise-rerun-scope-1.json",
+      );
+      const other = "docs/tasks/task.8.other/task.8.other.md";
+      writeFileSync(
+        scopeFile,
+        JSON.stringify({
+          ...JSON.parse(readFileSync(scopeFile, "utf8")),
+          document: other,
+        }),
+      );
+      const result = path.join(
+        dir,
+        ".claude/state/finalise-ac-result-task.9-1.yaml",
+      );
+      const record = path.join(dir, DOC_DIR, "task.9.dod.1.ac.json");
+      // A result naming no document (it would merge without the check: a silent wrong record),
+      // then this item's correct answer (it would be called another document's).
+      for (const answer of [
+        AGENT_ALL_PASS,
+        AGENT_ALL_PASS.replace(
+          "ac_traceability:\n",
+          `ac_traceability:\n  story_file: "${DOC}"\n`,
+        ),
+      ]) {
+        writeFileSync(result, answer);
+        const c = run(shell, dir, substitute(STEP_3C, { dodN: 1 }));
+        assert.equal(c.status, 1, c.stdout + c.stderr);
+        assert.match(
+          c.stdout,
+          /HALT: --scope is the re-run scope of docs\/tasks\/task\.8\.other\/task\.8\.other\.md, not docs\/tasks\/task\.9\.demo\/task\.9\.demo\.md/,
+        );
+        assert.match(
+          c.stdout,
+          /re-run Step 3a, the AC agent and the extract above/,
+        );
+        assert.doesNotMatch(c.stdout, /another document's answer/);
+        assert.ok(!existsSync(record), "nothing is recorded");
+      }
+      // DOC_PATH left unsubstituted is refused before the engine runs.
+      const un = run(
+        shell,
+        dir,
+        substitute(STEP_3C, { dodN: 1 }).replace(
+          `DOC_PATH="${DOC}"`,
+          'DOC_PATH="{document-path}"',
+        ),
+      );
+      assert.equal(un.status, 1, un.stdout + un.stderr);
+      assert.match(
+        un.stdout,
+        /HALT: DOC_PATH \('\{document-path\}'\) must be substituted/,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test(`[${shell}] Step 3c HALTs on another document's result in its own arm, naming the remedy, and records nothing (task 331)`, () => {
+    const dir = repo();
+    try {
+      const a1 = step3a(shell, dir, 1);
+      assert.equal(a1.status, 0, a1.stdout + a1.stderr);
+      const other = "docs/tasks/task.8.other/task.8.other.md";
+      writeFileSync(
+        path.join(dir, ".claude/state/finalise-ac-result-task.9-1.yaml"),
+        AGENT_ALL_PASS.replace(
+          "ac_traceability:\n",
+          `ac_traceability:\n  story_file: "${other}"\n`,
+        ),
+      );
+      const c = run(shell, dir, substitute(STEP_3C, { dodN: 1 }));
+      assert.equal(c.status, 1, c.stdout + c.stderr);
+      assert.match(
+        c.stdout,
+        /HALT: --result is for docs\/tasks\/task\.8\.other\/task\.8\.other\.md, not docs\/tasks\/task\.9\.demo\/task\.9\.demo\.md: it is another document's answer/,
+      );
+      // The arm's own remedy, not the generic `merge answered …` line the `*)` arm prints.
+      assert.match(
+        c.stdout,
+        /re-run the extract above, or hand-copy THIS item's AC agent answer to the result path, then re-run this block; never merge it/,
+      );
+      assert.doesNotMatch(c.stdout, /merge answered/);
+      assert.ok(
+        !existsSync(path.join(dir, DOC_DIR, "task.9.dod.1.ac.json")),
+        "nothing is recorded",
       );
     } finally {
       rmSync(dir, { recursive: true, force: true });

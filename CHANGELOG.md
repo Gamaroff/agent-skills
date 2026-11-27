@@ -17,6 +17,21 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Changed
 
+- **`/finalise`'s AC merge refuses another document's result, and its AC state files carry the work
+  item's stem (task 331).** `finalise-rerun-scope.js merge` now answers `result-document-mismatch`
+  and writes no record when the result's `ac_traceability.story_file` names another document than
+  the scope's (compared as resolved paths, so an absolute and a relative spelling of one document
+  agree). A result that names no document merges as before. Step 3c HALTs on the new reason and
+  names the remedy. Step 3c also passes `--doc`, and `merge` refuses a re-run scope that is another
+  document's (`scope-document-mismatch`, nothing written): the scope file is still keyed by the run
+  number alone, and another item's Step 3a can overwrite it. The AC result and merged files are now
+  `.claude/state/finalise-ac-result-{stem}-{N}.yaml` and `finalise-ac-merged-{stem}-{N}.json`, so
+  two work items finalised in one checkout never share a path: in task 329's DoD run 1 the merge
+  read the file task 325 had left at `finalise-ac-result-1.yaml`. A run resumed across the upgrade
+  finds nothing at the new paths. Before Step 3c, re-run the extract, then Step 3c. After Step 3c,
+  Step 6 action 2a HALTs because the AC record exists but the merged result is missing: move the
+  record aside, then re-run Step 3a, the AC agent and Step 3c.
+
 - **`ci.docsOnly.patterns` can exclude a path (task 325).** An entry that starts with `!` now makes the
   path it matches code, in any list order, so `- "docs/**"` with `- "!docs/catalogue.md"` keeps one
   tested file out of the docs-only rule and the pipelines wait for CI when it changes. Before, such an
