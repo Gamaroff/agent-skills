@@ -5,18 +5,20 @@ type: task
 description: "When the head moves, flag a measured criterion (timing, wall-clock, load) whose recorded figure comes from a commit that is not tree-equivalent to the head."
 tags: [qa-task, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-11-26
 updated: 2026-11-27
+completed_date: 2026-11-27
+pr_number: 960
 estimated_effort_hours: 8
 github_issue: 953
 ---
 
 # Technical Task: A measured criterion is re-measured when the head moves
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.328.review.1.measured-criterion-re-measured-when-head-moves.md` implemented 2026-11-27
 **GitHub Issue**: [#953](https://github.com/Gamaroff/agent-skills/issues/953)
 
@@ -279,9 +281,9 @@ preflight fails. Steps: revert the phase's commit, run `npm run bundle`, re-run 
 ### Key Findings
 Every success criterion is met, with criterion 4 met again after cycle 6. One advisory low-confidence finding is recorded for future work.
 
-## Definition of Done - Gaps Identified
+## DoD gap report — run 1 (historical, superseded by run 2)
 
-**Status:** IN PROGRESS
+**Status:** superseded — the gaps below were closed by the qa.7 addendum and accepted in DoD run 2
 
 ### QA Gate Status
 
@@ -309,6 +311,29 @@ The gate passed; the DoD's acceptance-criteria check found three records the cri
 **Gap Report Generated:** 2026-11-27
 
 **Detailed Verification Log:** See `task.328.dod.1.measured-criterion-re-measured-when-head-moves.md` for complete verification evidence and timestamps.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.328.qa.7.measured-criterion-re-measured-when-head-moves.md` (with the dod.1-gaps addendum)
+**Gate File**: `task.328.gate.7.measured-criterion-re-measured-when-head-moves.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 9/9 met. #5, #6 and #7 were re-judged on the addendum, and #8 was graded from CI reading 1 (SUCCESS @ `8a2b23243`).
+✅ **PR Review:** PR #960. `task.328.pr-review.1…md` APPROVE; the host requires no review.
+✅ **Documentation:** CHANGELOG `[Unreleased]` cites (task 328); qa-task and qa-story document the rule.
+✅ **Security Review:** ✅ PASS. The boundary was probed: 48 executed, 0 reproduced.
+✅ **Compliance Review:** N/A. Internal skill tooling.
+
+**Task marked as ACCEPTED on:** 2026-11-27
+
+**Detailed Verification Log:** See `task.328.dod.2.measured-criterion-re-measured-when-head-moves.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
@@ -334,6 +359,7 @@ The gate passed; the DoD's acceptance-criteria check found three records the cri
 | 2026-11-27 |  | QA findings fixed — cycle 6 (further cycle approved by the owner): "re-measure" restored for a rejected figure, other notes deferred to Step 3 (QA6-1); unverified mapping stated as deliberate (CR6-1); "whatever its value" held (CR6-2); one locator (CR6-3) | qa-fix |
 | 2026-11-27 |  | QA gate PASS (100/100) | qa-task |
 | 2026-11-27 |  | DoD incomplete — 3 gaps identified | finalise |
+| 2026-11-27 | 1.2 | DoD run 2 — accepted (PR #960) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
