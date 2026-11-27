@@ -1,0 +1,65 @@
+schema: 2
+task: 'task.331.ac-merge-refuses-another-documents-result'
+task_title: "The AC merge refuses another document's result"
+gate: PASS
+status_reason: 'Re-entry after DoD run 1 gap #7. The new eval test reaches the Step 3c result-document-mismatch arm under bash and zsh and is mutation-proven (arm deleted: both new tests red). The scoped review found nothing, and the fast gate on the head is green.'
+reviewer: 'QA Engineer'
+head: 'e22028a2c8a925c10794640e843cfcb3c7740eda'
+updated: '2026-11-27T17:46:38Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 95
+
+evidence:
+  tests_reviewed: 14
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary: internal
+    internal_reason: 'Unchanged since gate 3: shared/resources/finalise-rerun-scope.js#sameDocument (module-private, reached through the merge CLI) reads only the AC agent YAML that /finalise extracts from its own subagent transcript, the scope JSON Step 3a wrote, and the --doc path Step 3c substitutes. No corpus sink models those inputs. This cycle adds a test only.'
+    notes: 'This cycle changes no production code.'
+  performance:
+    status: PASS
+    notes: 'No production code changed.'
+  reliability:
+    status: PASS
+    notes: 'The result-document-mismatch HALT arm is now held by a committed test.'
+  maintainability:
+    status: PASS
+    notes: 'The gate-3 advisories still stand (below).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fixed:
+    - 'DoD run 1 gap #7 (AC #7): the Step 3c result-document-mismatch arm had no test. Commit e22028a2c adds one per shell. Mutation (arm deleted) turned both new tests red, 12/14; restored, 14/14'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Gate-3 advisories carried unchanged: stem-key the scope and extract files (cycle-3 CR-1), split scope-document-mismatch (CR-2), the CHANGELOG resume detail (CR-3), make merge --doc required (CR-4), and the earlier gate 1 CR-2 to CR-5 and gate 2 CR-4'
+      refs: ['skills/finalise/SKILL.md', 'shared/resources/finalise-rerun-scope.js', 'CHANGELOG.md']
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CI green on the pushed head']

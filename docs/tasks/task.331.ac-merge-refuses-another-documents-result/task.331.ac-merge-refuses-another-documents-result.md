@@ -410,17 +410,17 @@ The path comparison, or the message.
 **Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.331.qa.3.ac-merge-refuses-another-documents-result.md](./task.331.qa.3.ac-merge-refuses-another-documents-result.md)
-- **Gate File**: [task.331.gate.3.ac-merge-refuses-another-documents-result.yml](./task.331.gate.3.ac-merge-refuses-another-documents-result.yml)
+- **Full Report**: [task.331.qa.4.ac-merge-refuses-another-documents-result.md](./task.331.qa.4.ac-merge-refuses-another-documents-result.md)
+- **Gate File**: [task.331.gate.4.ac-merge-refuses-another-documents-result.yml](./task.331.gate.4.ac-merge-refuses-another-documents-result.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 74 (engine suite), 8963 (fast gate)
+- **Tests Executed**: 14 (eval Step 3c blocks), 8965 of 8968 pass, 0 fail (fast gate)
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-All gate-2 findings are fixed. Four medium-confidence advisories from the cycle-3 review are recorded as one follow-up: key the scope and extract files by stem, split scope-document-mismatch, fix the CHANGELOG resume detail, and make `--doc` required.
+DoD run 1 gap #7 is closed. A committed test per shell now runs the Step 3c `result-document-mismatch` arm, and deleting the arm turns both tests red. No new findings. The gate-3 advisories still stand as one follow-up.
 
 ## Definition of Done - Gaps Identified
 
@@ -465,6 +465,7 @@ All gate-2 findings are fixed. Four medium-confidence advisories from the cycle-
 | 2026-11-27 |         | QA gate PASS (95/100) — cycle 3, 0 open findings, 4 advisories | qa-task |
 | 2026-11-27 |         | PR review CONCERNS — PC-1 fixed: § 4 claim corrected; § 3 and § 5 describe `merge --doc` / `scope-document-mismatch` (§ 9 not reworded) | develop-task (5c) |
 | 2026-11-27 |  | DoD incomplete — 1 gap identified (§ 9 Migration: result-document-mismatch arm untested) | finalise |
+| 2026-11-27 |         | QA gate PASS (95/100) — cycle 4, 0 findings; DoD gap #7 closed by a mutation-proven test | qa-task |
 <!-- change-log-end -->
 
 ---
