@@ -5,11 +5,13 @@ type: task
 description: "finalise-rerun-scope.js merge refuses an AC result whose story_file names another document, and /finalise keys its AC state files by work item as well as DoD run number, so one item's verdicts can never become another's record."
 tags: [finalise, observation]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-11-26
 updated: 2026-11-27
+completed_date: 2026-11-27
+pr_number: 962
 estimated_effort_hours: 8
 github_issue: 958
 ---
@@ -18,7 +20,7 @@ github_issue: 958
 
 **GitHub Issue**: [#958](https://github.com/Gamaroff/agent-skills/issues/958)
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.331.review.1.ac-merge-refuses-another-documents-result.md` implemented 2026-11-27
 
 ---
@@ -422,9 +424,9 @@ The path comparison, or the message.
 ### Key Findings
 DoD run 1 gap #7 is closed. A committed test per shell now runs the Step 3c `result-document-mismatch` arm, and deleting the arm turns both tests red. No new findings. The gate-3 advisories still stand as one follow-up.
 
-## Definition of Done - Gaps Identified
+## Definition of Done - Gaps Identified — run 1 (historical, superseded by run 2)
 
-**Status:** IN PROGRESS
+**Status:** SUPERSEDED (was IN PROGRESS; the gap below was closed and DoD run 2 accepted the task)
 
 ### QA Gate Status
 
@@ -449,6 +451,29 @@ DoD run 1 gap #7 is closed. A committed test per shell now runs the Step 3c `res
 **QA Gate Reference**: See `task.331.gate.3.ac-merge-refuses-another-documents-result.yml` for full details
 
 **Detailed Verification Log:** See `task.331.dod.1.ac-merge-refuses-another-documents-result.md` for complete verification evidence and timestamps.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.331.qa.4.ac-merge-refuses-another-documents-result.md`
+**Gate File**: `task.331.gate.4.ac-merge-refuses-another-documents-result.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100
+
+All Definition of Done criteria have been verified (DoD run 2, scoped to the run-1 gap):
+
+✅ **Acceptance Criteria:** 8/8 met. #7, the run-1 gap, is closed by a per-shell test (`evals/shared/tests/finalise-rerun-scope-blocks.test.mjs:362`) that reaches the Step 3c `result-document-mismatch` arm; mutation-proven in QA cycle 4
+✅ **Tests & PR:** PR #962; `/review-pr` APPROVE (`task.331.pr-review.2.*.md`); CI reading 1 SUCCESS on `7af1c0a2705e` (6 checks)
+✅ **Documentation:** CHANGELOG `[Unreleased]` cites task 331; SKILL.md Step 3c documents both refusals and the stem-keyed paths
+✅ **Security Review:** PASS — boundary recorded as internal (pipeline-written inputs only); two spec challenges recorded for the owner
+✅ **Compliance Review:** not applicable (internal tooling)
+
+**Task marked as ACCEPTED on:** 2026-11-27
+
+**Detailed Verification Log:** See `task.331.dod.2.ac-merge-refuses-another-documents-result.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
@@ -466,6 +491,7 @@ DoD run 1 gap #7 is closed. A committed test per shell now runs the Step 3c `res
 | 2026-11-27 |         | PR review CONCERNS — PC-1 fixed: § 4 claim corrected; § 3 and § 5 describe `merge --doc` / `scope-document-mismatch` (§ 9 not reworded) | develop-task (5c) |
 | 2026-11-27 |  | DoD incomplete — 1 gap identified (§ 9 Migration: result-document-mismatch arm untested) | finalise |
 | 2026-11-27 |         | QA gate PASS (95/100) — cycle 4, 0 findings; DoD gap #7 closed by a mutation-proven test | qa-task |
+| 2026-11-27 | 1.2 | DoD passed — accepted (PR #962); run 2 closed the run-1 gap | finalise |
 <!-- change-log-end -->
 
 ---
