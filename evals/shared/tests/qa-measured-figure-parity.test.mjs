@@ -56,6 +56,16 @@ export function measuredFigureProblems(text) {
     if (p.includes(r))
       problems.push(`the paragraph restates the reason \`${r}\``);
   }
+  // Step 3 scopes its head-or-earlier-commit rule and its recording conditions itself; a
+  // paraphrase that says which figures must be on the head narrows it (task 328 QA-2, CR2-3).
+  if (/taken on the head commit/i.test(p))
+    problems.push(
+      "the paragraph paraphrases which figures Step 3 holds to the head",
+    );
+  if (!/from the repository root/.test(p))
+    problems.push(
+      "the paragraph does not say to run the check from the repository root",
+    );
   return problems;
 }
 
@@ -100,7 +110,7 @@ const GOOD = [
   "Intro.",
   "",
   `**A measured figure** carried or new counts only as ${CITATION} grades it, via`,
-  '`finalise-delta.js docs-only`; otherwise **unverified** with "re-measure".',
+  '`finalise-delta.js docs-only` run from the repository root; otherwise **unverified** with "re-measure".',
   "",
   `Elsewhere ${CITATION} is cited again.`,
 ].join("\n");
@@ -132,4 +142,17 @@ test("calibration: a restated reason list fails", () => {
     "on code-changed, disabled or unverifiable",
   );
   assert.match(measuredFigureProblems(text).join("\n"), /restates the reason/);
+});
+
+test("calibration: a paraphrase of which figures Step 3 holds to the head fails", () => {
+  const text = GOOD.replace(
+    "grades it, via",
+    "grades it: taken on the head commit, or on an earlier commit M, via",
+  );
+  assert.match(measuredFigureProblems(text).join("\n"), /paraphrases/);
+});
+
+test("calibration: a check with no repository-root cwd fails", () => {
+  const text = GOOD.replace(" run from the repository root", "");
+  assert.match(measuredFigureProblems(text).join("\n"), /repository root/);
 });

@@ -1093,14 +1093,16 @@ with no committed per-PR test, is a **MEDIUM** finding in `top_issues[]`, so it 
 rather than halting at finalise (obs #224).
 
 **A measured figure counts for this head only as finalise grades it** (task 328, obs #186). A figure
-for a measured criterion, taken this cycle or carried from an earlier cycle or QA report, counts for
-the head only as `finalise-dod-ac-prompt.md` Step 3, in the `finalise` skill, grades a measured
-figure: taken on the head commit, or on an earlier commit M for which
-`command node .agents/skills/qa-task/references/finalise-delta.js docs-only --base <M> --head HEAD --json`
-answers `tree-equivalent`. Any other answer leaves the criterion **unverified** with "re-measure", and
-a **MEDIUM** entry in `top_issues[]`, so it enters the fix loop rather than halting at finalise. Step 3
-owns the reasons a figure fails; this file does not list them. "No engine changed" is not that answer:
-run the command.
+for a measured criterion, taken this cycle or carried from an earlier cycle or QA report, is graded
+here by the measured-criterion rule of `finalise-dod-ac-prompt.md` Step 3, in the `finalise` skill,
+applied whole: that rule says which figures it holds to the head, what each must record, and when a
+figure from an earlier commit still counts. Where it lets an earlier commit M count, run its check
+from the repository root,
+`command node .agents/skills/qa-task/references/finalise-delta.js docs-only --base <M> --head HEAD --json`;
+only `tree-equivalent` lets that figure stand. A figure the rule does not accept leaves the criterion
+**unverified** with "re-measure", and a **MEDIUM** entry in `top_issues[]`, so it enters the fix loop
+rather than halting at finalise. Step 3 owns the conditions and the reasons a figure fails; this file
+does not list them. "No engine changed" is not that answer: run the command.
 
 **A "tool X passes on files Y" criterion is confirmed by one probe that X processes Y, before PASS is
 recorded** (obs #78). A formatter, linter or checker skips what its ignore file excludes and exits 0

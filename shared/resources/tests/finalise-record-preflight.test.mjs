@@ -236,6 +236,20 @@ test("each comparative bound, with and without a leading no, makes a criterion a
   }
 });
 
+test('an "or equal to" bound is a record criterion and measured (task 328 QA-2, CR2-2)', () => {
+  for (const text of [
+    "The suite is greater than or equal to 5 tests.",
+    "The step takes less than or equal to 30 s.",
+    "The bundle is no larger than or equal to 200 KB.",
+  ]) {
+    assert.equal(eng.isRecordCriterion(text), true, text);
+    assert.equal(eng.classify([text])[0]?.measured, true, text);
+  }
+  // Control: "or equal to" with no number after it is not a bound.
+  const bare = "The result is greater than or equal to the old one.";
+  assert.equal(eng.isRecordCriterion(bare), false, bare);
+});
+
 test("controls: a non-timing bound and a size bound are measured; a bare comparison and a plain record are not", () => {
   // A bound that is not a timing is still a bound (task 328 §8): listed, measured.
   const heading = eng.classify([

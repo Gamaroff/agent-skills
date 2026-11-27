@@ -227,7 +227,7 @@ and `ci-tree-equivalence.js` into both skills.
 - [ ] Each of "longer", "shorter", "faster", "slower", "larger", "smaller" and "greater" than a number, with and without a leading "no", makes a criterion a record criterion
 - [ ] A comparison with no number is not listed, and a record criterion with no bound reads `measured: false`
 - [ ] `qa-task` and `qa-story` each state that a measured figure, carried or new, counts for the head only as `finalise-dod-ac-prompt.md` Step 3 grades it, and is otherwise unverified with "re-measure"; a test fails if either loses the citation or restates the reason list
-- [ ] The corpus count of newly listed criteria, with five examples by path, is recorded in the QA report
+- [ ] The corpus count of newly listed criteria, with every newly listed example by path (up to five), is recorded in the QA report (amended: only one newly listed criterion exists; amendment approved by Lorien Gamaroff)
 
 **Code quality:**
 
@@ -292,6 +292,8 @@ Both cycle-1 fixes hold. Three findings are open for a fix cycle: "greater than 
 | 2026-11-27 |  | QA gate CONCERNS (80/100) — 3 findings | qa-task |
 | 2026-11-27 |  | QA findings fixed, 1 iteration. Restored the bullet break (CR-1) and added the parity assertion (CR-2). Reverted criterion 5 to its reviewed wording (QA-1): the rewording had no approver. With the reviewed wording the criterion is unmet (one newly listed example exists), so it stays open for the owner | qa-fix |
 | 2026-11-27 |  | QA gate CONCERNS (70/100) — 4 findings | qa-task |
+| 2026-11-27 |  | Criterion 5 amended to "every newly listed example by path (up to five)". The corpus has one newly listed criterion. Approved by the owner in session (T328-QA-1) | Lorien Gamaroff |
+| 2026-11-27 |  | QA findings fixed — cycle 2, 1 iteration: "or equal to" bounds listed (CR2-2); QA paragraph cites Step 3 whole and says to run from the repository root (CR2-3); id-after-"than" false positive accepted and documented (CR2-4) | qa-fix |
 <!-- change-log-end -->
 
 ## Progress Tracking
