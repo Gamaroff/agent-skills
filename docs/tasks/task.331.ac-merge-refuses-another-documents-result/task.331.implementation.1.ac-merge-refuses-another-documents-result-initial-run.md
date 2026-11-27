@@ -3,7 +3,7 @@
 **Task**: `task.331.ac-merge-refuses-another-documents-result.md`
 **Run Number**: 1
 **Started**: 2026-11-27 14:35
-**Status**: In Progress
+**Status**: Completed
 **Report format**: 2
 
 ---
@@ -37,9 +37,9 @@ Make `finalise-rerun-scope.js merge` refuse an AC result whose `story_file` name
 | 2. review-task             | ✅ Done | `task.331.review.{N}.{name}.md` exists (or skip logged)               | `task.331.review.1.…md`; READY TO IMPLEMENT 8/10; Planned → Ready for Development | —                    | 2026-11-27T14:41Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline, 1 iteration; 8/8 phase boxes; fast gate (remote) 8956 pass / 0 fail | —                    | 2026-11-27T15:14Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #962: https://github.com/Gamaroff/agent-skills/pull/962 | —                    | 2026-11-27T15:16Z |
-| 5–6. qa-task / qa-fix loop | ✅ Done | `task.331.qa.{N}.*.md`; `task.331.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 3 QA cycles; gate 3 PASS 95/100; 5c CONCERNS (PC-1 scope, doc-only, carried) | —                    | 2026-11-27T16:30Z |
-| 7. finalise                | ❌ Halted | `task.331.dod.{N}.*.md`; task `status: accepted`                      | DoD run 1: GAPS — 1 (AC #7 untested arm); lock held at 7 | —                    | 2026-11-27T16:39Z |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.331.qa.{N}.*.md`; `task.331.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 3 QA cycles; gate 3 PASS 95/100; 5c CONCERNS (PC-1 scope, doc-only, carried). Re-entered after DoD run 1: cycle 4, gate 4 PASS 95/100; 5c APPROVE (pr-review.2) | —                    | 2026-11-27T16:30Z |
+| 7. finalise                | ✅ Done | `task.331.dod.{N}.*.md`; task `status: accepted`                      | DoD run 1: GAPS — 1 (AC #7 untested arm), halted 16:39Z; QA re-entry closed it. DoD run 2: ACCEPTED (scoped, 4 re-judged, 4 carried); acceptance commit `54e155335` | —                    | 2026-11-27T18:08Z |
+| 8. commit-changes          | ✅ Done | All artifacts committed and pushed                                     | Implementation report committed and pushed | —                    | 2026-11-27T18:08Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -105,6 +105,18 @@ Make `finalise-rerun-scope.js merge` refuse an AC result whose `story_file` name
 - qa-fix findings ingest done inline (one finding, fully stated in the gate) — the independent ingester did not run.
 - Decision D2 (autonomous): T331-CI-1's fix is in this implementation report, so its update rides in the cycle-1 `fix(...)` commit instead of being deferred to Step 8. Deferring it would leave CI link-check red at /finalise's CI reading 1. Calibrated: CI's `markdown-link-check@3` with the repo config fails on the committed report (rc 1, the same dead mailto) and passes on the edited one (rc 0); all five task docs pass.
 - Step 7 /finalise DoD run 1 → GAPS (1). The gaps PR comment was posted, and the canonical summary, tracker close and board move were not run (accept-path only). Decision: take Step 8, not 8a (reason in the Issues Log). Pipeline HALT per Step 7 "If DoD Gaps Are Found".
+- Gap fix (user approved "Go ahead"): commit `e22028a2c` adds the per-shell eval test for the Step 3c `result-document-mismatch` arm. Mutation: arm deleted → both new tests red (12/14); restored → 14/14.
+- QA re-entry after finalise DoD gaps: reenter-qa: re-entered QA at step 5 / qa_phase 5a — qa_max_cycles=5 (base 3), gate_head=f35403b82a8d. Resumed via /develop-next → /develop-task --defaults (live lock, so no Phase 0b prompt was needed).
+
+### Step 7 — finalise (DoD run 2)
+
+- DoD summary: `docs/tasks/task.331.ac-merge-refuses-another-documents-result/task.331.dod.2.ac-merge-refuses-another-documents-result.md`. Re-run scope: scoped (prior-record): #2, #4, #6 and #7 re-judged, #1, #3, #5 and #8 carried. The AC YAML was extracted from the agent transcript (sha256 `7dd0e2be…`) and verified by `merge`. Security PASS (boundary internal, `finalise-rerun-scope.js#main`); compliance N/A; docs PASS.
+- CI reading 1: SUCCESS @ `7af1c0a2705e` over 6 checks (waited for the `test` lane; #6 graded PASS from it); CI reading 2: SUCCESS (tree-equivalent to e22028a2c8a9) @ `54e155335b02` over 6 checks.
+- DoD body posted to PR: https://github.com/Gamaroff/agent-skills/pull/962#issuecomment-7225151132 (canonical summary).
+- Issue close: #958 commented (`done`, reason `posted`), closed, and confirmed CLOSED. The Document link already pointed at `develop`.
+- Board transition: `gh-stage done` → `already`.
+- Task completed: `status: accepted`, Change Log v1.2, registry row ticked and staged (`planned` → `accepted`). The 5c `pr-review.2` was carried in the acceptance commit.
+- Tracker debt: journal empty → none.
 
 ---
 
@@ -113,6 +125,9 @@ Make `finalise-rerun-scope.js merge` refuse an AC result whose `story_file` name
 _Problems encountered and how they were resolved or escalated._
 
 - **Step 7 — finalise DoD gaps (escalated, HALT).** DoD run 1 (`task.331.dod.1.ac-merge-refuses-another-documents-result.md`): AC PARTIAL, 7/8. Gap: § 9 Migration criterion #7 (low). The Step 3c `result-document-mismatch` arm at `skills/finalise/SKILL.md:1074` is present and names the remedy, but no test runs it; the eval Step 3c test drives only the `scope-document-mismatch` arm. Security PASS (boundary: internal), compliance N/A, docs PASS, CI reading 1 SUCCESS @ `63a3d161e1c4` over 6 checks (#6 graded PASS from it). Step 8a not taken: the finding came from reading rather than execution, and no engine path re-grades one AC verdict in the merged result and the record. Fix: one per-shell eval test (correct scope, `story_file` = `task.8.other`; assert exit 1, `another document's answer`, the remedy text, no record), mutation-proven by deleting the arm. It changes code, so the resume re-enters QA at 5a.
+- **Process slip — HALT snapshot not written.** At the DoD-gaps HALT the `--halt` snapshot was not written before the HALT message. The lock survived, so the resume needed no restore and no state was lost.
+- **QA cycle 4 — remote fast gate dropped (environment, resolved).** The first `npm run test:remote` ended with status 255 ("No route to host") when the LAN server went offline. The re-run first refused, because this run's stale container and lock were still there (owner pid gone). Both were removed and the re-run passed: 8968 tests, 0 fail. An unrelated session's lock was left alone.
+- **Process slip — commit message passed by heredoc.** Commit `7af1c0a27`'s message went through a quoted heredoc, which the operator's rules forbid. The message itself was harmless. Later commits write the message to a file first.
 
 ---
 
@@ -170,14 +185,29 @@ _Track each QA review/fix cycle._
 **Loop exit**: 5c CONCERNS with no open coverage finding → ready-for-merge → Step 7
 **Action**: Proceeding to Step 7 /finalise
 
+### QA Cycle 4 — 2026-11-27
+**Gate Result**: PASS (95/100)
+**Issues Found**: none. This is the re-entry after DoD run 1 gap #7. The review was scoped to the 8 files changed since gate 3, the eval test being the only code (independent Explore, 17:01:25Z → 17:02:28Z, `duration_ms` 50696): 0 findings. Mutation: arm deleted → both new tests red, 12/14; restored → 14/14, `cmp` clean
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**Fast gate on head `e22028a2c`**: green — 8968 tests, 8965 pass / 0 fail. The first run ended with status 255 when the ssh session to .249 dropped (an environment failure). I removed the stale container and lock of that run, and the re-run passed
+**Convergence check**: HIGH 0 → 0 → 0 → 0, converging
+**Traceability**: skipped (no Success Criteria table)
+**PR Review**: APPROVE — `task.331.pr-review.2.ac-merge-refuses-another-documents-result.md` (conformance lens only, `--no-code`; independent Explore, 17:49:05Z → 17:49:50Z, `duration_ms` 45504): 0 findings. The summary comment was updated in place; `ready-for-merge` signalled
+**5c carry**: nothing to fix; the review report is staged for the acceptance commit
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-11-27T18:08Z
+**Final Status**: Completed
 **Branch**: feature/task.331.ac-merge-refuses-another-documents-result
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/962
+**QA Iterations**: 4
+**DoD Summary**: docs/tasks/task.331.ac-merge-refuses-another-documents-result/task.331.dod.2.ac-merge-refuses-another-documents-result.md
+**Tracker debt**: none
+
+Task completed. `finalise-rerun-scope.js merge` now refuses an AC result whose `story_file` names another document (`result-document-mismatch`). With `--doc`, it also refuses a scope computed for another document (`scope-document-mismatch`). `/finalise` keys its AC state files by work-item stem. DoD run 1 found one gap, an untested Step 3c arm. A mutation-proven test closed it, QA cycle 4 passed and DoD run 2 accepted.
