@@ -415,7 +415,7 @@ function stage(statuses) {
   mkdirSync(join(dir, "doc"), { recursive: true });
   const r = merged(statuses);
   writeFileSync(
-    join(dir, ".claude", "state", "finalise-ac-merged-1.json"),
+    join(dir, ".claude", "state", "finalise-ac-merged-task.9-1.json"),
     JSON.stringify(r, null, 2),
   );
   writeFileSync(
@@ -465,7 +465,7 @@ for (const shell of SHELLS) {
       assert.equal(r.status, 0, r.stderr + r.stdout);
       assert.equal(r.acOverall, "PASS");
       const m = readJson(
-        join(dir, ".claude", "state", "finalise-ac-merged-1.json"),
+        join(dir, ".claude", "state", "finalise-ac-merged-task.9-1.json"),
       );
       assert.equal(m.ac_result.ac_traceability.overall, "PASS");
       assert.equal(
@@ -527,7 +527,7 @@ for (const shell of SHELLS) {
       assert.equal(sc1.status, "PASS");
       assert.match(sc1.ci_reading, /SUCCESS @ fix456/);
       const m = readJson(
-        join(dir, ".claude", "state", "finalise-ac-merged-1.json"),
+        join(dir, ".claude", "state", "finalise-ac-merged-task.9-1.json"),
       );
       assert.equal(m.ac_result.ac_traceability.overall, "PASS");
     } finally {
@@ -579,13 +579,14 @@ for (const shell of SHELLS) {
   });
 
   test(`fence (${shell}): a bug run beside another work item's merged result skips and leaves it untouched (T249-QA-7, T249-QA-8)`, () => {
-    // An earlier task's run left its merged result under the same DOD_N, as task.248's did.
+    // An earlier task's run left its merged result under the same DOD_N, as task.248's did. Since
+    // task 331 the path carries that task's stem, so the bug run never reads it at all.
     const { dir } = stage({ "SC-1": D, "SC-2": "PASS", "SC-3": "PASS" });
     const mergedPath = join(
       dir,
       ".claude",
       "state",
-      "finalise-ac-merged-1.json",
+      "finalise-ac-merged-task.9-1.json",
     );
     rmSync(join(dir, "doc", "task.9.dod.1.ac.json"));
     const before = readFileSync(mergedPath, "utf8");
@@ -634,7 +635,7 @@ for (const shell of SHELLS) {
         dir,
         ".claude",
         "state",
-        "finalise-ac-merged-1.json",
+        "finalise-ac-merged-task.9-1.json",
       );
       writeFileSync(
         mergedPath,
@@ -672,7 +673,7 @@ for (const shell of SHELLS) {
       dir,
       ".claude",
       "state",
-      "finalise-ac-merged-1.json",
+      "finalise-ac-merged-task.9-1.json",
     );
     const m = JSON.parse(readFileSync(mergedPath, "utf8"));
     m.record.dod_n = 4;
@@ -712,7 +713,7 @@ for (const shell of SHELLS) {
   test(`fence (${shell}): a record without its merged result HALTs, never skips silently (CR-3)`, () => {
     const { dir } = stage({ "SC-1": D, "SC-2": "PASS", "SC-3": "PASS" });
     try {
-      rmSync(join(dir, ".claude", "state", "finalise-ac-merged-1.json"));
+      rmSync(join(dir, ".claude", "state", "finalise-ac-merged-task.9-1.json"));
       const r = runFence(shell, dir, {
         CI_ROLLUP: "SUCCESS",
         AC_OVERALL: "PARTIAL",

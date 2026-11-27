@@ -237,7 +237,7 @@ for (const shell of SHELLS) {
       assert.match(a1.stdout, /re-run at head: ran/);
       assert.match(a1.stdout, /sh check\.sh -> exit 0/);
       writeFileSync(
-        path.join(dir, ".claude/state/finalise-ac-result-1.yaml"),
+        path.join(dir, ".claude/state/finalise-ac-result-task.9-1.yaml"),
         AGENT_ALL_PASS, // the citation says nothing of a re-run
       );
       const c1 = run(shell, dir, substitute(STEP_3C, { dodN: 1 }));
@@ -270,7 +270,7 @@ for (const shell of SHELLS) {
       assert.match(a1.stdout, /re-run scope: full \(no-prior-record\)/);
 
       writeFileSync(
-        path.join(dir, ".claude/state/finalise-ac-result-1.yaml"),
+        path.join(dir, ".claude/state/finalise-ac-result-task.9-1.yaml"),
         AGENT_ALL_PASS,
       );
       const c1 = run(shell, dir, substitute(STEP_3C, { dodN: 1 }));

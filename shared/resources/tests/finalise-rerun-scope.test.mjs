@@ -2275,6 +2275,86 @@ const agentDoc = (entries) =>
 const acOf = (merged, id) =>
   merged.ac_result.ac_traceability.acs.find((x) => x.ac_id === id);
 
+// ── merge refuses another document's result (task 331) ─────────────────────
+// A result whose story_file names another document is refused, and writes nothing; the same
+// document named absolutely, or no story_file at all, merges as before; the hash is checked first.
+function mergeDocCase(storyFile, { sha256 } = {}) {
+  const dir = mkRepo();
+  try {
+    const entries = ["SC-1", "SC-2", "SC-3", "SC-4"].map((id) =>
+      acEntry(id, "PASS"),
+    );
+    let yaml = agentDoc(entries);
+    const line = `  story_file: "${DOC}"`;
+    assert.ok(yaml.includes(line), "the fixture carries the test's own DOC");
+    yaml = yaml.replace(
+      line + "\n",
+      storyFile === null
+        ? ""
+        : `  story_file: "${typeof storyFile === "function" ? storyFile(dir) : storyFile}"\n`,
+    );
+    writeFileSync(join(dir, "ac.yaml"), yaml);
+    writeFileSync(
+      join(dir, "scope.json"),
+      JSON.stringify({ ...scopeAt(dir, null), document: DOC }),
+    );
+    const rec = "docs/tasks/task.9.demo/task.9.dod.1.ac.json";
+    const r = cli(dir, [
+      "merge",
+      "--scope",
+      "scope.json",
+      "--result",
+      "ac.yaml",
+      ...(sha256 ? ["--sha256", sha256] : []),
+      "--dod-n",
+      "1",
+      "--record-out",
+      rec,
+      "--json",
+    ]);
+    return {
+      status: r.status,
+      out: JSON.parse(r.stdout),
+      recorded: existsSync(join(dir, rec)),
+    };
+  } finally {
+    cleanup(dir);
+  }
+}
+
+test("merge: a result whose story_file names another document is refused and nothing is recorded (CLI, task 331)", () => {
+  // Mutation target: the refusal. Without it this result merges under task 9's ids.
+  const m = mergeDocCase("docs/tasks/task.8.other/task.8.other.md");
+  assert.equal(m.status, 0);
+  assert.equal(m.out.reason, "result-document-mismatch");
+  assert.equal(m.out.exitCode, 0);
+  assert.match(m.out.message, /task\.8\.other\.md/);
+  assert.match(m.out.message, /task\.9\.demo\.md/);
+  assert.equal(m.recorded, false, "nothing is recorded");
+});
+
+test("merge: story_file naming the same document by absolute path merges (CLI, task 331)", () => {
+  // Mutation target: the path folding. Compared as raw strings, the absolute and relative
+  // spellings of one document differ and this result would be refused.
+  const m = mergeDocCase((dir) => join(dir, DOC));
+  assert.equal(m.out.reason, "merged");
+  assert.equal(m.recorded, true);
+});
+
+test("merge: a result with no story_file merges as before (CLI, task 331)", () => {
+  const m = mergeDocCase(null);
+  assert.equal(m.out.reason, "merged");
+  assert.equal(m.recorded, true);
+});
+
+test("merge: a mismatched story_file and a wrong --sha256 answer result-hash-mismatch — the hash is checked first (CLI, task 331)", () => {
+  const m = mergeDocCase("docs/tasks/task.8.other/task.8.other.md", {
+    sha256: "0".repeat(64),
+  });
+  assert.equal(m.out.reason, "result-hash-mismatch");
+  assert.equal(m.recorded, false);
+});
+
 test("severity (full run): a low AC FAIL keeps its grade; a FAIL with none stays ungraded (task 257)", () => {
   const dir = mkRepo();
   try {

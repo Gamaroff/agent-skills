@@ -1013,12 +1013,15 @@ Take agent 1's YAML out of its transcript — do not retype it (task 269). The A
 `finalise-ac-yaml` block (its prompt says so); `AC_AGENT_ID` is the id the Agent tool returned for it:
 
 ```bash
-# INPUTS, substituted into THIS block: {AC agent id}, and DOD_N exactly as Step 0 bound it.
+# INPUTS, substituted into THIS block: {AC agent id}, and STEM and DOD_N exactly as Step 0 bound them.
+# The result path carries the stem: two work items finalised in one checkout never share it (task 331).
 AC_AGENT_ID="{AC agent id}"
+STEM="{story.{P}.{E}.{S} | task.{id}}"
 DOD_N="{Step 0's DOD_N}"
-case "$AC_AGENT_ID$DOD_N" in ''|*'{'*) echo "HALT: AC_AGENT_ID and DOD_N must be substituted"; exit 1 ;; esac
+case "$AC_AGENT_ID$STEM$DOD_N" in *'{'*) echo "HALT: AC_AGENT_ID, STEM and DOD_N must be substituted"; exit 1 ;; esac
+[ -n "$AC_AGENT_ID" ] && [ -n "$STEM" ] && [ -n "$DOD_N" ] || { echo "HALT: AC_AGENT_ID, STEM and DOD_N must be substituted"; exit 1; }
 command node .agents/skills/finalise/references/finalise-rerun-scope.js extract \
-  --agent-id "$AC_AGENT_ID" --out ".claude/state/finalise-ac-result-${DOD_N}.yaml" --json \
+  --agent-id "$AC_AGENT_ID" --out ".claude/state/finalise-ac-result-${STEM}-${DOD_N}.yaml" --json \
   | tee ".claude/state/finalise-ac-extract-${DOD_N}.json"
 ```
 
@@ -1031,7 +1034,9 @@ pass it to `merge` below as `AC_SHA256` — `merge` re-hashes the file and answe
 nothing, and removed any earlier file at that path: fall back to saving agent 1's YAML, verbatim, to the same path with the file-write tool, leave
 `AC_SHA256` empty, and say "AC YAML hand-copied (unverified): {reason}" in the DoD. A record with
 `verified: false` says exactly that: its hash describes the file `merge` read, not proof it matches the
-agent's reply. Then:
+agent's reply. Whatever the route, `merge` also refuses a result whose `story_file` names another
+document than the scope's (`result-document-mismatch`, nothing merged, nothing recorded): a hand copy
+of the wrong agent's answer stops here instead of becoming this item's record (task 331). Then:
 
 ```bash
 # INPUTS, substituted into THIS block, as in Step 3a: STEM and DOD_N exactly as Step 0 bound them.
@@ -1042,12 +1047,12 @@ case "$STEM$DOD_N" in *'{'*) echo "HALT: STEM and DOD_N must be substituted into
 [ -n "$STEM" ] || { echo "HALT: STEM is empty — substitute the work item's filename stem"; exit 1; }
 case "$DOD_N" in ''|*[!0-9]*) echo "HALT: DOD_N ('$DOD_N') is not Step 0's run number"; exit 1 ;; esac
 AC_RECORD="{document-directory}/${STEM}.dod.${DOD_N}.ac.json"
-AC_MERGED_FILE=".claude/state/finalise-ac-merged-${DOD_N}.json"
+AC_MERGED_FILE=".claude/state/finalise-ac-merged-${STEM}-${DOD_N}.json"
 # The hash `extract` printed, or empty after a hand copy. Read back from its own output, not retyped.
 AC_SHA256=$(jq -r 'select(.reason == "extracted") | .sha256' ".claude/state/finalise-ac-extract-${DOD_N}.json" 2>/dev/null)
 command node .agents/skills/finalise/references/finalise-rerun-scope.js merge \
   --scope ".claude/state/finalise-rerun-scope-${DOD_N}.json" \
-  --result ".claude/state/finalise-ac-result-${DOD_N}.yaml" \
+  --result ".claude/state/finalise-ac-result-${STEM}-${DOD_N}.yaml" \
   ${AC_SHA256:+--sha256 "$AC_SHA256"} \
   --dod-n "$DOD_N" --record-out "$AC_RECORD" --json > "$AC_MERGED_FILE"
 [ $? -eq 0 ] || { echo "HALT: finalise-rerun-scope.js merge failed — see $AC_MERGED_FILE"; exit 1; }
@@ -1055,6 +1060,8 @@ case "$(jq -r '.reason' "$AC_MERGED_FILE")" in
   merged)             AC_OVERALL=$(jq -r '.ac_result.ac_traceability.overall' "$AC_MERGED_FILE")
                       RERUN_SCOPE_LINE=$(jq -r '.scope_line' "$AC_MERGED_FILE") ;;
   result-unparseable) AC_OVERALL=NEEDS_MANUAL_REVIEW; RERUN_SCOPE_LINE="" ;;   # no record is written
+  result-document-mismatch)   # nothing merged, nothing recorded (task 331)
+                      echo "HALT: $(jq -r '.message' "$AC_MERGED_FILE") — re-run the extract above, or hand-copy THIS item's AC agent answer to the result path, then re-run this block; never merge it"; exit 1 ;;
   *)                  echo "HALT: merge answered $(jq -r '.reason' "$AC_MERGED_FILE")"; exit 1 ;;
 esac
 echo "AC_OVERALL=$AC_OVERALL"
@@ -1656,10 +1663,11 @@ reading 1: SUCCESS after one re-run (see the CI re-run line)`, never as plain `S
    case "$DOD_N" in ''|*[!0-9]*) echo "HALT: DOD_N ('$DOD_N') is not Step 0's run number"; exit 1 ;; esac
    [ -n "$DOC_DIR" ] && [ -d "$DOC_DIR" ] || { echo "HALT: DOC_DIR ('$DOC_DIR') is not the work item's directory"; exit 1; }
    [ -n "$AC_OVERALL" ] || { echo "HALT: AC_OVERALL is empty — substitute Step 3c's verdict"; exit 1; }
-   AC_MERGED_FILE=".claude/state/finalise-ac-merged-${DOD_N}.json"
+   AC_MERGED_FILE=".claude/state/finalise-ac-merged-${STEM}-${DOD_N}.json"
    AC_RECORD="$DOC_DIR/${STEM}.dod.${DOD_N}.ac.json"
-   # Whose merged result is this? The file is keyed by DOD_N alone and never removed, so it can be
-   # another work item's from an earlier run (task 249, QA cycle 3, T249-QA-7).
+   # Whose merged result is this? The path carries the stem (task 331), but the file is never
+   # removed and a stem is not a whole document name, so the record's own document is still
+   # checked (task 249, QA cycle 3, T249-QA-7).
    MERGED_REASON=""; MERGED_DOC=""; MERGED_N=""
    if [ -f "$AC_MERGED_FILE" ]; then
      MERGED_REASON=$(jq -r '.reason' "$AC_MERGED_FILE" 2>/dev/null)
