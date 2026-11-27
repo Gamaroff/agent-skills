@@ -9,7 +9,7 @@ status: ready-for-review
 priority: Medium
 risk_level: low
 created: 2026-11-26
-updated: 2026-11-26
+updated: 2026-11-27
 estimated_effort_hours: 8
 github_issue: 952
 pr_number: 959
@@ -285,22 +285,22 @@ agent's block, or a text-reply transcript answers differently from before. Steps
 
 **QA Status**: PASS
 **QA Engineer**: QA Engineer
-**Testing Date**: 2026-11-26
-**Quality Score**: 92/100
+**Testing Date**: 2026-11-27
+**Quality Score**: 100/100
 **Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.327.qa.3.subagenthandback-replies-are-extracted.md](./task.327.qa.3.subagenthandback-replies-are-extracted.md)
-- **Gate File**: [task.327.gate.3.subagenthandback-replies-are-extracted.yml](./task.327.gate.3.subagenthandback-replies-are-extracted.yml)
+- **Full Report**: [task.327.qa.4.subagenthandback-replies-are-extracted.md](./task.327.qa.4.subagenthandback-replies-are-extracted.md)
+- **Gate File**: [task.327.gate.4.subagenthandback-replies-are-extracted.yml](./task.327.gate.4.subagenthandback-replies-are-extracted.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 85 (20 + 65), plus ci:fast 8923/0
+- **Tests Executed**: 20, plus ci:fast 8926 tests (8923 pass, 0 fail)
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-All six findings across cycles 1-2 are fixed and mutation-held. The real host hand-back transcript still extracts byte-identically. Three advisory cleanups are recorded in gate 3.
+Both DoD 1 gaps are closed. #6 has a stale `--out` case for every non-extracted reason. #10 was amended with an approver and is met by named mutations. Two advisory items are recorded in gate 4.
 
 ## Definition of Done - Gaps Identified
 
@@ -342,6 +342,7 @@ All six findings across cycles 1-2 are fixed and mutation-held. The real host ha
 | 2026-11-26 |  | QA findings fixed (2 of 2) — gate 2 FAIL, 2 iterations | qa-fix |
 | 2026-11-26 |  | QA gate PASS (92/100) — 0 findings | qa-task |
 | 2026-11-26 |  | DoD incomplete — 2 gaps identified | finalise |
+| 2026-11-27 |  | QA gate PASS (100/100) — 0 findings | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking
