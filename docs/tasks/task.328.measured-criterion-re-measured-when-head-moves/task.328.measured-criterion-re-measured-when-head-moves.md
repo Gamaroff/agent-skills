@@ -229,7 +229,7 @@ and `ci-tree-equivalence.js` into both skills.
 - [ ] Each of "longer", "shorter", "faster", "slower", "larger", "smaller" and "greater" than a number, with and without a leading "no", makes a criterion a record criterion
 - [ ] A comparison with no number is not listed, and a record criterion with no bound reads `measured: false`
 - [ ] `qa-task` and `qa-story` each state that a measured figure, carried or new, counts for the head only as `finalise-dod-ac-prompt.md` Step 3 grades it, and is otherwise unverified with "re-measure"; a test fails if either loses the citation or restates the reason list
-- [ ] The corpus count of newly listed criteria, with every newly listed example by path (up to five), is recorded in the QA report (amended: only one newly listed criterion exists; amendment approved by Lorien Gamaroff)
+- [ ] The corpus count of newly listed criteria, with every newly listed example by path (up to five), is recorded in the QA report (amended: four newly listed criteria exist at head, 375 → 379, recorded in the qa.7 addendum; amendment approved by Lorien Gamaroff)
 
 **Code quality:**
 
@@ -360,6 +360,7 @@ All Definition of Done criteria have been verified:
 | 2026-11-27 |  | QA gate PASS (100/100) | qa-task |
 | 2026-11-27 |  | DoD incomplete — 3 gaps identified | finalise |
 | 2026-11-27 | 1.2 | DoD run 2 — accepted (PR #960) | finalise |
+| 2026-11-27 | 1.3 | Criterion 5 parenthetical corrected: four newly listed criteria at head (375 → 379), not one; the bound and verdict are unchanged | Lorien Gamaroff |
 <!-- change-log-end -->
 
 ## Progress Tracking
