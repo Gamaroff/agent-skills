@@ -36,7 +36,7 @@ Make `finalise-rerun-scope.js merge` refuse an AC result whose `story_file` name
 | 1. create-branch           | ✅ Done | Branch `feature/task.331.*` exists in git                             | Branch created at `92ed119de`; pushed with upstream | —                    | 2026-11-27T14:37Z |
 | 2. review-task             | ✅ Done | `task.331.review.{N}.{name}.md` exists (or skip logged)               | `task.331.review.1.…md`; READY TO IMPLEMENT 8/10; Planned → Ready for Development | —                    | 2026-11-27T14:41Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline, 1 iteration; 8/8 phase boxes; fast gate (remote) 8956 pass / 0 fail | —                    | 2026-11-27T15:14Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
+| 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #962: https://github.com/Gamaroff/agent-skills/pull/962 | —                    | 2026-11-27T15:16Z |
 | 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.331.qa.{N}.*.md`; `task.331.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
 | 7. finalise                | ⏳ Pending | `task.331.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
@@ -82,9 +82,28 @@ Make `finalise-rerun-scope.js merge` refuse an AC result whose `story_file` name
 - Mutations: (1) refusal disabled → "story_file names another document" test red; (2) raw-string comparison → "absolute path merges" test red. Restored; engine suite 69/69.
 - Phase 2: four SKILL.md paths carry `${STEM}`; extract block binds STEM with guard; `result-document-mismatch` HALT arm naming the remedy; Step 6 comment rewritten, OWN_DOC guard kept; prose sentence added after the extract paragraph. Tests: 7 deferred-ci paths + 2 eval paths renamed. Path mutation (Step 3c result + Step 6 merged path reverted) → 18 deferred-ci and 4 eval failures; restored, 59/59.
 - Phase 3: CHANGELOG `[Unreleased]` › Changed entry (task 331); `changelog-cites.sh task.331` → cites; placement check ok (987 = 987 below the first release heading). `npm run bundle` → finalise 1 bundled; `bundle:check` 0 problems.
-- Fast gate: `npm run test:remote` (ci:fast on ci@192.168.1.249) — TEST_EXIT=0, 8959 tests, 8956 pass, 0 fail.
+- Fast gate: `npm run test:remote` (ci:fast on the LAN CI server) — TEST_EXIT=0, 8959 tests, 8956 pass, 0 fail.
 - Loop audit run inline (shell form of the shared prompt): `{"status":"ready-for-review","completed":8,"total":8}` — independent audit did not run.
 - Change Log row written by the inline path (one row). Development completion comment posted to github issue 958.
+
+### Step 4 — create-pr
+
+- SCOPE_PATHS: docs/tasks/task.331…, CHANGELOG.md, evals/shared/tests, shared/resources, shared/resources/tests, skills/finalise/references, skills/finalise. Pre-flight guard: nothing held. Report links: 0 relative links, ok.
+- Base branch pre-supplied: develop. Committed in two commits (d9d7d0dc1 feat, b4a0158c4 docs) directly rather than via /commit-changes; pre-commit bundle hook in sync. Pushed.
+- PR body written inline (diff fully known); the Explore PR-body summariser was not dispatched.
+- PR created: https://github.com/Gamaroff/agent-skills/pull/962. Leak check: OK. Issue #958 in-review comment: posted. GitHub board: in-review → stage-disabled.
+- Post-PR state check (inline `gh pr view`, poller not dispatched): PR #962 state = OPEN. errors = 0.
+- develop-next run state: prNumber = 962.
+
+### Step 5–6 — QA loop
+
+- GitHub board: QA-start re-assert → stage-disabled.
+- Traceability mapper skipped: no Success Criteria table (§ 9 is a checklist).
+- Record-criteria preflight: 1 listed (location-absent — normal before QA) → `.summaries/record-criteria.json`.
+- Cycle 1: /qa-task invoked with code_review_blocking=true record_criteria=…. Code review by an independent Explore subagent (15:16:56Z → 15:19:00Z, duration_ms 100216): 3 low bugs + 2 cleanups, all advisory. Gate 1 CONCERNS 90/100 — one MEDIUM, T331-CI-1 (CI link-check red: `mailto:` autolink of the LAN server address in this report).
+- QA Cycle 1 — changes-requested: stage-disabled. Third strike: n/a (no HIGH). Narrowing offer: not run (cycle 1, no previous gate).
+- qa-fix findings ingest done inline (one finding, fully stated in the gate) — the independent ingester did not run.
+- Decision D2 (autonomous): T331-CI-1's fix is in this implementation report, so its update rides in the cycle-1 `fix(...)` commit instead of being deferred to Step 8. Deferring it would leave CI link-check red at /finalise's CI reading 1. Calibrated: CI's `markdown-link-check@3` with the repo config fails on the committed report (rc 1, the same dead mailto) and passes on the edited one (rc 0); all five task docs pass.
 
 ---
 
@@ -97,6 +116,16 @@ _Problems encountered and how they were resolved or escalated._
 ## QA Iteration History
 
 _Track each QA review/fix cycle._
+
+### QA Cycle 1 — 2026-11-27
+**Gate Result**: CONCERNS
+**Issues Found**: 1 — T331-CI-1 (CI link-check red: dead mailto autolink in this report)
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**Traceability**: skipped (no Success Criteria table)
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 1 of 5)
 
 ---
 

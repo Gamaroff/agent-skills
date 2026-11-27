@@ -376,6 +376,27 @@ The path comparison, or the message.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-27
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.331.qa.1.ac-merge-refuses-another-documents-result.md](./task.331.qa.1.ac-merge-refuses-another-documents-result.md)
+- **Gate File**: [task.331.gate.1.ac-merge-refuses-another-documents-result.yml](./task.331.gate.1.ac-merge-refuses-another-documents-result.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 69 (engine suite), 8956 (fast gate)
+- **Phases Verified**: 3/3
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+One MEDIUM: CI link-check is red on the head because of a dead mailto autolink in the implementation report (T331-CI-1). Five advisory code-review notes are recorded in the gate.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -385,6 +406,8 @@ The path comparison, or the message.
 | 2026-11-27 | 1.1     | Review passed (8/10) — added the missed eval test pair, the extract-block STEM binding and the Step 6 comment to Phase 2; resolved Step 3c routing as a HALT; rescoped the grep criterion; refreshed drifted anchors | review-task |
 | 2026-11-27 |         | Status → ready-for-development | review-task |
 | 2026-11-27 |         | Implemented — 7 files (engine, SKILL.md, 3 tests, CHANGELOG, bundled copy), 4 new tests; status → ready-for-review | develop-task (inline) |
+| 2026-11-27 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-11-27 |         | QA findings fixed — cycle 1, 1 finding (T331-CI-1: dead mailto autolink in the implementation report) | qa-fix |
 <!-- change-log-end -->
 
 ---
