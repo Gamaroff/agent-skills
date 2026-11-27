@@ -57,6 +57,17 @@ eval test that runs those blocks, and `CHANGELOG.md`.
   `:1025` *(`| tee ".claude/state/finalise-ac-extract-${DOD_N}.json"`)*, `:1060` and `:1062`. Two
   items at the same `DOD_N` in one checkout overwrite each other's scope. Task 331 detects that and
   HALTs. It does not prevent it, and the remedy for one item overwrites the other's scope.
+  **It happens in practice, in consumer repos too.** On 2026-11-27, tinker-city ran `/finalise` for
+  task.163 straight after task.162. DoD run 1's AC merge read `finalise-ac-result-1.yaml`, which
+  task.162's run 1 had left behind (`story_file` was an absolute path to task.162, `pr_number: 1351`).
+  The vendored copy predated task 327, so the extract failed on a `SubagentHandback` reply and wrote
+  nothing. The merge then answered `merged` and recorded task.162's verdicts under task.163's ids. A
+  person caught it by reading `story_file`. Record: tinker-city `develop` at `c6a30e0b`,
+  `docs/tasks/task.163.infra-dns-scripts-hardening/task.163.implementation.1.infra-dns-scripts-hardening-initial-run.md`,
+  `## Issues Log`, the two "Step 7" entries. This is the second occurrence after task 325 → task 329
+  (observation #191), and the first in a consumer repo. Task 331's `result-document-mismatch`
+  would now refuse that merge, but only because the stale file named its document. That is S1's
+  gap: a run-number-keyed file with no `story_file` would still merge.
 - **G3-2 (gate 3).** `scope-document-mismatch` covers different states with one message and one
   remedy (`SKILL.md:1072`).
 - **G3-3 (gate 3).** The CHANGELOG resume sentence (`CHANGELOG.md:30-33`) covers a resume before
@@ -360,6 +371,7 @@ None.
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-11-27 | 1.0     | Initial draft — from task 331's DoD run 2 spec challenges and QA gate 1-3 advisories | create-task |
+| 2026-11-27 | 1.1     | G3-1: add the tinker-city task.162 → task.163 occurrence (first in a consumer repo) | Claude |
 <!-- change-log-end -->
 
 ## Progress Tracking
