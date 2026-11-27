@@ -295,6 +295,70 @@ for (const shell of SHELLS) {
     }
   });
 
+  test(`[${shell}] Step 3c refuses a scope another item's Step 3a overwrote, and names the scope, not this item's answer (T331-CR-1)`, () => {
+    const dir = repo();
+    try {
+      const a1 = step3a(shell, dir, 1);
+      assert.equal(a1.status, 0, a1.stdout + a1.stderr);
+      const scopeFile = path.join(
+        dir,
+        ".claude/state/finalise-rerun-scope-1.json",
+      );
+      const other = "docs/tasks/task.8.other/task.8.other.md";
+      writeFileSync(
+        scopeFile,
+        JSON.stringify({
+          ...JSON.parse(readFileSync(scopeFile, "utf8")),
+          document: other,
+        }),
+      );
+      const result = path.join(
+        dir,
+        ".claude/state/finalise-ac-result-task.9-1.yaml",
+      );
+      const record = path.join(dir, DOC_DIR, "task.9.dod.1.ac.json");
+      // A result naming no document (it would merge without the check: a silent wrong record),
+      // then this item's correct answer (it would be called another document's).
+      for (const answer of [
+        AGENT_ALL_PASS,
+        AGENT_ALL_PASS.replace(
+          "ac_traceability:\n",
+          `ac_traceability:\n  story_file: "${DOC}"\n`,
+        ),
+      ]) {
+        writeFileSync(result, answer);
+        const c = run(shell, dir, substitute(STEP_3C, { dodN: 1 }));
+        assert.equal(c.status, 1, c.stdout + c.stderr);
+        assert.match(
+          c.stdout,
+          /HALT: --scope is the re-run scope of docs\/tasks\/task\.8\.other\/task\.8\.other\.md, not docs\/tasks\/task\.9\.demo\/task\.9\.demo\.md/,
+        );
+        assert.match(
+          c.stdout,
+          /re-run Step 3a, the AC agent and the extract above/,
+        );
+        assert.doesNotMatch(c.stdout, /another document's answer/);
+        assert.ok(!existsSync(record), "nothing is recorded");
+      }
+      // DOC_PATH left unsubstituted is refused before the engine runs.
+      const un = run(
+        shell,
+        dir,
+        substitute(STEP_3C, { dodN: 1 }).replace(
+          `DOC_PATH="${DOC}"`,
+          'DOC_PATH="{document-path}"',
+        ),
+      );
+      assert.equal(un.status, 1, un.stdout + un.stderr);
+      assert.match(
+        un.stdout,
+        /HALT: DOC_PATH \('\{document-path\}'\) must be substituted/,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test(`[${shell}] Steps 3a and 3c run as delivered (placeholders unsubstituted) HALT before reaching the engine`, () => {
     const dir = repo();
     try {

@@ -1,0 +1,90 @@
+schema: 2
+task: 'task.331.ac-merge-refuses-another-documents-result'
+task_title: "The AC merge refuses another document's result"
+gate: CONCERNS
+status_reason: 'T331-CI-1 fixed. The cycle-2 refute pass found a new MEDIUM: the result-document-mismatch HALT cannot tell a wrong result from a stale DOD_N-keyed scope file, and its remedies cannot clear the second case. Two LOW documentation findings ride with it.'
+reviewer: 'QA Engineer'
+head: '7e55819c967b04a65f67b43a7cff170bcce7d1e1'
+updated: '2026-11-27T15:41:41Z'
+
+top_issues:
+  - id: 'T331-CR-1'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'origin: code-review (refute pass, confidence high). Step 3c merges with --scope .claude/state/finalise-rerun-scope-${DOD_N}.json, which is still keyed by DOD_N alone (SKILL.md:637, :1054). Another item finalised in the same checkout can overwrite it between Step 3a and 3c. Then merge answers result-document-mismatch for this item''s CORRECT answer ("--result is for task.9…, not task.8…"), and the HALT arm (:1064) offers only re-extract or hand-copy, which reproduce the same mismatch, so no retry can succeed.'
+    suggested_action: 'Before calling merge, check that the scope file''s .document is this item''s document and HALT with a distinct message naming the remedy (re-run Step 3a); keep result-document-mismatch for a result that names another document. Hold the new check with a test in the eval blocks suite.'
+    suggested_owner: dev
+    status: open
+  - id: 'T331-CR-2'
+    severity: low
+    file: 'CHANGELOG.md'
+    finding: 'origin: code-review (confidence high). "A run resumed across the upgrade finds no file at the new path and re-runs Step 3c" does not hold for a run that finished Step 3c before the upgrade: its record exists, the merged file sits at the old path, and Step 6 action 2a HALTs on "record exists but merged result missing".'
+    suggested_action: 'Rewrite the CHANGELOG sentence to name what a resumed run actually meets (Step 3c re-run, or the Step 6 action 2a HALT and its remedy)'
+    suggested_owner: dev
+    status: open
+  - id: 'T331-CR-3'
+    severity: low
+    file: 'skills/finalise/SKILL.md'
+    finding: 'origin: code-review (confidence high). The Step 6 action 2a prose (:1642) still says the merged-result file "is keyed by `DOD_N`", contradicting the renamed path and the rewritten comment inside the block.'
+    suggested_action: 'Say it is keyed by stem and DOD_N and never removed, and that a stem is not a whole document name; grep for any other stale description of these paths'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 69
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary: internal
+    internal_reason: 'shared/resources/finalise-rerun-scope.js#sameDocument (module-private, reached through the merge CLI): its only inputs are ac_traceability.story_file from the AC agent YAML that /finalise Step 3c extracts from its own subagent transcript, and the scope JSON document Step 3a wrote; no corpus sink has legitimate cases that are documents it accepts. Behaviour held by four committed CLI tests and two mutations.'
+    notes: 'The refusal fails closed (HALT, nothing written).'
+  performance:
+    status: PASS
+    notes: 'Unchanged since gate 1.'
+  reliability:
+    status: PASS
+    notes: 'T331-CR-1 is a recovery defect (a HALT whose remedy cannot succeed), recorded as a top issue; nothing is written wrongly.'
+  maintainability:
+    status: PASS
+    notes: 'Two stale descriptions (T331-CR-2, T331-CR-3).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+bug_resolution:
+  bugs_fixed: 1
+  bugs_remaining: 0
+  fixed: ['T331-CI-1 (gate 1) — fixed in 7e55819c9; verified with markdown-link-check@3 (old report rc 1, new rc 0)']
+
+recommendations:
+  immediate:
+    - action: 'T331-CR-1: distinguish a stale scope from a wrong result before merge'
+      refs: ['skills/finalise/SKILL.md']
+  future:
+    - action: 'CR-4 (low/low): a bare basename or a case-variant story_file is refused for a correct answer; document that story_file must be the exact <STORY_FILE> path, or add a basename fallback'
+      refs: ['shared/resources/finalise-rerun-scope.js']
+      remedy: unverified
+    - action: 'Gate 1 advisories CR-2 to CR-5 still stand (nonexistent-path message, root-level story_file, orphaned merge() JSDoc, realpath fallback untested)'
+      refs: ['shared/resources/finalise-rerun-scope.js', 'shared/resources/tests/finalise-rerun-scope.test.mjs']
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T331-CR-1 fixed', 'CI green on the pushed head']

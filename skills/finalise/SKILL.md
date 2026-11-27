@@ -1036,7 +1036,12 @@ nothing, and removed any earlier file at that path: fall back to saving agent 1'
 `verified: false` says exactly that: its hash describes the file `merge` read, not proof it matches the
 agent's reply. Whatever the route, `merge` also refuses a result whose `story_file` names another
 document than the scope's (`result-document-mismatch`, nothing merged, nothing recorded): a hand copy
-of the wrong agent's answer stops here instead of becoming this item's record (task 331). Then:
+of the wrong agent's answer stops here instead of becoming this item's record (task 331). Before
+that, `--doc` makes `merge` refuse a scope that is not this document's (`scope-document-mismatch`,
+nothing merged, nothing recorded). The scope file is keyed by `DOD_N` alone, so another item
+finalised in the same checkout can overwrite it between Step 3a and here. Merged, its criteria and
+carried verdicts would become this item's record, and a correct answer would be refused as another
+document's, which no re-extract can clear (task 331, T331-CR-1). Then:
 
 ```bash
 # INPUTS, substituted into THIS block, as in Step 3a: STEM and DOD_N exactly as Step 0 bound them.
@@ -1046,6 +1051,9 @@ DOD_N="{Step 0's DOD_N}"
 case "$STEM$DOD_N" in *'{'*) echo "HALT: STEM and DOD_N must be substituted into this block (an unsubstituted placeholder found)"; exit 1 ;; esac
 [ -n "$STEM" ] || { echo "HALT: STEM is empty — substitute the work item's filename stem"; exit 1; }
 case "$DOD_N" in ''|*[!0-9]*) echo "HALT: DOD_N ('$DOD_N') is not Step 0's run number"; exit 1 ;; esac
+# The document Step 3a's scope was computed for: merge refuses a scope that is another's (T331-CR-1).
+DOC_PATH="{document-path}"
+case "$DOC_PATH" in ''|*'{'*) echo "HALT: DOC_PATH ('$DOC_PATH') must be substituted with the work item's document path"; exit 1 ;; esac
 AC_RECORD="{document-directory}/${STEM}.dod.${DOD_N}.ac.json"
 AC_MERGED_FILE=".claude/state/finalise-ac-merged-${STEM}-${DOD_N}.json"
 # The hash `extract` printed, or empty after a hand copy. Read back from its own output, not retyped.
@@ -1053,6 +1061,7 @@ AC_SHA256=$(jq -r 'select(.reason == "extracted") | .sha256' ".claude/state/fina
 command node .agents/skills/finalise/references/finalise-rerun-scope.js merge \
   --scope ".claude/state/finalise-rerun-scope-${DOD_N}.json" \
   --result ".claude/state/finalise-ac-result-${STEM}-${DOD_N}.yaml" \
+  --doc "$DOC_PATH" \
   ${AC_SHA256:+--sha256 "$AC_SHA256"} \
   --dod-n "$DOD_N" --record-out "$AC_RECORD" --json > "$AC_MERGED_FILE"
 [ $? -eq 0 ] || { echo "HALT: finalise-rerun-scope.js merge failed — see $AC_MERGED_FILE"; exit 1; }
@@ -1060,6 +1069,8 @@ case "$(jq -r '.reason' "$AC_MERGED_FILE")" in
   merged)             AC_OVERALL=$(jq -r '.ac_result.ac_traceability.overall' "$AC_MERGED_FILE")
                       RERUN_SCOPE_LINE=$(jq -r '.scope_line' "$AC_MERGED_FILE") ;;
   result-unparseable) AC_OVERALL=NEEDS_MANUAL_REVIEW; RERUN_SCOPE_LINE="" ;;   # no record is written
+  scope-document-mismatch)    # nothing merged, nothing recorded (task 331, T331-CR-1)
+                      echo "HALT: $(jq -r '.message' "$AC_MERGED_FILE") — another item's Step 3a overwrote this run's scope: re-run Step 3a, the AC agent and the extract above, then this block"; exit 1 ;;
   result-document-mismatch)   # nothing merged, nothing recorded (task 331)
                       echo "HALT: $(jq -r '.message' "$AC_MERGED_FILE") — re-run the extract above, or hand-copy THIS item's AC agent answer to the result path, then re-run this block; never merge it"; exit 1 ;;
   *)                  echo "HALT: merge answered $(jq -r '.reason' "$AC_MERGED_FILE")"; exit 1 ;;
@@ -1638,8 +1649,8 @@ reading 1: SUCCESS after one re-run (see the CI re-run line)`, never as plain `S
    Step 8a's retaken CI reading 1 on the fix head replaces the red reading rather than leaving its
    FAIL in place; an undecided retaken reading folds it as not met. **This run's AC record is the
    signal that Step 3c merged**: a bug run, or a Step 3c answer that was not `merged`, has none and
-   skips with `AC_OVERALL` unchanged. The merged-result file alone proves nothing, because it is keyed
-   by `DOD_N` and outlives its run, so with a record present the block also checks that the file's
+   skips with `AC_OVERALL` unchanged. The merged-result file alone proves nothing: it is keyed by the
+   stem and `DOD_N`, it outlives its run, and a stem is not a whole document name, so with a record present the block also checks that the file's
    `record.document` and `record.dod_n` are this run's, and HALTs when they are not. With no record but
    a merged result that *is* this run's, it HALTs too: the record is not where `DOC_DIR` points:
 

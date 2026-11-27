@@ -385,8 +385,8 @@ The path comparison, or the message.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.331.qa.1.ac-merge-refuses-another-documents-result.md](./task.331.qa.1.ac-merge-refuses-another-documents-result.md)
-- **Gate File**: [task.331.gate.1.ac-merge-refuses-another-documents-result.yml](./task.331.gate.1.ac-merge-refuses-another-documents-result.yml)
+- **Full Report**: [task.331.qa.2.ac-merge-refuses-another-documents-result.md](./task.331.qa.2.ac-merge-refuses-another-documents-result.md)
+- **Gate File**: [task.331.gate.2.ac-merge-refuses-another-documents-result.yml](./task.331.gate.2.ac-merge-refuses-another-documents-result.yml)
 
 ### Test Coverage Summary
 - **Tests Executed**: 69 (engine suite), 8956 (fast gate)
@@ -395,7 +395,7 @@ The path comparison, or the message.
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-One MEDIUM: CI link-check is red on the head because of a dead mailto autolink in the implementation report (T331-CI-1). Five advisory code-review notes are recorded in the gate.
+T331-CI-1 is fixed. One new MEDIUM, T331-CR-1: the result-document-mismatch HALT cannot tell a wrong result from a stale DOD_N-keyed scope file. Two LOW findings are stale descriptions (T331-CR-2, T331-CR-3).
 
 <!-- change-log-start -->
 ## Change Log
@@ -408,6 +408,8 @@ One MEDIUM: CI link-check is red on the head because of a dead mailto autolink i
 | 2026-11-27 |         | Implemented — 7 files (engine, SKILL.md, 3 tests, CHANGELOG, bundled copy), 4 new tests; status → ready-for-review | develop-task (inline) |
 | 2026-11-27 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-11-27 |         | QA findings fixed — cycle 1, 1 finding (T331-CI-1: dead mailto autolink in the implementation report) | qa-fix |
+| 2026-11-27 |         | QA gate CONCERNS (90/100) — cycle 2, 3 findings | qa-task |
+| 2026-11-27 |         | QA findings fixed — cycle 2, 3 findings (T331-CR-1 scope-document-mismatch via merge --doc; T331-CR-2 CHANGELOG resume line; T331-CR-3 Step 6 2a prose) | qa-fix |
 <!-- change-log-end -->
 
 ---

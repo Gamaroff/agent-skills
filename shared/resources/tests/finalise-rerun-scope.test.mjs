@@ -2278,7 +2278,7 @@ const acOf = (merged, id) =>
 // ── merge refuses another document's result (task 331) ─────────────────────
 // A result whose story_file names another document is refused, and writes nothing; the same
 // document named absolutely, or no story_file at all, merges as before; the hash is checked first.
-function mergeDocCase(storyFile, { sha256 } = {}) {
+function mergeDocCase(storyFile, { sha256, scopeDoc = DOC, doc } = {}) {
   const dir = mkRepo();
   try {
     const entries = ["SC-1", "SC-2", "SC-3", "SC-4"].map((id) =>
@@ -2296,7 +2296,7 @@ function mergeDocCase(storyFile, { sha256 } = {}) {
     writeFileSync(join(dir, "ac.yaml"), yaml);
     writeFileSync(
       join(dir, "scope.json"),
-      JSON.stringify({ ...scopeAt(dir, null), document: DOC }),
+      JSON.stringify({ ...scopeAt(dir, null), document: scopeDoc }),
     );
     const rec = "docs/tasks/task.9.demo/task.9.dod.1.ac.json";
     const r = cli(dir, [
@@ -2306,6 +2306,9 @@ function mergeDocCase(storyFile, { sha256 } = {}) {
       "--result",
       "ac.yaml",
       ...(sha256 ? ["--sha256", sha256] : []),
+      ...(doc === undefined
+        ? []
+        : ["--doc", typeof doc === "function" ? doc(dir) : doc]),
       "--dod-n",
       "1",
       "--record-out",
@@ -2352,6 +2355,51 @@ test("merge: a mismatched story_file and a wrong --sha256 answer result-hash-mis
     sha256: "0".repeat(64),
   });
   assert.equal(m.out.reason, "result-hash-mismatch");
+  assert.equal(m.recorded, false);
+});
+
+test("merge --doc: another document's scope is refused although the result names no document — nothing is recorded (CLI, T331-CR-1)", () => {
+  // Mutation target: the scope check. Without it this merges, and task 9's record is written
+  // from task 8's scope and carried verdicts.
+  const m = mergeDocCase(null, {
+    scopeDoc: "docs/tasks/task.8.other/task.8.other.md",
+    doc: DOC,
+  });
+  assert.equal(m.status, 0);
+  assert.equal(m.out.reason, "scope-document-mismatch");
+  assert.match(m.out.message, /task\.8\.other\.md/);
+  assert.match(m.out.message, /task\.9\.demo\.md/);
+  assert.equal(m.recorded, false, "nothing is recorded");
+});
+
+test("merge --doc: a stale scope is named as the scope, not as this item's correct answer (CLI, T331-CR-1)", () => {
+  // The result names THIS document; the old answer called it another document's.
+  const m = mergeDocCase(DOC, {
+    scopeDoc: "docs/tasks/task.8.other/task.8.other.md",
+    doc: DOC,
+  });
+  assert.equal(m.out.reason, "scope-document-mismatch");
+  assert.equal(m.recorded, false);
+});
+
+test("merge --doc: must differ — task.91's scope is not task.9's, and a scope with no document is refused (CLI, T331-CR-1)", () => {
+  for (const scopeDoc of ["docs/tasks/task.91.demo/task.91.demo.md", null]) {
+    const m = mergeDocCase(null, { scopeDoc, doc: DOC });
+    assert.equal(m.out.reason, "scope-document-mismatch", String(scopeDoc));
+    assert.equal(m.recorded, false, String(scopeDoc));
+  }
+});
+
+test("merge --doc: must match — the same document by absolute path merges (CLI, T331-CR-1)", () => {
+  const m = mergeDocCase(DOC, { doc: (dir) => join(dir, DOC) });
+  assert.equal(m.out.reason, "merged");
+  assert.equal(m.recorded, true);
+});
+
+test("merge --doc '' is a usage error, never read as no check (CLI, T331-CR-1)", () => {
+  const m = mergeDocCase(null, { doc: "" });
+  assert.equal(m.status, 2);
+  assert.equal(m.out.reason, "usage");
   assert.equal(m.recorded, false);
 });
 
