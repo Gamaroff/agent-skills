@@ -36,9 +36,9 @@ Teach the shared agent-reply reader to take a `SubagentHandback` message as the 
 | 2. review-task             | ✅ Done    | `task.327.review.{N}.{name}.md` exists (or skip logged)                | review.1 — 9/10 READY; Planned → Ready for Development | —                    | 2026-11-26T20:12Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; 4/4 phases; ci:fast 8919/0 | —                    | 2026-11-26T20:32Z |
 | 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #959: https://github.com/Gamaroff/agent-skills/pull/959 | —                    | 2026-11-26T20:34Z |
-| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.327.qa.{N}.*.md`; `task.327.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 3 gates (CONCERNS → FAIL → PASS 92), 2 fix cycles; review-pr APPROVE | —                    | 2026-11-26T21:19Z |
-| 7. finalise                | ❌ Halted  | `task.327.dod.{N}.*.md`; task `status: accepted`                       | dod.1 — GAPS (#6, #10); lock held at 7 | —                    | 2026-11-26T21:30Z |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.327.qa.{N}.*.md`; `task.327.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 4 gates (CONCERNS → FAIL → PASS 92 → PASS 100), 2 fix cycles + 1 DoD re-entry; review-pr CONCERNS (no coverage finding) | —                    | 2026-11-27T00:52Z |
+| 7. finalise                | ✅ Done    | `task.327.dod.{N}.*.md`; task `status: accepted`                       | dod.1 GAPS (#6, #10), then QA re-entry; dod.2 ✅ ACCEPTED, 14/14; acceptance commit `0fec95fba` | —                    | 2026-11-27T01:08Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Implementation report committed and pushed | —                    | 2026-11-27T01:10Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -86,6 +86,15 @@ Teach the shared agent-reply reader to take a `SubagentHandback` message as the 
 - Commits: `930e65c9a` (review 1), `c1976c873` (implementation); pushed.
 - PR created: https://github.com/Gamaroff/agent-skills/pull/959 (base develop, Closes #952). PR body written by hand; summariser subagent not dispatched.
 - Tracker in-review comment: posted. GitHub board: in-review → stage-disabled. Post-PR state check (inline `gh pr view`, poller not dispatched): OPEN, errors = 0.
+
+### Step 7 — finalise (DoD run 2) — 2026-11-27
+
+- Preconditions ok; record criteria ok (#9 confirmed in qa.1:76–78); re-run at head not-configured.
+- Re-run scope: scoped (prior-record dod.1 at `fdcf01da1672`). 9 re-judged, 5 carried.
+- Four DoD agents ran in parallel. AC YAML extracted with `reply: handback`, sha256 `c79de9a4c07f…`, and the record reads `verified: true`. Security: the plan was reused from dod.1 (`reusable`) and re-run, 23 executed, 0 reproduced, 0 escaped. Compliance NOT_APPLICABLE; docs PASS.
+- CI reading 1: SUCCESS @ `24ce5725c001` over 6 checks; grading #12 against it gave PASS, so AC_OVERALL re-folded to PASS. CI reading 2: SUCCESS (tree-equivalent to 1d914ac8e4a3) @ `0fec95fbab5e`.
+- The DoD 1 gaps section was retitled "historical, superseded" (closes PC-2). Registry row ticked (staged). The pr-review.2 report rode the acceptance commit ("5c review carried").
+- 6d: cites (task 327). Canonical PR comment posted. Tracker: done comment posted, issue #952 CLOSED, board `already`. The Document link already pointed at develop.
 
 ---
 
@@ -157,14 +166,30 @@ _Track each QA review/fix cycle._
 **Action**: Proceeding to 5c → Step 7
 - Push note: push-policy deferred the gate 3 commit (docs only), but it was pushed before 5c so the PR head the review read carries gate 3. Deviation logged.
 
+### QA Cycle 4 — 2026-11-27
+**Re-entry**: from Step 7 after DoD 1 gaps (`reenter-qa-after-finalise.sh`, reason `dod-gaps-code-fix`, gate_head 53bcb574e). The owner approved the fix route.
+**Fix**: commit 1d914ac8e. #6: the stale `--out` test seeds all six non-extracted reasons. #10: the criterion was amended ("approved by the owner, 2026-11-27") to accept red under a named mutation for guards of pre-existing rules.
+**Gate Result**: PASS (100/100)
+**Issues Found**: 0 gating. CR-1 (low/medium: the coverage check trusts `REASONS`; measured, no present defect) and CR-2 (cleanup) are advisory, under gate 4 `recommendations.future`.
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**Traceability**: skipped (not re-run — cycle 4, test-only change)
+**Evidence**: mutations b, c, c2, m re-run by QA, each red on the named test. Probe plan at head: 23 executed, 0 reproduced, 0 escaped. ci:fast 8926 tests, 8923 pass, 0 fail.
+**PR Review**: CONCERNS — task.327.pr-review.2 (conformance lens only, `--no-code`). PC-1 medium trail (this entry missing) is fixed by this entry. PC-2 low: the DoD gaps section is superseded at acceptance. No coverage finding.
+**Loop exit**: route 2 — CONCERNS with no open coverage finding
+**Action**: Proceeding to 5c → Step 7
+- Push note: push-policy deferred the gate 4 commit (docs only); it was pushed before 5c so the review read gate 4. Deviation logged.
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-11-27T01:10Z
+**Final Status**: Completed
 **Branch**: feature/task.327.subagenthandback-replies-are-extracted
 **PR**: https://github.com/Gamaroff/agent-skills/pull/959
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**QA Iterations**: 4
+**DoD Summary**: task.327.dod.2.subagenthandback-replies-are-extracted.md — ✅ ACCEPTED (dod.1 GAPS, superseded)
+**Tracker debt**: none
+
+**Completion Summary**: Implemented `SubagentHandback` reply extraction in `agent-reply-block.js`. It adds a `reply` field and a newest-reply rule. A failed extract now clears `--out` first, and an `--out` that names the transcript, or a directory, is refused. The work took 4 QA gates (CONCERNS → FAIL → PASS 92 → PASS 100) and 2 fix cycles. DoD 1 found two gaps and sent the work back to QA once: the #6 stale-`--out` cases were added, and the owner approved an amendment to #10 that accepts mutation evidence for guards of pre-existing rules. DoD run 2 used the feature live: its AC YAML was extracted from a real hand-back (`verified: true`).
