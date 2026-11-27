@@ -16,7 +16,8 @@
  *
  * It reads the document's criteria section and two listings of the work item's directory
  * (`git ls-files`, `git status`), and prints for each record criterion
- * `{ criterion, location, state, artifacts }`.
+ * `{ criterion, location, state, artifacts, measured }` — `measured` is true when the criterion
+ * states a numeric bound.
  *
  * States:
  *   ok                          a committed artifact of the named kind exists
@@ -51,9 +52,11 @@ const RECORD_WORDS = Object.freeze([
   "documented",
 ]);
 
-// Check 22's second trigger: "a numeric bound graded by a measurement".
+// Check 22's second trigger: "a numeric bound graded by a measurement". The comparative
+// alternation ("longer than 30 s", "no larger than 200 KB") is task 328: task 320's criterion 10
+// bounded a wait with "longer than" and was never listed (obs #186).
 const NUMERIC_BOUND =
-  /(?:\b(?:under|within|below|above|over|at most|at least|no more than|no fewer than|fewer than|less than|more than)\s+\d|[<>]=?\s*\d|≤\s*\d|≥\s*\d)/i;
+  /(?:\b(?:under|within|below|above|over|at most|at least|no more than|no fewer than|fewer than|less than|more than)\s+\d|\b(?:no\s+)?(?:longer|shorter|faster|slower|larger|smaller|greater)\s+than\s+\d|[<>]=?\s*\d|≤\s*\d|≥\s*\d)/i;
 
 const STATES = Object.freeze([
   "ok",
@@ -123,6 +126,9 @@ function classify(criteria, { tracked = [], changed = [] } = {}) {
       index: i + 1,
       criterion: text,
       locations: named.map((l) => l.key),
+      // A stated numeric bound: QA grades its figure by finalise's tree-equivalence rule
+      // (finalise-dod-ac-prompt.md Step 3) before passing or carrying it (task 328).
+      measured: NUMERIC_BOUND.test(text),
     };
     if (named.length === 0) {
       const impl = IMPLEMENTATION_REPORT.test(text);

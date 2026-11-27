@@ -1627,6 +1627,16 @@ because no test carries them (obs #210). A behaviour criterion whose only eviden
 with no committed per-PR test, is a **MEDIUM** finding in `top_issues[]`, so it enters the fix loop
 rather than halting at finalise (obs #224).
 
+**A measured figure counts for this head only as finalise grades it** (task 328, obs #186). A figure
+for a measured criterion, taken this cycle or carried from an earlier cycle or QA report, counts for
+the head only as `finalise-dod-ac-prompt.md` Step 3, in the `finalise` skill, grades a measured
+figure: taken on the head commit, or on an earlier commit M for which
+`command node .agents/skills/qa-story/references/finalise-delta.js docs-only --base <M> --head HEAD --json`
+answers `tree-equivalent`. Any other answer leaves the criterion **unverified** with "re-measure", and
+a **MEDIUM** entry in `top_issues[]`, so it enters the fix loop rather than halting at finalise. Step 3
+owns the reasons a figure fails; this file does not list them. "No engine changed" is not that answer:
+run the command.
+
 **A "tool X passes on files Y" criterion is confirmed by one probe that X processes Y, before PASS is
 recorded** (obs #78). A formatter, linter or checker skips what its ignore file excludes and exits 0
 having read nothing, so "passes" is true of the empty set. Run one probe: a deliberately malformed copy

@@ -47,8 +47,7 @@ Skill(qa-task, args="traceability_matrix=<path> code_review_blocking=true record
 ```
 
 - `traceability_matrix=<path>` — a pre-built traceability matrix (see Step 5 / traceability handling); absent → internal mapping.
-- `record_criteria=<path>` — the listing the orchestrator saved from `finalise-record-preflight.js check --json`: every success criterion that says where its record lives, with `index`, `criterion`, `location` and `state`. Absent or empty `listed` → nothing extra to write. For each `listed` entry, write the record **into the report its `location` names** (`qa-report` is this run's QA report) as the step that produces the evidence runs, with the command and its output, and cite it from the Findings table. A `state` of `location-absent` for `qa-report` is expected while the report is being written. **Never edit a criterion's wording to fit the evidence**: the evidence moves, the criterion does not. A mutation-proof record names the **test that went red**, not only that one did.
-- `code_review_blocking=true` — run-level override. Set `CODE_REVIEW_BLOCKING_ARG` from this token (default empty when absent). It feeds the canonical resolution in **Step 3b step 6 (Gate mapping)** so high-confidence code-review bugs gate the build (and thus get fixed in the qa-fix loop) without needing per-task frontmatter; a bug QA reproduces by execution gates at any confidence (step 5d). A task still opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch). Absent for standalone runs → code review stays advisory unless the task opts in via frontmatter, except a bug QA reproduces by execution (step 5d).
+- `record_criteria=<path>` — the listing the orchestrator saved from `finalise-record-preflight.js check --json`: every success criterion that says where its record lives, with `index`, `criterion`, `location` and `state`. Absent or empty `listed` → nothing extra to write. For each `listed` entry, write the record **into the report its `location` names** (`qa-report` is this run's QA report) as the step that produces the evidence runs, with the command and its output, and cite it from the Findings table. A `state` of `location-absent` for `qa-report` is expected while the report is being written. **Never edit a criterion's wording to fit the evidence**: the evidence moves, the criterion does not. A mutation-proof record names the **test that went red**, not only that one did. An entry with `measured: true` states a numeric bound: grade its figure by Step 5's measured-figure rule ("A measured figure counts for this head only as finalise grades it") before its record is written or carried.- `code_review_blocking=true` — run-level override. Set `CODE_REVIEW_BLOCKING_ARG` from this token (default empty when absent). It feeds the canonical resolution in **Step 3b step 6 (Gate mapping)** so high-confidence code-review bugs gate the build (and thus get fixed in the qa-fix loop) without needing per-task frontmatter; a bug QA reproduces by execution gates at any confidence (step 5d). A task still opts **out** with `code_review_blocking: false` in its frontmatter (escape hatch). Absent for standalone runs → code review stays advisory unless the task opts in via frontmatter, except a bug QA reproduces by execution (step 5d).
 
 ## When to Use This Skill
 
@@ -1091,6 +1090,16 @@ Performance and structural criteria ("defined once", "one pass", "offline") are 
 because no test carries them (obs #210). A behaviour criterion whose only evidence is a hand run,
 with no committed per-PR test, is a **MEDIUM** finding in `top_issues[]`, so it enters the fix loop
 rather than halting at finalise (obs #224).
+
+**A measured figure counts for this head only as finalise grades it** (task 328, obs #186). A figure
+for a measured criterion, taken this cycle or carried from an earlier cycle or QA report, counts for
+the head only as `finalise-dod-ac-prompt.md` Step 3, in the `finalise` skill, grades a measured
+figure: taken on the head commit, or on an earlier commit M for which
+`command node .agents/skills/qa-task/references/finalise-delta.js docs-only --base <M> --head HEAD --json`
+answers `tree-equivalent`. Any other answer leaves the criterion **unverified** with "re-measure", and
+a **MEDIUM** entry in `top_issues[]`, so it enters the fix loop rather than halting at finalise. Step 3
+owns the reasons a figure fails; this file does not list them. "No engine changed" is not that answer:
+run the command.
 
 **A "tool X passes on files Y" criterion is confirmed by one probe that X processes Y, before PASS is
 recorded** (obs #78). A formatter, linter or checker skips what its ignore file excludes and exits 0

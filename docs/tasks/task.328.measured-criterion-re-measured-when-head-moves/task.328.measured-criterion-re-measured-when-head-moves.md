@@ -5,18 +5,19 @@ type: task
 description: "When the head moves, flag a measured criterion (timing, wall-clock, load) whose recorded figure comes from a commit that is not tree-equivalent to the head."
 tags: [qa-task, observation]
 category: refactoring
-status: planned
+status: ready-for-review
 priority: Medium
 risk_level: low
 created: 2026-11-26
-updated: 2026-11-26
+updated: 2026-11-27
 estimated_effort_hours: 8
 github_issue: 953
 ---
 
 # Technical Task: A measured criterion is re-measured when the head moves
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.328.review.1.measured-criterion-re-measured-when-head-moves.md` implemented 2026-11-27
 **GitHub Issue**: [#953](https://github.com/Gamaroff/agent-skills/issues/953)
 
 ---
@@ -141,23 +142,23 @@ where it passed before, which is the answer finalise already gives.
 
 ### Phase 1: Detect a measured criterion (Risk: Low)
 
-- [ ] Red tests: task 320's criterion 10, verbatim, is listed; each new phrasing is listed; controls
-- [ ] Widen `NUMERIC_BOUND`; add the `measured` field in `classify`
-- [ ] Corpus count before and after, over every tracked task document's criteria
+- [x] Red tests: task 320's criterion 10, verbatim, is listed; each new phrasing is listed; controls
+- [x] Widen `NUMERIC_BOUND`; add the `measured` field in `classify`
+- [x] Corpus count before and after, over every tracked task document's criteria
 
 ### Phase 2: QA grades a measured figure by finalise's rule (Risk: Low)
 
-- [ ] `qa-task` `:50` and `:1089`, `qa-story` `:1624`: cite `finalise-dod-ac-prompt.md` Step 3; carried
+- [x] `qa-task` `:50` and `:1089`, `qa-story` `:1624`: cite `finalise-dod-ac-prompt.md` Step 3; carried
   figures included
-- [ ] Bundle `finalise-delta.js` into both skills (`npm run bundle`)
-- [ ] Parity test: both QA skills cite the rule, and neither restates its reason list
+- [x] Bundle `finalise-delta.js` into both skills (`npm run bundle`)
+- [x] Parity test: both QA skills cite the rule, and neither restates its reason list
 
 ### Phase 3: Verify and close (Risk: Low)
 
-- [ ] Replay task 320: the preflight on its document lists #10 with `measured: true`;
+- [x] Replay task 320: the preflight on its document lists #10 with `measured: true`;
   `finalise-delta.js docs-only --base 7cae65a14 --head 5c9044f38` answers `code-changed`
-- [ ] Mutation table: revert each remedy, name the test that goes red
-- [ ] CHANGELOG entry citing (task 328)
+- [x] Mutation table: revert each remedy, name the test that goes red
+- [x] CHANGELOG entry citing (task 328)
 
 ## 7. Files Summary
 
@@ -170,11 +171,11 @@ where it passed before, which is the answer finalise already gives.
 **Tests:**
 
 4. ✅ `shared/resources/tests/finalise-record-preflight.test.mjs`
-5. ✅ A parity test for the two QA skills, new (no qa-task/qa-story parity test exists today;
-   place it in `evals/shared/tests/` beside `transition-protocol-parity.test.mjs`)
+5. ✅ `evals/shared/tests/qa-measured-figure-parity.test.mjs` — new parity test for the two QA skills
 
 **Bundled copies:** `npm run bundle` refreshes `skills/{develop-task,finalise}/references/finalise-record-preflight.js`
-and adds `skills/{qa-task,qa-story}/references/finalise-delta.js` (and what it reaches).
+and adds `skills/{qa-task,qa-story}/references/{finalise-delta,ci-tree-equivalence,bb-auth,glob-match}.js`
+(closure +4 in each skill).
 
 **Documentation:**
 
@@ -199,7 +200,24 @@ change; the count of newly listed criteria and five of them, by path, are record
 
 **Tests the remedy must leave green (obs #156).** `:127` and `:187` (what counts as a bound or
 trigger), `:242` and `:377` (five states, one Step 3a row each), `:274` (purity), `:294` (trigger
-words equal check 22's). None is overridden; if one goes red, the design has drifted.
+words equal check 22's). None is overridden; if one goes red, the design has drifted. Two more test
+files pin the engine (`git grep -ln 'finalise-record-preflight' -- '*.test.*' 'tests/**' 'evals/**'`,
+2026-11-27): `shared/resources/tests/record-criteria-dispatch.test.mjs` compares the saved listing with
+the engine's own output (`deepEqual(written, direct)`) and asserts `listed.length === 1` on a fixture
+with no bound phrase, and `evals/shared/tests/finalise-rerun-scope-blocks.test.mjs` pins only the
+`check` call's position. Neither pins the entry key set, so the `measured` field leaves both green.
+
+**Parity-test discriminator (review-task check 13).** Each QA skill already cites
+"`finalise-dod-ac-prompt.md` Step 3" twice outside the measured-criterion sentence
+(`skills/qa-task/SKILL.md:1084`, `:1106`; `skills/qa-story/SKILL.md:1619`, `:1641`). A test keyed on that
+citation alone stays green when the new sentence loses it. The test locates the measured-figure
+sentence by a positive marker of its own — `finalise-delta.js docs-only` together with "re-measure" in
+the same paragraph — and asserts the citation inside that paragraph.
+
+**Cite form.** Keep the existing in-file form for the AC prompt ("`finalise-dod-ac-prompt.md` Step 3, in
+the `finalise` skill"): a bare filename with no `references/` prefix is a citation, not a bundling
+dependency. Only `references/finalise-delta.js` is written as a dependency, so the bundler copies it
+and `ci-tree-equivalence.js` into both skills.
 
 ## 9. Success Criteria
 
@@ -209,7 +227,7 @@ words equal check 22's). None is overridden; if one goes red, the design has dri
 - [ ] Each of "longer", "shorter", "faster", "slower", "larger", "smaller" and "greater" than a number, with and without a leading "no", makes a criterion a record criterion
 - [ ] A comparison with no number is not listed, and a record criterion with no bound reads `measured: false`
 - [ ] `qa-task` and `qa-story` each state that a measured figure, carried or new, counts for the head only as `finalise-dod-ac-prompt.md` Step 3 grades it, and is otherwise unverified with "re-measure"; a test fails if either loses the citation or restates the reason list
-- [ ] The corpus count of newly listed criteria, with five examples by path, is recorded in the QA report
+- [ ] The corpus count of newly listed criteria, with every newly listed example by path (up to five), is recorded in the QA report
 
 **Code quality:**
 
@@ -246,13 +264,17 @@ preflight fails. Steps: revert the phase's commit, run `npm run bundle`, re-run 
 | Date | Version | Description | Author |
 | --- | --- | --- | --- |
 | 2026-11-26 | 1.0 | Initial draft — cut from observation #186 | create-task |
+| 2026-11-27 | 1.1 | Review passed (8/10) — named the two other tests that pin the engine; parity test keyed on the measured-figure paragraph, not the citation; cite form stated | review-task |
+| 2026-11-27 |  | Status → ready-for-development | review-task |
+| 2026-11-27 |  | Implemented — 1 engine, 2 QA skills, 8 bundled copies, CHANGELOG; 3 engine tests + 9 parity tests | develop |
+| 2026-11-27 |  | Corpus criterion: "five examples" → "every newly listed example (up to five)". The premise that five exist was disproved by measurement: `isRecordCriterion` over the 333 tracked task documents lists 375 criteria at `develop` and 376 after the change (delta 1, task 320 #10) | develop |
 <!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 1: Detect a measured criterion
-- [ ] Phase 2: QA grades a measured figure by finalise's rule
-- [ ] Phase 3: Verify and close
+- [x] Phase 1: Detect a measured criterion
+- [x] Phase 2: QA grades a measured figure by finalise's rule
+- [x] Phase 3: Verify and close
 
 ## References
 
