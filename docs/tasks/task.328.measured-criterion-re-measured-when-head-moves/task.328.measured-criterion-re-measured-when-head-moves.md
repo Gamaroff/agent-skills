@@ -263,21 +263,21 @@ preflight fails. Steps: revert the phase's commit, run `npm run bundle`, re-run 
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-27
-**Quality Score**: 80/100
+**Quality Score**: 70/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.328.qa.1.measured-criterion-re-measured-when-head-moves.md](./task.328.qa.1.measured-criterion-re-measured-when-head-moves.md)
-- **Gate File**: [task.328.gate.1.measured-criterion-re-measured-when-head-moves.yml](./task.328.gate.1.measured-criterion-re-measured-when-head-moves.yml)
+- **Full Report**: [task.328.qa.2.measured-criterion-re-measured-when-head-moves.md](./task.328.qa.2.measured-criterion-re-measured-when-head-moves.md)
+- **Gate File**: [task.328.gate.2.measured-criterion-re-measured-when-head-moves.yml](./task.328.gate.2.measured-criterion-re-measured-when-head-moves.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 8938 (fast gate) + 29 changed-file tests
+- **Tests Executed**: 8938 (fast gate, 0 failed)
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Two MEDIUM findings: the `code_review_blocking=true` bullet in qa-task is merged into the record_criteria bullet (T328-CR-1), and criterion 5 was reworded after review with no approver (T328-QA-1). One LOW: the parity test cannot see CR-1 (T328-CR-2).
+Both cycle-1 fixes hold. Three findings are open for a fix cycle: "greater than or equal to N" is still missed (T328-CR2-2), the QA paragraph paraphrases finalise Step 3 too narrowly (T328-CR2-3), and "faster than 319" reads as a bound (T328-CR2-4). Criterion 5 is unmet under its reviewed wording and needs the owner (T328-QA-1).
 
 <!-- change-log-start -->
 ## Change Log
@@ -291,6 +291,7 @@ Two MEDIUM findings: the `code_review_blocking=true` bullet in qa-task is merged
 | 2026-11-27 |  | Corpus criterion: "five examples" → "every newly listed example (up to five)". The premise that five exist was disproved by measurement: `isRecordCriterion` over the 333 tracked task documents lists 375 criteria at `develop` and 376 after the change (delta 1, task 320 #10) | develop |
 | 2026-11-27 |  | QA gate CONCERNS (80/100) — 3 findings | qa-task |
 | 2026-11-27 |  | QA findings fixed, 1 iteration. Restored the bullet break (CR-1) and added the parity assertion (CR-2). Reverted criterion 5 to its reviewed wording (QA-1): the rewording had no approver. With the reviewed wording the criterion is unmet (one newly listed example exists), so it stays open for the owner | qa-fix |
+| 2026-11-27 |  | QA gate CONCERNS (70/100) — 4 findings | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking

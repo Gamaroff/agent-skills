@@ -1,0 +1,111 @@
+schema: 2
+task: 'task.328.measured-criterion-re-measured-when-head-moves'
+task_title: 'A measured criterion is re-measured when the head moves'
+gate: CONCERNS
+status_reason: 'Both cycle-1 fixes hold. The cycle-2 refute pass found that the widened NUMERIC_BOUND still misses "greater than or equal to N" and now lists a comparative before an id ("faster than 319"). It also found the QA paragraph narrows finalise Step 3. Criterion 5 is unmet under its reviewed wording, and only the owner can settle it.'
+reviewer: 'QA Engineer'
+head: '4fc09e876341d99b5904cc46f94e3528aa346202'
+updated: '2026-11-27T04:42:29Z'
+
+top_issues:
+  - id: 'T328-QA-1'
+    severity: medium
+    file: 'docs/tasks/task.328.measured-criterion-re-measured-when-head-moves/task.328.measured-criterion-re-measured-when-head-moves.md'
+    finding: 'Criterion 5 is back at its reviewed wording ("with five examples by path"), and it is unmet. The corpus has exactly one newly listed criterion: 375 before, 376 after, task 320 #10. The bound cannot be met by any fix, because the five examples do not exist.'
+    suggested_action: 'Owner decision: approve a rewording (e.g. "every newly listed example by path, up to five") with `approved by <name>`, or accept the criterion as failed. The loop must not rewrite it.'
+    suggested_owner: po
+    status: open
+  - id: 'T328-CR2-2'
+    severity: medium
+    file: 'shared/resources/finalise-record-preflight.js'
+    finding: 'Line 58: the comparative branch needs a digit right after "than". "The suite is greater than or equal to 5 tests." returns NUMERIC_BOUND false and is not listed, although "greater" is one of the seven comparatives this task covers. The same miss affects "less than or equal to". Reproduced by QA (`NUMERIC_BOUND.test` → false); develop also gives false, so the class is unfinished in-scope work, not pre-existing. Synonyms the reviewer named outside the task list (bigger, higher, lower, up to) are a follow-up.'
+    suggested_action: 'Allow an optional "or equal to" between "than" and the number in both the comparative and the less/more-than branches, and add a test for each with a negative control.'
+    suggested_owner: dev
+    status: open
+  - id: 'T328-CR2-3'
+    severity: medium
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'Line 1098: the paragraph says it grades "as finalise-dod-ac-prompt.md Step 3 grades a measured figure: taken on the head commit, or on an earlier commit M ... tree-equivalent". Step 3 (finalise-dod-ac-prompt.md, measured criterion) scopes the head-or-M rule to a wall-clock bound and also requires the recorded load (`uptime`). The paraphrase applies the M rule to every measured figure and drops the load condition, so the cite-not-restate rule is broken in the direction it exists to prevent. The same text sits in skills/qa-story/SKILL.md.'
+    suggested_action: 'Cite Step 3 for the whole grading rule, and keep only the delta command as the how. Do not restate which figures it covers or what it requires. Keep the parity test discriminator and add an assertion against the paraphrase.'
+    suggested_owner: dev
+    status: open
+  - id: 'T328-CR2-4'
+    severity: low
+    file: 'shared/resources/finalise-record-preflight.js'
+    finding: 'Line 58: "The new engine is faster than 319 was." now reads NUMERIC_BOUND true and classify gives measured: true. Develop reads false, so this is introduced by the change. An id after "than" reads as a bound.'
+    suggested_action: 'Add the "faster than 319" negative control and require a unit or quantity word after the number in the comparative branch, or record why an occasional advisory false positive is acceptable.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 8938
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 2, 3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: false
+    boundary_signals: []
+    notes: 'Unchanged from gate 1: an advisory listing that exits 0. No predicate in the change prevents an action.'
+  performance:
+    status: PASS
+    notes: 'The regex has no nested quantifiers (refute pass checked linearity).'
+  reliability:
+    status: PASS
+    notes: 'Fast gate at 4fc09e876: 8938 tests, 0 failed. The CI Test job was red once on an unrelated `lockctl take is atomic` test (tests/test-remote-runner.test.js), and green on rerun.'
+  maintainability:
+    status: CONCERNS
+    notes: 'T328-CR2-3: the paraphrase restates finalise Step 3 inaccurately.'
+
+criteria_drift:
+  reason: drift
+  base: review-commit
+  changed:
+    - id: '#5'
+      kind: reworded
+      approved: false
+  note: 'The engine compares against review-commit 04827b92a, which already held the unapproved rewording, so the qa-fix revert to the reviewed text reads as a reword. The current text equals the text reviewed in review.1.'
+
+recommendations:
+  immediate:
+    - action: 'Owner: settle criterion 5 (T328-QA-1)'
+      refs: ['docs/tasks/task.328.measured-criterion-re-measured-when-head-moves/task.328.measured-criterion-re-measured-when-head-moves.md']
+    - action: 'Accept "or equal to" in the comparative bounds (T328-CR2-2)'
+      refs: ['shared/resources/finalise-record-preflight.js']
+    - action: 'Cite, do not paraphrase, Step 3 in both QA skills (T328-CR2-3)'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+  future:
+    - action: '`measured: true` marks any numeric bound, including a behaviour bound a per-PR test can hold (e.g. a heading longer than 80 characters). Describe it as a candidate measured criterion that QA classifies by Step 3 (refute CR-1, advisory)'
+      refs: ['shared/resources/finalise-record-preflight.js']
+      remedy: unverified
+    - action: 'Say "from the repository root" before the finalise-delta.js command in both QA skills (refute CR-5)'
+      refs: ['skills/qa-task/SKILL.md']
+      remedy: unverified
+    - action: 'Drop the no-op `(?:no\s+)?` group, or assert something only it makes true (CR-3 cycle 1, CR-6 cycle 2)'
+      refs: ['shared/resources/finalise-record-preflight.js']
+      remedy: unverified
+    - action: 'More comparatives (bigger, wider, higher, lower, up to) for NUMERIC_BOUND'
+      refs: ['shared/resources/finalise-record-preflight.js']
+      remedy: unverified
+    - action: 'review-task stamps a reviewed_blob without writing the object, so criteria-drift.js falls back to a later commit'
+      refs: ['shared/resources/criteria-drift.js']
+      remedy: unverified
+    - action: 'CI flake: `lockctl take is atomic` (tests/test-remote-runner.test.js:1047) failed once on run 45939155658 and passed on rerun'
+      refs: ['tests/test-remote-runner.test.js']
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['criterion 5 settled by the owner', 'T328-CR2-2 and T328-CR2-3 fixed']
