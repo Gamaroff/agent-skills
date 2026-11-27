@@ -118,6 +118,14 @@ Requiring the field is a later choice, for when every writer emits it.
 The SKILL.md paths gain the stem: `finalise-ac-result-${STEM}-${DOD_N}.yaml` and
 `finalise-ac-merged-${STEM}-${DOD_N}.json`, with `STEM` bound as Step 0 binds it.
 
+**Added in QA cycle 2 (T331-CR-1).** `merge` takes an optional `--doc <document>`. With it, a scope
+whose `document` is not that document (compared with the same resolved-path rule) is refused before
+the hash check: `{ reason: "scope-document-mismatch", exitCode: 0, mode, message }`, nothing written.
+`--doc ""` is a usage error. Step 3c binds `DOC_PATH` from `{document-path}`, guards it, passes
+`--doc`, and HALTs in its own `case` arm with the remedy "re-run Step 3a, the AC agent and the
+extract". Without it, a scope another item overwrote merged silently when the result named no
+document, and a correct result that did name this document was refused as another document's answer.
+
 ### Important Clarifications
 
 - **Absolute or relative.** `story_file` and `document` are compared after `path.resolve` against the
@@ -144,10 +152,13 @@ The SKILL.md paths gain the stem: `finalise-ac-result-${STEM}-${DOD_N}.yaml` and
 ❌ **Other `.claude/state` files** (the probe plan, the CI result): the probe plan's staleness is task 327's.
 
 ❌ **`finalise-ac-extract-${DOD_N}.json` and `finalise-rerun-scope-${DOD_N}.json`**, the two other
-DOD_N-only paths in the Step 3c chain. Each is rewritten in the same run before it is read (`tee` in
-the extract block; Step 3a writes the scope), so neither can carry another item's state into a merge.
-A stale extract record from another item would only give a hash the stem-keyed result does not
-match, which `merge` refuses as `result-hash-mismatch`.
+DOD_N-only paths in the Step 3c chain. Renaming them stays out of scope. QA cycle 2 (T331-CR-1)
+disproved the reasoning first written here: another item's Step 3a can overwrite the scope file
+between this item's Step 3a and 3c, so it *can* carry another item's state into a merge. Step 3c
+now passes `--doc`, and `merge` refuses such a scope as `scope-document-mismatch` (§ 3). A stale
+extract record from another item would only give a hash the stem-keyed result does not match, which
+`merge` refuses as `result-hash-mismatch`. Keying both files by stem is the follow-up recorded in
+gate 3.
 
 ---
 
@@ -164,13 +175,27 @@ reason instead of writing a wrong record.
 writes nothing. It gets its own `case` arm, so the HALT names the remedy (re-run the extract, or
 hand-copy this item's agent answer) instead of the generic `merge answered …` line.
 
+### Breaking Change 1b: another document's scope is refused (QA cycle 2)
+
+**What Changed**: with `--doc`, `merge` answers `scope-document-mismatch` and writes no record when
+the scope belongs to another document. Before, it merged.
+
+**Impact**: Step 3c stops with a named reason instead of recording another item's criteria and
+carried verdicts. Concurrent finalises of two items at one `DOD_N` in one checkout are still
+unsupported: each remedy re-runs Step 3a and can overwrite the other's scope.
+
+**Migration**: none. A caller that omits `--doc` keeps the old behaviour. Step 3c is the only CLI
+caller.
+
 ### Breaking Change 2: the AC state files carry the stem
 
 **What Changed**: `finalise-ac-result-{N}.yaml` becomes `finalise-ac-result-{stem}-{N}.yaml`, and the
 same for the merged file.
 
-**Migration**: none for a fresh run. A run resumed across the upgrade re-runs Step 3c, which the skill
-already does when the file is absent.
+**Migration**: none for a fresh run. A run resumed across the upgrade finds nothing at the new
+paths. Before Step 3c, re-run the extract, then Step 3c. After Step 3c, Step 6 action 2a HALTs
+(record present, merged result missing): move the record aside, then re-run Step 3a, the AC agent and
+Step 3c (corrected in QA cycle 2, T331-CR-2).
 
 ---
 
@@ -397,6 +422,33 @@ The path comparison, or the message.
 ### Key Findings
 All gate-2 findings are fixed. Four medium-confidence advisories from the cycle-3 review are recorded as one follow-up: key the scope and extract files by stem, split scope-document-mismatch, fix the CHANGELOG resume detail, and make `--doc` required.
 
+## Definition of Done - Gaps Identified
+
+**Status:** IN PROGRESS
+
+### QA Gate Status
+
+**QA Report**: `task.331.qa.3.ac-merge-refuses-another-documents-result.md`
+**Gate File**: `task.331.gate.3.ac-merge-refuses-another-documents-result.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 95/100
+
+### Missing Criteria:
+
+1. **Acceptance Criteria:**
+   - [ ] § 9 Migration, Step 3c's `result-document-mismatch` arm (low): the arm is present at `skills/finalise/SKILL.md:1074` and names the remedy, but no test runs it. The eval Step 3c test drives only the `scope-document-mismatch` arm, so deleting the arm would leave every test green while the generic `*)` arm HALTs without the remedy.
+
+### Next Steps:
+
+- [ ] Add a per-shell test to `evals/shared/tests/finalise-rerun-scope-blocks.test.mjs`: a correct scope plus a result whose `story_file` is `task.8.other`, run through the substituted Step 3c block. Assert exit 1, `another document's answer`, the remedy text (`hand-copy THIS item's AC agent answer`, `never merge it`), and that no record is written. Mutation-prove it by deleting the arm.
+- [ ] The test changes code outside the task directory, so it re-enters QA at 5a; then re-run `/finalise` (DoD run 2 is scoped to the reported gap).
+
+**Estimated Effort:** Small (one test, about 30 minutes)
+
+**Gap Report Generated:** 2026-11-27
+**QA Gate Reference**: See `task.331.gate.3.ac-merge-refuses-another-documents-result.yml` for full details
+
+**Detailed Verification Log:** See `task.331.dod.1.ac-merge-refuses-another-documents-result.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
@@ -411,6 +463,8 @@ All gate-2 findings are fixed. Four medium-confidence advisories from the cycle-
 | 2026-11-27 |         | QA gate CONCERNS (90/100) — cycle 2, 3 findings | qa-task |
 | 2026-11-27 |         | QA findings fixed — cycle 2, 3 findings (T331-CR-1 scope-document-mismatch via merge --doc; T331-CR-2 CHANGELOG resume line; T331-CR-3 Step 6 2a prose) | qa-fix |
 | 2026-11-27 |         | QA gate PASS (95/100) — cycle 3, 0 open findings, 4 advisories | qa-task |
+| 2026-11-27 |         | PR review CONCERNS — PC-1 fixed: § 4 claim corrected; § 3 and § 5 describe `merge --doc` / `scope-document-mismatch` (§ 9 not reworded) | develop-task (5c) |
+| 2026-11-27 |  | DoD incomplete — 1 gap identified (§ 9 Migration: result-document-mismatch arm untested) | finalise |
 <!-- change-log-end -->
 
 ---

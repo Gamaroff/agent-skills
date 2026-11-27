@@ -37,8 +37,8 @@ Make `finalise-rerun-scope.js merge` refuse an AC result whose `story_file` name
 | 2. review-task             | ✅ Done | `task.331.review.{N}.{name}.md` exists (or skip logged)               | `task.331.review.1.…md`; READY TO IMPLEMENT 8/10; Planned → Ready for Development | —                    | 2026-11-27T14:41Z |
 | 3. develop                 | ✅ Done | Task status == `Ready for Review`                                      | Inline, 1 iteration; 8/8 phase boxes; fast gate (remote) 8956 pass / 0 fail | —                    | 2026-11-27T15:14Z |
 | 4. create-pr               | ✅ Done | PR URL; issue comment posted                                           | PR #962: https://github.com/Gamaroff/agent-skills/pull/962 | —                    | 2026-11-27T15:16Z |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.331.qa.{N}.*.md`; `task.331.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.331.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
+| 5–6. qa-task / qa-fix loop | ✅ Done | `task.331.qa.{N}.*.md`; `task.331.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 3 QA cycles; gate 3 PASS 95/100; 5c CONCERNS (PC-1 scope, doc-only, carried) | —                    | 2026-11-27T16:30Z |
+| 7. finalise                | ❌ Halted | `task.331.dod.{N}.*.md`; task `status: accepted`                      | DoD run 1: GAPS — 1 (AC #7 untested arm); lock held at 7 | —                    | 2026-11-27T16:39Z |
 | 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
@@ -104,12 +104,15 @@ Make `finalise-rerun-scope.js merge` refuse an AC result whose `story_file` name
 - QA Cycle 1 — changes-requested: stage-disabled. Third strike: n/a (no HIGH). Narrowing offer: not run (cycle 1, no previous gate).
 - qa-fix findings ingest done inline (one finding, fully stated in the gate) — the independent ingester did not run.
 - Decision D2 (autonomous): T331-CI-1's fix is in this implementation report, so its update rides in the cycle-1 `fix(...)` commit instead of being deferred to Step 8. Deferring it would leave CI link-check red at /finalise's CI reading 1. Calibrated: CI's `markdown-link-check@3` with the repo config fails on the committed report (rc 1, the same dead mailto) and passes on the edited one (rc 0); all five task docs pass.
+- Step 7 /finalise DoD run 1 → GAPS (1). The gaps PR comment was posted, and the canonical summary, tracker close and board move were not run (accept-path only). Decision: take Step 8, not 8a (reason in the Issues Log). Pipeline HALT per Step 7 "If DoD Gaps Are Found".
 
 ---
 
 ## Issues Log
 
 _Problems encountered and how they were resolved or escalated._
+
+- **Step 7 — finalise DoD gaps (escalated, HALT).** DoD run 1 (`task.331.dod.1.ac-merge-refuses-another-documents-result.md`): AC PARTIAL, 7/8. Gap: § 9 Migration criterion #7 (low). The Step 3c `result-document-mismatch` arm at `skills/finalise/SKILL.md:1074` is present and names the remedy, but no test runs it; the eval Step 3c test drives only the `scope-document-mismatch` arm. Security PASS (boundary: internal), compliance N/A, docs PASS, CI reading 1 SUCCESS @ `63a3d161e1c4` over 6 checks (#6 graded PASS from it). Step 8a not taken: the finding came from reading rather than execution, and no engine path re-grades one AC verdict in the merged result and the record. Fix: one per-shell eval test (correct scope, `story_file` = `task.8.other`; assert exit 1, `another document's answer`, the remedy text, no record), mutation-proven by deleting the arm. It changes code, so the resume re-enters QA at 5a.
 
 ---
 
@@ -126,6 +129,46 @@ _Track each QA review/fix cycle._
 **PR Review**: not reached — gate did not exit the loop
 **Loop exit**: n/a — this exit not taken
 **Action**: Running qa-fix (cycle 1 of 5)
+
+#### qa-fix (5b)
+**Fixes Applied**: T331-CI-1 — the Step 3 fast-gate line names "the LAN CI server" instead of a user-at-address (D2: the report change rides this commit)
+**Fast gate**: green — 8956 pass / 0 fail
+**Commit**: `7e55819c9` (push deferred: push-policy qa-cycle → defer, docs-only)
+
+### QA Cycle 2 — 2026-11-27
+**Gate Result**: CONCERNS
+**Issues Found**: 3 — T331-CR-1 (result-document-mismatch HALT cannot tell a stale scope from a wrong result, and its remedy cannot clear the stale case), T331-CR-2 (CHANGELOG resume claim), T331-CR-3 (Step 6 2a prose still says DOD_N-keyed)
+**HIGH findings**: 0
+**MEDIUM findings**: 1
+**Traceability**: skipped (no Success Criteria table)
+**PR Review**: not reached — gate did not exit the loop
+**Loop exit**: n/a — this exit not taken
+**Action**: Running qa-fix (cycle 2 of 5)
+
+#### qa-fix (5b)
+**Fixes Applied**:
+- T331-CR-1: `merge --doc <document>` answers `scope-document-mismatch`, writing nothing, when the scope is not that document's (compared with `sameDocument`). Step 3c binds `DOC_PATH`, guards it, passes `--doc`, and HALTs in its own arm with the remedy "re-run Step 3a, the AC agent and the extract". Worse than gate 2 said: with no `story_file`, a stale scope merged silently and wrote this item's record from another document's criteria. That case is now the primary test.
+- T331-CR-2: the CHANGELOG resume sentence now names both cases, and the entry names the scope check.
+- T331-CR-3: Step 6 action 2a prose says "keyed by the stem and `DOD_N` … a stem is not a whole document name".
+
+**Mutation**: scope check disabled (`if (false && …)`), re-bundled → 5 named T331-CR-1 tests red (3 engine CLI tests, and the eval Step 3c test under bash and zsh). Restored → 135/135.
+**Probe**: phrases ``keyed by `DOD_N` ``, `finalise-ac-merged-` and `finalise-ac-result-` over the executed-document population → `skills/finalise/SKILL.md` only (population 1; updated). The task doc, CHANGELOG and earlier gates and reviews are history and are left as written.
+**Fast gate**: red twice, both causes found. Attempt 1: `prettier --check` on 2 files; fixed with `prettier --write`. Attempt 2: 8962 pass / 1 fail, the doc-links corpus test. The task doc links gate 2 and QA report 2, which were not staged before the gate ran (step 0-stage was skipped). After staging, that file passes 33/0. The 2-attempt bound is spent, so the commit goes in unpushed and cycle 3's review reads it.
+**Commit**: `f35403b82` (not pushed; the pre-5c or next-cycle push carries it along with `7e55819c9`)
+
+### QA Cycle 3 — 2026-11-27
+**Gate Result**: PASS (95/100)
+**Issues Found**: 0 open. The refute pass (independent Explore, 16:03:44Z → 16:09:41Z) raised 4 findings, all medium confidence and none reproduced, so they are advisory and recorded in the gate as one follow-up (stem-key the scope and extract files, split scope-document-mismatch, fix the CHANGELOG resume detail, make `--doc` required)
+**HIGH findings**: 0
+**MEDIUM findings**: 0 (gated)
+**Fast gate on head `f35403b82`**: green — 8963 pass / 0 fail
+**Convergence check**: HIGH 0 → 0 → 0, converging
+**Traceability**: skipped (no Success Criteria table)
+**Missed comment**: the qa-gate-2 comment had not been posted; posted late in cycle 3 (PR and issue, `posted`)
+**PR Review**: CONCERNS — `task.331.pr-review.1.ac-merge-refuses-another-documents-result.md` (conformance lens only, `--no-code`; independent Explore, 16:27:03Z → 16:28:20Z). PC-1 [scope · medium · high]: the work item did not describe `merge --doc` / `scope-document-mismatch`, and its § 4 claim was false. No open coverage finding.
+**5c carry**: PC-1 classified doc-only and fixed: § 4 claim corrected, § 3 and § 5 describe the refusal. § 9 not reworded (criteria-drift `clean`); doc-links ok; staged for the acceptance commit
+**Loop exit**: 5c CONCERNS with no open coverage finding → ready-for-merge → Step 7
+**Action**: Proceeding to Step 7 /finalise
 
 ---
 
