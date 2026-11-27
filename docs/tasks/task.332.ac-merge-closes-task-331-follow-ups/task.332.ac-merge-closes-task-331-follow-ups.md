@@ -5,18 +5,22 @@ type: task
 description: "finalise-rerun-scope.js merge requires --doc and a named story_file, /finalise keys its scope and extract files by work item, and the task 331 refusals each name their own cause and remedy."
 tags: [finalise, ac-merge, follow-up]
 category: infrastructure
-status: planned
+status: ready-for-review
 priority: Medium
 risk_level: low
 created: 2026-11-27
-updated: 2026-11-27
+updated: 2026-11-28
 assignee:
 estimated_effort_hours: 8
+github_issue: 963
 ---
 
 # The AC merge closes task 331's follow-ups
 
-**Status:** Planned
+**Status:** Ready for Review
+**Review**: ✅ All review recommendations from `task.332.review.1.ac-merge-closes-task-331-follow-ups.md` implemented 2026-11-27
+
+**GitHub Issue**: [#963](https://github.com/Gamaroff/agent-skills/issues/963)
 
 ---
 
@@ -113,6 +117,12 @@ the stem-keyed `finalise-ac-merged-${STEM}-${DOD_N}.json` (task 331).
 - `merge` requires `--doc`. Leaving it out is a usage error (exit 2), as `--doc ''` is today.
 - A result with no `story_file` is refused as `result-document-unnamed`, and nothing is written.
   `storyFileOf` reads `ac_traceability.story_file`, then a root `story_file`.
+- `result-document-unnamed` fires only on a result `merge()` would accept: one that parses **and**
+  carries an `ac_traceability.acs` list. Any other result goes on to `merge()`, which answers
+  `result-unparseable` as today. A parse that throws is not the only unparseable case:
+  `parseYamlSubset("this is not the YAML you asked for\n")` returns `{}` without throwing (run
+  2026-11-27), and that is the fixture of the existing `result-unparseable` test
+  (`finalise-rerun-scope.test.mjs:1885`).
 - A `story_file` that names no existing file keeps the reason `result-document-mismatch`, with its own
   message pointing at the answer, not the file. The Step 3c arm needs no new branch for it.
 - The scope and extract files become `finalise-rerun-scope-${STEM}-${DOD_N}.json` and
@@ -178,7 +188,8 @@ the stem-keyed `finalise-ac-merged-${STEM}-${DOD_N}.json` (task 331).
   re-run the extract, or hand-copy this item's AC agent answer.
 - **Affected:** the five pre-331 tests' result fixtures, and the test at `:2347`, which is rewritten
   to assert the refusal.
-- **Migration:** results add `story_file:` with the fixture document's path.
+- **Migration:** results add `story_file:` with the fixture document's path. The exception is the
+  `result-unparseable` fixture at `:1885`, which stays as it is and still expects `result-unparseable`.
 
 ### Breaking Change 3: the scope and extract files carry the stem
 
@@ -198,37 +209,38 @@ the stem-keyed `finalise-ac-merged-${STEM}-${DOD_N}.json` (task 331).
 
 **Risk:** Low. **Depends on:** none.
 
-- [ ] Step 3a writes `finalise-rerun-scope-${STEM}-${DOD_N}.json` (`SKILL.md:637`)
-- [ ] The extract tees `finalise-ac-extract-${STEM}-${DOD_N}.json`, and Step 3c reads both new paths
+- [x] Step 3a writes `finalise-rerun-scope-${STEM}-${DOD_N}.json` (`SKILL.md:637`)
+- [x] The extract tees `finalise-ac-extract-${STEM}-${DOD_N}.json`, and Step 3c reads both new paths
   (`:1025`, `:1060`, `:1062`)
-- [ ] The eval test's scope path follows (`evals/shared/tests/finalise-rerun-scope-blocks.test.mjs:305`)
+- [x] The eval test's scope path follows (`evals/shared/tests/finalise-rerun-scope-blocks.test.mjs:305`)
 
 ### Phase 2: The engine's refusals (S1, S2, G3-2, G1-2, G1-3, G1-4)
 
 **Risk:** Low. **Depends on:** Phase 1 (G3-2's remedies name Phase 1's paths).
 
-- [ ] Failing tests first, one per row of § 8
-- [ ] `--doc` required; `result-document-unnamed`; `scope-document-missing`; the nonexistent-file
+- [x] Failing tests first, one per row of § 8 (written after the engine change; each new test's red
+  shown by its mutation instead — see the implementation report)
+- [x] `--doc` required; `result-document-unnamed`; `scope-document-missing`; the nonexistent-file
   message; the root `story_file` fallback
-- [ ] Move the `merge()` JSDoc down to `merge()`
-- [ ] Update the six reversed-decision tests (§ 5)
+- [x] Move the `merge()` JSDoc down to `merge()`
+- [x] Update the six reversed-decision tests (§ 5)
 
 ### Phase 3: Step 3c arms and the exact-path rule (G3-2, G2-4)
 
 **Risk:** Low. **Depends on:** Phase 2.
 
-- [ ] Step 3c adds `result-document-unnamed` and `scope-document-missing` arms, each with its own
+- [x] Step 3c adds `result-document-unnamed` and `scope-document-missing` arms, each with its own
   HALT remedy, and the `scope-document-mismatch` remedy is reworded for the states left after Phase 1
-- [ ] `finalise-dod-ac-prompt.md` says `story_file` must be the exact `<STORY_FILE>` path, unchanged
+- [x] `finalise-dod-ac-prompt.md` says `story_file` must be the exact `<STORY_FILE>` path, unchanged
 
 ### Phase 4: Tests for the realpath branch, CHANGELOG, bundle (G1-5, G3-3)
 
 **Risk:** Low. **Depends on:** Phases 1-3.
 
-- [ ] A symlinked spelling of the document merges; a nonexistent spelling is refused
-- [ ] `CHANGELOG.md` `[Unreleased]`: the three breaking changes, with a resume sentence that covers
+- [x] A symlinked spelling of the document merges; a nonexistent spelling is refused
+- [x] `CHANGELOG.md` `[Unreleased]`: the three breaking changes, with a resume sentence that covers
   before Step 3c, between Step 3c and Step 3d, after Step 3d, and a pre-upgrade `result-unparseable` answer
-- [ ] `npm run bundle`
+- [x] `npm run bundle`
 
 ---
 
@@ -267,6 +279,7 @@ None.
 | :-- | :-- | :-- |
 | `merge` with no `--doc` | merges | `usage`, exit 2, nothing written |
 | a result with no `story_file` | `merged` | `result-document-unnamed`, nothing written |
+| a result that parses to no `acs` list and names no document (`"this is not the YAML you asked for"`) | `result-unparseable` | `result-unparseable` (unchanged: `result-document-unnamed` does not fire) |
 | a result with `story_file` at the root beside an `ac_traceability` block | `merged`, unchecked | checked: the same document merges, another is refused |
 | a `story_file` naming a file that does not exist | `result-document-mismatch`, "another document's answer" | `result-document-mismatch`, message names the missing file |
 | a scope with no `document` | `scope-document-mismatch` | `scope-document-missing` |
@@ -286,6 +299,8 @@ Each alone must turn a named test red:
 4. `scope-document-missing` folded back into `scope-document-mismatch`.
 5. The realpath branch of `sameDocument` removed (only the symlink test catches this one).
 6. Step 3a's scope path reverted to `finalise-rerun-scope-${DOD_N}.json` (the eval test catches it).
+7. `result-document-unnamed` checked on every parsed result, not only one with an `acs` list (the
+   `result-unparseable` test at `:1885` catches it).
 
 ### Consumer Tests
 
@@ -372,32 +387,35 @@ None.
 |------|---------|-------------|--------|
 | 2026-11-27 | 1.0     | Initial draft — from task 331's DoD run 2 spec challenges and QA gate 1-3 advisories | create-task |
 | 2026-11-27 | 1.1     | G3-1: add the tinker-city task.162 → task.163 occurrence (first in a consumer repo) | Claude |
+| 2026-11-27 | 1.2     | Review passed (9/10): document checks gated on an `acs` list so `result-unparseable` stays reachable; GitHub issue #963 linked | review-task |
+| 2026-11-27 |         | Status → ready-for-development | review-task |
+| 2026-11-28 |         | Implemented Phases 1–4: `--doc` required, `result-document-unnamed`, `scope-document-missing`, stem-keyed scope/extract paths, exact-path prompt rule; 7 mutations proved; status → ready-for-review | develop |
 <!-- change-log-end -->
 
 ## Progress Tracking
 
 ### Phase 1: Stem-keyed scope and extract files
 
-- [ ] SKILL.md paths
-- [ ] Eval test path
+- [x] SKILL.md paths
+- [x] Eval test path
 
 ### Phase 2: The engine's refusals
 
-- [ ] Failing tests
-- [ ] Refusals and fallback
-- [ ] JSDoc
-- [ ] Reversed-decision tests
+- [x] Failing tests
+- [x] Refusals and fallback
+- [x] JSDoc
+- [x] Reversed-decision tests
 
 ### Phase 3: Step 3c arms and the exact-path rule
 
-- [ ] Arms
-- [ ] AC prompt rule
+- [x] Arms
+- [x] AC prompt rule
 
 ### Phase 4: Tests, CHANGELOG, bundle
 
-- [ ] Symlink and nonexistent tests
-- [ ] CHANGELOG
-- [ ] Bundle
+- [x] Symlink and nonexistent tests
+- [x] CHANGELOG
+- [x] Bundle
 
 ---
 

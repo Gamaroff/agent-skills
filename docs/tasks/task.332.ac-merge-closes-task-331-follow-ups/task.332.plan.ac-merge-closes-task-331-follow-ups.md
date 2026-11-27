@@ -49,10 +49,16 @@ Order of checks after the change (each writes nothing):
    story_file is wrong — it must be the exact document path`
 7. `!sameDocument(cwd, named, s.document)` → `result-document-mismatch` (message unchanged)
 
-A result that does not parse keeps reaching `merge()`, which answers `result-unparseable`. So
-`storyFileOf` must tell "unparseable" from "no story_file": have it return `{ parsed: false }` /
-`{ named: null }` / `{ named }`, or parse once in `main()`. Step 5 must not fire for an unparseable
-result, or `result-unparseable` becomes unreachable and the existing test for it goes red.
+A result that does not parse keeps reaching `merge()`, which answers `result-unparseable`. Step 5
+must not fire for such a result, or `result-unparseable` becomes unreachable and the existing test
+for it goes red. **A throw is not the only unparseable case.** `merge()` also answers
+`result-unparseable` when the parse succeeds but holds no `ac_traceability.acs` list
+(`finalise-rerun-scope.js:775`). The existing test's fixture is that case:
+`parseYamlSubset("this is not the YAML you asked for\n")` returns `{}` and does not throw (run
+2026-11-27). So steps 5-7 run only when the result parses **and** `ac` (`parsed.ac_traceability ??
+parsed`) has an `acs` array, which is `merge()`'s own acceptance predicate. Parse once in `main()`,
+or share one helper with `merge()`, so the two cannot drift. Leave the `:1885` fixture without a
+`story_file`: it is the regression case for this ordering.
 
 `storyFileOf`: read `ac.story_file`, then `parsed.story_file` when `ac !== parsed`.
 
