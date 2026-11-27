@@ -149,6 +149,8 @@ _Track each QA review/fix cycle._
 
 - **Half-cycle**: none. The owner approved a further fix cycle after the escalation. qa-fix cycle 5 fixed CR5-1 (provenance before the bound) and CR5-2 (same-length drift calibration), both mutation-proven, and gate 6 judges the fix.
 
+- **Gate 6**: CONCERNS 80/100. Fast gate: 8948 tests, 0 failed; CI green at dcbdab636. Criterion 4 is unmet: cycle 3 (CR3-1) removed the "re-measure" wording the criterion names, and the parity test bans it. Applying reviewer findings without re-reading the criteria let the evidence drift from a criterion. **HALT**: escalated, because the fix reverses CR3-1.
+
 - **Correction to the Issues Log**: amending criterion 5 during develop was wrong. It was an unapproved rewording, and the qa-fix restores the reviewed text.
 
 ---

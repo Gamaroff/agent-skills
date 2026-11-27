@@ -263,21 +263,21 @@ preflight fails. Steps: revert the phase's commit, run `npm run bundle`, re-run 
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-27
-**Quality Score**: 90/100
+**Quality Score**: 80/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.328.qa.5.measured-criterion-re-measured-when-head-moves.md](./task.328.qa.5.measured-criterion-re-measured-when-head-moves.md)
-- **Gate File**: [task.328.gate.5.measured-criterion-re-measured-when-head-moves.yml](./task.328.gate.5.measured-criterion-re-measured-when-head-moves.yml)
+- **Full Report**: [task.328.qa.6.measured-criterion-re-measured-when-head-moves.md](./task.328.qa.6.measured-criterion-re-measured-when-head-moves.md)
+- **Gate File**: [task.328.gate.6.measured-criterion-re-measured-when-head-moves.yml](./task.328.gate.6.measured-criterion-re-measured-when-head-moves.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 8947 (fast gate, 0 failed); CI green at e9c20b2b3
+- **Tests Executed**: 8948 (fast gate, 0 failed); CI green at dcbdab636
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-The cycle-4 fixes hold. One MEDIUM remains: the missed-bound FAIL branch is ordered before provenance, so a figure Step 3 rejects fails outright instead of being unverified (T328-CR5-1). One LOW is also open (CR5-2). This is the last gate in the budget, so the run is escalated to the owner.
+The cycle-5 fixes hold. Criterion 4 is unmet: it requires "unverified with re-measure", but cycle 3 removed the word and the parity test forbids it (T328-QA6-1). Three LOW findings are also open. Escalated to the owner.
 
 <!-- change-log-start -->
 ## Change Log
@@ -300,6 +300,7 @@ The cycle-4 fixes hold. One MEDIUM remains: the missed-bound FAIL branch is orde
 | 2026-11-27 |  | QA findings fixed — cycle 4, 1 iteration: a missed bound fails the criterion (CR4-1); later/earlier and hedged bounds (CR4-2); `measured` listed, false rules nothing out (CR4-3); paragraph located by its lead (CR4-4); qa-task and qa-story paragraphs held identical (CR4-5); dead `no` group dropped (CR4-6) | qa-fix |
 | 2026-11-27 |  | QA gate CONCERNS (90/100) — 2 findings; QA budget exhausted (5 gates), escalated to the owner | qa-task |
 | 2026-11-27 |  | QA findings fixed — cycle 5 (one further cycle approved by the owner): provenance decided before the bound (CR5-1); identity check calibrated on a same-length drift (CR5-2) | qa-fix |
+| 2026-11-27 |  | QA gate CONCERNS (80/100) — criterion 4 unmet ("re-measure" removed in cycle 3); escalated to the owner | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking
