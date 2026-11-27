@@ -3,7 +3,7 @@
 **Task**: `task.330.docs-path-stream-and-c1-refusals.md`
 **Run Number**: 1
 **Started**: 2026-11-27 11:22
-**Status**: In Progress
+**Status**: Completed
 **Report format**: 2
 
 ---
@@ -36,10 +36,10 @@ Make `isDocsPath` read a `.git:` alternate-stream segment and a C1 control as co
 | 1. create-branch           | ✅ Done    | Branch `feature/task.330.*` exists in git                             | Branch created at `eb9b74d4b`; pushed with upstream | —                    | 2026-11-27T11:24Z |
 | 2. review-task             | ✅ Done    | `task.330.review.{N}.{name}.md` exists (or skip logged)               | `task.330.review.1.docs-path-stream-and-c1-refusals.md` — READY TO IMPLEMENT 9/10; Planned → Ready for Development | —                    | 2026-11-27T11:26Z |
 | 3. develop                 | ✅ Done    | Task status == `Ready for Review`                                      | Inline, 1 iteration; 3/3 phases; ci:fast 8955 tests 0 fail (2nd run, after a Prettier fix) | —                    | 2026-11-27T11:55Z |
-| 4. create-pr               | ⏳ Pending | PR URL; issue comment posted                                           |       | —                    |                 |
-| 5–6. qa-task / qa-fix loop | ⏳ Pending | `task.330.qa.{N}.*.md`; `task.330.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted |       | —                    |                 |
-| 7. finalise                | ⏳ Pending | `task.330.dod.{N}.*.md`; task `status: accepted`                      |       | —                    |                 |
-| 8. commit-changes          | ⏳ Pending | All artifacts committed and pushed                                     |       | —                    |                 |
+| 4. create-pr               | ✅ Done    | PR URL; issue comment posted                                           | PR #961: https://github.com/Gamaroff/agent-skills/pull/961 | —                    | 2026-11-27T11:57Z |
+| 5–6. qa-task / qa-fix loop | ✅ Done    | `task.330.qa.{N}.*.md`; `task.330.gate.{N}.*.yml`; `**PR Review**` row on the highest `### QA Cycle {N}` holds `APPROVE`, or `CONCERNS` with no open coverage finding (Step 5c); PR comment posted | 1 cycle; gate 1 PASS (100); PR review APPROVE | —                    | 2026-11-27T12:15Z |
+| 7. finalise                | ✅ Done    | `task.330.dod.{N}.*.md`; task `status: accepted`                      | DoD 1 ACCEPTED (7/7); acceptance commit `9d3f8b018`; CI reading 2 SUCCESS | —                    | 2026-11-27T12:31Z |
+| 8. commit-changes          | ✅ Done    | All artifacts committed and pushed                                     | Implementation report committed and pushed | —                    | 2026-11-27T12:31Z |
 
 > The `Subagent summary ref` column points to the JSON artifact described in `references/subagent-summary-artifact.md`. Use `—` for steps that don't dispatch a subagent or for in-flight pipelines started before this column existed.
 >
@@ -88,6 +88,38 @@ Make `isDocsPath` read a `.git:` alternate-stream segment and a C1 control as co
 - CHANGELOG placement: bullets below the first release heading 987 at the merge base, 987 now — new entries are in `[Unreleased]`.
 - Development completion comment posted to github issue 957 (`posted`).
 
+### Step 4 — create-pr
+
+- SCOPE_PATHS: the task dir, `CHANGELOG.md`, `docs/runbooks`, `shared/resources`, `shared/resources/tests`, and `references/` of develop-batch, develop-bug, develop-next, develop-story, develop-task, finalise, qa-story, qa-task, review-security. No out-of-scope untracked files held. Report links: 0 relative, ok.
+- Commit `1de74ff6c` (28 files); leak check OK.
+- PR body written inline, not by the summariser subagent (the orchestrator wrote the change; cost).
+- PR created: https://github.com/Gamaroff/agent-skills/pull/961 (base develop). Post-PR state check run inline (`gh pr view`): PR #961 state = OPEN. errors = 0.
+- Issue 957 in-review comment `posted`. GitHub board: in-review → stage-disabled.
+
+### Step 5–6 — QA loop
+
+- GitHub board: QA-start re-assert → stage-disabled.
+- Traceability mapper skipped: § 9 Success Criteria is a checkbox list, not a table (HAS_SUCCESS_CRITERIA_TABLE=false).
+- Record criteria preflight: 1 listed (`.summaries/record-criteria.json`) — the § 8 mutations recorded in the QA report.
+- QA cycle 1 (`/qa-task`): gate 1 PASS 100/100, 0 open entries. Diff review (Explore, 129973 ms): 0 findings. Probe `git-name` on `isDocsPath`: engages, 26 executed, 0 escaped. Three hand mutations covered (snapshot + `cmp` restore each). CI on 1de74ff6c8d7 green. Route 1 → 5c.
+- Gate + QA report committed `9c1a872a0` and pushed (push-policy `qa-pre-5c`: push); trail asserted on origin.
+- 5c `/review-pr --effort medium --comment --no-code`: conformance lens (Explore, 38833 ms) 0 findings → APPROVE; OPEN_COVERAGE=0. Report `task.330.pr-review.1.docs-path-stream-and-c1-refusals.md` staged for 6a; PR summary comment posted. GitHub board: ready-for-merge → stage-disabled.
+
+### Step 7 — finalise
+
+- `/finalise` invoked (Skill). Preconditions ok; record criteria ok (1, confirmed in qa.1 lines 150–152); re-run at head not-configured; re-run scope full (no prior record).
+- Four DoD agents (Explore, parallel) were each pointed at their prompt template file with the substitutions listed, rather than handed the substituted template inline (cost); templates followed from file. AC PASS 7/7 (YAML extracted, verified sha256); security PASS — boundary true, probe plan extracted and run by /finalise: 26 executed, 0 reproduced, 0 escaped (`task.330.dod.1.security.run.json`); compliance NOT_APPLICABLE; docs PASS.
+- DoD summary: `docs/tasks/task.330.docs-path-stream-and-c1-refusals/task.330.dod.1.docs-path-stream-and-c1-refusals.md`
+- CI reading 1: SUCCESS @ 9c1a872a0e8a (6 checks); CI reading 2: SUCCESS (tree-equivalent to 1de74ff6c8d7) @ 9d3f8b01836d
+- Acceptance commit `9d3f8b018` (DoD, sprint review, AC record, security record, registry ticked, 5c review carried); pushed; 6b assertions ok; 6d CHANGELOG cites (task 330).
+- `change-log.js` dropped the blank line before `<!-- change-log-start -->`; the DoD section inserted there restored the spacing.
+- Canonical PR comment posted: https://github.com/Gamaroff/agent-skills/pull/961#issuecomment-7218326971
+- DoD body posted to PR — comment URL: https://github.com/Gamaroff/agent-skills/pull/961#issuecomment-7218342181
+- Issue #957: Document link already durable (no rewrite); done comment `posted`; issue close: CLOSED ✅.
+- Board transition: done → `already`.
+- Tracker-actions journal empty → no tracker debt.
+- Task completed.
+
 ---
 
 ## Issues Log
@@ -102,14 +134,27 @@ _Problems encountered and how they were resolved or escalated._
 
 _Track each QA review/fix cycle._
 
+### QA Cycle 1 — 2026-11-27
+**Gate Result**: PASS
+**Issues Found**: none
+**HIGH findings**: 0
+**MEDIUM findings**: 0
+**Traceability**: skipped (no Success Criteria table)
+**PR Review**: APPROVE
+**Loop exit**: n/a — this exit not taken
+**Action**: Proceeding to 5c (PR conformance review)
+**Carried to 6a**: docs/tasks/task.330.docs-path-stream-and-c1-refusals/task.330.pr-review.1.docs-path-stream-and-c1-refusals.md
+
 ---
 
 ## Completion
 
-**Finished**: {populated at end}
-**Final Status**: {Completed / Failed / Escalated}
+**Finished**: 2026-11-27 12:31
+**Final Status**: Completed
 **Branch**: feature/task.330.docs-path-stream-and-c1-refusals
-**PR**: {populated after Step 4}
-**QA Iterations**: {populated at end}
-**DoD Summary**: {populated after Step 7}
-**Tracker debt**: {populated after Step 7 — "none", or "{N} action(s) outstanding — see ## Tracker Actions Required"; reconcile later with /tracker-reconcile}
+**PR**: https://github.com/Gamaroff/agent-skills/pull/961
+**QA Iterations**: 1
+**DoD Summary**: docs/tasks/task.330.docs-path-stream-and-c1-refusals/task.330.dod.1.docs-path-stream-and-c1-refusals.md
+**Tracker debt**: none
+
+**Completion Summary**: `isDocsPath` now reads a `.git:` NTFS alternate-stream segment and a C1 control as code. The fold is in `isDotGitSegment` and the control class is now `\p{Cc}`. A C1 control in an exclusion is a usage error. The `git-name` corpus gained three hostile cases, one legitimate case and a mechanical `dotGitStream` mutation row, and the four deferred wording findings are fixed. It took one QA cycle (gate PASS 100/100, 0 findings), and the 5c PR review was APPROVE. The DoD was accepted 7/7, and the security probe held on 26 cases. Notable: an empty-`new_string` Edit used as a mutation revert joined two lines, and was caught and fixed (obs #196).
