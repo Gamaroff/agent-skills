@@ -260,24 +260,24 @@ preflight fails. Steps: revert the phase's commit, run `npm run bundle`, re-run 
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-27
-**Quality Score**: 80/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.328.qa.6.measured-criterion-re-measured-when-head-moves.md](./task.328.qa.6.measured-criterion-re-measured-when-head-moves.md)
-- **Gate File**: [task.328.gate.6.measured-criterion-re-measured-when-head-moves.yml](./task.328.gate.6.measured-criterion-re-measured-when-head-moves.yml)
+- **Full Report**: [task.328.qa.7.measured-criterion-re-measured-when-head-moves.md](./task.328.qa.7.measured-criterion-re-measured-when-head-moves.md)
+- **Gate File**: [task.328.gate.7.measured-criterion-re-measured-when-head-moves.yml](./task.328.gate.7.measured-criterion-re-measured-when-head-moves.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 8948 (fast gate, 0 failed); CI green at dcbdab636
+- **Tests Executed**: 8951 (fast gate, 0 failed); CI green at 5fbd51264
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-The cycle-5 fixes hold. Criterion 4 is unmet: it requires "unverified with re-measure", but cycle 3 removed the word and the parity test forbids it (T328-QA6-1). Three LOW findings are also open. Escalated to the owner.
+Every success criterion is met, with criterion 4 met again after cycle 6. One advisory low-confidence finding is recorded for future work.
 
 <!-- change-log-start -->
 ## Change Log
@@ -302,6 +302,7 @@ The cycle-5 fixes hold. Criterion 4 is unmet: it requires "unverified with re-me
 | 2026-11-27 |  | QA findings fixed — cycle 5 (one further cycle approved by the owner): provenance decided before the bound (CR5-1); identity check calibrated on a same-length drift (CR5-2) | qa-fix |
 | 2026-11-27 |  | QA gate CONCERNS (80/100) — criterion 4 unmet ("re-measure" removed in cycle 3); escalated to the owner | qa-task |
 | 2026-11-27 |  | QA findings fixed — cycle 6 (further cycle approved by the owner): "re-measure" restored for a rejected figure, other notes deferred to Step 3 (QA6-1); unverified mapping stated as deliberate (CR6-1); "whatever its value" held (CR6-2); one locator (CR6-3) | qa-fix |
+| 2026-11-27 |  | QA gate PASS (100/100) | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking
