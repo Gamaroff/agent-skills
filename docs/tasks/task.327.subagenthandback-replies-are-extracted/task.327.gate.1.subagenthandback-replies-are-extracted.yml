@@ -1,0 +1,91 @@
+schema: 2
+task: 'task.327.subagenthandback-replies-are-extracted'
+task_title: 'SubagentHandback replies are extracted, not hand-copied'
+gate: CONCERNS
+status_reason: 'The hand-back reader works (byte-exact, real transcript verified), but the new --out removal can delete the transcript through a symlink (CR-1, reproduced; breaks criterion 7) and crashes on a directory --out (CR-2). Criterion 7 also reads as added after review with no approver.'
+reviewer: 'QA Engineer'
+head: 'c1976c87392a708082cafb4d1d7cea9b4c122237'
+updated: '2026-11-26T20:36:54Z'
+
+top_issues:
+  - id: 'T327-QA-1'
+    severity: medium
+    file: 'shared/resources/agent-reply-block.js'
+    finding: 'The --out = --transcript guard (extractUsageError and the copy in extract) compares path.resolve strings only. Reproduced by QA: extract --transcript link.jsonl --out t.jsonl, where link.jsonl is a symlink to t.jsonl, removed t.jsonl and answered transcript-not-found, exit 0. Control: the same literal path is refused with exit 2 and the file survives. Not on base (base never removed --out). Criterion 7 says the transcript is left unchanged. origin: code-review CR-1 (medium/high), reproduced by QA.'
+    suggested_action: 'Compare file identity (fs.realpathSync, or stat dev+ino when both exist) in both guards, and in extract remove --out only after the transcript path is resolved (agent-id discovery included), never when it is that file. Add a symlink test.'
+    suggested_owner: dev
+    status: open
+  - id: 'T327-QA-2'
+    severity: medium
+    file: 'docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md'
+    finding: 'criteria-drift.js reports criterion 7 (the --out = --transcript refusal) as added without an approver. Cause: review 1 added it as an Important fix, but its reviewed_blob was never written to the object database, so the engine fell back to the review commit, which carries only the review report and predates the fix.'
+    suggested_action: 'Record the approval on criterion 7 (approved by review-task, review 1 Important fix), without changing its wording, so finalise does not fail it as an unapproved edit.'
+    suggested_owner: dev
+    status: open
+  - id: 'T327-CI-1'
+    severity: medium
+    file: 'docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.implementation.1.subagenthandback-replies-are-extracted-initial-run.md'
+    finding: 'CI check link-check failed on c1976c87392a (https://github.com/Gamaroff/agent-skills/actions/runs/45891985827/job/140156623122); green on develop (run 45888757219). The implementation report names the LAN test host as user@address, which the checker reads as a mailto link and gets 400.'
+    suggested_action: 'Name the host without the user@address form (it is a machine-private address and belongs out of the committed report anyway), and commit the report change with the fix so the lane re-runs.'
+    suggested_owner: dev
+    status: open
+  - id: 'T327-QA-3'
+    severity: low
+    file: 'shared/resources/agent-reply-block.js'
+    finding: 'fs.rmSync(opts.out, { force: true }) runs unwrapped before any named answer, so a directory --out (reproduced) or an EACCES/EPERM path crashes extract with an uncaught error instead of a named reason. origin: code-review CR-2 (low/high).'
+    suggested_action: 'Wrap the removal and return a named reason, or refuse a directory --out as a usage error; add a test.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 81
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: CONCERNS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: ["never"]
+    boundary_reason: 'The never wording names reply selection (another tool name is never read) and self-deletion (extract never removes its transcript). replyText reads only harness-written transcript JSONL, which no corpus sink models (boundary: internal). extractUsageError is an equality guard, not a hostile-input gate. Both are held by named tests and mutations c, c2, e, f; the symlink gap was found and reproduced by execution (T327-QA-1).'
+    notes: 'Data-loss path through a symlinked --transcript (T327-QA-1).'
+  performance:
+    status: PASS
+    notes: 'One pass over the transcript lines, as before.'
+  reliability:
+    status: CONCERNS
+    notes: 'Directory or unremovable --out crashes extract (T327-QA-3).'
+  maintainability:
+    status: PASS
+    notes: 'One reader for both callers; bundled copy in sync; doc comments updated.'
+
+criteria_drift:
+  reason: drift
+  base: review-commit
+  changed:
+    - id: '#7'
+      kind: added
+      approved: false
+
+recommendations:
+  immediate:
+    - action: 'Fix T327-QA-1 and record the approval for criterion 7 (T327-QA-2).'
+      refs: ['shared/resources/agent-reply-block.js']
+  future:
+    - action: 'review-task stamps reviewed_blob without writing the blob (git hash-object -w), so criteria-drift falls back to a review commit that may predate the review''s own fixes.'
+      refs: ['skills/review-task/SKILL.md']
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T327-QA-1 fixed']

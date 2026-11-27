@@ -1,0 +1,77 @@
+schema: 2
+task: 'task.327.subagenthandback-replies-are-extracted'
+task_title: 'SubagentHandback replies are extracted, not hand-copied'
+gate: PASS
+status_reason: 'Both DoD 1 gaps are closed. #6: the stale --out test now seeds all six non-extracted reasons and is mutation-held. #10: the criterion was amended with an approver, and its three pre-existing-rule guards each go red under a named mutation re-run this cycle. The scoped review found one low advisory bug and one cleanup.'
+reviewer: 'QA Engineer'
+head: '1d914ac8e4a3785718da265426f749ca4529e43a'
+updated: '2026-11-27T00:49:11Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 20
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 23
+    escaped: 0
+    boundary: true
+    boundary_signals: ["never"]
+    notes: 'The DoD 1 probe plan (3 controls: --out identity guard on both routes, reply selection) re-run at 1d914ac8e: 23 executed, 0 reproduced, 0 escaped. Record: task.327.qa.4.security.run.json. Symlink/hard-link --out stays covered by the QA-1 test only.'
+  performance:
+    status: PASS
+    notes: 'Test-only change; the module is unchanged since gate 3.'
+  reliability:
+    status: PASS
+    notes: 'Every non-extracted reason now has a stale --out case; the loop reports every leaking reason at once.'
+  maintainability:
+    status: PASS
+    notes: 'CR-1 (low, medium confidence) and CR-2 (cleanup) are advisory, recorded below.'
+
+criteria_drift:
+  reason: drift
+  base: review-commit
+  changed:
+    - id: '#7'
+      kind: added
+      approved: true
+    - id: '#10'
+      kind: reworded
+      approved: true
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Tie the stale --out coverage check to the reasons extract() actually returns, not only the self-declared REASONS list (CR-1). Today every reason literal in the module is in REASONS or is usage, so it is not a present defect.'
+      refs: ['shared/resources/tests/agent-reply-block.test.mjs']
+      remedy: unverified
+    - action: 'Collect reason mismatches in the stale --out loop as leaks are collected, or narrow its comment to leaks (CR-2).'
+      refs: ['shared/resources/tests/agent-reply-block.test.mjs']
+      remedy: unverified
+    - action: 'Carried from gate 3: the mixed tool_result + text prompt-line case, non-array user content, and the isPrompt JSDoc placement (gate 3 CR-1..CR-3).'
+      refs: ['shared/resources/agent-reply-block.js']
+      remedy: unverified
+
+bug_resolution:
+  bugs_fixed: 2
+  bugs_remaining: 0
+  fix_date: '2026-11-27'
+  total_iterations: 3
+  verification_method: 'DoD 1 gaps #6 and #10 closed; mutations b, c, c2, m re-run this cycle; probe plan 23/0; ci:fast 8923 pass / 0 fail'
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: ['CI green on 1d914ac8e (pending at gate time; finalise reads it)']

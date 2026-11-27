@@ -1,0 +1,370 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "fdcf01da16724a11529fe90781620c368020eda1",
+  "dirty_paths": [
+    "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.implementation.1.subagenthandback-replies-are-extracted-initial-run.md",
+    "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.pr-review.1.subagenthandback-replies-are-extracted.md",
+    "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md"
+  ],
+  "document": "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md",
+  "result": {
+    "bytes": 15087,
+    "sha256": "0378f1d0f21ddc5498055bbbe589ba0ff87fc911cba83be48acd7e1c898c8c83",
+    "verified": true
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 14,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "d0c9f3d2b66a7fbb8cfd0fae799a8ba8358f2c7a37dff0f8e892ee628bd9778b",
+      "status": "PASS",
+      "description": "Hand-back-only transcript answers extracted, reply handback, byte-exact with CONTROLS",
+      "code_citation": "shared/resources/agent-reply-block.js:175",
+      "test_citation": "shared/resources/tests/agent-reply-block.test.mjs:284",
+      "members": [],
+      "non_member_fail": null,
+      "note": "replyText takes input.message of a SubagentHandback tool_use (:170-180) and returns reply \"handback\" (:189). The test builds the measured host shape (thinking, hand-back, tool_result, attachment) and asserts reason extracted, reply handback, deepEqual bytes, every CONTROLS char and the lone CR. Lane: test.yml runs on every pull_request; npm test selects shared/resources/tests/*.test.mjs."
+    },
+    {
+      "id": "#2",
+      "text_hash": "ab1109a73e4eae8599390e56e3d274251f4e12758b5c9e7808a289f638e1b88e",
+      "status": "PASS",
+      "description": "Text control answers extracted with reply text and unchanged bytes",
+      "code_citation": "shared/resources/agent-reply-block.js:188",
+      "test_citation": "shared/resources/tests/agent-reply-block.test.mjs:303",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The control test asserts reply \"text\" and the exact bytes. The pre-existing byte-exact text test at agent-reply-block.test.mjs:93 (seven CONTROLS chars) is unchanged and still runs, so the bytes are the same as before the change."
+    },
+    {
+      "id": "#3",
+      "text_hash": "e613ecc304ac93b387808fe24035e0bc29ddbd1980c1388a9b55884bf5d60a66",
+      "status": "PASS",
+      "description": "Later of text reply and hand-back is read, both orders",
+      "code_citation": "shared/resources/agent-reply-block.js:182",
+      "test_citation": "shared/resources/tests/agent-reply-block.test.mjs:314",
+      "members": [
+        {
+          "member": "text after hand-back",
+          "evidence": "shared/resources/tests/agent-reply-block.test.mjs:314",
+          "status": "PASS"
+        },
+        {
+          "member": "hand-back after text",
+          "evidence": "shared/resources/tests/agent-reply-block.test.mjs:326",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "A later() position comparison over [line, block] pairs picks the later candidate. Both orders are tested, plus the same-message tie at :340."
+    },
+    {
+      "id": "#4",
+      "text_hash": "5ce3a9b8c0132c63b79f9699212378227bac99353754ac8dda02feba5254f206",
+      "status": "PASS",
+      "description": "A block only in an earlier turn is not read, for hand-backs too",
+      "code_citation": "shared/resources/agent-reply-block.js:158",
+      "test_citation": "shared/resources/tests/agent-reply-block.test.mjs:351",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Covered by :351 (earlier hand-back, then a text turn with no block, answers no-block) and by the QA-4 test at :362 (a new prompt drops the earlier hand-back, in both prompt shapes, with a control). isPrompt at :133 clears the hand-back on a new prompt."
+    },
+    {
+      "id": "#5",
+      "text_hash": "d1fca0c7d7f1493d6e6d71ab8ff4a6d58cc5f302527c9cc63764e7b39ed4a57e",
+      "status": "PASS",
+      "description": "Other tool names never read; empty/non-string message answers transcript-unreadable",
+      "code_citation": "shared/resources/agent-reply-block.js:175",
+      "test_citation": "shared/resources/tests/agent-reply-block.test.mjs:427",
+      "members": [
+        {
+          "member": "tool_use of another name (Read)",
+          "evidence": "shared/resources/tests/agent-reply-block.test.mjs:427",
+          "status": "PASS"
+        },
+        {
+          "member": "empty or non-string message (empty string, 42, null, object)",
+          "evidence": "shared/resources/tests/agent-reply-block.test.mjs:436",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "The guard is the exact name SubagentHandback and a non-empty string input.message (:174-178)."
+    },
+    {
+      "id": "#6",
+      "text_hash": "726a90917ba3b40b9fe16ca71b519670022a254c2286326588467cee1d8a0261",
+      "status": "FAIL",
+      "description": "After any non-extracted answer, no file remains at --out, even a stale one",
+      "code_citation": "shared/resources/agent-reply-block.js:280",
+      "test_citation": "shared/resources/tests/agent-reply-block.test.mjs:453",
+      "members": [
+        {
+          "member": "transcript-not-found",
+          "evidence": "shared/resources/tests/agent-reply-block.test.mjs:453",
+          "status": "PASS"
+        },
+        {
+          "member": "transcript-unreadable",
+          "evidence": "shared/resources/tests/agent-reply-block.test.mjs:453",
+          "status": "PASS"
+        },
+        {
+          "member": "no-block",
+          "evidence": "shared/resources/tests/agent-reply-block.test.mjs:453",
+          "status": "PASS"
+        },
+        {
+          "member": "transcript-ambiguous",
+          "evidence": null,
+          "status": "FAIL"
+        },
+        {
+          "member": "empty-block",
+          "evidence": null,
+          "status": "FAIL"
+        },
+        {
+          "member": "entity-escaped",
+          "evidence": null,
+          "status": "FAIL"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "The members are the six non-extracted REASONS. usage is excluded: task section 3 says it is not a REASONS entry, and approved criterion #7 requires a usage answer to leave files alone. The code looks right, because clearOut (:280) runs before every branch, ambiguous included. But no test seeds a stale --out for transcript-ambiguous or empty-block. The tests at :192 and :197 never check --out. The entity-escaped test at :136 checks existsSync false only on a fresh path. The CLI test at finalise-rerun-scope.test.mjs:2117 repeats no-block only, and the base CLI test after it seeds no stale file. Unmapped: transcript-ambiguous, empty-block, entity-escaped."
+    },
+    {
+      "id": "#7",
+      "text_hash": "46a05721b5bea7dca35f6120555a48e0ab553ea9af8f032c27aa6360510f6fec",
+      "status": "PASS",
+      "description": "--out naming the --transcript is exit 2; transcript unchanged",
+      "code_citation": "shared/resources/agent-reply-block.js:401",
+      "test_citation": "shared/resources/tests/agent-reply-block.test.mjs:488",
+      "members": [],
+      "non_member_fail": null,
+      "note": "extractUsageError refuses by file identity (sameFile). extract repeats the guard at :277. :488 asserts CLI status 2 and the message, the transcript bytes unchanged, and a direct call not deleting it. :519 covers symlink, hard link and the agent-id route. criteria-drift reports #7 added, approved true (review-task), so the amendment is approved."
+    },
+    {
+      "id": "#8",
+      "text_hash": "fb1ad639ca1e103ef036cef647a140c849db965123bcbe5bd9f47beab5f661f3",
+      "status": "PASS",
+      "description": "finalise-rerun-scope extract on hand-back writes AC YAML; merge records verified",
+      "code_citation": "shared/resources/finalise-rerun-scope.js:1217",
+      "test_citation": "shared/resources/tests/finalise-rerun-scope.test.mjs:2035",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The CLI extract delegates to agentReplyBlock.extract. The test runs the extract CLI on the measured hand-back shape and asserts extracted, reply handback and the exact YAML. It then runs merge --sha256 and asserts reason merged, record.result.verified true and a matching sha256."
+    },
+    {
+      "id": "#9",
+      "text_hash": "631ae7e53a059d27d5405cd42b2bfb8141be6bb53020e25a5328ae27f0376e6f",
+      "status": "PASS",
+      "description": "One real host hand-back transcript extracted; command, reason, sha256 in QA report",
+      "code_citation": "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.qa.1.subagenthandback-replies-are-extracted.md:76",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "qa.1 lines 76-78 record the command (agent-reply-block.js extract --transcript .../agent-a7b3a36606dac7dad.jsonl --block finalise-ac-yaml), reason extracted, 17900 bytes, reply handback, sha256 77072d33...a970c9, and a cmp identical to the jq|awk hand copy. qa.3 section Real-transcript check repeats it after the turn-rule change, with the same hash."
+    },
+    {
+      "id": "#10",
+      "text_hash": "e3ee39cdabd0e87a431a854bc27ec262e0090815eb43e1ecde4c357e2be7e8c3",
+      "status": "FAIL",
+      "description": "Every new test red before its change; red runs in the QA report",
+      "code_citation": "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.qa.1.subagenthandback-replies-are-extracted.md:67",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "hand-back-only (:284)",
+          "evidence": "implementation report Red runs, line 72 (count only in qa.1:67)",
+          "status": "PASS"
+        },
+        {
+          "member": "text control reply field (:303)",
+          "evidence": "implementation report line 72",
+          "status": "PASS"
+        },
+        {
+          "member": "text after hand-back (:314)",
+          "evidence": "implementation report line 72",
+          "status": "PASS"
+        },
+        {
+          "member": "hand-back after text (:326)",
+          "evidence": "implementation report line 72",
+          "status": "PASS"
+        },
+        {
+          "member": "same-message tie (:340)",
+          "evidence": "implementation report line 72",
+          "status": "PASS"
+        },
+        {
+          "member": "stale --out (:453)",
+          "evidence": "implementation report line 72",
+          "status": "PASS"
+        },
+        {
+          "member": "--out = --transcript (:488)",
+          "evidence": "implementation report line 72",
+          "status": "PASS"
+        },
+        {
+          "member": "earlier hand-back then no-block text (:351)",
+          "evidence": null,
+          "status": "FAIL"
+        },
+        {
+          "member": "another tool name never read (:427)",
+          "evidence": null,
+          "status": "FAIL"
+        },
+        {
+          "member": "empty or non-string message (:436)",
+          "evidence": null,
+          "status": "FAIL"
+        },
+        {
+          "member": "QA-1 symlink/hard link/agent-id (:519)",
+          "evidence": "task.327.qa.2.subagenthandback-replies-are-extracted.md:23 (mutations g, h red)",
+          "status": "PASS"
+        },
+        {
+          "member": "QA-3 directory --out (:599)",
+          "evidence": "task.327.qa.2.subagenthandback-replies-are-extracted.md:26 (mutation i red)",
+          "status": "PASS"
+        },
+        {
+          "member": "QA-4 new prompt drops hand-back (:362)",
+          "evidence": "task.327.qa.3.subagenthandback-replies-are-extracted.md:23 (mutations j, k red)",
+          "status": "PASS"
+        },
+        {
+          "member": "QA-5 unchecked --out (:412)",
+          "evidence": "task.327.qa.3.subagenthandback-replies-are-extracted.md:24 (mutation l red)",
+          "status": "PASS"
+        },
+        {
+          "member": "CLI hand-back + merge (finalise-rerun-scope.test.mjs:2035)",
+          "evidence": "task.327.qa.1.subagenthandback-replies-are-extracted.md:156 (mutation a red)",
+          "status": "PASS"
+        },
+        {
+          "member": "CLI stale --out (finalise-rerun-scope.test.mjs:2117)",
+          "evidence": "task.327.qa.1.subagenthandback-replies-are-extracted.md:160 (mutation d red)",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "qa.1:67 itself records PASS (7 of 10): three new cases were never red before their change because they held rules that already held. Mutations (b), (c) and (c2) held them instead. Failing members: :351, :427, :436. The committed QA report also records only a count for the initial red runs, not the runs. The per-test list is in the implementation report (line 72), which this check does not accept as the committed record."
+    },
+    {
+      "id": "#11",
+      "text_hash": "53156fb905a4d1612728d6e37cc4842b56bfd3e7340e019ed2872ce23cb1b34a",
+      "status": "PASS",
+      "description": "Reverting any one remedy turns a named test red; mutation table in QA report",
+      "code_citation": "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.qa.1.subagenthandback-replies-are-extracted.md:156",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "(a) hand-back branch",
+          "evidence": "task.327.qa.1.subagenthandback-replies-are-extracted.md:156",
+          "status": "PASS"
+        },
+        {
+          "member": "(b) later-of-two order",
+          "evidence": "task.327.qa.1.subagenthandback-replies-are-extracted.md:157",
+          "status": "PASS"
+        },
+        {
+          "member": "(c) exact tool name",
+          "evidence": "task.327.qa.1.subagenthandback-replies-are-extracted.md:158",
+          "status": "PASS"
+        },
+        {
+          "member": "(c2) non-empty message",
+          "evidence": "task.327.qa.1.subagenthandback-replies-are-extracted.md:159",
+          "status": "PASS"
+        },
+        {
+          "member": "(d) rmSync of --out",
+          "evidence": "task.327.qa.1.subagenthandback-replies-are-extracted.md:160",
+          "status": "PASS"
+        },
+        {
+          "member": "(e) usage refusal",
+          "evidence": "task.327.qa.1.subagenthandback-replies-are-extracted.md:161",
+          "status": "PASS"
+        },
+        {
+          "member": "(f) in-extract same-file guard",
+          "evidence": "task.327.qa.1.subagenthandback-replies-are-extracted.md:162",
+          "status": "PASS"
+        },
+        {
+          "member": "(g, h) file identity / agent-id route",
+          "evidence": "task.327.qa.2.subagenthandback-replies-are-extracted.md:23",
+          "status": "PASS"
+        },
+        {
+          "member": "(i) directory refusal",
+          "evidence": "task.327.qa.2.subagenthandback-replies-are-extracted.md:26",
+          "status": "PASS"
+        },
+        {
+          "member": "(j, k) new-prompt hand-back clearing",
+          "evidence": "task.327.qa.3.subagenthandback-replies-are-extracted.md:23",
+          "status": "PASS"
+        },
+        {
+          "member": "(l) ENOENT-only lstat",
+          "evidence": "task.327.qa.3.subagenthandback-replies-are-extracted.md:24",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Every remedy has a committed mutation record that names the test that went red. The reply field is an added output rather than a remedy, and no mutation lists it. Its assertions at :303 and :284 would go red if it were removed."
+    },
+    {
+      "id": "#12",
+      "text_hash": "b7bebe77f25cfbb158e88a3f0e49cf5038f7a8cf760d0ee864c102f5b62cbbe8",
+      "status": "PASS",
+      "description": "npm test passes under CI=true; npm run bundle leaves no diff",
+      "code_citation": ".github/workflows/test.yml:58",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ fdcf01da16724a11529fe90781620c368020eda1 — RERUN_AT_HEAD is none. QA's ci:fast runs were on c1976c87 and 53bcb574, not the head fdcf01da. Both halves are CI state: test.yml:58 runs npm test (CI=true on Actions) on every pull_request, and validate.yml:128 runs bundle_skill.py --check. At read time, validate passed at the head and test was pending. A local cmp shows the bundled skills/finalise/references/agent-reply-block.js differs from the source only by its AUTO-GENERATED header line.",
+      "ci_reading": "CI reading 1: SUCCESS @ fdcf01da16724a11529fe90781620c368020eda1"
+    },
+    {
+      "id": "#13",
+      "text_hash": "6ffc69f4c3e39faa309c4553178a3e90f88bfec03959acfc83a64785c4e126f1",
+      "status": "PASS",
+      "description": "finalise SKILL.md says failed extract leaves no --out file, both paragraphs",
+      "code_citation": "skills/finalise/SKILL.md:733",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "SKILL.md:733 (probe-plan fallback) and :1031 (AC fallback) both say the failed extract 'wrote nothing, and removed any earlier file at that path', which states that no --out file is left in both places."
+    },
+    {
+      "id": "#14",
+      "text_hash": "6a5db7fb97567759df8e4e422b8d9bf17f587cb73d8e5cb04f4798bc83008d62",
+      "status": "PASS",
+      "description": "CHANGELOG [Unreleased] cites (task 327)",
+      "code_citation": "CHANGELOG.md:59",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "CHANGELOG.md:59 reads '/finalise extracts a subagent reply sent through SubagentHandback (task 327)'. It sits under '## [Unreleased]' (line 5) and above '[v0.69.0]'. changelog-cites.test.mjs tests the cites script on fixtures, not this repository's corpus, so no pinning test applies."
+    }
+  ],
+  "advisories": []
+}

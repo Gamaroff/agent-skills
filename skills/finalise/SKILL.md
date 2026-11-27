@@ -726,10 +726,11 @@ Skip it when `boundary` is `false` or `internal`. Otherwise:
      --agent-id "$AGENT_ID" --block finalise-probe-plan --out .claude/state/probe-plan.json --json
    ```
 
-   Read `reason`. `extracted`: the plan is on disk and byte-exact; record its `bytes` and `sha256` in the
+   Read `reason`. `extracted`: the plan is on disk and byte-exact; record its `bytes`, `sha256` and
+   `reply` (`text`, or `handback` when the agent answered through a `SubagentHandback` call) in the
    DoD as "plan extracted from the agent's transcript". Anything else (`transcript-not-found`,
    `transcript-ambiguous`, `transcript-unreadable`, `no-block`, `empty-block`, `entity-escaped`): the
-   extract wrote nothing; fall back to the old route — save `SECURITY_RESULT.probe_plan` as a JSON array to
+   extract wrote nothing, and removed any earlier file at that path; fall back to the old route — save `SECURITY_RESULT.probe_plan` as a JSON array to
    `.claude/state/probe-plan.json` with the Write tool — and record "plan hand-copied (unverified):
    {reason}" in the DoD, so a reader can tell a copy from an extraction. An absent or empty plan under
    `boundary: true` is written as `[]`; it is not skipped.
@@ -1021,12 +1022,13 @@ command node .agents/skills/finalise/references/finalise-rerun-scope.js extract 
   | tee ".claude/state/finalise-ac-extract-${DOD_N}.json"
 ```
 
-`reason: extracted`: the file is the agent's block byte for byte; read `sha256` from the output and
+`reason: extracted`: the file is the agent's block byte for byte, whether the agent replied in text or
+through a `SubagentHandback` call (the output's `reply` says which); read `sha256` from the output and
 pass it to `merge` below as `AC_SHA256` — `merge` re-hashes the file and answers `result-hash-mismatch`
 (nothing merged, nothing recorded) when it differs, then records `result.bytes`, `result.sha256` and
 `result.verified: true` in `…dod.{N}.ac.json`. Any other reason (`transcript-not-found`,
 `transcript-ambiguous`, `transcript-unreadable`, `no-block`, `empty-block`, `entity-escaped`) wrote
-nothing: fall back to saving agent 1's YAML, verbatim, to the same path with the file-write tool, leave
+nothing, and removed any earlier file at that path: fall back to saving agent 1's YAML, verbatim, to the same path with the file-write tool, leave
 `AC_SHA256` empty, and say "AC YAML hand-copied (unverified): {reason}" in the DoD. A record with
 `verified: false` says exactly that: its hash describes the file `merge` read, not proof it matches the
 agent's reply. Then:

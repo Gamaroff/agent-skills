@@ -5,18 +5,21 @@ type: task
 description: "Teach both extractors to read the `SubagentHandback` tool_use's `input.message` as the agent's reply when no final assistant text exists."
 tags: [finalise, observation]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-11-26
-updated: 2026-11-26
+updated: 2026-11-27
 estimated_effort_hours: 8
 github_issue: 952
+pr_number: 959
+completed_date: 2026-11-27
 ---
 
 # Technical Task: SubagentHandback replies are extracted, not hand-copied
 
-**Status:** Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.327.review.1.subagenthandback-replies-are-extracted.md` implemented 2026-11-26
 **GitHub Issue**: [#952](https://github.com/Gamaroff/agent-skills/issues/952)
 
 ---
@@ -97,8 +100,8 @@ The `user` tool-result line clears the tail. The reply is in `input.message`, so
 **Callers.** `git grep -ln agent-reply-block` over `skills/*/SKILL.md`, `shared/resources/*.{md,js,mjs}`
 and `scripts/`: `finalise-rerun-scope.js` (`require`, `:43`), `security-probe-plan.mjs:257` (a comment
 citing its entity rule, no call), the test, and `skills/finalise/SKILL.md`. The two prose call sites
-are `skills/finalise/SKILL.md:724` (probe-plan extract, fallback at `:729`–`:735`) and `:1020`
-(AC extract, fallback at `:1027`–`:1033`). Both say a failed extract "wrote nothing".
+are `skills/finalise/SKILL.md:725` (probe-plan extract, fallback at `:729`–`:735`) and `:1020`
+(AC extract, fallback at `:1026`–`:1032`). Both say a failed extract "wrote nothing".
 
 **Tests that hold today's decisions** (`git grep -n "transcript-unreadable\|tool_use" -- '*.test.*'`):
 
@@ -130,6 +133,9 @@ copy of the same message.
   then falls through to today's answers.
 - `extract` removes `opts.out` before it reads the transcript, once the usage checks have passed
   (`fs.rmSync(out, { force: true })`). Every answer except `extracted` then leaves no file there.
+- `extractUsageError` refuses an `--out` that resolves to the same path as `--transcript`
+  ("extract --out must not be the --transcript file"). Without it the new removal would delete the
+  transcript before reading it. The refusal is a usage error (exit 2), not a new `REASONS` entry.
 - The `extracted` answer gains `reply: "text" | "handback"`, so the DoD can say which shape it read.
 - `REASONS` does not change. `transcript-unreadable` keeps its meaning: unparseable, or no reply of
   either shape.
@@ -163,25 +169,26 @@ with the Write tool, as it does today.
 
 ### Phase 1: Read the hand-back reply (Risk: Low)
 
-- [ ] Add hand-back and resumed-agent fixtures to `agent-reply-block.test.mjs`, each red first
-- [ ] Teach `replyText` the later-of-two rule; return the shape with the text
-- [ ] Add `reply` to the `extracted` answer and the module header
+- [x] Add hand-back and resumed-agent fixtures to `agent-reply-block.test.mjs`, each red first
+- [x] Teach `replyText` the later-of-two rule; return the shape with the text
+- [x] Add `reply` to the `extracted` answer and the module header
 
 ### Phase 2: Clear `--out` before reading (Risk: Low)
 
-- [ ] Add a test with a stale `--out` file and a transcript that answers `no-block`; red first
-- [ ] Remove `opts.out` in `extract` once the usage checks have passed
+- [x] Add a test with a stale `--out` file and a transcript that answers `no-block`; red first
+- [x] Remove `opts.out` in `extract` once the usage checks have passed
+- [x] `extractUsageError` refuses `--out` equal to `--transcript`; a test shows the transcript survives and the call exits 2
 
 ### Phase 3: Callers and prose (Risk: Low)
 
-- [ ] Add a `finalise-rerun-scope.js extract` CLI test on a hand-back transcript (byte-exact, hash merges)
-- [ ] Update `skills/finalise/SKILL.md` at both fallback paragraphs
-- [ ] Run `npm run bundle`; add a CHANGELOG entry citing (task 327)
+- [x] Add a `finalise-rerun-scope.js extract` CLI test on a hand-back transcript (byte-exact, hash merges)
+- [x] Update `skills/finalise/SKILL.md` at both fallback paragraphs
+- [x] Run `npm run bundle`; add a CHANGELOG entry citing (task 327)
 
 ### Phase 4: Verify (Risk: Low)
 
-- [ ] Mutation table: revert each remedy, name the test that goes red
-- [ ] `npm test` under `CI=true` on the LAN server; `npm run bundle:check` clean
+- [x] Mutation table: revert each remedy, name the test that goes red
+- [x] `npm test` under `CI=true` on the LAN server; `npm run bundle:check` clean
 
 ## 7. Files Summary
 
@@ -219,6 +226,7 @@ bundled copy (`ls skills/*/references/agent-reply-block.js | wc -l` = 1 on 2026-
 - **Another tool named in a `tool_use`** (`Read`, with a `message`-shaped input). Not a reply.
 - **Hand-back with an empty or non-string `message`.** Answers `transcript-unreadable`.
 - **Stale `--out`.** A file at `--out` plus a transcript that answers `no-block`. The file is gone afterwards.
+- **`--out` is the transcript.** `--out` and `--transcript` name one file. The CLI exits 2 with the usage message and the transcript is unchanged.
 
 **Byte-exactness.** The hand-back fixture carries the seven characters a hand copy loses
 (`CONTROLS`, test line 91), and the extracted file must equal the block exactly.
@@ -236,12 +244,13 @@ command and its `reason` and `sha256` in the QA report.
 - [ ] A block only in an earlier turn is not read (the existing final-turn rule holds for hand-backs; Phase 1)
 - [ ] A `tool_use` of any other name is never read as a reply; an empty or non-string hand-back `message` answers `transcript-unreadable` (Phase 1: no candidate returns `null`)
 - [ ] After any answer but `extracted`, no file exists at `--out`, even when one existed before (Phase 2)
+- [ ] An `--out` that names the `--transcript` file is a usage error (exit 2) and the transcript is left unchanged (Phase 2) — added in review 1 (Important fix), approved by review-task
 - [ ] `finalise-rerun-scope.js extract` on a hand-back transcript writes the AC YAML, and `merge` with its `sha256` records `verified: true` (Phase 3)
 - [ ] One real hand-back transcript from this host extracts, with the command, `reason` and `sha256` recorded in the QA report
 
 **Code quality:**
 
-- [ ] Every new test was red before its change; the red runs are in the QA report
+- [ ] Every new test was red before its change, or, for a test that guards a rule which already held before the change, red under a named mutation of that rule; the red runs and mutations are in the QA report — amended after DoD 1 (a guard of a pre-existing rule cannot be red before the change), approved by the owner, 2026-11-27
 - [ ] Reverting any one remedy turns a named test red; the mutation table is in the QA report
 - [ ] `npm test` passes under `CI=true`; `npm run bundle` leaves no diff
 
@@ -273,20 +282,103 @@ agent's block, or a text-reply transcript answers differently from before. Steps
 
 **Forward fix.** A new reply shape gets its own fixture and reader branch.
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-27
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.327.qa.4.subagenthandback-replies-are-extracted.md](./task.327.qa.4.subagenthandback-replies-are-extracted.md)
+- **Gate File**: [task.327.gate.4.subagenthandback-replies-are-extracted.yml](./task.327.gate.4.subagenthandback-replies-are-extracted.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 20, plus ci:fast 8926 tests (8923 pass, 0 fail)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+Both DoD 1 gaps are closed. #6 has a stale `--out` case for every non-extracted reason. #10 was amended with an approver and is met by named mutations. Two advisory items are recorded in gate 4.
+
+## Definition of Done - Gaps Identified — run 1 (historical, superseded)
+
+> Superseded by DoD run 2 (`task.327.dod.2.subagenthandback-replies-are-extracted.md`), which closed both gaps below: #6 by commit 1d914ac8e, and #10 by the owner-approved amendment plus the mutation evidence in QA cycle 4.
+
+**Status (run 1):** IN PROGRESS
+
+### QA Gate Status
+
+**Gate File**: `task.327.gate.3.subagenthandback-replies-are-extracted.yml`
+**Gate Status**: ✅ PASS (92/100). PR review: ✅ APPROVE. CI reading 1: SUCCESS @ `fdcf01da1672`. Security: 23 probed, 0 reproduced.
+
+### Missing Criteria:
+
+- [ ] #6: add stale-`--out` tests for `transcript-ambiguous`, `empty-block` and `entity-escaped`. The code is right; only 3 of the 6 non-extracted reasons are tested with a stale file in place.
+- [ ] #10: three new tests (`agent-reply-block.test.mjs:351`, `:427`, `:436`) guard rules that already held, so they could never be red before the change. This needs an owner decision: amend the criterion (for example, accept mutation-red evidence for guards of pre-existing rules) or accept it as is.
+
+### Next Steps:
+
+- Decide #10 (owner).
+- Add the #6 test cases, then run QA cycle 4 (a code change re-enters QA).
+- Re-run `/finalise`.
+
+**Estimated Effort:** Small
+
+**Gap Report Generated:** 2026-11-26
+
+**Detailed Verification Log:** See `task.327.dod.1.subagenthandback-replies-are-extracted.md` for the complete verification evidence and timestamps.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.327.qa.4.subagenthandback-replies-are-extracted.md`
+**Gate File**: `task.327.gate.4.subagenthandback-replies-are-extracted.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified (DoD run 2):
+
+✅ **Success Criteria:** 14/14 met. #6 and #10, the run 1 gaps, are closed. #12 was graded from CI reading 1, SUCCESS @ `24ce5725c001`.
+✅ **Tests:** `shared/resources/tests/agent-reply-block.test.mjs` (20 tests) and `finalise-rerun-scope.test.mjs`. Every new test was red before its change or red under a named mutation (qa.1, qa.4).
+✅ **PR Review:** PR #959. pr-review.2 is CONCERNS with no coverage finding, and both its findings are closed.
+✅ **Documentation:** `skills/finalise/SKILL.md` fallback prose updated; CHANGELOG cites (task 327).
+✅ **Security Review:** ✅ PASS. 23 probes executed, 0 reproduced, 0 escaped (`task.327.dod.2.security.run.json`).
+✅ **Compliance Review:** not applicable (internal tooling).
+
+**Task marked as ACCEPTED on:** 2026-11-27
+
+**Detailed Verification Log:** See `task.327.dod.2.subagenthandback-replies-are-extracted.md` for the complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
 | Date | Version | Description | Author |
-| --- | --- | --- | --- |
+|------|---------|-------------|--------|
 | 2026-11-26 | 1.0 | Initial draft — cut from observation #185 | create-task |
+| 2026-11-26 | 1.1 | Review passed (9/10) — added the `--out` = `--transcript` refusal, its fixture and criterion; corrected two SKILL.md anchors | review-task |
+| 2026-11-26 |  | Status → ready-for-development | review-task |
+| 2026-11-26 |  | Implemented — 6 files, 13 tests | develop |
+| 2026-11-26 |  | QA gate CONCERNS (80/100) — 4 findings | qa-task |
+| 2026-11-26 |  | QA findings fixed (4 of 4) — gate 1 CONCERNS, 1 iteration | qa-fix |
+| 2026-11-26 |  | QA gate FAIL (70/100) — 2 findings | qa-task |
+| 2026-11-26 |  | QA findings fixed (2 of 2) — gate 2 FAIL, 2 iterations | qa-fix |
+| 2026-11-26 |  | QA gate PASS (92/100) — 0 findings | qa-task |
+| 2026-11-26 |  | DoD incomplete — 2 gaps identified | finalise |
+| 2026-11-27 |  | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-11-27 | 1.2 | DoD passed — accepted (PR #959) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
 
-- [ ] Phase 1: Read the hand-back reply
-- [ ] Phase 2: Clear `--out` before reading
-- [ ] Phase 3: Callers and prose
-- [ ] Phase 4: Verify
+- [x] Phase 1: Read the hand-back reply
+- [x] Phase 2: Clear `--out` before reading
+- [x] Phase 3: Callers and prose
+- [x] Phase 4: Verify
 
 ## References
 

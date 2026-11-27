@@ -1,0 +1,84 @@
+schema: 2
+task: 'task.327.subagenthandback-replies-are-extracted'
+task_title: 'SubagentHandback replies are extracted, not hand-copied'
+gate: FAIL
+status_reason: 'All four cycle-1 findings are fixed. The refute pass found that a hand-back from an earlier turn is still read as the reply after a new prompt (reproduced; high), which breaks the final-turn rule the task promises, and an lstat that cannot look is read as nothing there (reproduced crash; low).'
+reviewer: 'QA Engineer'
+head: '17b74641b5cbcc9f3d1d88d8da27c296c8a0b192'
+updated: '2026-11-26T20:57:45Z'
+
+top_issues:
+  - id: 'T327-QA-4'
+    severity: high
+    file: 'shared/resources/agent-reply-block.js'
+    finding: 'replyText clears the text tail on every user line but never clears the hand-back, so a resumed agent that has not answered yet returns its previous turn''s SubagentHandback as extracted. Reproduced by QA: user prompt, SubagentHandback with a block, its tool_result, a NEW user prompt, a Read tool_use and its tool_result gives extracted / reply: handback with the old block. Control: the first three rows alone are correctly extracted. Base answers transcript-unreadable, so the defect is new. Breaks criterion 4 (a block only in an earlier turn is not read). origin: code-review CR-1 (high/high), reproduced by QA.'
+    suggested_action: 'Clear the hand-back on a user line that is a new prompt (string content, or any block that is not a tool_result), keeping it across its own tool_result; add the resumed-agent test.'
+    suggested_owner: dev
+    status: open
+  - id: 'T327-QA-5'
+    severity: low
+    file: 'shared/resources/agent-reply-block.js'
+    finding: 'clearOut reads any lstat error as nothing there. Reproduced by QA: --out under a regular file (ENOTDIR) skips the removal, and the later mkdirSync throws an uncaught EEXIST instead of a named answer. origin: code-review CR-2 (low/medium), reproduced by QA.'
+    suggested_action: 'Treat only ENOENT as nothing there; any other lstat error is a named refusal. Add a test.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 83
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: ["never"]
+    boundary_reason: 'The never wording names reply selection and self-deletion. replyText reads only harness-written transcript JSONL, which no corpus sink models (boundary: internal). sameFile and extractUsageError are identity guards, not hostile-input gates. Each is held by named tests and mutations; the alias routes are tested.'
+    notes: 'Cycle-1 data-loss path closed (T327-QA-1 verified).'
+  performance:
+    status: PASS
+    notes: 'Unchanged: one pass over the transcript.'
+  reliability:
+    status: FAIL
+    notes: 'A stale hand-back is extracted as the current reply after a resume (T327-QA-4).'
+  maintainability:
+    status: PASS
+    notes: 'Advisory cleanup CR-3: the module header says every answer but extracted leaves no --out file, which a usage answer does not honour.'
+
+criteria_drift:
+  reason: drift
+  base: review-commit
+  changed:
+    - id: '#7'
+      kind: added
+      approved: true
+
+recommendations:
+  immediate:
+    - action: 'Fix T327-QA-4 with a resumed-agent test.'
+      refs: ['shared/resources/agent-reply-block.js']
+  future:
+    - action: 'Header wording (CR-3): usage answers leave --out in place; a symlink --out is unlinked, not followed.'
+      refs: ['shared/resources/agent-reply-block.js']
+      remedy: unverified
+
+bug_resolution:
+  bugs_fixed: 4
+  bugs_remaining: 0
+  fix_date: '2026-11-26'
+  total_iterations: 1
+  verification_method: 'Named tests, mutations g-i, reproduction probes re-run against 17b74641b'
+
+deployment_readiness:
+  staging: BLOCKED
+  production: BLOCKED
+  conditions: ['T327-QA-4 fixed']

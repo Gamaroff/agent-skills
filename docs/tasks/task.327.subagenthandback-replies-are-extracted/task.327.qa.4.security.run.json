@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": "path",
+      "entry": "cli:shared/resources/agent-reply-block.js",
+      "name": "agent-reply-block extract --out identity guard (--transcript)",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 8,
+      "passed": 8,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "observation_limits": [
+        "effects-after-accept"
+      ],
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "extract",
+        "--transcript",
+        "t.jsonl",
+        "--block",
+        "finalise-ac-yaml",
+        "--out",
+        "{input}"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "fixture_copy": null,
+      "ran_at": "2026-11-27T00:49:04.725Z"
+    },
+    {
+      "sink": "path",
+      "entry": "cli:shared/resources/agent-reply-block.js",
+      "name": "agent-reply-block extract reply selection",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 12,
+      "passed": 12,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "observation_limits": [
+        "effects-after-accept"
+      ],
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "extract",
+        "--transcript",
+        "{input}",
+        "--block",
+        "finalise-ac-yaml",
+        "--out",
+        "ac.yaml"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "fixture_copy": null,
+      "ran_at": "2026-11-27T00:49:06.118Z"
+    },
+    {
+      "sink": "path",
+      "entry": "cli:shared/resources/agent-reply-block.js",
+      "name": "agent-reply-block extract --out identity guard (--agent-id)",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 3,
+      "passed": 3,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "observation_limits": [
+        "effects-after-accept"
+      ],
+      "shells": null,
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "extract",
+        "--agent-id",
+        "abc",
+        "--projects-root",
+        "{fixture}",
+        "--block",
+        "finalise-ac-yaml",
+        "--out",
+        "{input}"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "fixture_copy": null,
+      "ran_at": "2026-11-27T00:49:06.510Z"
+    }
+  ],
+  "totals": {
+    "executed": 23,
+    "reproduced": 0,
+    "escaped": 0
+  },
+  "updated_at": "2026-11-27T00:49:06.510Z"
+}

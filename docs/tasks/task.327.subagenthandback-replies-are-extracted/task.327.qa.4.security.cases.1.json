@@ -1,0 +1,143 @@
+[
+  {
+    "id": "out-is-transcript",
+    "direction": "hostile",
+    "input": "t.jsonl",
+    "why": "--out naming the transcript would delete the input before reading it",
+    "correct": "usage error, exit 2, transcript kept",
+    "expected": {
+      "exit": 2,
+      "stdout": "usage: extract --out must not be the --transcript file\nusage: agent-reply-block.js extract (--agent-id <id> | --transcript <file>) --block <info-string> --out <path> [--projects-root <dir>] [--json]\n"
+    },
+    "fixture": {
+      "files": {
+        "t.jsonl": "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"thinking\",\"thinking\":\"x\"}]}}\n{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"t1\",\"name\":\"SubagentHandback\",\"input\":{\"message\":\"```finalise-ac-yaml\\nok: true\\n```\"}}]}}\n{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"t1\",\"content\":\"ok\"}]}}\n{\"type\":\"attachment\"}\n"
+      }
+    },
+    "spec_ref": "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md:246"
+  },
+  {
+    "id": "out-is-transcript-dot",
+    "direction": "hostile",
+    "input": "./t.jsonl",
+    "why": "alternative spelling of the same path",
+    "correct": "usage error, exit 2",
+    "expected": {
+      "exit": 2,
+      "stdout": "usage: extract --out must not be the --transcript file\nusage: agent-reply-block.js extract (--agent-id <id> | --transcript <file>) --block <info-string> --out <path> [--projects-root <dir>] [--json]\n"
+    },
+    "fixture": {
+      "files": {
+        "t.jsonl": "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"thinking\",\"thinking\":\"x\"}]}}\n{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"t1\",\"name\":\"SubagentHandback\",\"input\":{\"message\":\"```finalise-ac-yaml\\nok: true\\n```\"}}]}}\n{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"t1\",\"content\":\"ok\"}]}}\n{\"type\":\"attachment\"}\n"
+      }
+    },
+    "spec_ref": "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md:135"
+  },
+  {
+    "id": "out-is-transcript-dotdot",
+    "direction": "hostile",
+    "input": "sub/../t.jsonl",
+    "why": "a .. segment resolving to the transcript",
+    "correct": "usage error, exit 2",
+    "expected": {
+      "exit": 2,
+      "stdout": "usage: extract --out must not be the --transcript file\nusage: agent-reply-block.js extract (--agent-id <id> | --transcript <file>) --block <info-string> --out <path> [--projects-root <dir>] [--json]\n"
+    },
+    "fixture": {
+      "files": {
+        "t.jsonl": "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"thinking\",\"thinking\":\"x\"}]}}\n{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"t1\",\"name\":\"SubagentHandback\",\"input\":{\"message\":\"```finalise-ac-yaml\\nok: true\\n```\"}}]}}\n{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"t1\",\"content\":\"ok\"}]}}\n{\"type\":\"attachment\"}\n",
+        "sub/keep": ""
+      }
+    },
+    "spec_ref": "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md:135"
+  },
+  {
+    "id": "out-is-transcript-trailing-dot",
+    "direction": "hostile",
+    "input": "t.jsonl/.",
+    "why": "a trailing /. that resolves onto the transcript",
+    "correct": "usage error, exit 2",
+    "expected": {
+      "exit": 2,
+      "stdout": "usage: extract --out must not be the --transcript file\nusage: agent-reply-block.js extract (--agent-id <id> | --transcript <file>) --block <info-string> --out <path> [--projects-root <dir>] [--json]\n"
+    },
+    "fixture": {
+      "files": {
+        "t.jsonl": "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"thinking\",\"thinking\":\"x\"}]}}\n{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"t1\",\"name\":\"SubagentHandback\",\"input\":{\"message\":\"```finalise-ac-yaml\\nok: true\\n```\"}}]}}\n{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"t1\",\"content\":\"ok\"}]}}\n{\"type\":\"attachment\"}\n"
+      }
+    },
+    "spec_ref": "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md:135"
+  },
+  {
+    "id": "out-fresh-file",
+    "direction": "legitimate",
+    "input": "ac.yaml",
+    "why": "the ordinary call",
+    "correct": "extracted, exit 0",
+    "expected": {
+      "exit": 0,
+      "stdout": "extracted 9 bytes sha256=e4959e64276da4756978788e4a473eb17435c52f6dc936fe551cbb310e2e00d0 -> ac.yaml\n"
+    },
+    "fixture": {
+      "files": {
+        "t.jsonl": "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"thinking\",\"thinking\":\"x\"}]}}\n{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"t1\",\"name\":\"SubagentHandback\",\"input\":{\"message\":\"```finalise-ac-yaml\\nok: true\\n```\"}}]}}\n{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"t1\",\"content\":\"ok\"}]}}\n{\"type\":\"attachment\"}\n"
+      }
+    },
+    "spec_ref": "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md:240"
+  },
+  {
+    "id": "out-nested-new-dir",
+    "direction": "legitimate",
+    "input": "state/ac.yaml",
+    "why": "an --out under a directory that does not exist yet",
+    "correct": "extracted, exit 0",
+    "expected": {
+      "exit": 0,
+      "stdout": "extracted 9 bytes sha256=e4959e64276da4756978788e4a473eb17435c52f6dc936fe551cbb310e2e00d0 -> state/ac.yaml\n"
+    },
+    "fixture": {
+      "files": {
+        "t.jsonl": "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"thinking\",\"thinking\":\"x\"}]}}\n{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"t1\",\"name\":\"SubagentHandback\",\"input\":{\"message\":\"```finalise-ac-yaml\\nok: true\\n```\"}}]}}\n{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"t1\",\"content\":\"ok\"}]}}\n{\"type\":\"attachment\"}\n"
+      }
+    },
+    "spec_ref": "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md:240"
+  },
+  {
+    "id": "out-near-miss-name",
+    "direction": "legitimate",
+    "input": "t.jsonl.out",
+    "why": "a name sharing the transcript prefix is a different file",
+    "correct": "extracted, exit 0",
+    "expected": {
+      "exit": 0,
+      "stdout": "extracted 9 bytes sha256=e4959e64276da4756978788e4a473eb17435c52f6dc936fe551cbb310e2e00d0 -> t.jsonl.out\n"
+    },
+    "fixture": {
+      "files": {
+        "t.jsonl": "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"thinking\",\"thinking\":\"x\"}]}}\n{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"tool_use\",\"id\":\"t1\",\"name\":\"SubagentHandback\",\"input\":{\"message\":\"```finalise-ac-yaml\\nok: true\\n```\"}}]}}\n{\"type\":\"user\",\"message\":{\"content\":[{\"type\":\"tool_result\",\"tool_use_id\":\"t1\",\"content\":\"ok\"}]}}\n{\"type\":\"attachment\"}\n"
+      }
+    },
+    "spec_ref": "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md:240"
+  },
+  {
+    "id": "stale-out-removed-on-no-block",
+    "direction": "legitimate",
+    "input": "stale.yaml",
+    "why": "a failed extract must not leave an earlier run file",
+    "correct": "no-block, exit 0, stale.yaml removed",
+    "expected": {
+      "exit": 0,
+      "stdout": "no-block: the reply has no fenced block with the info string \"finalise-ac-yaml\"\n",
+      "removed": [
+        "stale.yaml"
+      ]
+    },
+    "fixture": {
+      "files": {
+        "t.jsonl": "{\"type\":\"assistant\",\"message\":{\"content\":[{\"type\":\"text\",\"text\":\"no block here\"}]}}\n",
+        "stale.yaml": "old: true\n"
+      }
+    },
+    "spec_ref": "docs/tasks/task.327.subagenthandback-replies-are-extracted/task.327.subagenthandback-replies-are-extracted.md:245"
+  }
+]

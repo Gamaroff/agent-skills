@@ -14,7 +14,9 @@ import {
   mkdtempSync,
   readFileSync,
   existsSync,
+  linkSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -237,6 +239,424 @@ test("extract: only the final turn is read — a block quoted in an earlier turn
       projectsRoot: join(dir, "projects"),
     });
     assert.equal(r.reason, "no-block");
+  }));
+
+// ---- task 327: the SubagentHandback reply shape, and a cleared --out ----
+
+/** A transcript file made of exactly `rows`, one JSON line each. */
+function rowsTranscript(dir, id, rows) {
+  const d = join(dir, "projects", "p", "s", "subagents");
+  mkdirSync(d, { recursive: true });
+  const f = join(d, `agent-${id}.jsonl`);
+  writeFileSync(f, rows.map((r) => JSON.stringify(r)).join("\n") + "\n");
+  return f;
+}
+const asst = (content) => ({
+  type: "assistant",
+  message: { role: "assistant", content },
+});
+const text = (t) => ({ type: "text", text: t });
+const handback = (message, name = "SubagentHandback") => ({
+  type: "tool_use",
+  id: "toolu_1",
+  name,
+  input: { message },
+});
+const toolResult = {
+  type: "user",
+  message: { role: "user", content: [{ type: "tool_result" }] },
+};
+const attachment = { type: "attachment", attachment: { type: "x" } };
+const fenced = (body) => "```finalise-ac-yaml\n" + body + "\n```\n";
+function run327(dir, id, rows, extra = {}) {
+  rowsTranscript(dir, id, rows);
+  const out = join(dir, `${id}.yaml`);
+  const r = arb.extract({
+    agentId: id,
+    block: "finalise-ac-yaml",
+    out,
+    projectsRoot: join(dir, "projects"),
+    ...extra,
+  });
+  return { r, out };
+}
+
+test("task 327: a hand-back-only transcript (the measured host shape) is extracted byte for byte", () =>
+  withDir((dir) => {
+    const body = `ac: "a${CONTROLS.join("|")}|b\rc"`;
+    const { r, out } = run327(dir, "h1", [
+      { type: "user", message: { role: "user", content: "task" } },
+      asst([{ type: "thinking", thinking: "…" }]),
+      asst([handback("Done.\n" + fenced(body))]),
+      toolResult,
+      attachment,
+    ]);
+    assert.equal(r.reason, "extracted");
+    assert.equal(r.reply, "handback");
+    const got = readFileSync(out);
+    assert.deepEqual(got, Buffer.from(body + "\n", "utf8"));
+    for (const ch of CONTROLS) assert.ok(got.toString("utf8").includes(ch));
+    assert.ok(got.toString("utf8").includes("b\rc"), "the lone CR is kept");
+    assert.equal(r.sha256, arb.sha256(got));
+  }));
+
+test("task 327: a final-turn text reply (control) answers extracted with reply: text and the same bytes", () =>
+  withDir((dir) => {
+    const { r, out } = run327(dir, "c1", [
+      { type: "user", message: { role: "user", content: "task" } },
+      asst([text("here\n" + fenced("t: 1"))]),
+    ]);
+    assert.equal(r.reason, "extracted");
+    assert.equal(r.reply, "text");
+    assert.equal(readFileSync(out, "utf8"), "t: 1\n");
+  }));
+
+test("task 327: of a text reply and a hand-back, the later one wins — text after hand-back", () =>
+  withDir((dir) => {
+    const { r, out } = run327(dir, "o1", [
+      asst([handback(fenced("old: handback"))]),
+      toolResult,
+      asst([text(fenced("new: text"))]),
+    ]);
+    assert.equal(r.reason, "extracted");
+    assert.equal(r.reply, "text");
+    assert.equal(readFileSync(out, "utf8"), "new: text\n");
+  }));
+
+test("task 327: of a text reply and a hand-back, the later one wins — hand-back after text", () =>
+  withDir((dir) => {
+    const { r, out } = run327(dir, "o2", [
+      asst([text(fenced("old: text"))]),
+      toolResult,
+      asst([handback(fenced("new: handback"))]),
+      toolResult,
+      attachment,
+    ]);
+    assert.equal(r.reason, "extracted");
+    assert.equal(r.reply, "handback");
+    assert.equal(readFileSync(out, "utf8"), "new: handback\n");
+  }));
+
+test("task 327: a text block and a hand-back in ONE message — the hand-back, the later block, wins", () =>
+  withDir((dir) => {
+    const { r, out } = run327(dir, "o3", [
+      asst([text(fenced("same: text")), handback(fenced("same: handback"))]),
+      toolResult,
+    ]);
+    assert.equal(r.reason, "extracted");
+    assert.equal(r.reply, "handback");
+    assert.equal(readFileSync(out, "utf8"), "same: handback\n");
+  }));
+
+test("task 327: a block only in an earlier hand-back, then a text turn with no block, answers no-block", () =>
+  withDir((dir) => {
+    const { r, out } = run327(dir, "e1", [
+      asst([handback(fenced("old: 1"))]),
+      toolResult,
+      asst([text("no block now")]),
+    ]);
+    assert.equal(r.reason, "no-block");
+    assert.equal(existsSync(out), false);
+  }));
+
+test("task 327 QA-4: a hand-back from an earlier turn is not the reply once a new prompt opens a turn", () =>
+  withDir((dir) => {
+    const prompt = {
+      type: "user",
+      message: { role: "user", content: "now redo it" },
+    };
+    const promptBlocks = {
+      type: "user",
+      message: {
+        role: "user",
+        content: [{ type: "text", text: "now redo it" }],
+      },
+    };
+    const earlier = [
+      { type: "user", message: { role: "user", content: "task" } },
+      asst([handback("Done.\n" + fenced("old: 1"))]),
+      toolResult,
+    ];
+    // Resumed and still working: no reply yet, so nothing is extracted — in either prompt shape.
+    for (const [id, p] of [
+      ["r1", prompt],
+      ["r2", promptBlocks],
+    ]) {
+      const { r, out } = run327(dir, id, [
+        ...earlier,
+        p,
+        asst([handback("x", "Read")]),
+        toolResult,
+      ]);
+      assert.equal(
+        r.reason,
+        "transcript-unreadable",
+        `${id}: no reply in the open turn`,
+      );
+      assert.equal(existsSync(out), false);
+    }
+    // Resumed and answered by a new hand-back: the new one is the reply.
+    const { r: r3, out: out3 } = run327(dir, "r3", [
+      ...earlier,
+      prompt,
+      asst([handback("Again.\n" + fenced("new: 2"))]),
+      toolResult,
+    ]);
+    assert.equal(r3.reason, "extracted");
+    assert.equal(readFileSync(out3, "utf8"), "new: 2\n");
+    // Control: the hand-back's own tool_result does not end its turn.
+    const { r: r4 } = run327(dir, "r4", earlier);
+    assert.equal(r4.reason, "extracted");
+  }));
+
+test("task 327 QA-5: an --out that cannot be checked is a named usage error, not a crash", () =>
+  withDir((dir) => {
+    const f = rowsTranscript(dir, "e1", [asst([text(fenced("a: 1"))])]);
+    const file = join(dir, "plain");
+    writeFileSync(file, "x\n");
+    const r = arb.extract({
+      transcript: f,
+      block: "finalise-ac-yaml",
+      out: join(file, "sub.yaml"),
+    });
+    assert.equal(r.reason, "usage");
+    assert.equal(r.exitCode, 2);
+    assert.match(r.message, /cannot be checked/);
+  }));
+
+test("task 327: a tool_use of another name is never read as a reply", () =>
+  withDir((dir) => {
+    const { r } = run327(dir, "n1", [
+      asst([handback(fenced("not: a reply"), "Read")]),
+      toolResult,
+    ]);
+    assert.equal(r.reason, "transcript-unreadable");
+  }));
+
+test("task 327: a hand-back whose message is empty or not a string answers transcript-unreadable", () =>
+  withDir((dir) => {
+    for (const [id, m] of [
+      ["m1", ""],
+      ["m2", 42],
+      ["m3", null],
+      ["m4", { text: fenced("x: 1") }],
+    ]) {
+      const { r } = run327(dir, id, [asst([handback(m)]), toolResult]);
+      assert.equal(
+        r.reason,
+        "transcript-unreadable",
+        `message ${JSON.stringify(m)}`,
+      );
+    }
+  }));
+
+test("task 327: after any answer but extracted, no file is left at --out, even a stale one", () =>
+  withDir((dir) => {
+    const out = join(dir, "stale.yaml");
+    const root = join(dir, "projects");
+    const cases = [
+      [
+        "no-block",
+        () =>
+          rowsTranscript(dir, "s1", [asst([text("none")])]) && {
+            agentId: "s1",
+          },
+      ],
+      ["transcript-not-found", () => ({ agentId: "missing" })],
+      [
+        "transcript-unreadable",
+        () => {
+          const f = join(dir, "junk.jsonl");
+          writeFileSync(f, "not json\n");
+          return { transcript: f };
+        },
+      ],
+      [
+        "transcript-ambiguous",
+        () => {
+          transcript(dir, "dup", fenced("a: 1"), { session: "s1" });
+          transcript(dir, "dup", fenced("a: 1"), { session: "s2" });
+          return { agentId: "dup" };
+        },
+      ],
+      [
+        "empty-block",
+        () => {
+          transcript(dir, "em", "```finalise-ac-yaml\n\n```\n");
+          return { agentId: "em" };
+        },
+      ],
+      [
+        "entity-escaped",
+        () => {
+          transcript(dir, "esc", fenced('i: "&lt;!-- x --&gt;"'));
+          return { agentId: "esc" };
+        },
+      ],
+    ];
+    // Every non-extracted reason in REASONS is seeded here (criterion #6); a new reason that is
+    // not added to this list fails the coverage check below.
+    const covered = new Set(cases.map(([w]) => w));
+    assert.ok(arb.REASONS.length >= 7, "REASONS is exported and non-empty");
+    for (const reason of arb.REASONS) {
+      if (reason !== "extracted") {
+        assert.ok(covered.has(reason), `stale --out case for ${reason}`);
+      }
+    }
+    const leaked = [];
+    for (const [want, setup] of cases) {
+      writeFileSync(out, "run 1's 7-entry plan\n");
+      const r = arb.extract({
+        block: "finalise-ac-yaml",
+        out,
+        projectsRoot: root,
+        ...setup(),
+      });
+      assert.equal(r.reason, want);
+      if (existsSync(out)) leaked.push(want);
+    }
+    // Every reason is run before the verdict, so a regression names each reason it reaches.
+    assert.deepEqual(leaked, [], "these answers left a stale --out file");
+  }));
+
+test("task 327: an --out that names the --transcript file is a usage error and the transcript survives", () =>
+  withDir((dir) => {
+    const f = rowsTranscript(dir, "same", [asst([text(fenced("a: 1"))])]);
+    const before = readFileSync(f);
+    const r = spawnSync(
+      process.execPath,
+      [
+        MOD,
+        "extract",
+        "--transcript",
+        f,
+        "--block",
+        "finalise-ac-yaml",
+        "--out",
+        f,
+        "--json",
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(r.status, 2);
+    assert.match(r.stdout, /--out must not be the --transcript file/);
+    assert.deepEqual(readFileSync(f), before);
+    // A direct caller skips the CLI's usage check: extract itself must not delete its own input.
+    arb.extract({ transcript: f, block: "finalise-ac-yaml", out: f });
+    assert.equal(
+      existsSync(f),
+      true,
+      "extract never removes the transcript it reads",
+    );
+  }));
+
+test("task 327 QA-1: an --out that is the transcript by symlink, hard link or the agent-id route is refused and the transcript survives", () =>
+  withDir((dir) => {
+    const f = rowsTranscript(dir, "alias", [asst([text(fenced("a: 1"))])]);
+    const before = readFileSync(f);
+    const link = join(dir, "link.jsonl");
+    symlinkSync(f, link);
+    const hard = join(dir, "hard.jsonl");
+    linkSync(f, hard);
+    const cli = (transcript, out) =>
+      spawnSync(
+        process.execPath,
+        [
+          MOD,
+          "extract",
+          "--transcript",
+          transcript,
+          "--block",
+          "finalise-ac-yaml",
+          "--out",
+          out,
+          "--json",
+        ],
+        { encoding: "utf8" },
+      );
+    const routes = [
+      [
+        "CLI: --transcript a symlink, --out the file",
+        () => cli(link, f).status,
+      ],
+      [
+        "CLI: --transcript the file, --out a symlink",
+        () => cli(f, link).status,
+      ],
+      [
+        "CLI: --transcript a hard link, --out the file",
+        () => cli(hard, f).status,
+      ],
+      [
+        "direct: --transcript a symlink",
+        () =>
+          arb.extract({ transcript: link, block: "finalise-ac-yaml", out: f })
+            .exitCode,
+      ],
+      [
+        "direct: --transcript a hard link",
+        () =>
+          arb.extract({ transcript: hard, block: "finalise-ac-yaml", out: f })
+            .exitCode,
+      ],
+      [
+        "direct: --agent-id finds the --out file",
+        () =>
+          arb.extract({
+            agentId: "alias",
+            block: "finalise-ac-yaml",
+            out: f,
+            projectsRoot: join(dir, "projects"),
+          }).exitCode,
+      ],
+    ];
+    for (const [name, run] of routes) {
+      assert.equal(run(), 2, `${name}: a usage error`);
+      assert.deepEqual(
+        readFileSync(f),
+        before,
+        `${name}: the transcript survives`,
+      );
+    }
+    // Control: a different file at --out is still cleared and written.
+    const out = join(dir, "other.yaml");
+    writeFileSync(out, "stale\n");
+    const ok = arb.extract({
+      transcript: link,
+      block: "finalise-ac-yaml",
+      out,
+    });
+    assert.equal(ok.reason, "extracted");
+    assert.equal(readFileSync(out, "utf8"), "a: 1\n");
+  }));
+
+test("task 327 QA-3: a directory --out is a named usage error, not a crash, and is left in place", () =>
+  withDir((dir) => {
+    const f = rowsTranscript(dir, "d1", [asst([text("no block here")])]);
+    const out = join(dir, "a-dir");
+    mkdirSync(out);
+    const r = arb.extract({ transcript: f, block: "finalise-ac-yaml", out });
+    assert.equal(r.reason, "usage");
+    assert.equal(r.exitCode, 2);
+    assert.match(r.message, /--out is a directory/);
+    assert.equal(existsSync(out), true);
+    const cli = spawnSync(
+      process.execPath,
+      [
+        MOD,
+        "extract",
+        "--transcript",
+        f,
+        "--block",
+        "finalise-ac-yaml",
+        "--out",
+        out,
+        "--json",
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(cli.status, 2, cli.stderr);
+    assert.match(cli.stdout, /"reason": "usage"/);
   }));
 
 test("CLI: an agent id that is a path, or both sources, or no block name, is a usage error (exit 2)", () => {
