@@ -380,6 +380,29 @@ None.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-27
+**Quality Score**: 70/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.332.qa.1.ac-merge-closes-task-331-follow-ups.md](./task.332.qa.1.ac-merge-closes-task-331-follow-ups.md)
+- **Gate File**: [task.332.gate.1.ac-merge-closes-task-331-follow-ups.yml](./task.332.gate.1.ac-merge-closes-task-331-follow-ups.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 96 task tests; full suite 8,972/8,976 (1 load-only failure, green alone)
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+- T332-QA-1 (medium): the CHANGELOG splits `(task 332)` across two lines, so `/finalise` 6d would HALT.
+- T332-CR-1 (medium, reproduced): a nonexistent `story_file` shares `result-document-mismatch` and a remedy that cannot clear it.
+- T332-CR-2 (medium, reproduced): the `result-document-unnamed` remedy misses an agent whose own answer omits `story_file`.
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -390,6 +413,8 @@ None.
 | 2026-11-27 | 1.2     | Review passed (9/10): document checks gated on an `acs` list so `result-unparseable` stays reachable; GitHub issue #963 linked | review-task |
 | 2026-11-27 |         | Status → ready-for-development | review-task |
 | 2026-11-28 |         | Implemented Phases 1–4: `--doc` required, `result-document-unnamed`, `scope-document-missing`, stem-keyed scope/extract paths, exact-path prompt rule; 7 mutations proved; status → ready-for-review | develop |
+| 2026-11-28 |         | QA gate CONCERNS (70/100) — 3 findings | qa-task |
+| 2026-11-28 |         | QA findings fixed — gate 1's 3 MEDIUM (CHANGELOG citation, two Step 3c remedies), 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ## Progress Tracking

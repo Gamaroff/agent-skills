@@ -1038,7 +1038,9 @@ agent's reply. Whatever the route, `merge` also refuses a result whose `story_fi
 document than the scope's, or a file that does not exist (`result-document-mismatch`), and a result
 that names no document at all (`result-document-unnamed`): nothing merged, nothing recorded. A hand
 copy of the wrong agent's answer stops here instead of becoming this item's record (task 331, 332).
-`story_file` must be the exact document path; a basename or a re-cased spelling is refused. Before
+`story_file` must be the exact document path; a basename or a re-cased spelling is refused. When the
+AC agent itself wrote the wrong or no `story_file`, re-extracting brings the same answer back, so
+both arms also name re-running the AC agent, with the path it must give. Before
 that, `merge` requires `--doc` and refuses a scope that is not this document's
 (`scope-document-mismatch`) or names no document (`scope-document-missing`, a scope written before
 task 331). The scope, extract, result and merged files all carry the work item's stem, so two items
@@ -1075,9 +1077,9 @@ case "$(jq -r '.reason' "$AC_MERGED_FILE")" in
   scope-document-mismatch)    # nothing merged, nothing recorded (task 331, 332)
                       echo "HALT: $(jq -r '.message' "$AC_MERGED_FILE") — --scope is not this item's: check STEM and DOD_N, re-run Step 3a for this item, then this block"; exit 1 ;;
   result-document-unnamed)    # nothing merged, nothing recorded (task 332)
-                      echo "HALT: $(jq -r '.message' "$AC_MERGED_FILE") — re-run the extract above, or hand-copy THIS item's full AC agent answer to the result path, then re-run this block"; exit 1 ;;
+                      echo "HALT: $(jq -r '.message' "$AC_MERGED_FILE") — re-run the extract above, or hand-copy THIS item's full AC agent answer to the result path; if the agent's own answer names no story_file, re-run the AC agent (story_file must be exactly $DOC_PATH), then the extract; then re-run this block"; exit 1 ;;
   result-document-mismatch)   # nothing merged, nothing recorded (task 331)
-                      echo "HALT: $(jq -r '.message' "$AC_MERGED_FILE") — re-run the extract above, or hand-copy THIS item's AC agent answer to the result path, then re-run this block; never merge it"; exit 1 ;;
+                      echo "HALT: $(jq -r '.message' "$AC_MERGED_FILE") — re-run the extract above, or hand-copy THIS item's AC agent answer to the result path; if the agent's own answer names a wrong or missing file, re-run the AC agent (story_file must be exactly $DOC_PATH), then the extract; then re-run this block; never merge another document's answer"; exit 1 ;;
   *)                  echo "HALT: merge answered $(jq -r '.reason' "$AC_MERGED_FILE")"; exit 1 ;;
 esac
 echo "AC_OVERALL=$AC_OVERALL"

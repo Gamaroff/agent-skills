@@ -414,7 +414,39 @@ for (const shell of SHELLS) {
       // The arm's own remedy, not the generic `merge answered …` line the `*)` arm prints.
       assert.match(
         c.stdout,
-        /re-run the extract above, or hand-copy THIS item's AC agent answer to the result path, then re-run this block; never merge it/,
+        /re-run the extract above, or hand-copy THIS item's AC agent answer to the result path; .*then re-run this block; never merge another document's answer/,
+      );
+      assert.doesNotMatch(c.stdout, /merge answered/);
+      assert.ok(
+        !existsSync(path.join(dir, DOC_DIR, "task.9.dod.1.ac.json")),
+        "nothing is recorded",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test(`[${shell}] Step 3c on an agent-written basename story_file names re-running the AC agent with the exact path, which a re-extract cannot clear (T332-CR-1)`, () => {
+    const dir = repo();
+    try {
+      const a1 = step3a(shell, dir, 1);
+      assert.equal(a1.status, 0, a1.stdout + a1.stderr);
+      writeFileSync(
+        path.join(dir, ".claude/state/finalise-ac-result-task.9-1.yaml"),
+        AGENT_ALL_PASS.replace(
+          "ac_traceability:\n",
+          'ac_traceability:\n  story_file: "task.9.demo.md"\n',
+        ),
+      );
+      const c = run(shell, dir, substitute(STEP_3C, { dodN: 1 }));
+      assert.equal(c.status, 1, c.stdout + c.stderr);
+      assert.match(
+        c.stdout,
+        /HALT: --result names task\.9\.demo\.md, which does not exist/,
+      );
+      assert.match(
+        c.stdout,
+        /re-run the AC agent \(story_file must be exactly docs\/tasks\/task\.9\.demo\/task\.9\.demo\.md\), then the extract/,
       );
       assert.doesNotMatch(c.stdout, /merge answered/);
       assert.ok(
@@ -444,7 +476,13 @@ for (const shell of SHELLS) {
       assert.match(c.stdout, /HALT: --result names no document/);
       assert.match(
         c.stdout,
-        /re-run the extract above, or hand-copy THIS item's full AC agent answer to the result path, then re-run this block/,
+        /re-run the extract above, or hand-copy THIS item's full AC agent answer to the result path; .*then re-run this block/,
+      );
+      // An agent that omitted story_file is not cleared by a re-extract: the remedy names the
+      // re-run and the exact path it must give (T332-CR-2).
+      assert.match(
+        c.stdout,
+        /if the agent's own answer names no story_file, re-run the AC agent \(story_file must be exactly docs\/tasks\/task\.9\.demo\/task\.9\.demo\.md\)/,
       );
       assert.doesNotMatch(c.stdout, /merge answered/);
       assert.ok(
