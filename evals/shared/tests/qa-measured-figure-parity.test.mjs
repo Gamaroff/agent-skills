@@ -84,6 +84,14 @@ test("qa-task's record_criteria token sends a measured entry through the rule", 
   assert.ok(line, "the record_criteria token line is present");
   assert.match(line, /`measured: true`/);
   assert.match(line, /measured-figure rule/);
+  // The sentence ends the bullet: the next args token keeps its own list item (task 328 QA-1, CR-1).
+  assert.doesNotMatch(line, /`code_review_blocking=true`/);
+  assert.ok(
+    read("qa-task")
+      .split("\n")
+      .some((l) => l.startsWith("- `code_review_blocking=true`")),
+    "the code_review_blocking token starts its own bullet",
+  );
 });
 
 // ── Calibration: the checker reproduces each failure it exists to catch ──
