@@ -195,6 +195,104 @@ test("a criterion with no trigger word is not listed", () => {
   }
 });
 
+// ── Task 328: a measured criterion is listed, and says it is measured ─────
+
+// Task 320's criterion 10, verbatim from the committed document
+// (docs/tasks/task.320.task-319-leftover-findings/task.320.task-319-leftover-findings.md, line 440
+// at c937ce621). The preflight did not list it: "longer than" was not a bound (obs #186).
+const CRITERION_320_10 =
+  "The four suites gain no test that waits longer than 30 s (the SIGSTOP case needs about 15), read from their per-test durations, measured on the PR's head commit with `uptime` beside them, in the QA report";
+
+test("task 320 criterion 10, verbatim, is listed with measured: true", () => {
+  const dir = repo([CRITERION_320_10], [QA]);
+  try {
+    const r = run(dir);
+    assert.equal(r.listed.length, 1);
+    assert.equal(r.listed[0].index, 1);
+    assert.equal(r.listed[0].measured, true);
+    assert.equal(r.listed[0].state, "ok");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("each comparative bound, with and without a leading no, makes a criterion a record criterion", () => {
+  const words = [
+    "longer",
+    "shorter",
+    "faster",
+    "slower",
+    "larger",
+    "smaller",
+    "greater",
+    "lower",
+    "higher",
+    "bigger",
+    "later",
+    "earlier",
+  ];
+  for (const w of words) {
+    for (const lead of ["", "no "]) {
+      const text = `The step takes ${lead}${w} than 3 units.`;
+      assert.equal(eng.isRecordCriterion(text), true, text);
+      const [entry] = eng.classify([text]);
+      assert.equal(entry?.measured, true, text);
+    }
+  }
+});
+
+test('an "or equal to" bound is a record criterion and measured (task 328 QA-2, CR2-2)', () => {
+  for (const text of [
+    "The suite is greater than or equal to 5 tests.",
+    "The step takes less than or equal to 30 s.",
+    "The bundle is no larger than or equal to 200 KB.",
+  ]) {
+    assert.equal(eng.isRecordCriterion(text), true, text);
+    assert.equal(eng.classify([text])[0]?.measured, true, text);
+  }
+  // A hedge before the number keeps the bound (QA-4, CR4-2).
+  for (const text of [
+    "The wait is longer than about 30 s.",
+    "The step finishes within ~2 s.",
+    "The run takes less than roughly 5 minutes.",
+  ]) {
+    assert.equal(eng.isRecordCriterion(text), true, text);
+    assert.equal(eng.classify([text])[0]?.measured, true, text);
+  }
+  // Control: "or equal to" with no number after it is not a bound.
+  const bare = "The result is greater than or equal to the old one.";
+  assert.equal(eng.isRecordCriterion(bare), false, bare);
+});
+
+test("controls: a non-timing bound and a size bound are measured; a bare comparison and a plain record are not", () => {
+  // A bound that is not a timing is still a bound (task 328 §8): listed, measured.
+  const heading = eng.classify([
+    "A heading longer than 80 characters is refused.",
+  ]);
+  assert.equal(heading.length, 1);
+  assert.equal(heading[0].measured, true);
+  const size = eng.classify(["The bundle is no larger than 200 KB."]);
+  assert.equal(size.length, 1);
+  assert.equal(size[0].measured, true);
+  // A comparison with no number is not a bound.
+  assert.equal(
+    eng.isRecordCriterion("The new message is longer than the old one."),
+    false,
+  );
+  assert.deepEqual(
+    eng.classify(["The new message is longer than the old one."]),
+    [],
+  );
+  // A record criterion with no bound is listed, and is not measured.
+  const plain = eng.classify(["A is recorded in the QA report."]);
+  assert.equal(plain.length, 1);
+  assert.equal(plain[0].measured, false);
+  // The no-location branch carries the field too.
+  const bare = eng.classify(["The check finishes in under 5 seconds."]);
+  assert.equal(bare[0].state, "no-location");
+  assert.equal(bare[0].measured, true);
+});
+
 test("an empty criteria list answers empty, which is not scan-broken", () => {
   const dir = repo([], [QA]);
   try {

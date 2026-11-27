@@ -49,6 +49,15 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **A measured figure is re-measured when the head moves (task 328).** The record preflight
+  (`finalise-record-preflight.js`) missed a bound written as "longer than", "shorter than",
+  "faster than", "slower than", "larger than", "smaller than" or "greater than" a number, with or
+  without a leading "no", so task 320's criterion 10 was never listed. It lists them now, and every
+  listed entry carries `measured: true` when its criterion states a numeric bound. `qa-task` and
+  `qa-story` grade a measured figure, new or carried from an earlier cycle, by finalise's
+  tree-equivalence rule (`finalise-dod-ac-prompt.md` Step 3, through `finalise-delta.js docs-only`),
+  and otherwise mark it unverified with "re-measure", one stage before `/finalise` (obs #186). Both
+  skills now bundle `finalise-delta.js`.
 - **What task 319 carried forward (task 320).** `/finalise`'s re-run refuses a listed command that a
   fenced `## ` line, a heading that only contains "criteria", a criteria section that holds none, or a
   stray backtick with an unindented line hid from it, and an untracked file in a directory that differs from a submodule's only in case.

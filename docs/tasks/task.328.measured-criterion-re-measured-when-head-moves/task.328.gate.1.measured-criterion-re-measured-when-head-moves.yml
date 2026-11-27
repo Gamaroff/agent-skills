@@ -1,0 +1,90 @@
+schema: 2
+task: 'task.328.measured-criterion-re-measured-when-head-moves'
+task_title: 'A measured criterion is re-measured when the head moves'
+gate: CONCERNS
+status_reason: 'Engine and QA-skill changes verified, the fast gate is green and every remedy is mutation-proven. Two MEDIUM findings: the qa-task edit merged the code_review_blocking token bullet into the record_criteria bullet, and success criterion 5 was reworded after review with no approver.'
+reviewer: 'QA Engineer'
+head: '04827b92a00560b9975876e7b1c5d39955b9c3bd'
+updated: '2026-11-27T04:15:01Z'
+
+top_issues:
+  - id: 'T328-CR-1'
+    severity: medium
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'Line 50: the new record_criteria sentence ends "...written or carried." with no newline, so the `- code_review_blocking=true` bullet is now inside the record_criteria bullet and the token loses its own list item. Reproduced: develop has 1 line starting with that bullet, HEAD has 0. origin: code-review, reproduced by QA.'
+    suggested_action: 'Restore the newline so the code_review_blocking=true bullet starts its own line.'
+    suggested_owner: dev
+    status: open
+  - id: 'T328-CR-2'
+    severity: low
+    file: 'evals/shared/tests/qa-measured-figure-parity.test.mjs'
+    finding: 'Line 83: the record_criteria token test stayed green on T328-CR-1. It only checks that the matched line contains its two phrases, so it cannot see the bullet swallowing the next token.'
+    suggested_action: 'Also assert that the record_criteria line does not contain `code_review_blocking=true` (or that every args token starts its own "- " line), and mutation-prove it against the merged line.'
+    suggested_owner: dev
+    status: open
+  - id: 'T328-QA-1'
+    severity: medium
+    file: 'docs/tasks/task.328.measured-criterion-re-measured-when-head-moves/task.328.measured-criterion-re-measured-when-head-moves.md'
+    finding: 'Success criterion 5 was reworded after review, from "with five examples by path" to "with every newly listed example by path (up to five)", with no approver. criteria-drift.js reports clean only because the reviewed_blob object is not in the object database, so it fell back to the review commit, which already holds the rewording (base exact: false).'
+    suggested_action: 'Restore the reviewed wording and append a Change Log row recording the revert. Only the owner can approve the rewording; never write the approval in for them.'
+    suggested_owner: po
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 29
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: false
+    boundary_signals: []
+    notes: 'Unchanged trust surface: the engine reads a repository document and prints an advisory listing that exits 0. isRecordCriterion, classify and NUMERIC_BOUND are predicate-shaped but prevent no action (precedent: task 259 gate 1). The QA prose runs finalise-delta.js, an existing engine, with no new input path.'
+  performance:
+    status: PASS
+    notes: 'One extra regex alternation per criterion. The corpus run over 3305 criteria completes without measurable change.'
+  reliability:
+    status: PASS
+    notes: 'The measured flag is additive. Existing STATES and REASONS are unchanged, and the preflight still exits 0.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The rule is cited, not restated, and a parity test holds both skills to it. T328-CR-1 (merged bullet) and the CR-2 test gap are open.'
+
+criteria_drift:
+  reason: drift
+  base: review-commit
+  changed:
+    - id: '#5'
+      kind: reworded
+      approved: false
+  note: 'The engine reported clean on an inexact base (review-commit 04827b92a, exact: false; reviewed_blob b758aeae is not in the object database). #5 is recorded from the edit made in this run.'
+
+recommendations:
+  immediate:
+    - action: 'Restore the newline before the code_review_blocking=true bullet (T328-CR-1)'
+      refs: ['skills/qa-task/SKILL.md']
+    - action: 'Restore the reviewed wording of criterion 5 (T328-QA-1)'
+      refs: ['docs/tasks/task.328.measured-criterion-re-measured-when-head-moves/task.328.measured-criterion-re-measured-when-head-moves.md']
+  future:
+    - action: 'Drop the no-op `(?:no\s+)?` group in NUMERIC_BOUND, or comment that it is for readability (CR-3, cleanup)'
+      refs: ['shared/resources/finalise-record-preflight.js']
+      remedy: unverified
+    - action: 'review-task stamps a reviewed_blob without writing the object, so criteria-drift.js silently falls back to a later commit'
+      refs: ['shared/resources/criteria-drift.js']
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T328-CR-1 fixed', 'criterion 5 wording settled by the owner']

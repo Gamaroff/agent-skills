@@ -15,7 +15,8 @@
  *
  * It reads the document's criteria section and two listings of the work item's directory
  * (`git ls-files`, `git status`), and prints for each record criterion
- * `{ criterion, location, state, artifacts }`.
+ * `{ criterion, location, state, artifacts, measured }` — `measured` is true when the criterion
+ * states a numeric bound.
  *
  * States:
  *   ok                          a committed artifact of the named kind exists
@@ -50,9 +51,17 @@ const RECORD_WORDS = Object.freeze([
   "documented",
 ]);
 
-// Check 22's second trigger: "a numeric bound graded by a measurement".
+// Check 22's second trigger: "a numeric bound graded by a measurement". The comparative
+// alternation ("longer than 30 s", "no larger than 200 KB") is task 328: task 320's criterion 10
+// bounded a wait with "longer than" and was never listed (obs #186). "or equal to" may sit between
+// the comparative and the number ("greater than or equal to 5"), and so may a hedge ("longer than
+// about 30 s", "~30 s"). A leading "no" needs no group of its own: the pattern is unanchored, so
+// "no later than 5 days" matches through "later than 5" (QA-4, CR4-2/CR4-6). No unit is required after the
+// number, so a comparative before an id ("faster than 319 was") also lists: the listing is advisory
+// and QA classifies each entry by finalise Step 3, so a false positive costs one look, while a unit
+// list would miss bounds written in any unit it does not name.
 const NUMERIC_BOUND =
-  /(?:\b(?:under|within|below|above|over|at most|at least|no more than|no fewer than|fewer than|less than|more than)\s+\d|[<>]=?\s*\d|≤\s*\d|≥\s*\d)/i;
+  /(?:\b(?:under|within|below|above|over|at most|at least|no more than|no fewer than|fewer than|less than|more than)\s+(?:or\s+equal\s+to\s+)?(?:(?:about|around|roughly|approximately)\s+|~\s*)?\d|\b(?:longer|shorter|faster|slower|larger|smaller|greater|lower|higher|bigger|later|earlier)\s+than\s+(?:or\s+equal\s+to\s+)?(?:(?:about|around|roughly|approximately)\s+|~\s*)?\d|[<>]=?\s*\d|≤\s*\d|≥\s*\d)/i;
 
 const STATES = Object.freeze([
   "ok",
@@ -122,6 +131,10 @@ function classify(criteria, { tracked = [], changed = [] } = {}) {
       index: i + 1,
       criterion: text,
       locations: named.map((l) => l.key),
+      // A stated numeric bound: a candidate, not Step 3's classification. QA classifies it by
+      // finalise-dod-ac-prompt.md Step 3 (a bound a per-PR test could assert is a behaviour
+      // criterion) and grades only a measured one by that rule (task 328, QA-3 CR3-2).
+      measured: NUMERIC_BOUND.test(text),
     };
     if (named.length === 0) {
       const impl = IMPLEMENTATION_REPORT.test(text);

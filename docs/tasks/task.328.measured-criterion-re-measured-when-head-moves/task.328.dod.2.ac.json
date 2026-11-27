@@ -1,0 +1,423 @@
+{
+  "schema": 1,
+  "dod_n": 2,
+  "head": "8a2b23243c32da7a3cc6219ee598fd221489c4f7",
+  "dirty_paths": [],
+  "document": "docs/tasks/task.328.measured-criterion-re-measured-when-head-moves/task.328.measured-criterion-re-measured-when-head-moves.md",
+  "result": {
+    "bytes": 19069,
+    "sha256": "e7e266d53c5aec37d2ef659a5e95eb77e070fc1fd949a7127066af2e946f79b4",
+    "verified": true
+  },
+  "scope": {
+    "mode": "scoped",
+    "reason": "prior-record",
+    "rejudged": 4,
+    "carried": 5
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "0fdf6899e83d18071574ee1b375496727957eccd56a05b899f1ada3bfb6f8e51",
+      "status": "PASS",
+      "description": "Task 320 criterion 10 verbatim listed by preflight with measured: true",
+      "code_citation": "shared/resources/finalise-record-preflight.js:63",
+      "test_citation": "shared/resources/tests/finalise-record-preflight.test.mjs:206",
+      "members": [],
+      "non_member_fail": null,
+      "note": "NUMERIC_BOUND gains the comparative alternation (line 63) and classify sets measured (line 137). The test constant at :203 matches task 320 line 440 at c937ce621, checked with git show. A read-only preflight run on task 320 at head lists #10 with measured: true and state ok. The test ran and passed as ok 2884 in the PR's test.yml npm test run (run 45966890545, head aee5f9efd), which selects shared/resources/tests/*.test.mjs."
+    },
+    {
+      "id": "#2",
+      "text_hash": "bb7d3e3b17147c4a5ec403e1706ddb5b9d3cf252ca8283e7e1afbf1238bc19dc",
+      "status": "PASS",
+      "description": "Seven comparatives, with/without leading no, make a record criterion",
+      "code_citation": "shared/resources/finalise-record-preflight.js:63",
+      "test_citation": "shared/resources/tests/finalise-record-preflight.test.mjs:219",
+      "members": [
+        {
+          "member": "longer / no longer",
+          "evidence": "shared/resources/tests/finalise-record-preflight.test.mjs:219",
+          "status": "PASS"
+        },
+        {
+          "member": "shorter / no shorter",
+          "evidence": "shared/resources/tests/finalise-record-preflight.test.mjs:219",
+          "status": "PASS"
+        },
+        {
+          "member": "faster / no faster",
+          "evidence": "shared/resources/tests/finalise-record-preflight.test.mjs:219",
+          "status": "PASS"
+        },
+        {
+          "member": "slower / no slower",
+          "evidence": "shared/resources/tests/finalise-record-preflight.test.mjs:219",
+          "status": "PASS"
+        },
+        {
+          "member": "larger / no larger",
+          "evidence": "shared/resources/tests/finalise-record-preflight.test.mjs:219",
+          "status": "PASS"
+        },
+        {
+          "member": "smaller / no smaller",
+          "evidence": "shared/resources/tests/finalise-record-preflight.test.mjs:219",
+          "status": "PASS"
+        },
+        {
+          "member": "greater / no greater",
+          "evidence": "shared/resources/tests/finalise-record-preflight.test.mjs:219",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "The loop checks every word in both the '' and 'no ' forms, asserting isRecordCriterion and measured: true. It also covers lower, higher, bigger, later and earlier. It ran and passed in CI as ok 2885."
+    },
+    {
+      "id": "#3",
+      "text_hash": "3a32393f5ca656f24f5ea7750a66004ad7d00ed6b581ff53e45df9ca552ce609",
+      "status": "PASS",
+      "description": "Bare comparison not listed; record criterion without bound reads measured: false",
+      "code_citation": "shared/resources/finalise-record-preflight.js:137",
+      "test_citation": "shared/resources/tests/finalise-record-preflight.test.mjs:267",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The controls test asserts that 'The new message is longer than the old one.' is not a record criterion and that classify returns []. It also asserts that 'A is recorded in the QA report.' is listed with measured: false. The test sits in shared/resources/tests/*.test.mjs, which npm test runs per PR."
+    },
+    {
+      "id": "#4",
+      "text_hash": "5e94e331ea7810fb7f282dc241641b57c022952c4b754df28577c0934ff20e60",
+      "status": "PASS",
+      "description": "qa-task and qa-story cite Step 3 rule, re-measure; test guards citation/restatement",
+      "code_citation": "skills/qa-task/SKILL.md:1095",
+      "test_citation": "evals/shared/tests/qa-measured-figure-parity.test.mjs:130",
+      "members": [
+        {
+          "member": "qa-task",
+          "evidence": "skills/qa-task/SKILL.md:1095 (paragraph); evals/shared/tests/qa-measured-figure-parity.test.mjs:130",
+          "status": "PASS"
+        },
+        {
+          "member": "qa-story",
+          "evidence": "skills/qa-story/SKILL.md:1630 (paragraph); evals/shared/tests/qa-measured-figure-parity.test.mjs:130 and :151 (identity)",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "I read the paragraph. It covers carried figures and applies 'finalise-dod-ac-prompt.md Step 3' whole. It marks a rejected figure **unverified** with \\\"re-measure\\\" and restates none of the reason tokens. measuredFigureProblems fails when the citation is lost (calibration :223) or the reason list is restated (:235). The tests are in evals/shared/tests/*.test.mjs, which npm test runs per PR; ok 1606 passed in CI."
+    },
+    {
+      "id": "#5",
+      "text_hash": "5c030c5edc763f11586b60b7721769eae0146073e131dd38a8e79bdb58729db9",
+      "status": "PASS",
+      "description": "Corpus count of newly listed criteria, with examples by path, in QA report",
+      "code_citation": "docs/tasks/task.328.measured-criterion-re-measured-when-head-moves/task.328.qa.7.measured-criterion-re-measured-when-head-moves.md:73",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Documentation criterion: QA report F records count S. I read qa.7:63-82, committed in 8a2b23243. It records 3305 criteria and 375 listed before vs 379 after (delta 4) with the shipped engine. qa.7:77-80 gives all four newly listed examples by full path: task.320 #10, task.59 #6, task.76 #10, task.94 #11. That meets 'every newly listed example by path (up to five)', and it clears the prior non-member FAIL (stale cycle-1 count, glob instead of path). I re-checked it myself without writing files. In node, I compiled develop's (c937ce621) finalise-record-preflight.js in memory and compared its isRecordCriterion with head's over every task document's criteria. Result: 3305 criteria, 375 -> 379, 131 measured: true, the same four new entries, none dropped. These match the addendum exactly. My document count (331 docs, 330 with criteria) differs from the addendum's 333/331 because the file filters differ. The criterion totals agree. Amendment rule: criteria-drift.js exits 0, and #5 is reworded with approved: true. The parenthetical does not relax the bound."
+    },
+    {
+      "id": "#6",
+      "text_hash": "0f667512e4eb11df737d304608c157f0f91574e21c93e04301c0d5b45c62a2ab",
+      "status": "PASS",
+      "description": "Every new test red before its change; red runs recorded in QA report",
+      "code_citation": "docs/tasks/task.328.measured-criterion-re-measured-when-head-moves/task.328.qa.7.measured-criterion-re-measured-when-head-moves.md:88",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "engine: task 320 criterion 10, verbatim (test.mjs:206)",
+          "evidence": "qa.1:88 (develop engine: fail 3)",
+          "status": "PASS"
+        },
+        {
+          "member": "engine: each comparative bound (test.mjs:219)",
+          "evidence": "qa.1:88",
+          "status": "PASS"
+        },
+        {
+          "member": "engine: controls (test.mjs:267)",
+          "evidence": "qa.1:88",
+          "status": "PASS"
+        },
+        {
+          "member": "engine: 'or equal to' bound (test.mjs:244)",
+          "evidence": "qa.3:51 (removing the group turns it red)",
+          "status": "PASS"
+        },
+        {
+          "member": "parity: qa-task/qa-story grades a measured figure (parity:130, x2)",
+          "evidence": "qa.1:89 (5 of 9 failed against develop prose)",
+          "status": "PASS"
+        },
+        {
+          "member": "parity: qa-task/qa-story runs its own bundled finalise-delta.js (parity:134, x2)",
+          "evidence": "qa.1:89",
+          "status": "PASS"
+        },
+        {
+          "member": "parity: record_criteria token (parity:172)",
+          "evidence": "qa.1:89",
+          "status": "PASS"
+        },
+        {
+          "member": "parity: same measured-figure paragraph (parity:151)",
+          "evidence": "qa.5:50 ('applied' -> 'used' red)",
+          "status": "PASS"
+        },
+        {
+          "member": "calibration: identity check sees one-word drift (parity:160)",
+          "evidence": "qa.6:47 (length-only comparison red)",
+          "status": "PASS"
+        },
+        {
+          "member": "calibration: a correct paragraph passes (parity:214)",
+          "evidence": "qa.7:90 (M01; reproduced: calibration red; my variant also reds the two skill tests, see advisory)",
+          "status": "PASS"
+        },
+        {
+          "member": "calibration: no such paragraph fails (parity:218)",
+          "evidence": "qa.7:91 (M02; reproduced: only this test red)",
+          "status": "PASS"
+        },
+        {
+          "member": "calibration: losing its citation fails (parity:223)",
+          "evidence": "qa.7:92 (M03; reproduced)",
+          "status": "PASS"
+        },
+        {
+          "member": "calibration: restated reason list fails (parity:235)",
+          "evidence": "qa.7:93 (M04; reproduced)",
+          "status": "PASS"
+        },
+        {
+          "member": "calibration: paraphrase of which figures Step 3 holds (parity:244)",
+          "evidence": "qa.7:94 (M05; reproduced)",
+          "status": "PASS"
+        },
+        {
+          "member": "calibration: Step 3 head-or-M sentence copied in (parity:252)",
+          "evidence": "qa.7:95 (M06; reproduced)",
+          "status": "PASS"
+        },
+        {
+          "member": "calibration: re-measure as note for every rejection (parity:260)",
+          "evidence": "qa.7:96 (M07; reproduced)",
+          "status": "PASS"
+        },
+        {
+          "member": "calibration: no re-measure at all (parity:269)",
+          "evidence": "qa.7:97 (M08; reproduced)",
+          "status": "PASS"
+        },
+        {
+          "member": "calibration: dropping 'whatever its value' (parity:281)",
+          "evidence": "qa.7:98 (M09; reproduced)",
+          "status": "PASS"
+        },
+        {
+          "member": "calibration: undeclared unverified mapping (parity:287)",
+          "evidence": "qa.7:99 (M10; reproduced)",
+          "status": "PASS"
+        },
+        {
+          "member": "calibration: missed bound called unverified (parity:293)",
+          "evidence": "qa.7:100 (M11; reproduced: 293 and 302 red, as recorded)",
+          "status": "PASS"
+        },
+        {
+          "member": "calibration: FAIL branch ignoring provenance (parity:302)",
+          "evidence": "qa.7:101 (M12; reproduced: 302 alone red)",
+          "status": "PASS"
+        },
+        {
+          "member": "calibration: dropped **unverified** caught (parity:313)",
+          "evidence": "qa.7:102 (M13; reproduced)",
+          "status": "PASS"
+        },
+        {
+          "member": "calibration: no repository-root cwd (parity:318)",
+          "evidence": "qa.7:103 (M14; reproduced)",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "PASS from merged members (23 counted)"
+    },
+    {
+      "id": "#7",
+      "text_hash": "53156fb905a4d1612728d6e37cc4842b56bfd3e7340e019ed2872ce23cb1b34a",
+      "status": "PASS",
+      "description": "Reverting any remedy turns a named test red; mutation table in QA report",
+      "code_citation": "docs/tasks/task.328.measured-criterion-re-measured-when-head-moves/task.328.qa.7.measured-criterion-re-measured-when-head-moves.md:109",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "Phase 1: comparative alternation in NUMERIC_BOUND",
+          "evidence": "qa.1:158",
+          "status": "PASS"
+        },
+        {
+          "member": "Phase 1: measured field in classify",
+          "evidence": "qa.1:159",
+          "status": "PASS"
+        },
+        {
+          "member": "Phase 2: qa-task Step 3 citation",
+          "evidence": "qa.1:160",
+          "status": "PASS"
+        },
+        {
+          "member": "Phase 2: qa-story no restated reason list",
+          "evidence": "qa.1:161",
+          "status": "PASS"
+        },
+        {
+          "member": "Phase 2: qa-story Step 3 citation",
+          "evidence": "qa.1:162",
+          "status": "PASS"
+        },
+        {
+          "member": "Phase 2: qa-task record_criteria measured sentence",
+          "evidence": "qa.1:163",
+          "status": "PASS"
+        },
+        {
+          "member": "Phase 2: bundle finalise-delta.js into qa-task and qa-story",
+          "evidence": "qa.7:113 (citation revert reds 'qa-task's paragraph runs its own bundled finalise-delta.js' + identity test; reproduced); qa.7:114 (copy deletion -> bundle:check MISSING)",
+          "status": "PASS"
+        },
+        {
+          "member": "CR-1 merged bullet",
+          "evidence": "qa.2:61",
+          "status": "PASS"
+        },
+        {
+          "member": "CR-2 parity blind to CR-1",
+          "evidence": "qa.2:16",
+          "status": "PASS"
+        },
+        {
+          "member": "CR2-2 or equal to",
+          "evidence": "qa.3:51",
+          "status": "PASS"
+        },
+        {
+          "member": "CR2-3 Step 3 paraphrase",
+          "evidence": "qa.3:52",
+          "status": "PASS"
+        },
+        {
+          "member": "CR3-1 re-measure for every rejection",
+          "evidence": "qa.4:45",
+          "status": "PASS"
+        },
+        {
+          "member": "CR3-2 measured as classification",
+          "evidence": "qa.4:46",
+          "status": "PASS"
+        },
+        {
+          "member": "CR3-3 lower/higher/bigger",
+          "evidence": "qa.4:47",
+          "status": "PASS"
+        },
+        {
+          "member": "CR3-4 narrow guard",
+          "evidence": "qa.4:48",
+          "status": "PASS"
+        },
+        {
+          "member": "CR4-1 missed bound FAIL branch",
+          "evidence": "qa.5:48",
+          "status": "PASS"
+        },
+        {
+          "member": "CR4-2 later/earlier, hedges",
+          "evidence": "qa.5:51",
+          "status": "PASS"
+        },
+        {
+          "member": "CR4-3 measured field listed",
+          "evidence": "qa.5:49",
+          "status": "PASS"
+        },
+        {
+          "member": "CR4-4 dead check (locate by lead)",
+          "evidence": "qa.7:112 (pre-cycle-4 locator from e9c20b2b3^ reds calibration :313; reproduced in memory, only that test red)",
+          "status": "PASS"
+        },
+        {
+          "member": "CR4-5 paragraph identity",
+          "evidence": "qa.5:50",
+          "status": "PASS"
+        },
+        {
+          "member": "CR5-1 outcome order",
+          "evidence": "qa.6:46",
+          "status": "PASS"
+        },
+        {
+          "member": "CR5-2 identity calibration",
+          "evidence": "qa.6:47",
+          "status": "PASS"
+        },
+        {
+          "member": "QA6-1 criterion 4 re-measure wording",
+          "evidence": "qa.7:46",
+          "status": "PASS"
+        },
+        {
+          "member": "CR6-1 'unverified on purpose' mapping",
+          "evidence": "qa.7:111 (dropping 'on purpose' in qa-task SKILL.md:1106 reds qa-task grades test + identity test; reproduced in memory)",
+          "status": "PASS"
+        },
+        {
+          "member": "CR6-2 'whatever its value'",
+          "evidence": "qa.7:47",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "PASS from merged members (25 counted)"
+    },
+    {
+      "id": "#8",
+      "text_hash": "cf164c980b38afdadabc13104ecb83979260d40bd31bee2779970170963ec03a",
+      "status": "PASS",
+      "description": "npm test passes under CI=true; bundle no diff; bundle:check 0 problems",
+      "code_citation": ".github/workflows/test.yml:58",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 8a2b23243c32da7a3cc6219ee598fd221489c4f7 — All of this criterion's evidence is CI state. test.yml:58 runs npm test on pull_request, where Actions sets CI=true. validate.yml:128 runs bundle_skill.py --check (npm run bundle:check), and validate.yml:134 runs bundle --all plus git diff (npm run bundle leaves no diff). For /finalise: at head 8a2b23243 gh pr checks shows test pending (run 45977454521) and validate pass. Run 1's test failure at aee5f9efd was the unrelated lockctl atomic-take flake.",
+      "ci_reading": "CI reading 1: SUCCESS @ 8a2b23243c32da7a3cc6219ee598fd221489c4f7"
+    },
+    {
+      "id": "#9",
+      "text_hash": "bac36a3b51e94b7448830692153c2b68b12ddf029c31cc7d9c57538d19fc05b8",
+      "status": "PASS",
+      "description": "CHANGELOG [Unreleased] cites (task 328)",
+      "code_citation": "CHANGELOG.md:52",
+      "test_citation": "evals/shared/tests/changelog-entry-drift.test.mjs:2",
+      "members": [],
+      "non_member_fail": null,
+      "note": "CHANGELOG.md:52 reads '- **A measured figure is re-measured when the head moves (task 328).**' and sits in the ## [Unreleased] section (line 5; the next release heading is at line 79), so it meets the criterion. changelog-entry-drift.test.mjs is the corpus guard. It runs in npm test, but it binds only accepted, merged tasks, so it guards this entry post-acceptance."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#5",
+      "note": "The amendment's own text still says 'only one newly listed criterion exists', and the owner approved it on that premise. qa.7:82 records that the premise is false for the shipped engine (4 newly listed; I reproduced 375 -> 379). The amended bound (up to five examples by path) is met. The criterion wording now contradicts its own record, so the owner may want to reword or re-approve it."
+    },
+    {
+      "ac_id": "#6",
+      "note": "qa.7:90 (M01) says GOOD lacks 'applied whole' and the skills have it. In the skills the phrase is broken across lines ('applied\\\\nwhole', qa-task SKILL.md:1097-1098). A literal includes('applied whole') check also reds the two 'grades a measured figure' skill tests, which I reproduced, so the addendum's mutation must have matched whitespace. The calibration still goes red as recorded. Only the description of the mutation is loose."
+    },
+    {
+      "ac_id": "#6",
+      "note": "The 14 calibration red-first records are reconstructed by mutation after the change, as qa.7:86 says, not runs made before it. I accept that reading. The caller may want to note it, mainly for the positive control at parity:214, where red-first is contrived (an over-strict check)."
+    }
+  ]
+}

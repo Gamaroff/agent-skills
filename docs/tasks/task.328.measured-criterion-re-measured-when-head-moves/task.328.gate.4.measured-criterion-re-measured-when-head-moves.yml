@@ -1,0 +1,109 @@
+schema: 2
+task: 'task.328.measured-criterion-re-measured-when-head-moves'
+task_title: 'A measured criterion is re-measured when the head moves'
+gate: CONCERNS
+status_reason: 'The cycle-3 fixes hold. One MEDIUM remains: the QA paragraph calls every rejected figure unverified, but Step 3 grades a measurement that misses its bound as FAIL.'
+reviewer: 'QA Engineer'
+head: 'f81ac7546ff5c74c21acf34d67b663cab8b57abd'
+updated: '2026-11-27T06:07:13Z'
+
+top_issues:
+  - id: 'T328-CR4-1'
+    severity: medium
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'Line 1103: "A figure the rule does not accept leaves the criterion **unverified**, with the note Step 3 gives it". Step 3 (finalise-dod-ac-prompt.md, measured criterion) grades "FAIL ... when it misses the bound", with no note, so a figure that misses its bound is a failed criterion, not an unverified one. The same text is in skills/qa-story/SKILL.md. Checked against the source.'
+    suggested_action: 'Split the outcome. A figure that misses the bound fails the criterion. Any other figure the rule rejects is unverified, with Step 3''s note.'
+    suggested_owner: dev
+    status: open
+  - id: 'T328-CR4-2'
+    severity: low
+    file: 'shared/resources/finalise-record-preflight.js'
+    finding: 'Line 62: "no later than 5 days", "earlier than 2 s" and "longer than about 30 s" are missed.'
+    suggested_action: 'Add later and earlier, plus an optional about/around/roughly/~ before the digit; one test each.'
+    suggested_owner: dev
+    status: open
+  - id: 'T328-CR4-3'
+    severity: low
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'Line 50: the field list omits `measured`, and `measured: false` reads as "not measured" although the regex can miss a bound.'
+    suggested_action: 'List `measured`, and say that Step 3 classifies every listed entry; the flag only marks the likely ones.'
+    suggested_owner: dev
+    status: open
+  - id: 'T328-CR4-4'
+    severity: low
+    file: 'evals/shared/tests/qa-measured-figure-parity.test.mjs'
+    finding: 'Line 55: the **unverified** check is dead (the locator already requires it).'
+    suggested_action: 'Locate the paragraph by its bold lead sentence so the check is live.'
+    suggested_owner: dev
+    status: open
+  - id: 'T328-CR4-5'
+    severity: low
+    file: 'evals/shared/tests/qa-measured-figure-parity.test.mjs'
+    finding: 'Nothing checks that the two skills hold the same paragraph or keep the MEDIUM top_issues clause.'
+    suggested_action: 'Assert the paragraphs are identical once the skill name is normalised, and assert the MEDIUM clause.'
+    suggested_owner: dev
+    status: open
+  - id: 'T328-CR4-6'
+    severity: low
+    file: 'shared/resources/finalise-record-preflight.js'
+    finding: 'The `(?:no\s+)?` group is dead: the unanchored pattern matches inside "no longer than 3" without it. The "no " test loop proves nothing.'
+    suggested_action: 'Drop the group, and keep the "no " loop as a behaviour check that the phrasing lists.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 8943
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: false
+    boundary_signals: []
+    notes: 'Unchanged: advisory listing, exits 0; no predicate prevents an action.'
+  performance:
+    status: PASS
+    notes: 'No nested quantifiers.'
+  reliability:
+    status: PASS
+    notes: 'LAN fast gate: 8943 tests, 0 failed (TEST_EXIT=0). GitHub CI green at f81ac7546.'
+  maintainability:
+    status: CONCERNS
+    notes: 'CR4-1.'
+
+criteria_drift:
+  reason: drift
+  base: review-commit
+  changed:
+    - id: '#5'
+      kind: reworded
+      approved: true
+  note: 'Owner-approved amendment (Lorien Gamaroff, 2026-11-27).'
+
+recommendations:
+  immediate:
+    - action: 'Split the measured-figure outcome into FAIL (misses the bound) and unverified (CR4-1)'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md']
+  future:
+    - action: 'review-task stamps a reviewed_blob it never writes (obs #193)'
+      refs: ['shared/resources/criteria-drift.js']
+      remedy: unverified
+    - action: 'CI flake: lockctl take is atomic (tests/test-remote-runner.test.js:1047)'
+      refs: ['tests/test-remote-runner.test.js']
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR4-1 fixed']

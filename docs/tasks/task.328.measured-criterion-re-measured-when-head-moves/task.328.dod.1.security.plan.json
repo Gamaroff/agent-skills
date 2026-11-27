@@ -1,0 +1,42 @@
+[
+  {
+    "argv": [
+      "--sink",
+      "git-name",
+      "--entry",
+      "skills/qa-task/references/ci-tree-equivalence.js#isDocsPath",
+      "--args-json",
+      "[[\"**\"]]",
+      "--name",
+      "qa-task bundled isDocsPath git-name corpus (widest patterns)"
+    ]
+  },
+  {
+    "argv": [
+      "--sink",
+      "git-name",
+      "--entry",
+      "skills/qa-story/references/ci-tree-equivalence.js#isDocsPath",
+      "--args-json",
+      "[[\"**\"]]",
+      "--name",
+      "qa-story bundled isDocsPath git-name corpus (widest patterns)"
+    ]
+  },
+  {
+    "argv": [
+      "--sink",
+      "path",
+      "--entry",
+      "cli:skills/qa-task/references/finalise-delta.js",
+      "--argv",
+      "[\"docs-only\",\"--base\",\"{input}\",\"--head\",\"HEAD\",\"--json\"]",
+      "--fixture-setup",
+      "docs/tasks/task.271.finalise-accepts-what-the-record-already-shows/task.271.qa.4.security.delta.setup.sh",
+      "--name",
+      "qa-task bundled finalise-delta.docs-only-base"
+    ],
+    "cases_file": "task.328.dod.1.security.cases.3.json",
+    "cases_sha256": "cc5a995a0ed24ef225c38dbec98e1b780f183ac6d124cd0ea255a9feb8414d6c"
+  }
+]

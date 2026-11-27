@@ -1,0 +1,71 @@
+schema: 2
+task: 'task.328.measured-criterion-re-measured-when-head-moves'
+task_title: 'A measured criterion is re-measured when the head moves'
+gate: PASS
+status_reason: 'Every success criterion is met. Criterion 4 is met again ("unverified with re-measure", other notes deferred to Step 3), and provenance is decided before the bound. Fast gate and CI are green. One advisory low-confidence finding is recorded for the future.'
+reviewer: 'QA Engineer'
+head: '5fbd512647537f1ee271d7c1b95a1c97383be351'
+updated: '2026-11-27T08:34:50Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 8951
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: false
+    boundary_signals: []
+    notes: 'Unchanged: advisory listing, exits 0; no predicate prevents an action.'
+  performance:
+    status: PASS
+    notes: 'Prose and test changes only.'
+  reliability:
+    status: PASS
+    notes: 'LAN fast gate: 8951 tests, 0 failed (TEST_EXIT=0). GitHub CI green at 5fbd51264.'
+  maintainability:
+    status: PASS
+    notes: 'qa-task and qa-story paragraphs held identical by test; every content check calibrated.'
+
+criteria_drift:
+  reason: drift
+  base: review-commit
+  changed:
+    - id: '#5'
+      kind: reworded
+      approved: true
+  note: 'Owner-approved amendment (Lorien Gamaroff, 2026-11-27).'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Reason-list guard matches only hyphenated engine tokens; a worded paraphrase passes (reviewer CR-1, low/low, advisory)'
+      refs: ['evals/shared/tests/qa-measured-figure-parity.test.mjs']
+      remedy: unverified
+    - action: 'review-task stamps a reviewed_blob it never writes (obs #193)'
+      refs: ['shared/resources/criteria-drift.js']
+      remedy: unverified
+    - action: 'qa-fix applies reviewer findings without checking the success criteria (obs #195)'
+      refs: ['skills/qa-fix/SKILL.md']
+      remedy: unverified
+    - action: 'CI flake: lockctl take is atomic (tests/test-remote-runner.test.js:1047)'
+      refs: ['tests/test-remote-runner.test.js']
+      remedy: unverified
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []

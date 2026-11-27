@@ -1627,6 +1627,21 @@ because no test carries them (obs #210). A behaviour criterion whose only eviden
 with no committed per-PR test, is a **MEDIUM** finding in `top_issues[]`, so it enters the fix loop
 rather than halting at finalise (obs #224).
 
+**A measured figure counts for this head only as finalise grades it** (task 328, obs #186). A figure
+taken this cycle or carried from an earlier cycle or QA report, is graded here by the
+measured-criterion rule of `finalise-dod-ac-prompt.md` Step 3, in the `finalise` skill, applied
+whole. That rule decides whether a criterion is measured, which figures it holds to the head, what
+each must record, and the note each failure carries; this file restates none of it. Where the rule
+lets a figure from an earlier commit M count, run its check from the repository root,
+`command node .agents/skills/qa-story/references/finalise-delta.js docs-only --base <M> --head HEAD --json`,
+and read the answer as Step 3 reads it. "No engine changed" is not that answer: run the command.
+Decide whether the figure counts before reading it against the bound. A figure the rule does not
+accept as this head's evidence leaves the criterion **unverified** with "re-measure", or with the
+other note Step 3 gives it, whatever its value, and a **MEDIUM** entry in `top_issues[]`. Step 3
+grades such a figure `FAIL`; QA records it as unverified on purpose, so it enters the fix loop
+rather than halting at finalise. Only a figure the rule accepts that misses the criterion's bound
+fails the criterion, graded as any failed criterion is.
+
 **A "tool X passes on files Y" criterion is confirmed by one probe that X processes Y, before PASS is
 recorded** (obs #78). A formatter, linter or checker skips what its ignore file excludes and exits 0
 having read nothing, so "passes" is true of the empty set. Run one probe: a deliberately malformed copy

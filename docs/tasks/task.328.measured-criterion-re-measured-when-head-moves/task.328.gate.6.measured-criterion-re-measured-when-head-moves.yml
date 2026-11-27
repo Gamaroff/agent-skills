@@ -1,0 +1,95 @@
+schema: 2
+task: 'task.328.measured-criterion-re-measured-when-head-moves'
+task_title: 'A measured criterion is re-measured when the head moves'
+gate: CONCERNS
+status_reason: 'The cycle-5 fixes hold: provenance is decided before the bound. Criterion 4 is now unmet: it requires a rejected figure to be "unverified with re-measure", but cycle 3 removed "re-measure" from both paragraphs and the parity test forbids it. Escalated to the owner, since the fix reverses a cycle-3 finding.'
+reviewer: 'QA Engineer'
+head: 'dcbdab636748565d386c0ae3ed9fb1b9f0579869'
+updated: '2026-11-27T07:30:03Z'
+
+top_issues:
+  - id: 'T328-QA6-1'
+    severity: medium
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'Criterion 4 reads: "counts for the head only as `finalise-dod-ac-prompt.md` Step 3 grades it, and is otherwise unverified with re-measure". Since cycle 3 (CR3-1), the paragraph at skills/qa-task/SKILL.md:1103 and skills/qa-story/SKILL.md says "with the note Step 3 gives it", and evals/shared/tests/qa-measured-figure-parity.test.mjs rejects "re-measure". Since cycle 5, a rejected figure is a provenance failure, which Step 3 notes "re-measure" (off the head, no load, a single run).'
+    suggested_action: 'Restore "re-measure" as the note for a rejected figure, with Step 3''s other notes deferred ("unverified with re-measure, or the other note Step 3 gives it"). Replace the parity ban with a check that the paragraph carries "re-measure".'
+    suggested_owner: dev
+    status: open
+  - id: 'T328-CR6-1'
+    severity: low
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'Line 1106: Step 3 grades a rejected figure FAIL. QA records it as unverified plus a MEDIUM entry, as criterion 4 asks, but the paragraph also says it "restates none of" Step 3 and does not say the mapping is deliberate. The reviewer raised this as medium; downgraded because criterion 4 specifies the mapping.'
+    suggested_action: 'Say that QA records a figure Step 3 rejects as unverified, so it reaches the fix loop.'
+    suggested_owner: dev
+    status: open
+  - id: 'T328-CR6-2'
+    severity: low
+    file: 'evals/shared/tests/qa-measured-figure-parity.test.mjs'
+    finding: 'Line 69: the order check tests only the "Decide whether…" sentence. Dropping "whatever its value" passes.'
+    suggested_action: 'Assert the rejected-figure clause, and calibrate on dropping "whatever its value".'
+    suggested_owner: dev
+    status: open
+  - id: 'T328-CR6-3'
+    severity: low
+    file: 'evals/shared/tests/qa-measured-figure-parity.test.mjs'
+    finding: 'measuredFigureProblems repeats the locator that measuredFigureParagraph implements.'
+    suggested_action: 'Share one locator.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 8948
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: false
+    boundary_signals: []
+    notes: 'Unchanged: advisory listing, exits 0; no predicate prevents an action.'
+  performance:
+    status: PASS
+    notes: 'Prose and test changes only.'
+  reliability:
+    status: PASS
+    notes: 'LAN fast gate: 8948 tests, 0 failed (TEST_EXIT=0). GitHub CI green at dcbdab636.'
+  maintainability:
+    status: CONCERNS
+    notes: 'QA6-1: the paragraph drifted from criterion 4 under review pressure.'
+
+criteria_drift:
+  reason: drift
+  base: review-commit
+  changed:
+    - id: '#5'
+      kind: reworded
+      approved: true
+  note: 'Owner-approved amendment (Lorien Gamaroff, 2026-11-27). Criterion 4 is unchanged; the evidence drifted from it, not the criterion.'
+
+recommendations:
+  immediate:
+    - action: 'Restore "re-measure" in both paragraphs to meet criterion 4 (QA6-1)'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md', 'evals/shared/tests/qa-measured-figure-parity.test.mjs']
+  future:
+    - action: 'review-task stamps a reviewed_blob it never writes (obs #193)'
+      refs: ['shared/resources/criteria-drift.js']
+      remedy: unverified
+    - action: 'CI flake: lockctl take is atomic (tests/test-remote-runner.test.js:1047)'
+      refs: ['tests/test-remote-runner.test.js']
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['criterion 4 met (QA6-1)']

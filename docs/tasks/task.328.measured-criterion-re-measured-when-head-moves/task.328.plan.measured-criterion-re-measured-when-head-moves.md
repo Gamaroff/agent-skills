@@ -59,11 +59,13 @@
    `finalise-delta.js` and `ci-tree-equivalence.js`, and whatever else they `require`. Commit the
    generated copies.
 5. **Parity test** in `evals/shared/tests/` (the same family as `transition-protocol-parity.test.mjs`).
-   For each of the two QA SKILL.md files:
-   - it cites `finalise-dod-ac-prompt.md` Step 3 and `finalise-delta.js docs-only` within the
-     measured-criterion sentence;
+   For each of the two QA SKILL.md files, locate the measured-figure paragraph by its own marker
+   (`finalise-delta.js docs-only` and "re-measure" in one paragraph — the citation alone also
+   appears at qa-task `:1084`/`:1106` and qa-story `:1619`/`:1641`, so it cannot be the key):
+   - that paragraph cites `finalise-dod-ac-prompt.md` Step 3;
    - it does not contain the literal `code-changed`, `disabled` and `unverifiable` reason list near
-     that sentence.
+     that sentence;
+   - a file with no such paragraph fails (never passes vacuously).
 
    **Calibrate it** (CLAUDE.md, "a check proves nothing until it has reproduced a known failure").
    Delete the citation from one file, and the test goes red. Paste the reason list into the other,
