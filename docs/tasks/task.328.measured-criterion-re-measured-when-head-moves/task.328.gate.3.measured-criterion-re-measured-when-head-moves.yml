@@ -1,0 +1,98 @@
+schema: 2
+task: 'task.328.measured-criterion-re-measured-when-head-moves'
+task_title: 'A measured criterion is re-measured when the head moves'
+gate: CONCERNS
+status_reason: 'Cycle-2 fixes hold: "or equal to" bounds are listed, the paraphrase is gone, and criterion 5 is amended with owner approval. Two MEDIUMs remain where QA prose still decides what Step 3 owns: the outcome wording ("re-measure" for every rejection), and record_criteria treating measured: true as a classification.'
+reviewer: 'QA Engineer'
+head: '77c4e7dccc981d1ce897625cb916df9d12d8d2c7'
+updated: '2026-11-27T05:46:56Z'
+
+top_issues:
+  - id: 'T328-CR3-1'
+    severity: medium
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'Line 1102: "A figure the rule does not accept leaves the criterion **unverified** with re-measure". Step 3 (finalise-dod-ac-prompt.md, measured criterion) uses "re-measure" only for a figure on the wrong head or missing its load. A figure that misses the bound is FAIL, and one cited only in the implementation report fails with its own note. The same text is in skills/qa-story/SKILL.md. Checked against the source.'
+    suggested_action: 'Defer the outcome to Step 3 too. Keep "re-measure" only for the head-or-M check this paragraph runs, and add a parity calibration for the overbroad wording.'
+    suggested_owner: dev
+    status: open
+  - id: 'T328-CR3-2'
+    severity: medium
+    file: 'skills/qa-task/SKILL.md'
+    finding: 'Line 50: record_criteria sends every `measured: true` entry to the measured-figure rule. `measured` is a regex hit for any numeric bound, and Step 3 classifies a bound a per-PR test can hold as a behaviour criterion; the preflight test pins "A heading longer than 80 characters is refused." as measured: true. Raised as advisory in cycle 2 and again in cycle 3; now promoted.'
+    suggested_action: 'Say measured: true marks a candidate, and only a criterion Step 3 classifies as measured takes the measured-figure rule. Say the same in the field comment in finalise-record-preflight.js.'
+    suggested_owner: dev
+    status: open
+  - id: 'T328-CR3-3'
+    severity: low
+    file: 'shared/resources/finalise-record-preflight.js'
+    finding: 'Line 62: "no lower than 80%", "higher than 200 ms" and "bigger than 5 MB" read NUMERIC_BOUND false (reproduced by QA).'
+    suggested_action: 'Add lower, higher and bigger to the comparative list, with a test for each.'
+    suggested_owner: dev
+    status: open
+  - id: 'T328-CR3-4'
+    severity: low
+    file: 'evals/shared/tests/qa-measured-figure-parity.test.mjs'
+    finding: 'Line 61: the paraphrase guard matches one exact string, so Step 3''s own sentence ("taken on the PR''s head commit, or on an earlier commit M") would pass.'
+    suggested_action: 'Broaden the guard and calibrate it with Step 3''s verbatim sentence.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 80
+
+evidence:
+  tests_reviewed: 32
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: false
+    boundary_signals: []
+    notes: 'Unchanged: advisory listing, exits 0; no predicate prevents an action.'
+  performance:
+    status: PASS
+    notes: 'Two optional groups added; no nested quantifiers.'
+  reliability:
+    status: PASS
+    notes: 'GitHub CI full suite green at 77c4e7dcc. The LAN fast gate timed out (exit 124, 30-minute limit) under host load, with individual tests at 70-85 s, so it carries no verdict.'
+  maintainability:
+    status: CONCERNS
+    notes: 'CR3-1, CR3-2: QA prose still decides parts of Step 3.'
+
+criteria_drift:
+  reason: drift
+  base: review-commit
+  changed:
+    - id: '#5'
+      kind: reworded
+      approved: true
+  note: 'Amendment approved by the owner (Lorien Gamaroff) in session on 2026-11-27, recorded in the criterion and the Change Log.'
+
+recommendations:
+  immediate:
+    - action: 'Defer the outcome wording to Step 3 (CR3-1) and make measured: true a candidate (CR3-2)'
+      refs: ['skills/qa-task/SKILL.md', 'skills/qa-story/SKILL.md', 'shared/resources/finalise-record-preflight.js']
+  future:
+    - action: 'Drop the dead `(?:no\s+)?` group and the vacuous "no " test loop (CR3-5 cleanup)'
+      refs: ['shared/resources/finalise-record-preflight.js']
+      remedy: unverified
+    - action: 'review-task stamps a reviewed_blob it never writes (obs #193)'
+      refs: ['shared/resources/criteria-drift.js']
+      remedy: unverified
+    - action: 'CI flake: lockctl take is atomic (tests/test-remote-runner.test.js:1047)'
+      refs: ['tests/test-remote-runner.test.js']
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['CR3-1 and CR3-2 fixed']

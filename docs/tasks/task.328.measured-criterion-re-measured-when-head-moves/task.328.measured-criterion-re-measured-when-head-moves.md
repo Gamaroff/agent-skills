@@ -263,21 +263,21 @@ preflight fails. Steps: revert the phase's commit, run `npm run bundle`, re-run 
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-27
-**Quality Score**: 70/100
+**Quality Score**: 80/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.328.qa.2.measured-criterion-re-measured-when-head-moves.md](./task.328.qa.2.measured-criterion-re-measured-when-head-moves.md)
-- **Gate File**: [task.328.gate.2.measured-criterion-re-measured-when-head-moves.yml](./task.328.gate.2.measured-criterion-re-measured-when-head-moves.yml)
+- **Full Report**: [task.328.qa.3.measured-criterion-re-measured-when-head-moves.md](./task.328.qa.3.measured-criterion-re-measured-when-head-moves.md)
+- **Gate File**: [task.328.gate.3.measured-criterion-re-measured-when-head-moves.yml](./task.328.gate.3.measured-criterion-re-measured-when-head-moves.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 8938 (fast gate, 0 failed)
+- **Tests Executed**: GitHub CI full suite green at 77c4e7dcc. The LAN fast gate timed out (exit 124) under host load.
 - **Phases Verified**: 3/3
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
 
 ### Key Findings
-Both cycle-1 fixes hold. Three findings are open for a fix cycle: "greater than or equal to N" is still missed (T328-CR2-2), the QA paragraph paraphrases finalise Step 3 too narrowly (T328-CR2-3), and "faster than 319" reads as a bound (T328-CR2-4). Criterion 5 is unmet under its reviewed wording and needs the owner (T328-QA-1).
+The cycle-2 fixes hold, and criterion 5 is amended with owner approval. Two MEDIUM findings remain. The QA paragraph still restates Step 3's outcome ("re-measure" for every rejection, T328-CR3-1). The record_criteria line treats `measured: true` as Step 3's classification (T328-CR3-2). Two LOW findings are also open: missed comparatives (CR3-3) and a narrow paraphrase guard (CR3-4).
 
 <!-- change-log-start -->
 ## Change Log
@@ -294,6 +294,7 @@ Both cycle-1 fixes hold. Three findings are open for a fix cycle: "greater than 
 | 2026-11-27 |  | QA gate CONCERNS (70/100) — 4 findings | qa-task |
 | 2026-11-27 |  | Criterion 5 amended to "every newly listed example by path (up to five)". The corpus has one newly listed criterion. Approved by the owner in session (T328-QA-1) | Lorien Gamaroff |
 | 2026-11-27 |  | QA findings fixed — cycle 2, 1 iteration: "or equal to" bounds listed (CR2-2); QA paragraph cites Step 3 whole and says to run from the repository root (CR2-3); id-after-"than" false positive accepted and documented (CR2-4) | qa-fix |
+| 2026-11-27 |  | QA gate CONCERNS (80/100) — 4 findings | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking
