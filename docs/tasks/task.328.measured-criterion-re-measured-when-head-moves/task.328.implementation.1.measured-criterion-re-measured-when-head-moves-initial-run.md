@@ -110,6 +110,11 @@ _Problems encountered and how they were resolved or escalated._
   - #6 (medium): 13 calibration tests in `qa-measured-figure-parity.test.mjs` have no red-first record.
   - #7 (medium): no mutation record for the finalise-delta.js bundling, CR4-4 and CR6-1.
   - Fix-and-recheck (8a) not applicable (two medium findings). QA budget spent (7 gates, 2 owner-approved). **Owner decision needed:** an evidence-only fix cycle, or reword #6 (and/or #7); acknowledge #5's premise.
+  - **✅ Resolved 2026-11-27 — evidence-only fix cycle** (owner: "Go ahead with one more fix cycle"). Recorded in the qa.7 addendum, no code changed, no gate 8:
+    - #5: recount at head, 375 → 379, delta 4, all four paths listed. The premise the amendment was approved on ("only one") was wrong for the shipped engine; the amended wording is met.
+    - #6: 14 calibration tests (the DoD said 13), each red under the mutation that removes its check (M01–M14).
+    - #7: CR6-1, CR4-4 and the finalise-delta.js citation each turn a named test red. Removing the bundled copy itself turns only `bundle:check` red, a CI check, not a test.
+    - Resume at Step 7 (docs-only change inside the task directory) → `/finalise` run 2.
 
 ---
 
