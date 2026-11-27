@@ -301,6 +301,7 @@ The cycle-5 fixes hold. Criterion 4 is unmet: it requires "unverified with re-me
 | 2026-11-27 |  | QA gate CONCERNS (90/100) — 2 findings; QA budget exhausted (5 gates), escalated to the owner | qa-task |
 | 2026-11-27 |  | QA findings fixed — cycle 5 (one further cycle approved by the owner): provenance decided before the bound (CR5-1); identity check calibrated on a same-length drift (CR5-2) | qa-fix |
 | 2026-11-27 |  | QA gate CONCERNS (80/100) — criterion 4 unmet ("re-measure" removed in cycle 3); escalated to the owner | qa-task |
+| 2026-11-27 |  | QA findings fixed — cycle 6 (further cycle approved by the owner): "re-measure" restored for a rejected figure, other notes deferred to Step 3 (QA6-1); unverified mapping stated as deliberate (CR6-1); "whatever its value" held (CR6-2); one locator (CR6-3) | qa-fix |
 <!-- change-log-end -->
 
 ## Progress Tracking

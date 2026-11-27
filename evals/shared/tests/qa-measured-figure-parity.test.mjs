@@ -5,11 +5,11 @@
  * The rule lives once, in `finalise-dod-ac-prompt.md` Step 3. Each QA skill holds one
  * paragraph that applies that rule whole to a measured figure — new or carried — runs
  * `finalise-delta.js docs-only` where the rule calls for it, and marks a figure the rule
- * rejects **unverified**. The note each failure carries is Step 3's, so the paragraph names
- * none (task 328 QA-3, CR3-1: "re-measure" for every rejection was wrong).
+ * rejects **unverified** with "re-measure" — criterion 4's wording — or with the other note
+ * Step 3 gives it. "re-measure" alone, for every rejection, was overbroad (QA-3, CR3-1); with
+ * no "re-measure" at all, criterion 4 went unmet (QA-6, QA6-1). Both are held below.
  *
- * The paragraph is located by its OWN marker (`finalise-delta.js docs-only` and
- * `**unverified**` in one paragraph), never by the citation: each skill already cites
+ * The paragraph is located by its OWN bold lead, never by the citation: each skill already cites
  * "`finalise-dod-ac-prompt.md` Step 3" twice elsewhere, so a test keyed on the citation
  * stays green when this paragraph loses it (review-task check 13).
  *
@@ -34,20 +34,24 @@ const CITATION = "`finalise-dod-ac-prompt.md` Step 3";
 // a second copy here would be the enumeration drift docs/reference/anti-patterns.md names.
 const REASONS = ["code-changed", "disabled", "unverifiable"];
 
-/** The problems with one skill's measured-figure paragraph; an empty list means it holds. */
 // The paragraph's bold lead. Locating by it keeps every content check below live: a check on
 // a string the locator also requires can never fail on its own (QA-4, CR4-4).
 export const LEAD =
   "**A measured figure counts for this head only as finalise grades it**";
 
+// One locator, used by both readers below (QA-6, CR6-3).
+const leadParagraphs = (text) =>
+  text.split(/\n\s*\n/).filter((p) => p.includes(LEAD));
+
 /** The measured-figure paragraph of a skill file, or null when not exactly one exists. */
 export function measuredFigureParagraph(text) {
-  const hits = text.split(/\n\s*\n/).filter((p) => p.includes(LEAD));
+  const hits = leadParagraphs(text);
   return hits.length === 1 ? hits[0] : null;
 }
 
+/** The problems with one skill's measured-figure paragraph; an empty list means it holds. */
 export function measuredFigureProblems(text) {
-  const hits = text.split(/\n\s*\n/).filter((p) => p.includes(LEAD));
+  const hits = leadParagraphs(text);
   if (hits.length !== 1) {
     return [
       `expected exactly one measured-figure paragraph, found ${hits.length}`,
@@ -92,9 +96,26 @@ export function measuredFigureProblems(text) {
     problems.push(
       "the paragraph paraphrases which figures Step 3 holds to the head",
     );
-  // "re-measure" is the note Step 3 gives some failures, not all of them (QA-3, CR3-1).
-  if (/re-measure/.test(p))
-    problems.push("the paragraph restates the note a failure carries");
+  // Criterion 4: a rejected figure is unverified with "re-measure" (QA-6, QA6-1) — but that is
+  // the note Step 3 gives some failures, not all of them, so the other notes stay Step 3's (CR3-1).
+  if (!/\*\*unverified\*\*\s+with\s+"re-measure"/.test(p))
+    problems.push(
+      'the paragraph does not mark a rejected figure unverified with "re-measure"',
+    );
+  if (
+    !/"re-measure",\s+or\s+with\s+the\s+other\s+note\s+Step\s+3\s+gives\s+it/.test(
+      p,
+    )
+  )
+    problems.push("the paragraph gives every rejection the one note");
+  // A rejected figure is unverified whatever its value; QA's mapping of Step 3's FAIL is
+  // stated as deliberate (QA-6, CR6-2, CR6-1).
+  if (!/gives\s+it,\s+whatever\s+its\s+value/.test(p))
+    problems.push("the paragraph lets a rejected figure's value decide it");
+  if (!/unverified\s+on\s+purpose/.test(p))
+    problems.push(
+      "the paragraph does not state the unverified mapping as deliberate",
+    );
   if (!/from the repository root/.test(p))
     problems.push(
       "the paragraph does not say to run the check from the repository root",
@@ -182,7 +203,8 @@ const GOOD = [
   `**A measured figure counts for this head only as finalise grades it**. A figure carried or new`,
   `counts only as ${CITATION} grades it, via`,
   "`finalise-delta.js docs-only` run from the repository root. Decide whether the figure counts before reading it against the bound.",
-  "A figure not accepted is **unverified** with Step 3's note, and a **MEDIUM** entry in `top_issues[]`.",
+  'A figure not accepted is **unverified** with "re-measure", or with the other note Step 3 gives it, whatever its value,',
+  "and a **MEDIUM** entry in `top_issues[]`; QA records it as unverified on purpose.",
   "Only a figure the rule accepts that misses the criterion's",
   "bound fails the criterion.",
   "",
@@ -235,12 +257,37 @@ test("calibration: Step 3's own head-or-M sentence, copied in, fails", () => {
   assert.match(measuredFigureProblems(text).join("\n"), /paraphrases/);
 });
 
-test('calibration: "re-measure" as the note for every rejection fails', () => {
-  const text = GOOD.replace("with Step 3's note", 'with "re-measure"');
+test('calibration: "re-measure" as the note for every rejection fails (QA-3, CR3-1)', () => {
+  const text = GOOD.replace(", or with the other note Step 3 gives it", "");
+  assert.notEqual(text, GOOD);
   assert.match(
     measuredFigureProblems(text).join("\n"),
-    /restates the note a failure carries/,
+    /gives every rejection the one note/,
   );
+});
+
+test('calibration: no "re-measure" at all fails criterion 4 (QA-6, QA6-1)', () => {
+  const text = GOOD.replace(
+    'with "re-measure", or with the other note',
+    "with the note",
+  );
+  assert.notEqual(text, GOOD);
+  assert.match(
+    measuredFigureProblems(text).join("\n"),
+    /unverified with "re-measure"/,
+  );
+});
+
+test('calibration: dropping "whatever its value" fails (QA-6, CR6-2)', () => {
+  const text = GOOD.replace(" whatever its value,", "");
+  assert.notEqual(text, GOOD);
+  assert.match(measuredFigureProblems(text).join("\n"), /value decide it/);
+});
+
+test("calibration: an undeclared unverified mapping fails (QA-6, CR6-1)", () => {
+  const text = GOOD.replace("; QA records it as unverified on purpose.", ".");
+  assert.notEqual(text, GOOD);
+  assert.match(measuredFigureProblems(text).join("\n"), /as deliberate/);
 });
 
 test("calibration: a missed bound called unverified fails (QA-4, CR4-1)", () => {

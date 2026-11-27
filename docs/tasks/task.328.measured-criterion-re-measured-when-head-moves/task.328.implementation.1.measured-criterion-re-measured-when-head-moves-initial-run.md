@@ -151,6 +151,8 @@ _Track each QA review/fix cycle._
 
 - **Gate 6**: CONCERNS 80/100. Fast gate: 8948 tests, 0 failed; CI green at dcbdab636. Criterion 4 is unmet: cycle 3 (CR3-1) removed the "re-measure" wording the criterion names, and the parity test bans it. Applying reviewer findings without re-reading the criteria let the evidence drift from a criterion. **HALT**: escalated, because the fix reverses CR3-1.
 
+- **Cycle 6 fix** (owner-approved): "re-measure" is restored to meet criterion 4, with Step 3's other notes deferred. The parity test now requires the word, not bans it. CR6-1/2/3 are fixed, and all are mutation-proven. Observation #195 is logged for the criteria-blind fix.
+
 - **Correction to the Issues Log**: amending criterion 5 during develop was wrong. It was an unapproved rewording, and the qa-fix restores the reviewed text.
 
 ---
