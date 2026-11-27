@@ -359,6 +359,40 @@ for (const shell of SHELLS) {
     }
   });
 
+  test(`[${shell}] Step 3c HALTs on another document's result in its own arm, naming the remedy, and records nothing (task 331)`, () => {
+    const dir = repo();
+    try {
+      const a1 = step3a(shell, dir, 1);
+      assert.equal(a1.status, 0, a1.stdout + a1.stderr);
+      const other = "docs/tasks/task.8.other/task.8.other.md";
+      writeFileSync(
+        path.join(dir, ".claude/state/finalise-ac-result-task.9-1.yaml"),
+        AGENT_ALL_PASS.replace(
+          "ac_traceability:\n",
+          `ac_traceability:\n  story_file: "${other}"\n`,
+        ),
+      );
+      const c = run(shell, dir, substitute(STEP_3C, { dodN: 1 }));
+      assert.equal(c.status, 1, c.stdout + c.stderr);
+      assert.match(
+        c.stdout,
+        /HALT: --result is for docs\/tasks\/task\.8\.other\/task\.8\.other\.md, not docs\/tasks\/task\.9\.demo\/task\.9\.demo\.md: it is another document's answer/,
+      );
+      // The arm's own remedy, not the generic `merge answered …` line the `*)` arm prints.
+      assert.match(
+        c.stdout,
+        /re-run the extract above, or hand-copy THIS item's AC agent answer to the result path, then re-run this block; never merge it/,
+      );
+      assert.doesNotMatch(c.stdout, /merge answered/);
+      assert.ok(
+        !existsSync(path.join(dir, DOC_DIR, "task.9.dod.1.ac.json")),
+        "nothing is recorded",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test(`[${shell}] Steps 3a and 3c run as delivered (placeholders unsubstituted) HALT before reaching the engine`, () => {
     const dir = repo();
     try {
