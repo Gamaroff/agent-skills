@@ -4663,24 +4663,19 @@ test("task.131: lintReport through the markdown-structure sink engages — every
 
 const GIT_NAME_ENTRY = "shared/resources/ci-tree-equivalence.js#isDocsPath";
 const GIT_NAME_ARGS = [["**"]];
-// Each refusal has two spellings: inline in isDocsPath, as on develop, and in a
-// hasPathFormDefect helper, which the unmerged task-325 branch adds. Exactly one spelling must occur, exactly
-// once, so the test holds on both sides of that refactor and fails on a third.
+// The source line of each refusal, verbatim. `control`, `segment` and `normalise` live in the
+// hasPathFormDefect helper task 325 merged; `dotGitStream` is the `:` fold inside
+// isDotGitSegment (task 330). Each must occur exactly once, so a rewrite of a refusal fails here
+// rather than making its mutation remove nothing (T329-QA-10).
 const IS_DOCS_LINES = Object.freeze({
-  control: [
-    "  if (/[\\u0000-\\u001f\\u007f]/.test(file)) return false;",
-    "  if (/[\\u0000-\\u001f\\u007f]/.test(p)) return true;",
-  ],
+  control: ["  if (/\\p{Cc}/u.test(p)) return true;"],
   segment: [
-    '  if (file.split("/").some((seg) => seg === "" || seg === "." || seg === ".."))\n    return false;',
     '  if (p.split("/").some((seg) => seg === "" || seg === "." || seg === ".."))\n    return true;',
   ],
   dotGit: ['  if (file.split("/").some(isDotGitSegment)) return false;'],
+  dotGitStream: ['    .replace(/:.*$/s, "")'],
   config: ['  if (file.split("/").pop() === CONFIG_BASENAME) return false;'],
-  normalise: [
-    "  if (normalisePath(file) !== file) return false;",
-    "  return normalisePath(p) !== p;",
-  ],
+  normalise: ["  return normalisePath(p) !== p;"],
 });
 const isDocsAnchor = (src, name) => {
   const hits = IS_DOCS_LINES[name].filter((l) => src.split(l).length === 2);
@@ -4696,7 +4691,10 @@ const isDocsAnchor = (src, name) => {
   return hits[0];
 };
 const GIT_NAME_MUTATIONS = Object.freeze([
-  { removed: ["control"], reproduces: ["control-char", "tab", "nul"] },
+  {
+    removed: ["control"],
+    reproduces: ["control-char", "c1-control", "tab", "nul"],
+  },
   {
     removed: ["segment"],
     reproduces: ["dot-dot-segment", "empty-segment", "trailing-slash"],
@@ -4708,7 +4706,13 @@ const GIT_NAME_MUTATIONS = Object.freeze([
       "dot-git-bare",
       "dot-git-nested",
       "dot-git-case",
+      "dot-git-stream",
+      "dot-git-stream-name",
     ],
+  },
+  {
+    removed: ["dotGitStream"],
+    reproduces: ["dot-git-stream", "dot-git-stream-name"],
   },
   { removed: ["config"], reproduces: ["config-root", "config-nested"] },
   {

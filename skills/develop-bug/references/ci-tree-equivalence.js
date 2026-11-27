@@ -129,13 +129,17 @@ const CONFIG_BASENAME = "skills-config.yaml";
  * Is one path segment a spelling of `.git`? Git itself refuses these names (is_hfs_dotgit /
  * is_ntfs_dotgit), because on a case-insensitive or Unicode-folding filesystem they ARE the
  * repository directory: any case, HFS+-ignorable code points (zero-width and directional marks,
- * U+FEFF), trailing dots or spaces, and the NTFS short name `git~1`. A path through one names the
+ * U+FEFF), trailing dots or spaces, the NTFS short name `git~1`, and an NTFS alternate data stream
+ * (`.git::$INDEX_ALLOCATION`, `.git:x`): everything from the first `:` is dropped before the other
+ * folds, as git's own NTFS check does (task.330). Only the `.git` comparison is folded, so
+ * `docs/a:b.md` stays a name. A path through one names the
  * repository's internals, never documentation, so no pattern may accept it.
  */
 const DOTGIT_IGNORABLE = /[\u200b-\u200f\u202a-\u202e\u206a-\u206f\ufeff]/g;
 function isDotGitSegment(seg) {
   const folded = seg
     .replace(DOTGIT_IGNORABLE, "")
+    .replace(/:.*$/s, "")
     .replace(/[. ]+$/, "")
     .toLowerCase();
   return folded === ".git" || folded === "git~1";
@@ -152,7 +156,8 @@ function isDotGitSegment(seg) {
  *    hand-typed gate values: it trims, strips a leading `/` and turns `\` into `/`. Git emits paths
  *    verbatim, so a file literally named `docs\evil.js` or ` docs/x.js` must not be normalised into
  *    `docs/**` (CR-4).
- *  - It contains a control character (U+0000–U+001F, U+007F). Git never emits a NUL, but a caller
+ *  - It contains a control character (`\p{Cc}`: U+0000–U+001F, U+007F, and C1 U+0080–U+009F,
+ *    task.330 — the class `UNPRINTABLE` already refuses in `ci.skipMarker`). Git never emits a NUL, but a caller
  *    that hands this predicate a path read from a document can: the 5c classify block reads a review
  *    report's `ref`, and under zsh a NUL survives `read` while `git` sees the argument cut at it, so
  *    `src/a.js<NUL>.md` matched the default markdown glob here and then passed git's tracked-and-clean test as
@@ -180,7 +185,7 @@ function isDotGitSegment(seg) {
  * rest).
  */
 function hasPathFormDefect(p) {
-  if (/[\u0000-\u001f\u007f]/.test(p)) return true; // control characters: never documentation
+  if (/\p{Cc}/u.test(p)) return true; // control characters (C0, DEL, C1): never documentation
   if (p.split("/").some((seg) => seg === "" || seg === "." || seg === ".."))
     return true;
   return normalisePath(p) !== p;
@@ -823,9 +828,10 @@ function interpretConfig(parsed, keys) {
       // is left alone.
       if (excl && /[{}[\]|]|[@!+]\(/.test(g.slice(1))) {
         throw new UsageError(
-          `ci.docsOnly.patterns holds ${JSON.stringify(g)}: braces, character classes and extglob are not supported ` +
+          `ci.docsOnly.patterns holds ${JSON.stringify(g)}: braces, character classes, extglob groups (@(, !(, +() and | are not supported ` +
             "(only *, ** and ? are wildcards; every other character matches itself). " +
-            'List each path as its own exclusion (`- "!docs/a.md"`, `- "!docs/b.md"`), or use * or ?',
+            'List each path as its own exclusion (`- "!docs/a.md"`, `- "!docs/b.md"`), or use * or ?. ' +
+            'For a file whose name holds a bracket, write each literal `[` or `]` as `?` (`- "!docs/blog/?slug?.md"` excludes docs/blog/[slug].md)',
         );
       }
     }

@@ -60,7 +60,7 @@ const FLOORS = Object.freeze({
   path: { hostile: 7, legitimate: 3 },
   // task.329: the names isDocsPath refuses, each caught by a broken copy, and
   // the literal names a filesystem-minded check would wrongly refuse.
-  "git-name": { hostile: 14, legitimate: 8 },
+  "git-name": { hostile: 17, legitimate: 9 },
   "template-render": { hostile: 5, legitimate: 3 },
   // task.128: the names that defeated qa-cycle.sh, plus the shapes a shell
   // re-reads (substitution, separators, options, globs) and the limits the

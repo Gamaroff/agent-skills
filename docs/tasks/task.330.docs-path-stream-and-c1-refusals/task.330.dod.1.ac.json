@@ -1,0 +1,148 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "9c1a872a0e8aa1f0ce25bde80bf1319434ebe00e",
+  "dirty_paths": [
+    "docs/tasks/task.330.docs-path-stream-and-c1-refusals/task.330.implementation.1.docs-path-stream-and-c1-refusals-initial-run.md",
+    "docs/tasks/task.330.docs-path-stream-and-c1-refusals/task.330.pr-review.1.docs-path-stream-and-c1-refusals.md"
+  ],
+  "document": "docs/tasks/task.330.docs-path-stream-and-c1-refusals/task.330.docs-path-stream-and-c1-refusals.md",
+  "result": {
+    "bytes": 7994,
+    "sha256": "f506a17b83d28638aa49309f77de2d1c8f297bd7ae95bdf1bc00d74d5a2a95ae",
+    "verified": true
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 7,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "a35860ec481f9c9af93aa29b62d705124c2e0bb6545f2d8b4f446419356ca3ab",
+      "status": "PASS",
+      "description": "Every row of the § 8 table holds in a test",
+      "code_citation": "shared/resources/ci-tree-equivalence.js:141",
+      "test_citation": "shared/resources/tests/ci-tree-equivalence.test.mjs:712",
+      "members": [
+        {
+          "member": "isDocsPath over each Tried row of § 3 (stream x3, GIT~1:a, C1 0x80/0x85/0x9f, .git/, a:b, git:x, U+00A0)",
+          "evidence": "shared/resources/tests/ci-tree-equivalence.test.mjs:712",
+          "status": "PASS"
+        },
+        {
+          "member": "git-name hostile cases for the .git: stream (two spellings) and a C1 control, refused (held)",
+          "evidence": "shared/resources/security-input-corpus.mjs:707,715,765; held by shared/resources/tests/security-probe.test.mjs:4730 (engages at HEAD), reproduced by mutation rows :4696/:4714; floor shared/resources/tests/security-input-corpus.test.mjs:63",
+          "status": "PASS"
+        },
+        {
+          "member": "git-name legitimate case docs/a:b.md accepted",
+          "evidence": "shared/resources/security-input-corpus.mjs:835; shared/resources/tests/security-probe.test.mjs:4730; shared/resources/tests/ci-tree-equivalence.test.mjs:712",
+          "status": "PASS"
+        },
+        {
+          "member": "isDocsPath(docs/c++.md,[docs/c++.md]) true and docs/cc.md false, pinned",
+          "evidence": "shared/resources/tests/ci-tree-equivalence.test.mjs:731",
+          "status": "PASS"
+        },
+        {
+          "member": "patterns [docs/**, !docs/a<U+0085>.md] is a usage error naming ci.docsOnly.patterns",
+          "evidence": "shared/resources/tests/ci-tree-equivalence.test.mjs:736",
+          "status": "PASS"
+        },
+        {
+          "member": "bracket refusal message names ? for each [ and ]",
+          "evidence": "shared/resources/tests/ci-tree-equivalence.test.mjs:753",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "All six § 8 rows map to a test. The tests are in shared/resources/tests/*.test.mjs, which npm test (test:suite) selects, and .github/workflows/test.yml:58 runs that on every pull_request with no paths filter. Code: the ':' fold at ci-tree-equivalence.js:141 and \\\\p{Cc} at :187."
+    },
+    {
+      "id": "#2",
+      "text_hash": "ec3f2195ed35cee4d0f314160b7a5b2b31b775fbd09ceae9536011828f78f0d0",
+      "status": "PASS",
+      "description": "isDotGitSegment has no new caller; git grep shows only isDocsPath",
+      "code_citation": "shared/resources/ci-tree-equivalence.js:197",
+      "test_citation": "shared/resources/tests/ci-tree-equivalence.test.mjs:712",
+      "members": [],
+      "non_member_fail": null,
+      "note": "I ran git grep -n isDotGitSegment -- shared/resources ':!shared/resources/tests' at head 9c1a872. It prints the definition :138, a doc comment :167 and the one call in isDocsPath :197, so there is no new caller. The behaviour this criterion protects (the fold stays inside the .git comparison) is pinned by the docs/a:b.md and docs/git:x.md accepted rows (test.mjs:712) and by the colon-name corpus case under security-probe.test.mjs:4730. The QA report's fold-every-segment mutation turned both red. No test asserts the caller count itself, so the grep is the direct evidence."
+    },
+    {
+      "id": "#3",
+      "text_hash": "3f4840e8e5357334d3ea4640273ec8c735da15b43ebaa0dbd95a1af07d077403",
+      "status": "PASS",
+      "description": "Performance: not applicable, no bound claimed",
+      "code_citation": "docs/tasks/task.330.docs-path-stream-and-c1-refusals/task.330.docs-path-stream-and-c1-refusals.md:339",
+      "test_citation": "NOT_APPLICABLE: the task says so explicitly (§ 8 Performance Tests 'Not applicable.', line 326; § 9 line 339 'no bound is claimed')",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The task states no performance bound, so there is nothing to measure or test."
+    },
+    {
+      "id": "#4",
+      "text_hash": "416cfaa6810f7c0b13e1c445c2a5d6155cc78f55a42ac9860bd3e7181cb72d7f",
+      "status": "PASS",
+      "description": "Every § 8 mutation recorded in QA report with test turned red",
+      "code_citation": "docs/tasks/task.330.docs-path-stream-and-c1-refusals/task.330.qa.1.docs-path-stream-and-c1-refusals.md:150",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "the ':' fold removed: .git: stream cases reproduce",
+          "evidence": "docs/tasks/task.330.docs-path-stream-and-c1-refusals/task.330.qa.1.docs-path-stream-and-c1-refusals.md:152 (plus committed dotGitStream row, :155; security-probe.test.mjs:4714)",
+          "status": "PASS"
+        },
+        {
+          "member": "control class narrowed back to C0 and DEL: C1 case reproduces",
+          "evidence": "docs/tasks/task.330.docs-path-stream-and-c1-refusals/task.330.qa.1.docs-path-stream-and-c1-refusals.md:150",
+          "status": "PASS"
+        },
+        {
+          "member": "fold applied to every segment: docs/a:b.md legitimate case refused",
+          "evidence": "docs/tasks/task.330.docs-path-stream-and-c1-refusals/task.330.qa.1.docs-path-stream-and-c1-refusals.md:151",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "Each of the three § 8 mutations has a mutation-proven line at qa.1 lines 150 to 152 that names the tests it turned red. A green baseline was run between mutations (line 147). The QA report is committed at head 9c1a872."
+    },
+    {
+      "id": "#5",
+      "text_hash": "4999c165b79021a23c9d1010200e422554cb68ede31c8b2797ca34a95f6dccd8",
+      "status": "PASS",
+      "description": "npm run test:remote and npm run bundle:check pass",
+      "code_citation": "docs/tasks/task.330.docs-path-stream-and-c1-refusals/task.330.qa.1.docs-path-stream-and-c1-refusals.md:68",
+      "test_citation": ".github/workflows/test.yml:58",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The QA report (lines 68 and 164) records ci:fast, which test:remote runs, at 8955 tests and 0 fail, and bundle:check at 129 skills and 0 problems, both at 1de74ff6c8d7. finalise-delta docs-only from 1de74ff6c8d7 to HEAD 9c1a872 returned tree-equivalent (exit 0): the only changes are 5 files in the task directory. On every PR, test.yml:58 runs npm test (the same suite), and validate.yml:128 runs bundle_skill.py --check, triggered on skills/** and shared/resources/** changes, both of which this PR touches. The caller reports CI green at 1de74ff6c8d7. RERUN_AT_HEAD is none, so no command was re-run at head."
+    },
+    {
+      "id": "#6",
+      "text_hash": "152ef711c17ec8a99bec3c7f1ec6e757a3ee48bb0fe2ca8120b90e2af73046f5",
+      "status": "PASS",
+      "description": "CHANGELOG [Unreleased] names both § 5 changes and @( !( +(",
+      "code_citation": "CHANGELOG.md:36",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "I read CHANGELOG.md under [Unreleased] (line 5). Lines 36 to 41 name both § 5 changes: Breaking Change 1, a .git: stream segment or a C1 control is now code, so the pipelines wait for CI; Breaking Change 2, an exclusion holding a C1 control is a usage error naming the key (exit 2). Line 32 replaces 'extglob' with 'an extglob group (`@(`, `!(` or `+(`)'. changelog-cites.test.mjs checks fixtures only and does not pin this text."
+    },
+    {
+      "id": "#7",
+      "text_hash": "c0112695b7d3eda74c81338423fd926ac0514547004ed7cae8cf568ec10ab81d",
+      "status": "PASS",
+      "description": "Bracket message and runbook say write each [ or ] as ?",
+      "code_citation": "shared/resources/ci-tree-equivalence.js:833; docs/runbooks/ci-docs-only-skip.md:208",
+      "test_citation": "shared/resources/tests/ci-tree-equivalence.test.mjs:753",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The message at ci-tree-equivalence.js:833 says 'write each literal `[` or `]` as `?`'. The test at :753 asserts that wording and that the advice works: !docs/blog/?slug?.md excludes docs/blog/[slug].md. I read the runbook text at ci-docs-only-skip.md:207-208; it says to write each literal [ or ] as ? and gives the same example. The runbook half is a documentation criterion and no test pins it."
+    }
+  ],
+  "advisories": []
+}

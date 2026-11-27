@@ -1,0 +1,12 @@
+[
+  {
+    "argv": [
+      "--sink",
+      "git-name",
+      "--entry",
+      "shared/resources/ci-tree-equivalence.js#isDocsPath",
+      "--args-json",
+      "[[\"**\"]]"
+    ]
+  }
+]

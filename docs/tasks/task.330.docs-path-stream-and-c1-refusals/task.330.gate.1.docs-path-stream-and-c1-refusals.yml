@@ -1,0 +1,55 @@
+schema: 2
+task: 'task.330.docs-path-stream-and-c1-refusals'
+task_title: 'isDocsPath refuses the NTFS .git stream and C1 controls'
+gate: PASS
+status_reason: 'All three phases verified, every § 8 row held by a committed test, all three § 8 mutations covered, probe engages (26 cases, 0 reproduced, 0 escaped), CI green on the head; the diff review returned no findings.'
+reviewer: 'QA Engineer'
+head: '1de74ff6c8d7cd4c6fa95613462e40b2dd2d1ebc'
+updated: '2026-11-27T12:07:14Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 8955
+  phases_verified: 3/3
+  trace:
+    phases_covered: [1, 2, 3]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: measured
+    probes_executed: 26
+    escaped: 0
+    boundary_signals: []
+    boundary_reason: ''
+    notes: 'boundary: true — isDocsPath probed through the git-name sink (security-probe.mjs, record task.330.qa.1.security.run.json): verdict engages, 26 executed, 0 reproduced, 0 overblocked, 0 escaped. The change only narrows what counts as documentation.'
+  performance:
+    status: PASS
+    notes: 'One extra regex replace per path segment; no bound is claimed.'
+  reliability:
+    status: PASS
+    notes: 'Fail-safe direction only: a refused spelling makes the pipeline wait for CI. A C1 exclusion is a usage error naming the key (exit 2).'
+  maintainability:
+    status: PASS
+    notes: 'One spelling per refusal in IS_DOCS_LINES, a mechanical dotGitStream mutation row, generated corpus tables asserted verbatim.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future: []
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

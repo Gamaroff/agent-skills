@@ -706,6 +706,72 @@ test("task.325: readConfig refuses brace and class syntax in an exclusion, which
   assert.equal(matchesAnyGlob("docs/a.md", ["docs/?.md"]), true);
 });
 
+// ── task.330: the NTFS `.git:` stream and C1 controls ─────────────────────
+const C1 = (cp) => String.fromCharCode(cp);
+
+test("task.330: a `.git:` stream segment and a C1 control are code; a colon elsewhere is not", () => {
+  for (const [path, docs] of [
+    ["docs/.git::$INDEX_ALLOCATION/x.md", false],
+    ["docs/.git:x/y.md", false],
+    [".git:stream", false],
+    ["docs/GIT~1:a/b.md", false],
+    ["docs/.git. :x/y.md", false], // the stream is cut before the trailing dots and spaces
+    [`docs/a${C1(0x80)}.md`, false],
+    [`docs/a${C1(0x85)}.md`, false],
+    [`docs/a${C1(0x9f)}.md`, false],
+    ["docs/.git/x.md", false],
+    ["docs/a:b.md", true],
+    ["docs/git:x.md", true],
+    [`docs/a${C1(0xa0)}b.md`, true], // no-break space: not a control character
+  ]) {
+    assert.equal(eng.isDocsPath(path, ["**"]), docs, JSON.stringify(path));
+  }
+});
+
+test("task.330: a pattern's literal `+` is matched literally (the plus-signs corpus clause)", () => {
+  assert.equal(eng.isDocsPath("docs/c++.md", ["docs/c++.md"]), true);
+  assert.equal(eng.isDocsPath("docs/cc.md", ["docs/c++.md"]), false);
+});
+
+test("task.330: readConfig refuses an exclusion holding a C1 control, naming the key", () => {
+  const entry = `!docs/a${C1(0x85)}.md`;
+  const dir = mkRepo({
+    config: `ci:\n  docsOnly:\n    patterns:\n      - "docs/**"\n      - ${JSON.stringify(entry)}\n`,
+  });
+  try {
+    assert.throws(
+      () => eng.readConfig(dir),
+      (e) =>
+        e instanceof eng.UsageError && /ci\.docsOnly\.patterns/.test(e.message),
+      "a C1 control in an exclusion",
+    );
+  } finally {
+    cleanup(dir);
+  }
+});
+
+test("task.330: the bracket refusal says to write a literal `[` or `]` as `?`, and that works", () => {
+  const dir = mkRepo({
+    config:
+      'ci:\n  docsOnly:\n    patterns:\n      - "docs/**"\n      - "!docs/blog/[slug].md"\n',
+  });
+  try {
+    assert.throws(
+      () => eng.readConfig(dir),
+      (e) =>
+        e instanceof eng.UsageError &&
+        /write each literal `\[` or `\]` as `\?`/.test(e.message),
+    );
+  } finally {
+    cleanup(dir);
+  }
+  // The advice, followed: the `?` spelling excludes the bracketed file.
+  assert.equal(
+    eng.isDocsPath("docs/blog/[slug].md", ["docs/**", "!docs/blog/?slug?.md"]),
+    false,
+  );
+});
+
 test("task.325: glob-match itself has no negation — qa.testArtifactGlobs keeps its meaning", () => {
   // The exclusion lives in isDocsPath alone. matchesAnyGlob is shared with qa.testArtifactGlobs,
   // where a `!` entry matches only a path literally named with it.

@@ -66,7 +66,11 @@ the one spelling that exists. Task 325 merged `hasPathFormDefect`, so the inline
 `control` anchor becomes the new line verbatim. Add the mutation rows to `GIT_NAME_MUTATIONS`:
 
 - `control` reproduces `c1-control` too;
-- `dotGit` reproduces `dot-git-stream` and `dot-git-stream-name` too.
+- `dotGit` reproduces `dot-git-stream` and `dot-git-stream-name` too;
+- a new anchor `dotGitStream`, the fold line `    .replace(/:.*$/s, "")` verbatim (the anchor test
+  needs it to occur exactly once in the file), and a new row `{ removed: ["dotGitStream"], reproduces:
+  ["dot-git-stream", "dot-git-stream-name"] }`. This is the mechanical proof of the `:` fold that § 8
+  names (review 1).
 
 The test already demands that every hostile id is reached by some row.
 
