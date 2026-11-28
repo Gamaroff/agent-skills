@@ -5,11 +5,13 @@ type: task
 description: "The two review-story ${X:+--flag \"$X\"} sites use the array form and a guard test fails on any new one; /finalise discloses every unverified AC hand copy, keys its re-run-at-head files by work item, states what merge refuses exactly, and parses the AC answer once."
 tags: [review-story, finalise, observation, zsh, follow-up]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-11-28
 updated: 2026-11-28
+completed_date: 2026-11-28
+pr_number: 966
 assignee:
 estimated_effort_hours: 8
 github_issue: 965
@@ -17,7 +19,7 @@ github_issue: 965
 
 # Close task 332's follow-ups and guard the zsh flag trap
 
-**Status:** Ready for Review
+**Status:** Accepted
 
 **Review**: ✅ All review recommendations from `task.333.review.1.close-task-332-follow-ups-and-zsh-flag-guard.md` implemented 2026-11-28
 
@@ -417,12 +419,34 @@ A false positive in the guard is fixed by narrowing the key, with the new case a
 - T333-QA-1 and T333-QA-2 are fixed (`b30e42f94`). QA reverted each fix and saw its test fail.
 - The cycle 2 refute review found two unbound reads in review-story's Jira blocks. They are identical on `origin/develop`, so they are routed to future work. It also found two advisory cleanups.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.333.qa.2.close-task-332-follow-ups-and-zsh-flag-guard.md`
+**Gate File**: `task.333.gate.2.close-task-332-follow-ups-and-zsh-flag-guard.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 11/11 success criteria met (#8 graded from CI reading 1, SUCCESS @ `4ecd2dab92b8`)
+✅ **PR Review:** PR #966; no review required on this host. Step 5c report `task.333.pr-review.1.close-task-332-follow-ups-and-zsh-flag-guard.md` is CONCERNS with 0 open coverage findings
+✅ **Tests:** `test:remote` 8987 pass, 0 fail; CI green over 6 checks
+✅ **Documentation:** CHANGELOG `[Unreleased]` entries and the `docs/contributing/traps.md` zsh entry
+✅ **Security Review:** PASS — `boundary: internal` (`finalise-rerun-scope.js#merge`, pipeline-owned inputs)
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal tooling
+
+**Task marked as ACCEPTED on:** 2026-11-28
+
+**Detailed Verification Log:** See `task.333.dod.1.close-task-332-follow-ups-and-zsh-flag-guard.md` for complete verification evidence and timestamps.
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
-
 | Date | Version | Description | Author |
-| ---- | ------- | ----------- | ------ |
+|------|---------|-------------|--------|
 | 2026-11-28 | 1.0 | Initial draft — cut from observation #202 | create-task |
 | 2026-11-28 | 1.1 | Review passed (9/10) — two criteria now name their evidence (the stem-key test; CI plus test:remote in the QA report), M4's target line named | review-task |
 |  |  | Status → ready-for-development | review-task |
@@ -431,7 +455,7 @@ A false positive in the guard is fixed by narrowing the key, with the new case a
 | 2026-11-28 |  | QA gate CONCERNS (90/100) — 2 findings (1 medium, 1 low) | qa-task |
 | 2026-11-28 |  | QA findings fixed — T333-QA-1, T333-QA-2 (guard population by marker, whitespace key), 1 iteration | qa-fix |
 | 2026-11-28 |  | QA gate PASS (100/100) — 0 open findings (2 pre-existing routed to future, 2 advisory cleanups) | qa-task |
-
+| 2026-11-28 | 1.2 | DoD passed — accepted (PR #966) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
