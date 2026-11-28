@@ -1,0 +1,83 @@
+schema: 2
+task: 'task.332.ac-merge-closes-task-331-follow-ups'
+task_title: "The AC merge closes task 331's follow-ups"
+gate: PASS
+status_reason: 'Gate 2''s finding is fixed and mutation-proven, as is the zsh --sha256 defect the new test exposed; the scoped review of the fix found two low advisories and no gating issue.'
+reviewer: 'QA Engineer'
+head: '4ccb29fcdbb3e36cf3dba23b6a19397e76eace3f'
+updated: '2026-11-28T00:06:45Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 8980
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+bug_resolution:
+  bugs_fixed: 5
+  bugs_remaining: 0
+  fix_date: '2026-11-28'
+  total_iterations: 2
+  verification_method: 'Blocks test under bash and zsh, mutation proofs, full ci:fast on the LAN server'
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary: internal
+    internal_reason: 'Unchanged from gates 1 and 2: the merge refusals read only pipeline artefacts (the extracted AC YAML, Step 3a''s scope JSON, the substituted --doc path) that no corpus sink models, and they exit 0 with a reason. Cycle 2 changed remedy text, one new arm and the argument passing.'
+    notes: 'Every refusal still writes nothing; no new input path.'
+  performance:
+    status: PASS
+    notes: 'Unchanged.'
+  reliability:
+    status: PASS
+    notes: 'Every Step 3c document HALT now has a remedy that clears it in sequence, held end to end by the blocks test under bash and zsh.'
+  maintainability:
+    status: PASS
+    notes: 'Remedies held by committed tests; QA mutation (never pass --sha256) turns 2 tests red.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'CR3-1 (low): a hand copy after a successful extract, with the record removed, merges as verified: false, but SKILL.md:1035 asks for the "AC YAML hand-copied (unverified): {reason}" DoD line only after a failed extract. Extend the sentence at :1043-1045 so this route also discloses itself in the DoD.'
+      refs: ['skills/finalise/SKILL.md']
+      remedy: unverified
+    - action: 'CR3-2 (cleanup): the new blocks case checks only that the record exists after the hand copy; assert result.verified === false as well.'
+      refs: ['evals/shared/tests/finalise-rerun-scope-blocks.test.mjs']
+      remedy: unverified
+    - action: 'Carried, CR-2 (low): finalise-dod-ac-prompt.md:153 over-claims what /finalise refuses.'
+      refs: ['shared/resources/finalise-dod-ac-prompt.md']
+      remedy: unverified
+    - action: 'Carried, the zsh-unsafe ${X:+--flag "$X"} expansion in skills/review-story/SKILL.md:2398 and :2483 (same class as T332-CR2-2).'
+      refs: ['skills/review-story/SKILL.md']
+      provenance: pre-existing
+      remedy: unverified
+    - action: 'Carried, CR-3 (pre-existing): finalise-rerun-at-head-${DOD_N}.json and .d still keyed by DOD_N alone.'
+      refs: ['skills/finalise/SKILL.md']
+      provenance: pre-existing
+      remedy: unverified
+    - action: 'Carried, CR-4 (cleanup): the merge CLI parses the agent YAML twice.'
+      refs: ['shared/resources/finalise-rerun-scope.js']
+      remedy: unverified
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

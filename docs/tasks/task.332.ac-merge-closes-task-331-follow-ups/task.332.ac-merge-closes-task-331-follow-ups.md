@@ -382,25 +382,25 @@ None.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-28
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.332.qa.2.ac-merge-closes-task-331-follow-ups.md](./task.332.qa.2.ac-merge-closes-task-331-follow-ups.md)
-- **Gate File**: [task.332.gate.2.ac-merge-closes-task-331-follow-ups.yml](./task.332.gate.2.ac-merge-closes-task-331-follow-ups.yml)
+- **Full Report**: [task.332.qa.3.ac-merge-closes-task-331-follow-ups.md](./task.332.qa.3.ac-merge-closes-task-331-follow-ups.md)
+- **Gate File**: [task.332.gate.3.ac-merge-closes-task-331-follow-ups.yml](./task.332.gate.3.ac-merge-closes-task-331-follow-ups.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: full suite 8,975/8,978 pass, 0 fail, 3 skipped; blocks test 18/18
+- **Tests Executed**: full suite 8,977/8,980 pass, 0 fail, 3 skipped; blocks test 20/20
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- Gate 1's T332-QA-1, T332-CR-1 and T332-CR-2 are fixed and mutation-proven.
-- T332-CR2-1 (medium, reproduced): after a successful extract, the hand-copy remedy in both Step 3c document arms is refused as `result-hash-mismatch`, which has no remedy of its own.
+- No open findings. Gate 2's T332-CR2-1 and the zsh `--sha256` defect are fixed and mutation-proven.
+- Two low advisories (DoD disclosure for a hand copy over an extract; a stronger test assertion) routed to the gate's future recommendations.
 
 ## Change Log
 
@@ -416,6 +416,7 @@ None.
 | 2026-11-28 |         | QA findings fixed — gate 1's 3 MEDIUM (CHANGELOG citation, two Step 3c remedies), 1 iteration | qa-fix |
 | 2026-11-28 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-11-28 |         | QA findings fixed — gate 2's 1 MEDIUM (hand copy after an extract), plus the zsh `--sha256` argument, 1 iteration | qa-fix |
+| 2026-11-28 |         | QA gate PASS (100/100) — 0 findings | qa-task |
 <!-- change-log-end -->
 
 ## Progress Tracking
