@@ -2370,6 +2370,9 @@ Before executing any tool calls to apply changes to the story file or review mar
 **Resolve the durable doc-link branch** (`PIN_BRANCH`) once, before the tracker split — Step 10 reuses it:
 
 ```bash
+# INPUT, substituted into THIS block (a fenced block is its own shell): the story file path.
+STORY_FILE_PATH="{resolved story file path}"
+case "$STORY_FILE_PATH" in ''|*'{'*) echo "HALT: STORY_FILE_PATH must be substituted into this block"; exit 1 ;; esac
 # Prefer develop, fall back to repo default branch, then main (same as finalise).
 if git ls-remote --exit-code --heads origin develop >/dev/null 2>&1; then
   DURABLE_BRANCH=develop
@@ -2387,6 +2390,8 @@ else
   PIN_BRANCH=""
   echo "ℹ️ Story not yet on origin/${DURABLE_BRANCH} — doc URL kept on the current branch; finalise will pin it durably at acceptance."
 fi
+# Printed for the blocks below, which re-bind it: each runs as its own shell.
+echo "PIN_BRANCH=${PIN_BRANCH}"
 ```
 
 **Branch on TRACKER**:
@@ -2394,6 +2399,12 @@ fi
 **Jira path** (`TRACKER=jira`):
 
 ```bash
+# INPUTS, substituted into THIS block — it is its own shell, so the resolve block's values are gone:
+# the story file path, and PIN_BRANCH exactly as that block printed it (empty when it did not pin).
+STORY_FILE_PATH="{resolved story file path}"
+PIN_BRANCH="{PIN_BRANCH as the resolve block printed it — empty when it did not pin}"
+case "$STORY_FILE_PATH$PIN_BRANCH" in *'{'*) echo "HALT: STORY_FILE_PATH and PIN_BRANCH must be substituted into this block"; exit 1 ;; esac
+[ -f "$STORY_FILE_PATH" ] || { echo "HALT: STORY_FILE_PATH ('$STORY_FILE_PATH') is not a file"; exit 1; }
 # An array, not ${PIN_BRANCH:+--doc-branch "$PIN_BRANCH"}: zsh does not split that into two words
 # (docs/contributing/traps.md; observation #202).
 PIN_ARGS=(); [ -n "$PIN_BRANCH" ] && PIN_ARGS=(--doc-branch "$PIN_BRANCH")
@@ -2482,6 +2493,12 @@ On failure → log warning `⚠️ sync-github-story failed — GitHub issue bod
    - **Jira path** (`TRACKER=jira`): run `sync-jira-story.js` to push the status transition and updated frontmatter:
 
      ```bash
+     # INPUTS, substituted into THIS block (its own shell): the story file path, and PIN_BRANCH as
+     # Step 9.6's resolve block printed it (empty when it did not pin).
+     STORY_FILE_PATH="{resolved story file path}"
+     PIN_BRANCH="{PIN_BRANCH as Step 9.6's resolve block printed it — empty when it did not pin}"
+     case "$STORY_FILE_PATH$PIN_BRANCH" in *'{'*) echo "HALT: STORY_FILE_PATH and PIN_BRANCH must be substituted into this block"; exit 1 ;; esac
+     [ -f "$STORY_FILE_PATH" ] || { echo "HALT: STORY_FILE_PATH ('$STORY_FILE_PATH') is not a file"; exit 1; }
      # An array, not a ${PIN_BRANCH:+…} flag expansion: zsh passes that as one word (traps.md).
      PIN_ARGS=(); [ -n "$PIN_BRANCH" ] && PIN_ARGS=(--doc-branch "$PIN_BRANCH")
      node .agents/skills/sync-jira-story/scripts/sync-jira-story.js \
