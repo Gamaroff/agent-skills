@@ -9,16 +9,19 @@
 // `${X:+--flag "$X"}`".
 //
 // What the guard claims, as a bounded set:
-//   - CAUGHT: an alternative that opens with a flag, bare, quoted or after whitespace —
-//     `${X:+--f "$X"}`, `${X:+-f "$X"}`, `${X:+"-f" "$X"}`, `${X:+'--f' "$X"}`, `${X:+ --f "$X"}` —
-//     on a non-comment line of a fenced `bash` block (extractBlocks) in every SKILL.md, every
+//   - CAUGHT: an alternative that opens with a flag, bare, quoted or after whitespace, and has a
+//     second word after it — `${X:+--f "$X"}`, `${X:+-f "$X"}`, `${X:+"-f" "$X"}`,
+//     `${X:+'--f' "$X"}`, `${X:+ --f "$X"}` — with `:+` or a bare `+` (`${X+--f "$X"}`) and a named
+//     or positional parameter (`${1:+-f "$1"}`), on a non-comment line of a fenced `bash` block (extractBlocks) in every SKILL.md, every
 //     shared/resources/*.md and every hand-authored skills/*/references/*.md. A generated copy is
 //     left out by its AUTO-GENERATED marker line, not by its directory (T333-QA-1).
 //   - NOT CAUGHT (named, not claimed): an alternative that opens with a variable
 //     (`${X:+$FLAG "$X"}`); a `.sh` file (shellcheck and its shebang own those); a fence tagged
 //     anything but `bash`; a trailing `# …` comment after code on the same line is still scanned.
+//     A special parameter (`${@:+…}`, `${#:+…}`) is not matched either.
 //   - LEGAL, and pinned so a widened key goes red here first: an alternative meant as one word,
-//     such as `"${X:+ (eq ${X})}"` or `${X:+, ${X}}` — zsh's behaviour is correct for those.
+//     such as `"${X:+ (eq ${X})}"` or `${X:+, ${X}}` — zsh's behaviour is correct for those —
+//     and a flag that is one word in both shells: `${X:+--flag=$X}`, `${X:+-f}`.
 //
 // Each block is the smallest claim whose reverse turns it red:
 //   A — zero flag-key hits outside comments across the population, named as path:line;
@@ -38,8 +41,14 @@ import { extractBlocks } from "../qa-execute-snippets.mjs";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..", "..");
 
-/** An expansion whose `:+` alternative opens with a flag, optionally spaced and quoted. */
-const FLAG_KEY = /\$\{[A-Za-z_][A-Za-z0-9_]*:\+\s*["']?-/;
+/**
+ * An expansion whose `+` alternative (`:+` or bare `+`, named or positional parameter) opens with
+ * a flag, optionally spaced and quoted, and then has another WORD after whitespace. That second
+ * word is the whole defect: bash splits there and zsh does not. A flag joined to its value
+ * (`--flag=$X`) or standing alone (`-f`) is one word in both shells and is not matched.
+ */
+const FLAG_KEY =
+  /\$\{(?:[A-Za-z_][A-Za-z0-9_]*|[0-9]+):?\+\s*["']?-[A-Za-z0-9_-]*["']?\s/;
 const COMMENT = /^\s*#/;
 const BLOCK_FLOOR = 700;
 /** The line `bundle_skill.py` writes into every generated `references/` copy. */
@@ -154,6 +163,24 @@ test(
   },
 );
 
+test(
+  "C — premise: the no-colon and positional forms split under bash and not under zsh; =-joined is one word in both",
+  { skip: hasZsh ? false : "zsh is not installed" },
+  () => {
+    const NO_COLON = 'X=v; set -- ${X+--flag "$X"}; echo $#';
+    const POSITIONAL = 'set -- v; set -- ${1:+-f "$1"}; echo $#';
+    const JOINED = "X=v; set -- ${X:+--flag=$X}; echo $#";
+    for (const [code, zsh, bash] of [
+      [NO_COLON, "1", "2"],
+      [POSITIONAL, "1", "2"],
+      [JOINED, "1", "1"],
+    ]) {
+      assert.equal(argCount("zsh", code), zsh, `zsh: ${code}`);
+      assert.equal(argCount("bash", code), bash, `bash: ${code}`);
+    }
+  },
+);
+
 test("E — the population holds hand-authored references files and no generated copy", () => {
   const files = population();
   const refs = files.filter((f) => f.includes("/references/"));
@@ -197,6 +224,8 @@ test("D — the key matches flag-opening alternatives and none of the one-word o
     '${PIN_BRANCH:+--doc-branch "$PIN_BRANCH"}',
     '${X:+ --flag "$X"}', // whitespace after :+ — zsh still passes one argument (T333-QA-2)
     '${X:+  "-f" "$X"}',
+    '${X+--flag "$X"}', // no colon: the same split (task 333 gate 2 CR-3)
+    '${1:+-f "$1"}', // positional parameter: the same split (CR-3)
   ]) {
     assert.ok(FLAG_KEY.test(caught), `must catch: ${caught}`);
   }
@@ -206,6 +235,9 @@ test("D — the key matches flag-opening alternatives and none of the one-word o
     '"${X:+$X}"',
     "${X:-default}",
     '${X:+$FLAG "$X"}', // the named unguarded spelling: not claimed
+    "${X:+--flag=$X}", // one word in both shells (CR-3: the old key flagged it)
+    '${X:+--flag="$X"}',
+    "${X:+-f}", // a lone flag is one word
   ]) {
     assert.ok(!FLAG_KEY.test(legal), `must not catch: ${legal}`);
   }
