@@ -9,7 +9,7 @@
 // These cases RUN the blocks, under bash and zsh, with a stub `node` that prints its argv one per
 // line, so the assertions are on the arguments the sync would receive, not on the prose.
 
-import test from "node:test";
+import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -52,8 +52,15 @@ function bind(code, values) {
   return out;
 }
 
+// Every sandbox is removed when the file's tests finish (scripts/test-tmpdir.mjs fails a leak).
+const SANDBOXES = [];
+after(() => {
+  for (const d of SANDBOXES) fs.rmSync(d, { recursive: true, force: true });
+});
+
 function sandbox() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "review-story-pin-"));
+  SANDBOXES.push(dir);
   const bin = path.join(dir, "bin");
   fs.mkdirSync(bin);
   fs.writeFileSync(
