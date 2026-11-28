@@ -242,8 +242,11 @@ ARGS=(); [ -n "$X" ] && ARGS=(--flag "$X")
 cmd "${ARGS[@]}"
 ```
 
-`zsh-flag-expansion-guard.test.mjs` fails on any `${X:+--flag …}` (or `${X:+"-f" …}`) on a
-non-comment line of a fenced `bash` block in a canonical source. It does not see an alternative that
+`zsh-flag-expansion-guard.test.mjs` fails on any `${X:+--flag …}` (or `${X:+"-f" …}`, or
+`${X:+ --flag …}` with whitespace after `:+`) on a non-comment line of a fenced `bash` block in a
+canonical source: every `SKILL.md`, every `shared/resources/*.md` and every hand-authored
+`skills/*/references/*.md` (a generated copy is left out by its `AUTO-GENERATED` marker, not by its
+directory). It does not see an alternative that
 opens with a variable (`${X:+$FLAG "$X"}`) or a `.sh` file, so a reviewer applies the rule, not the
 regex. An alternative meant as one word (`"${X:+ (eq ${X})}"`) is correct in both shells and legal.
 

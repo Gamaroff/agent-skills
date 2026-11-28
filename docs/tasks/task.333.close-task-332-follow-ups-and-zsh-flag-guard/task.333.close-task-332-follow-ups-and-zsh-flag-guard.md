@@ -430,6 +430,7 @@ A false positive in the guard is fixed by narrowing the key, with the new case a
 | 2026-11-28 |  | Implemented — 13 files, 6 tests added (guard 5 cases; 1 blocks case + 3 assertion sets; 1 parse-count) | develop |
 |  |  | Status → ready-for-review | develop |
 | 2026-11-28 |  | QA gate CONCERNS (90/100) — 2 findings (1 medium, 1 low) | qa-task |
+| 2026-11-28 |  | QA findings fixed — T333-QA-1, T333-QA-2 (guard population by marker, whitespace key), 1 iteration | qa-fix |
 
 <!-- change-log-end -->
 

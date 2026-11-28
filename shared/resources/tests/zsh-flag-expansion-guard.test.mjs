@@ -9,10 +9,11 @@
 // `${X:+--flag "$X"}`".
 //
 // What the guard claims, as a bounded set:
-//   - CAUGHT: an alternative that opens with a flag, bare or quoted — `${X:+--f "$X"}`,
-//     `${X:+-f "$X"}`, `${X:+"-f" "$X"}`, `${X:+'--f' "$X"}` — on a non-comment line of a fenced
-//     `bash` block (extractBlocks) in `git ls-files 'skills/*/SKILL.md' 'shared/resources/*.md'`,
-//     minus any /references/ copy.
+//   - CAUGHT: an alternative that opens with a flag, bare, quoted or after whitespace —
+//     `${X:+--f "$X"}`, `${X:+-f "$X"}`, `${X:+"-f" "$X"}`, `${X:+'--f' "$X"}`, `${X:+ --f "$X"}` —
+//     on a non-comment line of a fenced `bash` block (extractBlocks) in every SKILL.md, every
+//     shared/resources/*.md and every hand-authored skills/*/references/*.md. A generated copy is
+//     left out by its AUTO-GENERATED marker line, not by its directory (T333-QA-1).
 //   - NOT CAUGHT (named, not claimed): an alternative that opens with a variable
 //     (`${X:+$FLAG "$X"}`); a `.sh` file (shellcheck and its shebang own those); a fence tagged
 //     anything but `bash`; a trailing `# …` comment after code on the same line is still scanned.
@@ -37,21 +38,41 @@ import { extractBlocks } from "../qa-execute-snippets.mjs";
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..", "..");
 
-/** An expansion whose `:+` alternative opens with a flag, optionally quoted. */
-const FLAG_KEY = /\$\{[A-Za-z_][A-Za-z0-9_]*:\+["']?-/;
+/** An expansion whose `:+` alternative opens with a flag, optionally spaced and quoted. */
+const FLAG_KEY = /\$\{[A-Za-z_][A-Za-z0-9_]*:\+\s*["']?-/;
 const COMMENT = /^\s*#/;
 const BLOCK_FLOOR = 700;
+/** The line `bundle_skill.py` writes into every generated `references/` copy. */
+const GENERATED = /^<!-- AUTO-GENERATED — DO NOT EDIT/m;
 
 const hasZsh = spawnSync("zsh", ["-c", "true"]).status === 0;
 
+/**
+ * Every canonical source: each SKILL.md, each shared resource, and each HAND-AUTHORED
+ * skills/*\/references/*.md. A generated copy is dropped by its marker line, never by its
+ * directory: 76 references files carry no marker and are sources (task 333, T333-QA-1).
+ * `:(glob)` keeps `*` from crossing `/`, so the test fixtures beside this file stay out.
+ * The same population qa-fix's Step 3.5 probe uses.
+ */
 function population() {
-  return execFileSync(
+  const tracked = execFileSync(
     "git",
-    ["ls-files", "skills/*/SKILL.md", "shared/resources/*.md"],
+    [
+      "ls-files",
+      "--",
+      ":(glob)skills/*/SKILL.md",
+      ":(glob)skills/*/references/*.md",
+      ":(glob)shared/resources/*.md",
+    ],
     { cwd: ROOT, encoding: "utf8" },
   )
     .split("\n")
-    .filter((f) => f && !f.includes("/references/"));
+    .filter(Boolean);
+  return tracked.filter(
+    (f) =>
+      !f.includes("/references/") ||
+      !GENERATED.test(fs.readFileSync(path.join(ROOT, f), "utf8")),
+  );
 }
 
 /** Every flag-key hit on a non-comment line of a fenced bash block, as `path:line`. */
@@ -123,6 +144,46 @@ test(
   },
 );
 
+test(
+  'C — premise: the spaced form ${X:+ --flag "$X"} is the same defect under zsh',
+  { skip: hasZsh ? false : "zsh is not installed" },
+  () => {
+    const SPACED = 'X=v; set -- ${X:+ --flag "$X"}; echo $#';
+    assert.equal(argCount("zsh", SPACED), "1");
+    assert.equal(argCount("bash", SPACED), "2");
+  },
+);
+
+test("E — the population holds hand-authored references files and no generated copy", () => {
+  const files = population();
+  const refs = files.filter((f) => f.includes("/references/"));
+  // Hand-authored, no marker: develop-bug's step documents are sources (T333-QA-1).
+  assert.ok(
+    files.includes(
+      "skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md",
+    ),
+    "a hand-authored references/*.md must be scanned",
+  );
+  assert.ok(refs.length >= 50, `only ${refs.length} references files scanned`);
+  // Generated: carries the marker, so it is a copy of a shared source and stays out.
+  const generated = "skills/finalise/references/finalise-dod-ac-prompt.md";
+  assert.ok(
+    GENERATED.test(fs.readFileSync(path.join(ROOT, generated), "utf8")),
+    `${generated} should carry the AUTO-GENERATED marker`,
+  );
+  assert.ok(!files.includes(generated), "a generated copy must not be scanned");
+  for (const f of refs) {
+    assert.ok(
+      !GENERATED.test(fs.readFileSync(path.join(ROOT, f), "utf8")),
+      `generated copy in population: ${f}`,
+    );
+  }
+  assert.ok(
+    !files.some((f) => f.startsWith("shared/resources/tests/")),
+    "test fixtures must stay out",
+  );
+});
+
 test("C — the array form passes 2 arguments under bash too", () => {
   assert.equal(argCount("bash", ARRAY), "2");
 });
@@ -134,6 +195,8 @@ test("D — the key matches flag-opening alternatives and none of the one-word o
     '${X:+"-f" "$X"}',
     "${X:+'--f' \"$X\"}",
     '${PIN_BRANCH:+--doc-branch "$PIN_BRANCH"}',
+    '${X:+ --flag "$X"}', // whitespace after :+ — zsh still passes one argument (T333-QA-2)
+    '${X:+  "-f" "$X"}',
   ]) {
     assert.ok(FLAG_KEY.test(caught), `must catch: ${caught}`);
   }

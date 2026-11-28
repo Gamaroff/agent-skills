@@ -11,7 +11,9 @@ All notable changes to this project will be documented in this file. Format foll
   unknown flag. The trap was fixed site by site four times and was still live in `/review-story`'s two
   Jira sync blocks, which now pass `--doc-branch` through a `PIN_ARGS` array.
   `zsh-flag-expansion-guard.test.mjs` fails on any flag-opening `${X:+…}` alternative on a
-  non-comment line of a fenced `bash` block in a canonical source, reads at least 700 blocks, and shows
+  non-comment line of a fenced `bash` block in a canonical source (every `SKILL.md`, every
+  `shared/resources/*.md` and every hand-authored `skills/*/references/*.md`, whitespace after `:+`
+  included), reads at least 700 blocks, and shows
   the premise under zsh (1 argument for the bad form, 2 for the array). `docs/contributing/traps.md`
   states the rule, including the spelling the guard does not see (`${X:+$FLAG "$X"}`).
 
