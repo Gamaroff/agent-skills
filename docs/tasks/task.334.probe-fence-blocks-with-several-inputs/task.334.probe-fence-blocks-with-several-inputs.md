@@ -12,11 +12,14 @@ created: 2026-11-28
 updated: 2026-11-28
 assignee:
 estimated_effort_hours: 4
+github_issue: 967
 ---
 
 # Probe fenced blocks that take several inputs
 
 **Status:** Planned
+
+**GitHub Issue**: [#967](https://github.com/Gamaroff/agent-skills/issues/967)
 
 ---
 
