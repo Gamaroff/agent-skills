@@ -151,7 +151,7 @@ ac_traceability:
   summary: "one-line summary of AC traceability results"
 ```
 
-**`story_file` rule**: `story_file` is the exact `<STORY_FILE>` path you were given, unchanged — not a basename, not re-cased. `/finalise` refuses an answer that leaves it out or spells it any other way.
+**`story_file` rule**: `story_file` is the exact `<STORY_FILE>` path you were given, unchanged — not a basename, not re-cased. `/finalise` refuses an answer that leaves it out, or that names a path that does not resolve to the same file.
 
 **Citation rule**: `status: PASS` requires a non-null citation. Null citation → `status: FAIL`. `NOT_APPLICABLE` must have a `note`.
 

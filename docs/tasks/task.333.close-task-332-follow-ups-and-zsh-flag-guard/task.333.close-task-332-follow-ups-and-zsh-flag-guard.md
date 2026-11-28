@@ -5,11 +5,13 @@ type: task
 description: "The two review-story ${X:+--flag \"$X\"} sites use the array form and a guard test fails on any new one; /finalise discloses every unverified AC hand copy, keys its re-run-at-head files by work item, states what merge refuses exactly, and parses the AC answer once."
 tags: [review-story, finalise, observation, zsh, follow-up]
 category: infrastructure
-status: planned
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-11-28
 updated: 2026-11-28
+completed_date: 2026-11-28
+pr_number: 966
 assignee:
 estimated_effort_hours: 8
 github_issue: 965
@@ -17,7 +19,9 @@ github_issue: 965
 
 # Close task 332's follow-ups and guard the zsh flag trap
 
-**Status:** Planned
+**Status:** Accepted
+
+**Review**: ✅ All review recommendations from `task.333.review.1.close-task-332-follow-ups-and-zsh-flag-guard.md` implemented 2026-11-28
 
 **GitHub Issue**: [#965](https://github.com/Gamaroff/agent-skills/issues/965)
 
@@ -217,21 +221,21 @@ is a new output line.
 **Risk:** Low. **Files:** `shared/resources/tests/zsh-flag-expansion-guard.test.mjs`,
 `skills/review-story/SKILL.md`, `docs/contributing/traps.md`.
 
-- [ ] Write the guard first and run it on the unfixed tree: it must fail and name exactly
+- [x] Write the guard first and run it on the unfixed tree: it must fail and name exactly
       `skills/review-story/SKILL.md:2398` and `:2483`. Record the output in the QA report.
-- [ ] Add the zsh case: a reconstructed `${X:+--flag "$X"}` gives one argument, and the array form
+- [x] Add the zsh case: a reconstructed `${X:+--flag "$X"}` gives one argument, and the array form
       gives two. It is skipped with a named reason only when zsh is absent.
-- [ ] Fix both review-story sites with the `PIN_ARGS` array, and re-run the guard (green).
-- [ ] Add the `traps.md` entry next to the zsh `nomatch` entry, and cite it from the guard's header.
+- [x] Fix both review-story sites with the `PIN_ARGS` array, and re-run the guard (green).
+- [x] Add the `traps.md` entry next to the zsh `nomatch` entry, and cite it from the guard's header.
 
 ### Phase 2: Disclose every unverified hand copy (CR3-1, CR3-2)
 
 **Risk:** Low. **Files:** `skills/finalise/SKILL.md` Step 3c,
 `evals/shared/tests/finalise-rerun-scope-blocks.test.mjs`.
 
-- [ ] On `merged`, the Step 3c block prints `AC_YAML_VERIFIED=$(jq -r '.result.verified' "$AC_RECORD")`.
-- [ ] Rewrite the `:1035` rule to cover both routes, each with the reason it names.
-- [ ] In the `:462` test, assert `result.verified === false` in the record, and assert that the block
+- [x] On `merged`, the Step 3c block prints `AC_YAML_VERIFIED=$(jq -r '.result.verified' "$AC_RECORD")`.
+- [x] Rewrite the `:1035` rule to cover both routes, each with the reason it names.
+- [x] In the `:462` test, assert `result.verified === false` in the record, and assert that the block
       printed `AC_YAML_VERIFIED=false`. In an extracted-route case, assert `AC_YAML_VERIFIED=true`.
 
 ### Phase 3: Exact refusal wording, stem-keyed re-run-at-head files, one parse (CR-2, CR-3, CR-4)
@@ -239,23 +243,24 @@ is a new output line.
 **Risk:** Low. **Files:** `shared/resources/finalise-dod-ac-prompt.md`, `skills/finalise/SKILL.md`
 Step 3a, `shared/resources/finalise-rerun-scope.js`, both finalise test files.
 
-- [ ] Reword `finalise-dod-ac-prompt.md:153` to match `sameDocument`, keeping the "exact path you were
+- [x] Reword `finalise-dod-ac-prompt.md:153` to match `sameDocument`, keeping the "exact path you were
       given" instruction.
-- [ ] Bind and guard `STEM` in the Step 3a re-run-at-head block. Rename the file and its out-dir in
+- [x] Bind and guard `STEM` in the Step 3a re-run-at-head block. Rename the file and its out-dir in
       the writer (`:600-605`) and the reader (`:641`).
-- [ ] Extend the run-number-keyed-path assertion (`finalise-rerun-scope-blocks.test.mjs:316`) to
-      `finalise-rerun-at-head-`.
-- [ ] Have the CLI read the answer once and pass it to `merge` through `opts.answer`. Add a test that
+- [x] Extend the run-number-keyed-path assertion (`finalise-rerun-scope-blocks.test.mjs:316`) to
+      `finalise-rerun-at-head-`. (The out-dir half is held in the T319-CR-5 case, the only one that
+      runs a listed command: with none, no out-dir is written and M5 on it stayed green.)
+- [x] Have the CLI read the answer once and pass it to `merge` through `opts.answer`. Add a test that
       counts `parseYamlSubset` calls on one `merge` CLI run (exactly 1).
 
 ### Phase 4: CHANGELOG, bundle, full suite
 
 **Risk:** Low.
 
-- [ ] Add a CHANGELOG `[Unreleased]` entry that names the guard, the disclosure line, the prompt wording,
+- [x] Add a CHANGELOG `[Unreleased]` entry that names the guard, the disclosure line, the prompt wording,
       the renamed files with their resume path, and the single parse.
-- [ ] `npm run bundle`, then `npm run bundle:check`.
-- [ ] `npm run test:remote` on the LAN server.
+- [x] `npm run bundle`, then `npm run bundle:check`.
+- [x] `npm run test:remote` on the LAN server.
 
 ## 7. Files Summary
 
@@ -306,7 +311,7 @@ Each mutation is recorded in the QA report with the test it turned red:
 | M1 | Revert one review-story site to `${PIN_BRANCH:+--doc-branch "$PIN_BRANCH"}` | the guard, naming that line |
 | M2 | Make the guard skip every line (an always-empty scan) | the non-vacuity floor |
 | M3 | Remove the `AC_YAML_VERIFIED` echo | the blocks hand-copy case |
-| M4 | Make `merge` record `verified: true` on an empty `--sha256` | the new `verified === false` assertion |
+| M4 | Make the `merge` CLI record `verified: true` on an empty `--sha256` (`verified: opts.sha256 !== undefined`, `finalise-rerun-scope.js:1300`) | the new `verified === false` assertion |
 | M5 | Restore `finalise-rerun-at-head-${DOD_N}` in Step 3a | the run-number-keyed-path assertion |
 | M6 | Restore the second `readAnswer` call in `merge` | the parse-count test |
 
@@ -330,7 +335,11 @@ Not applicable: no bound is claimed.
 - [ ] Step 3c prints `AC_YAML_VERIFIED=false` after a hand copy over an extracted file and
       `AC_YAML_VERIFIED=true` after an extract. The record's `result.verified` matches in both cases
       (blocks test).
-- [ ] `git grep -nE 'finalise-rerun-at-head-\$\{DOD_N\}' -- skills/finalise/SKILL.md` matches nothing.
+- [ ] No re-run-at-head path in Step 3a is keyed by `DOD_N` alone: the blocks test's run-number-keyed-path
+      assertion (`finalise-rerun-scope-blocks.test.mjs`, extended in Phase 3) runs the re-run-at-head
+      block, asserts the stem-keyed file exists and the `finalise-rerun-at-head-1.json` file does not,
+      and mutation M5 turns it red. `git grep -nE 'finalise-rerun-at-head-\$\{DOD_N\}' -- skills/finalise/SKILL.md`
+      matches nothing.
 - [ ] One `merge` CLI run calls `parseYamlSubset` exactly once (engine test).
 
 ### Performance
@@ -340,7 +349,8 @@ Not applicable: no bound is claimed.
 ### Code Quality
 
 - [ ] All 6 mutations in §8 are recorded in the QA report, each with the test it turned red.
-- [ ] `npm run test:remote` and `npm run bundle:check` pass.
+- [ ] The PR's CI run is green on its head commit (`bundle:check` runs inside it). The `npm run test:remote`
+      result on the LAN server (command, exit status, pass/fail counts) is recorded in the QA report.
 - [ ] `finalise-dod-ac-prompt.md`'s `story_file` rule matches `sameDocument`. It names the exact-path
       instruction and the two refusals: a missing field, and a path that does not resolve to the same
       file.
@@ -384,33 +394,87 @@ Each phase stands alone. Revert one phase's commit to back out only that outcome
 
 A false positive in the guard is fixed by narrowing the key, with the new case added to the test.
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-28
+**Quality Score**: 100/100
+**Gate Decision**: PASS
+
+### QA Report
+
+- **Full Report**: [task.333.qa.2.close-task-332-follow-ups-and-zsh-flag-guard.md](./task.333.qa.2.close-task-332-follow-ups-and-zsh-flag-guard.md)
+- **Gate File**: [task.333.gate.2.close-task-332-follow-ups-and-zsh-flag-guard.yml](./task.333.gate.2.close-task-332-follow-ups-and-zsh-flag-guard.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 110 (task suites); 8987 pass in `test:remote`
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+
+- T333-QA-1 and T333-QA-2 are fixed (`b30e42f94`). QA reverted each fix and saw its test fail.
+- The cycle 2 refute review found two unbound reads in review-story's Jira blocks. They are identical on `origin/develop`, so they are routed to future work. It also found two advisory cleanups.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.333.qa.2.close-task-332-follow-ups-and-zsh-flag-guard.md`
+**Gate File**: `task.333.gate.2.close-task-332-follow-ups-and-zsh-flag-guard.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 11/11 success criteria met (#8 graded from CI reading 1, SUCCESS @ `4ecd2dab92b8`)
+✅ **PR Review:** PR #966; no review required on this host. Step 5c report `task.333.pr-review.1.close-task-332-follow-ups-and-zsh-flag-guard.md` is CONCERNS with 0 open coverage findings
+✅ **Tests:** `test:remote` 8987 pass, 0 fail; CI green over 6 checks
+✅ **Documentation:** CHANGELOG `[Unreleased]` entries and the `docs/contributing/traps.md` zsh entry
+✅ **Security Review:** PASS — `boundary: internal` (`finalise-rerun-scope.js#merge`, pipeline-owned inputs)
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal tooling
+
+**Task marked as ACCEPTED on:** 2026-11-28
+
+**Detailed Verification Log:** See `task.333.dod.1.close-task-332-follow-ups-and-zsh-flag-guard.md` for complete verification evidence and timestamps.
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
-
 | Date | Version | Description | Author |
-| ---- | ------- | ----------- | ------ |
+|------|---------|-------------|--------|
 | 2026-11-28 | 1.0 | Initial draft — cut from observation #202 | create-task |
-
+| 2026-11-28 | 1.1 | Review passed (9/10) — two criteria now name their evidence (the stem-key test; CI plus test:remote in the QA report), M4's target line named | review-task |
+|  |  | Status → ready-for-development | review-task |
+| 2026-11-28 |  | Implemented — 13 files, 6 tests added (guard 5 cases; 1 blocks case + 3 assertion sets; 1 parse-count) | develop |
+|  |  | Status → ready-for-review | develop |
+| 2026-11-28 |  | QA gate CONCERNS (90/100) — 2 findings (1 medium, 1 low) | qa-task |
+| 2026-11-28 |  | QA findings fixed — T333-QA-1, T333-QA-2 (guard population by marker, whitespace key), 1 iteration | qa-fix |
+| 2026-11-28 |  | QA gate PASS (100/100) — 0 open findings (2 pre-existing routed to future, 2 advisory cleanups) | qa-task |
+| 2026-11-28 | 1.2 | DoD passed — accepted (PR #966) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
 
 ### Phase 1: The zsh guard and the review-story fix
 
-- [ ] Guard calibrated red, then the review-story sites fixed, then `traps.md`
+- [x] Guard calibrated red, then the review-story sites fixed, then `traps.md`
 
 ### Phase 2: Disclose every unverified hand copy
 
-- [ ] `AC_YAML_VERIFIED` and the route-independent rule, with tests
+- [x] `AC_YAML_VERIFIED` and the route-independent rule, with tests
 
 ### Phase 3: Wording, stem key, one parse
 
-- [ ] Prompt wording, Step 3a rename, single parse, with tests
+- [x] Prompt wording, Step 3a rename, single parse, with tests
 
 ### Phase 4: CHANGELOG, bundle, full suite
 
-- [ ] CHANGELOG, bundle, `test:remote`
+- [x] CHANGELOG, bundle, `test:remote`
 
 ## References
 

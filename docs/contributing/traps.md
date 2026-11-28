@@ -226,6 +226,30 @@ both shells (the HALT snippets, `advance-pipeline-lock.sh --restore`, the Step 8
 [anti-patterns § Never put a must-succeed path and a glob in one `rm` argv](../reference/anti-patterns.md).
 Fences are invisible to `lint:shell`; `halt-snippet-glob-safe.test.mjs` runs them under zsh.
 
+### zsh does not word-split `${X:+--flag "$X"}`
+
+bash word-splits the unquoted alternative of `${X:+--flag "$X"}` into two arguments, `--flag` and
+the value. zsh does not split an unquoted expansion, so the callee receives **one** argument,
+`--flag <value>`, and reads it as an unknown flag. Every bash test is green, and the failure appears
+only under zsh. It was fixed one site at a time five times: the Step 8 commit block
+(`develop-pipeline-step-8-commit.md`), `resolve-platform.sh`, `tracker-access.test.sh`, finalise
+Step 3c (task 332, T332-CR2-2) and review-story's two Jira sync blocks (task 333, observation #202).
+
+The rule: pass an optional flag through an **array**, never through a `:+` expansion.
+
+```bash
+ARGS=(); [ -n "$X" ] && ARGS=(--flag "$X")
+cmd "${ARGS[@]}"
+```
+
+`zsh-flag-expansion-guard.test.mjs` fails on any `${X:+--flag …}` (or `${X:+"-f" …}`, or
+`${X:+ --flag …}` with whitespace after `:+`) on a non-comment line of a fenced `bash` block in a
+canonical source: every `SKILL.md`, every `shared/resources/*.md` and every hand-authored
+`skills/*/references/*.md` (a generated copy is left out by its `AUTO-GENERATED` marker, not by its
+directory). It does not see an alternative that
+opens with a variable (`${X:+$FLAG "$X"}`) or a `.sh` file, so a reviewer applies the rule, not the
+regex. An alternative meant as one word (`"${X:+ (eq ${X})}"`) is correct in both shells and legal.
+
 ### A git pathspec `**` is `*` unless you say otherwise
 
 `git ls-files 'shared/resources/**/*.md'` and `git grep -- 'skills/**/SKILL.md'` do **not**

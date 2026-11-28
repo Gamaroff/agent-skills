@@ -6,6 +6,17 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Added
 
+- **A guard against zsh's unsplit `${X:+--flag "$X"}`** (task 333, observation #202). bash splits
+  that expansion into a flag and its value; zsh passes them as one word, which the callee reads as an
+  unknown flag. The trap was fixed site by site four times and was still live in `/review-story`'s two
+  Jira sync blocks, which now pass `--doc-branch` through a `PIN_ARGS` array.
+  `zsh-flag-expansion-guard.test.mjs` fails on any flag-opening `${X:+…}` alternative on a
+  non-comment line of a fenced `bash` block in a canonical source (every `SKILL.md`, every
+  `shared/resources/*.md` and every hand-authored `skills/*/references/*.md`, whitespace after `:+`
+  included), reads at least 700 blocks, and shows
+  the premise under zsh (1 argument for the bad form, 2 for the array). `docs/contributing/traps.md`
+  states the rule, including the spelling the guard does not see (`${X:+$FLAG "$X"}`).
+
 - **A `git-name` security-probe sink, for classifiers of repository names.** A function that only
   compares a git-printed name against patterns, such as `ci-tree-equivalence.js#isDocsPath`, was
   probed under `path`. The decoding and symlink cases then "reproduced", although such a function
@@ -16,6 +27,19 @@ All notable changes to this project will be documented in this file. Format foll
   `git-name` over `path` (task 329).
 
 ### Changed
+
+- **`/finalise` closes task 332's gate 3 advisories** (task 333). One breaking change: Step 3a's
+  re-run-at-head record and out-dir are now `.claude/state/finalise-rerun-at-head-{stem}-{N}.json`
+  and `finalise-rerun-at-head-{stem}-{N}/`, so no `/finalise` state file is shared by two work items.
+  **Resume path:** a run halted between Step 3a's re-run-at-head block and its scope block when this
+  version is installed re-runs the re-run-at-head block, which is idempotent and writes the new name;
+  the old `finalise-rerun-at-head-{N}.json` is inert. Also: Step 3c prints `AC_YAML_VERIFIED=<true|false>`
+  on `merged`, and every `verified: false` record is disclosed in the DoD as "AC YAML hand-copied
+  (unverified): {reason}", including a hand copy over an extracted file, which merged silently before.
+  The AC prompt's `story_file` rule now says what `merge` refuses: a missing field, or a path that
+  does not resolve to the same file (an absolute or symlinked spelling of it is accepted). And one
+  `merge` CLI run parses the AC answer once, not twice: the CLI passes its read to `merge()` as
+  `opts.answer`.
 
 - **`/finalise`'s AC merge can no longer skip a document check by leaving something out**
   (task 332). Three breaking changes. `finalise-rerun-scope.js merge` now requires `--doc`; without it

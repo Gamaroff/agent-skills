@@ -1,0 +1,182 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "4ecd2dab92b826347497cb6a2eeddea459b952c2",
+  "dirty_paths": [
+    "docs/tasks/task.333.close-task-332-follow-ups-and-zsh-flag-guard/task.333.implementation.1.close-task-332-follow-ups-and-zsh-flag-guard-initial-run.md",
+    "docs/tasks/task.333.close-task-332-follow-ups-and-zsh-flag-guard/task.333.pr-review.1.close-task-332-follow-ups-and-zsh-flag-guard.md"
+  ],
+  "document": "docs/tasks/task.333.close-task-332-follow-ups-and-zsh-flag-guard/task.333.close-task-332-follow-ups-and-zsh-flag-guard.md",
+  "result": {
+    "bytes": 10195,
+    "sha256": "395b5488165e368a83dd9537996ded6d574ceccf808e64a602cfb9401fabc175",
+    "verified": true
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 11,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "7a39cdef43c11740d380f932daf475a5d866bd317497f029760be67b301c3af3",
+      "status": "PASS",
+      "description": "Guard fails on unfixed tree naming review-story :2398 and :2483; recorded in QA",
+      "code_citation": "docs/tasks/task.333.close-task-332-follow-ups-and-zsh-flag-guard/task.333.qa.1.close-task-332-follow-ups-and-zsh-flag-guard.md:80",
+      "test_citation": "shared/resources/tests/zsh-flag-expansion-guard.test.mjs:99",
+      "members": [],
+      "non_member_fail": null,
+      "note": "qa.1 §'SC 1 record' (:80-93, committed) shows the guard run in a scratch worktree at origin/develop exiting 1 (pass 4 / fail 1), naming exactly skills/review-story/SKILL.md:2398 and :2483. Guard case A is the test that produces those hits. It lives in shared/resources/tests/*.test.mjs, which is in test:suite (package.json:27) and runs per PR through `npm test` in .github/workflows/test.yml."
+    },
+    {
+      "id": "#2",
+      "text_hash": "c307eabc19b500a162802bf821c3142e999708f2d792ecc04ca1f42506643c66",
+      "status": "PASS",
+      "description": "Guard passes after fix; zsh premise 1 arg bad form, 2 array form",
+      "code_citation": "skills/review-story/SKILL.md:2399",
+      "test_citation": "shared/resources/tests/zsh-flag-expansion-guard.test.mjs:126",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Both sites now use PIN_ARGS=() and \\\"${PIN_ARGS[@]}\\\" (:2399/:2401 and :2486/:2488). Case A (:99) asserts zero hits. Case C (:126-145) asserts argCount zsh BAD == '1' and ARRAY == '2'. It skips only when zsh is absent. CI installs zsh (test.yml 'Install awk variants and zsh'), so C runs per PR. qa.1:68 records C green and not skipped in test:remote."
+    },
+    {
+      "id": "#3",
+      "text_hash": "b327bd21784e370c2f8e04e615a6cfc5de8298a1e1b30241f1b6b546123c8e5f",
+      "status": "PASS",
+      "description": "Step 3c prints AC_YAML_VERIFIED false/true; record result.verified matches",
+      "code_citation": "skills/finalise/SKILL.md:1092",
+      "test_citation": "evals/shared/tests/finalise-rerun-scope-blocks.test.mjs:547",
+      "members": [],
+      "non_member_fail": null,
+      "note": "SKILL.md:1089-1110 sets AC_YAML_VERIFIED from jq .result.verified on merged and echoes it. In the blocks test, the T332-CR2-1 hand-copy case (:490, assertions :550-555) asserts record verified === false and stdout ^AC_YAML_VERIFIED=false$. The extracted case (:561, :581-586) asserts AC_YAML_VERIFIED=true and verified true. Both run under bash and zsh. evals/shared/tests/*.test.mjs is in test:suite, so they run per PR."
+    },
+    {
+      "id": "#4",
+      "text_hash": "ad06587747c8b43a3ebc7bbd5997f7cf74fc40504d3fdbcbbfb79f1612f431ba",
+      "status": "PASS",
+      "description": "No Step 3a re-run-at-head path keyed by DOD_N alone; M5 red",
+      "code_citation": "skills/finalise/SKILL.md:602",
+      "test_citation": "evals/shared/tests/finalise-rerun-scope-blocks.test.mjs:337",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Writer :602/:605 and reader :646 use finalise-rerun-at-head-${STEM}-${DOD_N}. The blocks case at :318 runs step3a. It asserts that the stem-keyed record task.9-1.json exists (:338-343) and that finalise-rerun-at-head-1.json does not (:344-349). The out-dir half is held at :248-256 (T319-CR-5). `git grep -nE 'finalise-rerun-at-head-\\\\$\\\\{DOD_N\\\\}' -- skills/finalise/SKILL.md` exits 1 with no match (re-run here). M5a/M5b are recorded red in qa.1:107-108. Runs per PR via test:suite."
+    },
+    {
+      "id": "#5",
+      "text_hash": "e39834b4166aa9dd5df256d220b70ed78d0089850e280694a2152ddf2bfb0104",
+      "status": "PASS",
+      "description": "One merge CLI run calls parseYamlSubset exactly once",
+      "code_citation": "shared/resources/finalise-rerun-scope.js:1300",
+      "test_citation": "shared/resources/tests/finalise-rerun-scope.test.mjs:2613",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The CLI passes its single readAnswer result as opts.answer, and merge() uses opts.answer when defined (:789-790). The engine test preloads a counter on parseYamlSubset, runs the merge CLI, and asserts stderr ^PARSE_COUNT=1$. M6 is recorded red (PARSE_COUNT=2) at qa.1:109. Runs per PR via test:suite (shared/resources/tests/*.test.mjs)."
+    },
+    {
+      "id": "#6",
+      "text_hash": "a0db6413ccd118873873851a502b9eef61069eaac89ecafeb0d4cfc1084c7a69",
+      "status": "PASS",
+      "description": "Performance: not applicable, no bound claimed",
+      "code_citation": "docs/tasks/task.333.close-task-332-follow-ups-and-zsh-flag-guard/task.333.close-task-332-follow-ups-and-zsh-flag-guard.md:323",
+      "test_citation": "NOT_APPLICABLE: the task states no performance bound ('Not applicable: no bound is claimed', §8 Performance Tests :323)",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The criterion asserts that no performance bound exists. §8 :323 states it, and no numeric bound appears anywhere in the task, so this is neither a measured nor a behaviour criterion."
+    },
+    {
+      "id": "#7",
+      "text_hash": "81be650a77e003d109e59d51ebe909796fb133407580848116d66cfd8ef1ce90",
+      "status": "PASS",
+      "description": "All 6 §8 mutations recorded in QA report with the red test",
+      "code_citation": "docs/tasks/task.333.close-task-332-follow-ups-and-zsh-flag-guard/task.333.qa.1.close-task-332-follow-ups-and-zsh-flag-guard.md:97",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "M1 revert a review-story site",
+          "evidence": "docs/tasks/task.333.close-task-332-follow-ups-and-zsh-flag-guard/task.333.qa.1.close-task-332-follow-ups-and-zsh-flag-guard.md:103",
+          "status": "PASS"
+        },
+        {
+          "member": "M2 always-empty guard scan",
+          "evidence": "docs/tasks/task.333.close-task-332-follow-ups-and-zsh-flag-guard/task.333.qa.1.close-task-332-follow-ups-and-zsh-flag-guard.md:104",
+          "status": "PASS"
+        },
+        {
+          "member": "M3 remove AC_YAML_VERIFIED echo",
+          "evidence": "docs/tasks/task.333.close-task-332-follow-ups-and-zsh-flag-guard/task.333.qa.1.close-task-332-follow-ups-and-zsh-flag-guard.md:105",
+          "status": "PASS"
+        },
+        {
+          "member": "M4 verified: true on empty --sha256",
+          "evidence": "docs/tasks/task.333.close-task-332-follow-ups-and-zsh-flag-guard/task.333.qa.1.close-task-332-follow-ups-and-zsh-flag-guard.md:106",
+          "status": "PASS"
+        },
+        {
+          "member": "M5 restore finalise-rerun-at-head-${DOD_N}",
+          "evidence": "docs/tasks/task.333.close-task-332-follow-ups-and-zsh-flag-guard/task.333.qa.1.close-task-332-follow-ups-and-zsh-flag-guard.md:107",
+          "status": "PASS"
+        },
+        {
+          "member": "M6 restore second readAnswer in merge",
+          "evidence": "docs/tasks/task.333.close-task-332-follow-ups-and-zsh-flag-guard/task.333.qa.1.close-task-332-follow-ups-and-zsh-flag-guard.md:109",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "qa.1 §'SC 7 record' (committed) has one row per mutation, each with what was reverted, the test that went red with its failing message or count, and the outcome 'covered'. M5 has two halves (a :107, b :108). M1 was applied at :2488, the post-fix line of the same site. qa.2 adds further mutation-proven lines for the QA-fix (population filter). No unit is uncovered."
+    },
+    {
+      "id": "#8",
+      "text_hash": "47328651de7cbb58833fb0787fce4fb1c1a489c2a874fd48648c7c8fcd4a7928",
+      "status": "PASS",
+      "description": "PR CI green on head; test:remote result recorded in QA report",
+      "code_citation": ".github/workflows/test.yml:1",
+      "test_citation": "NOT_APPLICABLE: CI-state criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "resolved from CI reading 1: SUCCESS @ 4ecd2dab92b826347497cb6a2eeddea459b952c2 — CI half: the test.yml run on PR head 4ecd2dab9 must be SUCCESS. Finalise has not read CI yet, so /finalise Step 6 grades it. Doc half judged separately, PASS: qa.2:178 records test:remote at the committed tree with 8990 tests, 8987 pass, 0 fail, 3 skipped, ratchet ok. It names the command (`npm run test:remote`, :195), and the remote rc=0 is recorded at qa.1:121-122.",
+      "ci_reading": "CI reading 1: SUCCESS @ 4ecd2dab92b826347497cb6a2eeddea459b952c2"
+    },
+    {
+      "id": "#9",
+      "text_hash": "066d2570b436a1041522c6f94e2d68ceba128ea980f645c5adc50f3f139918fd",
+      "status": "PASS",
+      "description": "AC prompt story_file rule matches sameDocument; exact path plus two refusals",
+      "code_citation": "shared/resources/finalise-dod-ac-prompt.md:153",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The line reads: story_file is 'the exact <STORY_FILE> path you were given, unchanged', and /finalise 'refuses an answer that leaves it out, or that names a path that does not resolve to the same file'. That is the exact-path instruction and the two refusals (result-document-unnamed, result-document-mismatch at finalise-rerun-scope.js:1273/1281). It matches sameDocument (:767), which uses resolve then realpath, and it no longer claims that every other spelling is refused. The bundled copies (skills/finalise|review-story|review-task/references/) are kept identical by bundle:check."
+    },
+    {
+      "id": "#10",
+      "text_hash": "619ec17f01d538e6a486ae6f78e7dd5bf1fa2ad5a95ea6dc6ec55f28a66ca2ae",
+      "status": "PASS",
+      "description": "CHANGELOG [Unreleased] names renamed re-run-at-head files and resume path",
+      "code_citation": "CHANGELOG.md:34",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The [Unreleased] ### Changed entry (:31-42) names .claude/state/finalise-rerun-at-head-{stem}-{N}.json and its out-dir. The 'Resume path:' at :34 says to re-run the idempotent Step 3a re-run-at-head block, which writes the new name, and that the old file is inert. QA ran changelog-cites.sh task.333 (qa.2:192)."
+    },
+    {
+      "id": "#11",
+      "text_hash": "2207f53e7d14d5ec543e32f5cbd708e7150cf585cfd34d850dfa2d54fad69ff8",
+      "status": "PASS",
+      "description": "traps.md has zsh flag-expansion entry and the guard cites it",
+      "code_citation": "docs/contributing/traps.md:229",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "traps.md:229 is the heading '### zsh does not word-split ${X:+--flag \\\"$X\\\"}'. :238 states the array rule. The guard's header cites it at zsh-flag-expansion-guard.test.mjs:8 (docs/contributing/traps.md § \\\"zsh does not word-split...\\\"), and its failure message names traps.md at :105."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#8",
+      "note": "PR reviewDecision is empty (no review required on this host), which matches the caller's context. The CI state on head 4ecd2dab9 has not been read here. qa.1:74 recorded CI as pending on an earlier commit (bc7b6013867d)."
+    }
+  ]
+}

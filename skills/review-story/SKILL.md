@@ -2394,8 +2394,11 @@ fi
 **Jira path** (`TRACKER=jira`):
 
 ```bash
+# An array, not ${PIN_BRANCH:+--doc-branch "$PIN_BRANCH"}: zsh does not split that into two words
+# (docs/contributing/traps.md; observation #202).
+PIN_ARGS=(); [ -n "$PIN_BRANCH" ] && PIN_ARGS=(--doc-branch "$PIN_BRANCH")
 node .agents/skills/sync-jira-story/scripts/sync-jira-story.js \
-  --file "$STORY_FILE_PATH" ${PIN_BRANCH:+--doc-branch "$PIN_BRANCH"} \
+  --file "$STORY_FILE_PATH" "${PIN_ARGS[@]}" \
   --no-transition
 ```
 
@@ -2479,8 +2482,10 @@ On failure → log warning `⚠️ sync-github-story failed — GitHub issue bod
    - **Jira path** (`TRACKER=jira`): run `sync-jira-story.js` to push the status transition and updated frontmatter:
 
      ```bash
+     # An array, not a ${PIN_BRANCH:+…} flag expansion: zsh passes that as one word (traps.md).
+     PIN_ARGS=(); [ -n "$PIN_BRANCH" ] && PIN_ARGS=(--doc-branch "$PIN_BRANCH")
      node .agents/skills/sync-jira-story/scripts/sync-jira-story.js \
-       --file "$STORY_FILE_PATH" ${PIN_BRANCH:+--doc-branch "$PIN_BRANCH"}
+       --file "$STORY_FILE_PATH" "${PIN_ARGS[@]}"
      ```
 
      > **This site deliberately omits `--no-transition`, unlike Step 9.6.** Driving the transition *is* the point here — the status has just changed locally and this is what carries it to the card. The two steps ran the same command line until bug.12; they are now different on purpose, so do not "restore consistency" by flagging this one. The `jira-sync-no-transition` parity guard (test G, in the shared test suite) records this step in its deliberate-status-push allowlist — the file is named without its path on purpose: the bundler treats a literal shared-resources path in shipped prose as a resource to copy into this skill, and a test is not a shared resource.

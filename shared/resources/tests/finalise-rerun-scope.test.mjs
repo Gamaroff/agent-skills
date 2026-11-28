@@ -2605,6 +2605,71 @@ test("severity (end to end): a merged low AC FAIL is read by the evaluator as lo
   }
 });
 
+// ── task 333: one merge CLI run parses the AC answer once (gate 3 CR-4) ────────
+// The CLI reads the answer for its document checks and hands it to merge(). A preloaded module
+// wraps yaml-subset.js's parseYamlSubset with a counter before finalise-rerun-scope.js loads and
+// destructures it, so the count is every parse the run made. Mutation target: merge() calling
+// readAnswer(agentYaml) again, ignoring opts.answer — the count reads 2.
+test("merge (CLI): one run parses the AC answer exactly once (task 333)", () => {
+  const dir = mkRepo();
+  try {
+    const counter = join(dir, "count-parses.cjs");
+    writeFileSync(
+      counter,
+      [
+        "const m = require(process.env.YAML_SUBSET_PATH);",
+        "const real = m.parseYamlSubset;",
+        "let n = 0;",
+        "m.parseYamlSubset = (...a) => { n += 1; return real(...a); };",
+        'process.on("exit", () => process.stderr.write(`PARSE_COUNT=${n}\\n`));',
+        "",
+      ].join("\n"),
+    );
+    writeFileSync(
+      join(dir, "ac.yaml"),
+      agentDoc(
+        ["SC-1", "SC-2", "SC-3", "SC-4"].map((id) => acEntry(id, "PASS")),
+      ),
+    );
+    writeFileSync(
+      join(dir, "scope.json"),
+      JSON.stringify({ ...scopeAt(dir, null), document: DOC }),
+    );
+    const r = spawnSync(
+      process.execPath,
+      [
+        "--require",
+        counter,
+        ENGINE_PATH,
+        "merge",
+        "--scope",
+        "scope.json",
+        "--result",
+        "ac.yaml",
+        "--doc",
+        DOC,
+        "--dod-n",
+        "1",
+        "--json",
+      ],
+      {
+        cwd: dir,
+        encoding: "utf8",
+        timeout: CLI_BUDGET.timeoutMs,
+        env: {
+          ...process.env,
+          YAML_SUBSET_PATH: join(__dirname, "..", "yaml-subset.js"),
+        },
+      },
+    );
+    assert.equal(r.status, 0, r.stderr);
+    assert.equal(JSON.parse(r.stdout).reason, "merged");
+    assert.match(r.stderr, /^PARSE_COUNT=1$/m, r.stderr);
+  } finally {
+    cleanup(dir);
+  }
+});
+
 test("every documented reason is reached by a case above", () => {
   for (const r of [...eng.FULL_REASONS, ...eng.CRITERION_REASONS]) {
     assert.ok(SEEN.has(r), `reason ${r} is documented but no case produced it`);

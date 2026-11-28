@@ -781,11 +781,14 @@ function sameDocument(cwd, a, b) {
  *
  * @param {object} s           the `scope` result
  * @param {string} agentYaml   the AC agent's raw YAML
- * @param {object} opts        { dodN, document }
+ * @param {object} opts        { dodN, document, answer? } — `answer` is readAnswer(agentYaml) when the
+ *                             caller already read it; the CLI passes it, so one run parses once and
+ *                             its document checks and this merge read the same answer (task 333)
  * @param {object} io          { tracked } — the CLI passes gitIo(cwd)
  */
 function merge(s, agentYaml, opts, io) {
-  const answer = readAnswer(agentYaml);
+  const answer =
+    opts && opts.answer !== undefined ? opts.answer : readAnswer(agentYaml);
   if (!answer.ok) {
     return {
       reason: "result-unparseable",
@@ -1295,6 +1298,7 @@ function main(argv) {
       {
         dodN: opts.dodN ? Number(opts.dodN) : null,
         document: s.document ?? null,
+        answer, // read once above: merge does not parse the YAML a second time (task 333, CR-4)
         result: {
           bytes: resultBuf.length,
           sha256: resultSha,
