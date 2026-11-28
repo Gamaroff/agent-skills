@@ -525,11 +525,25 @@ PR_SOURCE=$(printf '%s' "$PR_JSON" | jq -r '.source // "none"')
 STORY_TYPE=$(grep '^type:' {story-file} | awk '{print $(2)}' | tr -d '"')
 [ -z "$STORY_TYPE" ] && STORY_TYPE="task"
 
-# Git diff for AC agent (best-effort — empty diff is handled gracefully by the agent)
+# The PR's whole change, for the agents (task 321). Exit 1 leaves DIFF_FILE empty and is not a
+# HALT: the agents judge an empty change as "could not be read". Exit 2 is a wrong call.
 DIFF_FILE=".claude/state/pr-diff-$(date +%s).diff"
-[ -n "$PR_NUMBER" ] && gh pr diff "$PR_NUMBER" > "$DIFF_FILE" 2>/dev/null \
-  || git diff HEAD~1 HEAD > "$DIFF_FILE" 2>/dev/null || touch "$DIFF_FILE"
+DIFF_ARGS=(--out "$DIFF_FILE")
+[ -n "$PR_NUMBER" ] && DIFF_ARGS+=(--pr "$PR_NUMBER")
+DIFF_LINE=$(bash .agents/skills/finalise/references/finalise-diff.sh "${DIFF_ARGS[@]}")
+DIFF_RC=$?
+[ "$DIFF_RC" -ne 2 ] || { echo "HALT: finalise-diff.sh was called wrongly: $DIFF_LINE"; exit 1; }
+printf '**PR diff:** %s\n' "$DIFF_LINE"
 ```
+
+**The diff comes from `references/finalise-diff.sh`, never from `gh pr diff` alone or the last
+commit.** It diffs the merge base of the PR's base branch against the PR's head commit, on either
+forge, and asks the forge only when that head is not in this checkout or adds nothing (a merged
+PR); GitHub only. It writes the patch to `$DIFF_FILE`, without bundled `skills/*/references/`
+copies, and every changed path, the copies included, NUL-delimited to `$DIFF_FILE.names`. When no
+change can be read it prints `unresolved: <reason>` and leaves both files empty; it never falls back
+to `HEAD~1`, which on PR #937 handed the agents 1 file of 250. Record the line it printed as
+`**PR diff:** {DIFF_LINE}` under the `**PR:**` line of the running summary's Step 2 block.
 
 **The PR number comes from `references/resolve-pr-number.sh`, never from the document body.** It
 reads, first answer wins: an explicit `--pr`, the PR whose head is the current branch (`pr-read.sh`),
@@ -1342,7 +1356,7 @@ specification is the owner's decision.
 #### Step 3e: Clean Up and Proceed
 
 ```bash
-rm -f "$DIFF_FILE"
+rm -f "$DIFF_FILE" "$DIFF_FILE.names"
 ```
 
 After all 4 appends are complete, proceed directly to Step 6 (Make Acceptance Decision). The decision logic uses `AC_OVERALL`, `SEC_OVERALL`, `COMP_OVERALL`, and `DOCS_OVERALL`.

@@ -1384,3 +1384,97 @@ test("every entry shape in the four graded prompts names severity beside its sta
     }
   }
 });
+
+// --- Task 321: the change the agents read ----------------------------------------------------
+//
+// Step 3a now writes the patch to <DIFF_FILE> WITHOUT bundled copies, and every changed path to
+// <DIFF_FILE>.names. An empty diff used to pass a criterion over a set (no members, none unmapped).
+// Each assertion names the rule it holds; the prose may rewrap freely (`has` collapses whitespace).
+
+const DIFF_PROMPTS = {
+  "finalise-dod-ac-prompt.md": null,
+  "finalise-dod-docs-prompt.md": null,
+  "finalise-dod-fix-evidence-prompt.md": null,
+};
+const diffPrompt = (name) =>
+  (DIFF_PROMPTS[name] ??= readFileSync(
+    join(repoRoot, "shared", "resources", name),
+    "utf-8",
+  ));
+const NAMES_READ = "tr '\\0' '\\n' < <DIFF_FILE>.names";
+const UNREADABLE = '`FAIL` with the note "the change could not be read"';
+
+test("task 321: each diff-reading prompt reads paths from the names list and fails on an empty one", () => {
+  for (const name of Object.keys(DIFF_PROMPTS)) {
+    const text = diffPrompt(name);
+    assert.ok(
+      has(text, NAMES_READ),
+      `${name}: paths are not read from <DIFF_FILE>.names`,
+    );
+    assert.ok(
+      has(text, UNREADABLE),
+      `${name}: an empty change is not FAIL "the change could not be read"`,
+    );
+    assert.doesNotMatch(
+      text,
+      /NEEDS_MANUAL_REVIEW/,
+      `${name}: a status token its contract does not have`,
+    );
+    assert.doesNotMatch(
+      text,
+      /grep '\^diff --git' <DIFF_FILE>/,
+      `${name}: the patch is read for paths, and it no longer holds the bundled copies`,
+    );
+  }
+});
+
+test("task 321: the AC quantifier rule takes members from the names list and fails a set over an empty one", () => {
+  const ac = diffPrompt("finalise-dod-ac-prompt.md");
+  assert.ok(
+    has(ac, "List the members from `<DIFF_FILE>.names`"),
+    "members are not listed from the names list",
+  );
+  assert.ok(
+    has(
+      ac,
+      "When the names list is empty or missing, a criterion over a set is `FAIL`",
+    ),
+    "an empty names list does not fail a criterion over a set",
+  );
+});
+
+test("task 321: fix-evidence check 5 reads the bundled copies from the names list", () => {
+  const fe = diffPrompt("finalise-dod-fix-evidence-prompt.md");
+  const check5 = fe.slice(
+    fe.indexOf("5. **Bundled copies match the source.**"),
+  );
+  assert.ok(
+    check5.length > 0 && fe.includes("5. **Bundled copies match the source.**"),
+    "check 5 not found",
+  );
+  assert.ok(
+    has(
+      check5.slice(0, 400),
+      "read them from `<DIFF_FILE>.names`, not `<DIFF_FILE>`",
+    ),
+    "check 5 reads the copies from the patch, which leaves them out",
+  );
+});
+
+test("task 321: Step 3a reads the change through finalise-diff.sh, and Step 3e removes both files", () => {
+  const s = skill();
+  assert.match(s, /references\/finalise-diff\.sh "\$\{DIFF_ARGS\[@\]\}"/);
+  assert.doesNotMatch(
+    s,
+    /git diff HEAD~1 HEAD/,
+    "a block still falls back to the last commit",
+  );
+  assert.ok(
+    has(s, 'rm -f "$DIFF_FILE" "$DIFF_FILE.names"'),
+    "Step 3e leaves the names list behind",
+  );
+  assert.ok(
+    has(s, "`**PR diff:** {DIFF_LINE}` under the `**PR:**` line"),
+    "the running summary has no PR diff line",
+  );
+});

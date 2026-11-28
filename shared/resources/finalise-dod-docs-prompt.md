@@ -56,7 +56,10 @@ Based on `<STORY_TYPE>`, check:
 #### task / refactoring / skill
 - Are any skill `SKILL.md` files, shared resource files, or README files updated for the changed functionality?
 - If a skill's catalog entry changed, is the catalog regenerated? Judge from the PR's changed files
-  (`grep '^diff --git' <DIFF_FILE>`, then that `SKILL.md`'s hunks in `<DIFF_FILE>`):
+  (`tr '\0' '\n' < <DIFF_FILE>.names`, then that `SKILL.md`'s hunks in `<DIFF_FILE>`). When the
+  names list is empty or missing, the change could not be read (Step 3a's `**PR diff:** unresolved: …`):
+  this check is `FAIL` with the note "the change could not be read", never `PASS` or `NOT_APPLICABLE`.
+  Otherwise:
   the catalog is built from `SKILL.md` frontmatter only, so a `SKILL.md` whose frontmatter changed in
   the diff with no `docs/reference/skill-catalog.md` change in the same diff is the gap, and a body-only
   `SKILL.md` change is not. **Never run the generator, or any other command that writes, to find
