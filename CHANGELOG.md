@@ -38,7 +38,10 @@ All notable changes to this project will be documented in this file. Format foll
   no document). Between Step 3c and Step 3d, and after Step 3d, nothing more is needed: only Step 3c
   reads the renamed files, and its merged file was already stem-keyed. A run that stopped on a
   pre-upgrade `result-unparseable` answer wrote no record: re-run Step 3a, the AC agent, the extract
-  and Step 3c.
+  and Step 3c. A hand copy over a file `extract` wrote now also removes that extract's record,
+  whose old hash would refuse it, and `result-hash-mismatch` has its own Step 3c arm and remedy.
+  Fixed on the way: under zsh, Step 3c passed `--sha256 <hex>` as one argument, so every merge after
+  a successful extract was a usage error (pre-existing since task 269).
 
 - **`/finalise`'s AC merge refuses another document's result, and its AC state files carry the work
   item's stem (task 331).** `finalise-rerun-scope.js merge` now answers `result-document-mismatch`

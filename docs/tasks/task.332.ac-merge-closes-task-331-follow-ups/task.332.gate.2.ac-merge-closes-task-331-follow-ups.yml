@@ -1,0 +1,75 @@
+schema: 2
+task: 'task.332.ac-merge-closes-task-331-follow-ups'
+task_title: "The AC merge closes task 331's follow-ups"
+gate: CONCERNS
+status_reason: 'Gate 1''s three findings are fixed and mutation-proven, but the hand-copy remedy that both Step 3c document arms offer cannot clear the HALT after a successful extract: the stale extract record re-supplies --sha256 and the corrected copy is refused as result-hash-mismatch (reproduced by QA).'
+reviewer: 'QA Engineer'
+head: 'ce71df6aaac6a07bca2ab64a318ab655690a13bb'
+updated: '2026-11-27T23:42:34Z'
+
+top_issues:
+  - id: 'T332-CR2-1'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'After a successful extract, .claude/state/finalise-ac-extract-${STEM}-${DOD_N}.json still reads reason extracted with the sha256 of the agent''s answer, and Step 3c (SKILL.md:1063) passes it as --sha256 again. A corrected hand copy (the remedy both the result-document-unnamed and result-document-mismatch arms offer, SKILL.md:1080, 1082) is then refused as result-hash-mismatch, which falls to the generic "merge answered …" arm with no remedy. Origin: code-review (confidence medium), reproduced by QA.'
+    suggested_action: 'Make the hand-copy remedy also remove the stem-keyed extract record (or limit it to when the extract did not answer extracted), give result-hash-mismatch its own Step 3c arm and remedy, and add a blocks-test case that hand-copies after a successful extract.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 8978
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [3]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary: internal
+    internal_reason: 'Unchanged from gate 1: sameDocument and the merge-CLI refusals read only the AC agent YAML /finalise extracts from its own subagent transcript, the scope JSON Step 3a wrote, and the --doc path Step 3c substitutes. No corpus sink models those inputs, and the refusals exit 0 with a reason, so the cli: form has no exit-status verdict to score. Cycle 1 changed only HALT remedy text.'
+    notes: 'Every refusal still writes nothing. Cycle 1 added no input path.'
+  performance:
+    status: PASS
+    notes: 'Unchanged; the double YAML parse stays advisory.'
+  reliability:
+    status: CONCERNS
+    notes: 'T332-CR2-1: the hand-copy remedy cannot clear a document HALT once an extract has succeeded.'
+  maintainability:
+    status: PASS
+    notes: 'Cycle 1 remedies held by the blocks test (18/18); mutation of the unnamed remedy turns 2 tests red.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T332-CR2-1.'
+      refs: ['skills/finalise/SKILL.md']
+  future:
+    - action: 'CR-2 (cleanup, low): finalise-dod-ac-prompt.md:153 says /finalise refuses a story_file spelt "any other way", but sameDocument accepts an absolute, ./-prefixed or symlinked path to the same file. Reword to "missing or not resolving to the given document (a basename, a re-cased name)" and re-bundle.'
+      refs: ['shared/resources/finalise-dod-ac-prompt.md']
+      remedy: unverified
+    - action: 'Carried from gate 1, CR-3 (pre-existing, out of scope): finalise-rerun-at-head-${DOD_N}.json and .d are still keyed by DOD_N alone. Follow-up: stem-key them after enumerating every .claude/state/*-${DOD_N} path.'
+      refs: ['skills/finalise/SKILL.md']
+      provenance: pre-existing
+      remedy: unverified
+    - action: 'Carried from gate 1, CR-4 (cleanup): the merge CLI parses the agent YAML with readAnswer and merge() parses it again.'
+      refs: ['shared/resources/finalise-rerun-scope.js']
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T332-CR2-1 fixed']

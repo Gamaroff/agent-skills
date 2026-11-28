@@ -21,6 +21,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -414,7 +415,7 @@ for (const shell of SHELLS) {
       // The arm's own remedy, not the generic `merge answered …` line the `*)` arm prints.
       assert.match(
         c.stdout,
-        /re-run the extract above, or hand-copy THIS item's AC agent answer to the result path; .*then re-run this block; never merge another document's answer/,
+        /re-run the extract above, or hand-copy THIS item's AC agent answer to the result path and remove \.claude\/state\/finalise-ac-extract-task\.9-1\.json; .*then re-run this block; never merge another document's answer/,
       );
       assert.doesNotMatch(c.stdout, /merge answered/);
       assert.ok(
@@ -458,6 +459,70 @@ for (const shell of SHELLS) {
     }
   });
 
+  test(`[${shell}] Step 3c after a successful extract: a corrected hand copy HALTs in the hash arm with its remedy, and following that remedy merges (T332-CR2-1)`, () => {
+    const dir = repo();
+    try {
+      const a1 = step3a(shell, dir, 1);
+      assert.equal(a1.status, 0, a1.stdout + a1.stderr);
+      // What a successful extract leaves: the agent's answer (here a wrong story_file) and a
+      // record of its hash.
+      const result = path.join(
+        dir,
+        ".claude/state/finalise-ac-result-task.9-1.yaml",
+      );
+      const extract = path.join(
+        dir,
+        ".claude/state/finalise-ac-extract-task.9-1.json",
+      );
+      const wrong = AGENT_ALL_PASS.replace(
+        "ac_traceability:\n",
+        'ac_traceability:\n  story_file: "task.9.demo.md"\n',
+      );
+      writeFileSync(result, wrong);
+      writeFileSync(
+        extract,
+        JSON.stringify({
+          reason: "extracted",
+          sha256: createHash("sha256").update(wrong).digest("hex"),
+        }),
+      );
+      const c1 = run(shell, dir, substitute(STEP_3C, { dodN: 1 }));
+      assert.equal(c1.status, 1, c1.stdout + c1.stderr);
+      assert.match(c1.stdout, /which does not exist/);
+      assert.match(
+        c1.stdout,
+        /hand-copy THIS item's AC agent answer to the result path and remove \.claude\/state\/finalise-ac-extract-task\.9-1\.json/,
+      );
+
+      // A hand copy that corrects story_file but keeps the record: refused on the old hash, in
+      // its own arm with a remedy, not the generic `merge answered …` line.
+      writeFileSync(result, AGENT_NAMED);
+      const c2 = run(shell, dir, substitute(STEP_3C, { dodN: 1 }));
+      assert.equal(c2.status, 1, c2.stdout + c2.stderr);
+      assert.match(
+        c2.stdout,
+        /the result file is not the one the extract wrote: re-run the extract above, or, for a deliberate hand copy, remove \.claude\/state\/finalise-ac-extract-task\.9-1\.json; then re-run this block/,
+      );
+      assert.doesNotMatch(c2.stdout, /merge answered/);
+      assert.ok(
+        !existsSync(path.join(dir, DOC_DIR, "task.9.dod.1.ac.json")),
+        "nothing is recorded",
+      );
+
+      // The remedy as printed clears the HALT.
+      rmSync(extract);
+      const c3 = run(shell, dir, substitute(STEP_3C, { dodN: 1 }));
+      assert.equal(c3.status, 0, c3.stdout + c3.stderr);
+      assert.match(c3.stdout, /^AC_OVERALL=PASS$/m);
+      assert.ok(
+        existsSync(path.join(dir, DOC_DIR, "task.9.dod.1.ac.json")),
+        "the corrected hand copy is recorded",
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test(`[${shell}] Step 3c HALTs on a result that names no document in its own arm, naming the remedy, and records nothing (task 332)`, () => {
     const dir = repo();
     try {
@@ -476,7 +541,7 @@ for (const shell of SHELLS) {
       assert.match(c.stdout, /HALT: --result names no document/);
       assert.match(
         c.stdout,
-        /re-run the extract above, or hand-copy THIS item's full AC agent answer to the result path; .*then re-run this block/,
+        /re-run the extract above, or hand-copy THIS item's full AC agent answer to the result path and remove \.claude\/state\/finalise-ac-extract-task\.9-1\.json; .*then re-run this block/,
       );
       // An agent that omitted story_file is not cleared by a re-extract: the remedy names the
       // re-run and the exact path it must give (T332-CR-2).

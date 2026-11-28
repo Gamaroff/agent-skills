@@ -384,24 +384,23 @@ None.
 
 **QA Status**: CONCERNS
 **QA Engineer**: QA Engineer
-**Testing Date**: 2026-11-27
-**Quality Score**: 70/100
+**Testing Date**: 2026-11-28
+**Quality Score**: 90/100
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.332.qa.1.ac-merge-closes-task-331-follow-ups.md](./task.332.qa.1.ac-merge-closes-task-331-follow-ups.md)
-- **Gate File**: [task.332.gate.1.ac-merge-closes-task-331-follow-ups.yml](./task.332.gate.1.ac-merge-closes-task-331-follow-ups.yml)
+- **Full Report**: [task.332.qa.2.ac-merge-closes-task-331-follow-ups.md](./task.332.qa.2.ac-merge-closes-task-331-follow-ups.md)
+- **Gate File**: [task.332.gate.2.ac-merge-closes-task-331-follow-ups.yml](./task.332.gate.2.ac-merge-closes-task-331-follow-ups.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 96 task tests; full suite 8,972/8,976 (1 load-only failure, green alone)
+- **Tests Executed**: full suite 8,975/8,978 pass, 0 fail, 3 skipped; blocks test 18/18
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- T332-QA-1 (medium): the CHANGELOG splits `(task 332)` across two lines, so `/finalise` 6d would HALT.
-- T332-CR-1 (medium, reproduced): a nonexistent `story_file` shares `result-document-mismatch` and a remedy that cannot clear it.
-- T332-CR-2 (medium, reproduced): the `result-document-unnamed` remedy misses an agent whose own answer omits `story_file`.
+- Gate 1's T332-QA-1, T332-CR-1 and T332-CR-2 are fixed and mutation-proven.
+- T332-CR2-1 (medium, reproduced): after a successful extract, the hand-copy remedy in both Step 3c document arms is refused as `result-hash-mismatch`, which has no remedy of its own.
 
 ## Change Log
 
@@ -415,6 +414,8 @@ None.
 | 2026-11-28 |         | Implemented Phases 1–4: `--doc` required, `result-document-unnamed`, `scope-document-missing`, stem-keyed scope/extract paths, exact-path prompt rule; 7 mutations proved; status → ready-for-review | develop |
 | 2026-11-28 |         | QA gate CONCERNS (70/100) — 3 findings | qa-task |
 | 2026-11-28 |         | QA findings fixed — gate 1's 3 MEDIUM (CHANGELOG citation, two Step 3c remedies), 1 iteration | qa-fix |
+| 2026-11-28 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
+| 2026-11-28 |         | QA findings fixed — gate 2's 1 MEDIUM (hand copy after an extract), plus the zsh `--sha256` argument, 1 iteration | qa-fix |
 <!-- change-log-end -->
 
 ## Progress Tracking

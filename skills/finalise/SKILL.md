@@ -1040,7 +1040,9 @@ that names no document at all (`result-document-unnamed`): nothing merged, nothi
 copy of the wrong agent's answer stops here instead of becoming this item's record (task 331, 332).
 `story_file` must be the exact document path; a basename or a re-cased spelling is refused. When the
 AC agent itself wrote the wrong or no `story_file`, re-extracting brings the same answer back, so
-both arms also name re-running the AC agent, with the path it must give. Before
+both arms also name re-running the AC agent, with the path it must give. A hand copy over a file
+`extract` wrote also removes `finalise-ac-extract-${STEM}-${DOD_N}.json`: its hash is the extracted
+file's, so `merge` would refuse the copy as `result-hash-mismatch` (T332-CR2-1). Before
 that, `merge` requires `--doc` and refuses a scope that is not this document's
 (`scope-document-mismatch`) or names no document (`scope-document-missing`, a scope written before
 task 331). The scope, extract, result and merged files all carry the work item's stem, so two items
@@ -1060,12 +1062,17 @@ case "$DOC_PATH" in ''|*'{'*) echo "HALT: DOC_PATH ('$DOC_PATH') must be substit
 AC_RECORD="{document-directory}/${STEM}.dod.${DOD_N}.ac.json"
 AC_MERGED_FILE=".claude/state/finalise-ac-merged-${STEM}-${DOD_N}.json"
 # The hash `extract` printed, or empty after a hand copy. Read back from its own output, not retyped.
-AC_SHA256=$(jq -r 'select(.reason == "extracted") | .sha256' ".claude/state/finalise-ac-extract-${STEM}-${DOD_N}.json" 2>/dev/null)
+# A hand copy over an extracted file removes this record, or the old hash refuses it (T332-CR2-1).
+AC_EXTRACT_FILE=".claude/state/finalise-ac-extract-${STEM}-${DOD_N}.json"
+AC_SHA256=$(jq -r 'select(.reason == "extracted") | .sha256' "$AC_EXTRACT_FILE" 2>/dev/null)
+# An array, not ${AC_SHA256:+--sha256 "$AC_SHA256"}: zsh does not split that into two words, and
+# merge read "--sha256 <hex>" as one unknown flag on every extracted run (T332-CR2-2).
+AC_SHA_ARGS=(); [ -n "$AC_SHA256" ] && AC_SHA_ARGS=(--sha256 "$AC_SHA256")
 command node .agents/skills/finalise/references/finalise-rerun-scope.js merge \
   --scope ".claude/state/finalise-rerun-scope-${STEM}-${DOD_N}.json" \
   --result ".claude/state/finalise-ac-result-${STEM}-${DOD_N}.yaml" \
   --doc "$DOC_PATH" \
-  ${AC_SHA256:+--sha256 "$AC_SHA256"} \
+  "${AC_SHA_ARGS[@]}" \
   --dod-n "$DOD_N" --record-out "$AC_RECORD" --json > "$AC_MERGED_FILE"
 [ $? -eq 0 ] || { echo "HALT: finalise-rerun-scope.js merge failed — see $AC_MERGED_FILE"; exit 1; }
 case "$(jq -r '.reason' "$AC_MERGED_FILE")" in
@@ -1077,9 +1084,11 @@ case "$(jq -r '.reason' "$AC_MERGED_FILE")" in
   scope-document-mismatch)    # nothing merged, nothing recorded (task 331, 332)
                       echo "HALT: $(jq -r '.message' "$AC_MERGED_FILE") — --scope is not this item's: check STEM and DOD_N, re-run Step 3a for this item, then this block"; exit 1 ;;
   result-document-unnamed)    # nothing merged, nothing recorded (task 332)
-                      echo "HALT: $(jq -r '.message' "$AC_MERGED_FILE") — re-run the extract above, or hand-copy THIS item's full AC agent answer to the result path; if the agent's own answer names no story_file, re-run the AC agent (story_file must be exactly $DOC_PATH), then the extract; then re-run this block"; exit 1 ;;
+                      echo "HALT: $(jq -r '.message' "$AC_MERGED_FILE") — re-run the extract above, or hand-copy THIS item's full AC agent answer to the result path and remove $AC_EXTRACT_FILE; if the agent's own answer names no story_file, re-run the AC agent (story_file must be exactly $DOC_PATH), then the extract; then re-run this block"; exit 1 ;;
   result-document-mismatch)   # nothing merged, nothing recorded (task 331)
-                      echo "HALT: $(jq -r '.message' "$AC_MERGED_FILE") — re-run the extract above, or hand-copy THIS item's AC agent answer to the result path; if the agent's own answer names a wrong or missing file, re-run the AC agent (story_file must be exactly $DOC_PATH), then the extract; then re-run this block; never merge another document's answer"; exit 1 ;;
+                      echo "HALT: $(jq -r '.message' "$AC_MERGED_FILE") — re-run the extract above, or hand-copy THIS item's AC agent answer to the result path and remove $AC_EXTRACT_FILE; if the agent's own answer names a wrong or missing file, re-run the AC agent (story_file must be exactly $DOC_PATH), then the extract; then re-run this block; never merge another document's answer"; exit 1 ;;
+  result-hash-mismatch)       # nothing merged, nothing recorded (task 332, T332-CR2-1)
+                      echo "HALT: $(jq -r '.message' "$AC_MERGED_FILE") — the result file is not the one the extract wrote: re-run the extract above, or, for a deliberate hand copy, remove $AC_EXTRACT_FILE; then re-run this block"; exit 1 ;;
   *)                  echo "HALT: merge answered $(jq -r '.reason' "$AC_MERGED_FILE")"; exit 1 ;;
 esac
 echo "AC_OVERALL=$AC_OVERALL"
