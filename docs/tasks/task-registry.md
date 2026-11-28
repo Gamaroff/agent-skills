@@ -2,7 +2,7 @@
 
 **Purpose:** Central tracking for all task numbers in this repo.
 **Last Updated:** 2026-11-26
-**Next Available Task Number:** **333**
+**Next Available Task Number:** **334**
 
 ## How to use
 
@@ -374,6 +374,7 @@ grep -i "<keyword>" docs/tasks/task-registry.md
 | 330 | [isDocsPath refuses the NTFS .git stream and C1 controls](task.330.docs-path-stream-and-c1-refusals/task.330.docs-path-stream-and-c1-refusals.md) | accepted | infrastructure | Medium | 2026-11-26 | — | task 329 QA's two pre-existing `isDocsPath` gaps (a `.git:` stream segment, a C1 control), tried green in a worktree; plus T325-CR-501/502 and T329-QA-9/10 · three phases · independent |
 | 331 | [The AC merge refuses another document's result](task.331.ac-merge-refuses-another-documents-result/task.331.ac-merge-refuses-another-documents-result.md) | accepted | infrastructure | Medium | 2026-11-26 | task.327 | observation #191: `merge` refuses a result whose `story_file` names another document, and the AC state files carry the work item's stem · three phases · edits the file task 327 edits |
 | 332 | [The AC merge closes task 331's follow-ups](task.332.ac-merge-closes-task-331-follow-ups/task.332.ac-merge-closes-task-331-follow-ups.md) | accepted | infrastructure | Medium | 2026-11-27 | task.331 | task 331's DoD run 2 spec challenges (`merge --doc` required, a result must name its `story_file`) and its gate 1-3 advisories (stem-keyed scope and extract files, split refusal reasons, CHANGELOG resume paths, realpath tests) · four phases · edits the file task 331 edited |
+| 333 | [Close task 332's follow-ups and guard the zsh flag trap](task.333.close-task-332-follow-ups-and-zsh-flag-guard/task.333.close-task-332-follow-ups-and-zsh-flag-guard.md) | planned | infrastructure | Medium | 2026-11-28 | task.332 | observation #202 (the zsh `${X:+--flag "$X"}` trap: fix the two review-story sites, add a calibrated fence guard) and task 332's gate 3 advisories (CR3-1, CR3-2, CR-2, CR-3, CR-4) · four phases · one task at the owner's request |
 
 - **Tasks 145 and 146 are task.144's observation follow-ups (obs #168, #169)**, filed 2026-09-24 — one shippable unit each, independent of each other. **145** makes review check that a criterion's stated outcome is one the deciding function can return (task.144's accept-all fixture was promised `present-but-inert` and could only score `absent`); **146** makes a fix to an identity rule prove both directions, because task.144's record key was patched once per direction for four QA cycles. Both are prose checks held by a population test; neither touches runtime code. Each observation is set `actioned` when its task's PR merges.
 
