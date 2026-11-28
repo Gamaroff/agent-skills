@@ -86,9 +86,12 @@ it with `tr '\0' '\n'`). Add: *an empty or missing list means the change could n
 over a set is then `FAIL`, with the note "the change could not be read".* Rule 1 reads the paths from
 the same list.
 
-**The other two prompts**: one sentence each. An empty `<DIFF_FILE>` is "could not read", and is
-reported as `NEEDS_MANUAL_REVIEW`. It is not "nothing changed". Check first which status words each
-prompt's contract has.
+**The other two prompts**: one sentence each. An empty `<DIFF_FILE>` is "could not read", not "nothing
+changed". Both contracts allow only `PASS | FAIL | NOT_APPLICABLE`, so a check that needs the diff is
+`FAIL` with the note "the change could not be read" (review 1, I1).
+
+**Fix-evidence check 5** ("bundled copies match the source") reads the copies from `<DIFF_FILE>.names`:
+the patch no longer holds them (review 1, I2).
 
 ### Phase 3: The gap body
 

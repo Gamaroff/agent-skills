@@ -123,6 +123,17 @@ All notable changes to this project will be documented in this file. Format foll
 
 ### Fixed
 
+- **`/finalise` judges the PR's whole change, or says it could not read it (task 321).** Step 3a
+  gave its agents `gh pr diff`, then `git diff HEAD~1 HEAD`, then an empty file, with errors
+  discarded. On PR #937 the forge refused the diff and the agents got 1 file of 250; on Bitbucket
+  every run was judged on its last commit; and an empty diff passed a criterion over a set. The new
+  `finalise-diff.sh` diffs the merge base against the PR's head on either forge, asks GitHub only
+  when that head is not checked out or adds nothing, leaves bundled `references/` copies out of the
+  patch but keeps every path in a names list, and otherwise prints `unresolved: <reason>`. The line
+  it prints goes into the DoD as `**PR diff:**`, and the AC, docs and fix-evidence prompts fail a
+  check with "the change could not be read" when there is no change to read. Separately,
+  `dod-gap-count.sh --body` now ends the gap section at the change-log start marker, current or
+  legacy, so the marker no longer leaks into the PR comment.
 - **A measured figure is re-measured when the head moves (task 328).** The record preflight
   (`finalise-record-preflight.js`) missed a bound written as "longer than", "shorter than",
   "faster than", "slower than", "larger than", "smaller than" or "greater than" a number, with or
