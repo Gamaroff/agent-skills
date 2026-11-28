@@ -30,6 +30,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
+import { createRequire } from "node:module";
 import {
   ROOT,
   SHELLS,
@@ -843,4 +844,114 @@ for (const shell of SHELLS) {
       }
     });
   }
+}
+
+// ── The gap body ends at the change-log marker (task 321) ───────────────────────────────────
+//
+// `--body` closed the section at the next `## ` heading only. The change-log start marker stands
+// ABOVE the `## Change Log` heading (document-change-log.md § Markers), so it was the section's
+// last line and went into the PR comment. The section now also ends at an unfenced start marker,
+// the current one or either legacy one; a fenced marker is a picture of one and is kept.
+//
+// The markers are read from change-log.js, not restated: a fourth pair added there turns the
+// parity case red until the script knows it too.
+//
+// Mutation proof (task 321 § 9): delete the marker rule from dod-gap-count.sh → "--body stops at
+// every start marker change-log.js defines" goes red for all three markers.
+const requireCjs = createRequire(import.meta.url);
+const { CL_START, LEGACY_MARKER_PAIRS } = requireCjs(
+  path.join(ROOT, "shared", "resources", "change-log.js"),
+);
+const START_MARKERS = [CL_START, ...LEGACY_MARKER_PAIRS.map((p) => p.start)];
+
+function markerDoc(marker, { fencedMarker = false } = {}) {
+  return [
+    "# Task 9: fixture",
+    "",
+    "## Definition of Done - Gaps Identified",
+    "",
+    "### Missing Criteria:",
+    "",
+    "- [ ] the one gap",
+    "- [ ] the second gap",
+    "",
+    ...(fencedMarker ? ["```text", marker, "```", ""] : []),
+    "### Next Steps:",
+    "",
+    "- [ ] close it",
+    "",
+    marker,
+    "## Change Log",
+    "",
+    "| Date | Version | Description | Author |",
+    "| ---- | ------- | ----------- | ------ |",
+    "| 2026-11-28 | 1.0 | Initial draft | create-task |",
+    "<!-- change-log-end -->",
+    "",
+  ].join("\n");
+}
+
+test("the start markers are the three change-log.js defines", () => {
+  // Non-vacuity floor: a destructure that read nothing would make the loop below test nothing.
+  assert.equal(START_MARKERS.length, 3, START_MARKERS.join(", "));
+  for (const m of START_MARKERS) assert.match(m, /^<!-- [a-z-]+-start -->$/);
+});
+
+for (const shell of SHELLS) {
+  const gap = (file, mode = "") =>
+    run(shell, `bash "${GAP_COUNT}" "${file}" ${mode}`, { cwd: ROOT });
+
+  test(`[${shell}] dod-gap-count.sh --body stops at every start marker change-log.js defines`, () => {
+    const dir = tmp("t321-marker-");
+    try {
+      for (const marker of START_MARKERS) {
+        const file = write(dir, "doc.md", markerDoc(marker));
+        const body = gap(file, "--body");
+        assert.equal(body.status, 0, `${marker}: ${body.stderr}`);
+        assert.match(body.stdout, /close it/, marker);
+        assert.equal(
+          body.stdout.includes(marker),
+          false,
+          `${marker} is not part of the gap body:\n${body.stdout}`,
+        );
+        assert.doesNotMatch(body.stdout, /Initial draft/, marker);
+        assert.equal(
+          gap(file).stdout,
+          "2\n",
+          `${marker}: the count is unchanged`,
+        );
+      }
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test(`[${shell}] dod-gap-count.sh --body keeps a fenced marker inside the section`, () => {
+    const dir = tmp("t321-fenced-");
+    try {
+      for (const marker of START_MARKERS) {
+        const file = write(
+          dir,
+          "doc.md",
+          markerDoc(marker, { fencedMarker: true }),
+        );
+        const body = gap(file, "--body");
+        assert.equal(body.status, 0, `${marker}: ${body.stderr}`);
+        // The fenced copy stays, and the body runs on past it to Next Steps.
+        assert.equal(
+          body.stdout.split(marker).length - 1,
+          1,
+          `${marker}: exactly the fenced copy:\n${body.stdout}`,
+        );
+        assert.match(body.stdout, /close it/, marker);
+        assert.equal(
+          gap(file).stdout,
+          "2\n",
+          `${marker}: the count is unchanged`,
+        );
+      }
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
 }
