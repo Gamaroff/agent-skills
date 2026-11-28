@@ -553,6 +553,37 @@ for (const shell of SHELLS) {
         "a hand copy is recorded verified: false",
       );
       assert.match(c3.stdout, /^AC_YAML_VERIFIED=false$/m);
+      // ...with the reason the DoD line copies (task 333 follow-up).
+      assert.match(
+        c3.stdout,
+        /^AC_YAML_UNVERIFIED_REASON=extract record removed for a hand copy$/m,
+      );
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test(`[${shell}] Step 3c after a failed extract prints the extract's reason for the unverified record (task 333 follow-up)`, () => {
+    const dir = repo();
+    try {
+      const a1 = step3a(shell, dir, 1);
+      assert.equal(a1.status, 0, a1.stdout + a1.stderr);
+      // A failed extract leaves its reason and no hash; the agent's YAML is then hand-copied.
+      writeFileSync(
+        path.join(dir, ".claude/state/finalise-ac-result-task.9-1.yaml"),
+        AGENT_NAMED,
+      );
+      writeFileSync(
+        path.join(dir, ".claude/state/finalise-ac-extract-task.9-1.json"),
+        JSON.stringify({ reason: "transcript-not-found" }),
+      );
+      const c = run(shell, dir, substitute(STEP_3C, { dodN: 1 }));
+      assert.equal(c.status, 0, c.stdout + c.stderr);
+      assert.match(c.stdout, /^AC_YAML_VERIFIED=false$/m);
+      assert.match(
+        c.stdout,
+        /^AC_YAML_UNVERIFIED_REASON=extract failed: transcript-not-found$/m,
+      );
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -579,6 +610,7 @@ for (const shell of SHELLS) {
       assert.equal(c.status, 0, c.stdout + c.stderr);
       assert.match(c.stdout, /^AC_OVERALL=PASS$/m);
       assert.match(c.stdout, /^AC_YAML_VERIFIED=true$/m);
+      assert.doesNotMatch(c.stdout, /AC_YAML_UNVERIFIED_REASON/);
       const record = path.join(dir, DOC_DIR, "task.9.dod.1.ac.json");
       assert.equal(
         JSON.parse(readFileSync(record, "utf8")).result.verified,
