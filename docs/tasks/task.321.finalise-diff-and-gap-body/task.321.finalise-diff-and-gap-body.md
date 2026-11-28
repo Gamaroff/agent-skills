@@ -5,11 +5,13 @@ type: task
 description: "Give /finalise one reader for the PR's whole change that names its source and refuses to answer with less, and end the gap report's body at the change-log marker."
 tags: [finalise, observation]
 category: refactoring
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-11-25
 updated: 2026-11-28
+completed_date: 2026-11-28
+pr_number: 969
 estimated_effort_hours: 8
 github_issue: 941
 ---
@@ -18,7 +20,7 @@ github_issue: 941
 
 **GitHub Issue**: [#941](https://github.com/Gamaroff/agent-skills/issues/941)
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.321.review.1.finalise-diff-and-gap-body.md` implemented 2026-11-28
 
 ---
@@ -457,11 +459,34 @@ A wrong reason text, or a missing line in the running summary, is fixed forward.
 - T321-CR-202 fixed: the merge-base patch ignores host git colour and prefix config.
 - Three low test-coverage cleanups recorded as future work.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.321.qa.3.finalise-diff-and-gap-body.md`
+**Gate File**: `task.321.gate.3.finalise-diff-and-gap-body.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 96/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 11/11 met, each cited to code and a per-PR test (or a committed record)
+✅ **Unit Tests:** the three task suites (133 tests) and `ci:fast` (9055 tests, 0 failed); CI reading 1 SUCCESS over 6 checks
+✅ **PR Review:** PR #969 — `/review-pr` APPROVE, 0 findings (the host requires no human review)
+✅ **Documentation:** CHANGELOG `[Unreleased]` entry; finalise SKILL.md, three DoD prompts and bundled copies updated
+✅ **Security Review:** PASS — `dod-gap-count.sh` probed as a boundary, 14 candidates executed, 0 reproduced
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal skill tooling
+
+**Task marked as ACCEPTED on:** 2026-11-28
+
+**Detailed Verification Log:** See `task.321.dod.1.finalise-diff-and-gap-body.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                     | Author      |
-| ---------- | ------- | ----------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-25 | 1.0     | Initial draft — cut from observation #178       | create-task |
 | 2026-11-28 | 1.1     | Review passed (8/10) — prompts use their own status words, fix-evidence check 5 reads the names list, pattern-pinning tests listed | review-task |
 | 2026-11-28 |         | Status → ready-for-development                  | review-task |
@@ -471,6 +496,7 @@ A wrong reason text, or a missing line in the running summary, is fixed forward.
 | 2026-11-28 |         | QA gate CONCERNS (90/100) — 2 findings          | qa-task     |
 | 2026-11-28 |         | QA findings fixed — 2 of 2, 1 iteration         | qa-fix      |
 | 2026-11-28 |         | QA gate PASS (96/100) — 0 findings              | qa-task     |
+| 2026-11-28 | 1.2 | DoD passed — accepted (PR #969) | finalise |
 <!-- change-log-end -->
 
 ---

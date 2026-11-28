@@ -1,0 +1,252 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "19c106141e6f38121926a52e76ee34a88a291298",
+  "dirty_paths": [
+    "docs/tasks/task.321.finalise-diff-and-gap-body/task.321.implementation.1.finalise-diff-and-gap-body-initial-run.md",
+    "docs/tasks/task.321.finalise-diff-and-gap-body/task.321.pr-review.1.finalise-diff-and-gap-body.md"
+  ],
+  "document": "docs/tasks/task.321.finalise-diff-and-gap-body/task.321.finalise-diff-and-gap-body.md",
+  "result": {
+    "bytes": 11769,
+    "sha256": "0a941e88e36da7d1b81c2419f2e3b457e950bd547634a62c9e995447f907fa08",
+    "verified": true
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 11,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "e27a8372480876bac3384339f21cc132f3521ef5cbbd1f223c7f0a17aa0e8f31",
+      "status": "PASS",
+      "description": "Every row of both § 8 tables holds in a script-driving test",
+      "code_citation": "shared/resources/finalise-diff.sh:28",
+      "test_citation": "shared/resources/tests/finalise-diff.test.mjs:110",
+      "members": [
+        {
+          "member": "three-commit branch, PR head is HEAD -> source=merge-base",
+          "evidence": "shared/resources/tests/finalise-diff.test.mjs:110",
+          "status": "PASS"
+        },
+        {
+          "member": "gh fails on that branch -> forge not asked",
+          "evidence": "shared/resources/tests/finalise-diff.test.mjs:110 (stub pr diff fails; asserts no 'pr diff' call)",
+          "status": "PASS"
+        },
+        {
+          "member": "Bitbucket remote -> source=merge-base",
+          "evidence": "shared/resources/tests/finalise-diff.test.mjs:166",
+          "status": "PASS"
+        },
+        {
+          "member": "merged PR, checkout is base, GitHub -> source=forge",
+          "evidence": "shared/resources/tests/finalise-diff.test.mjs:219",
+          "status": "PASS"
+        },
+        {
+          "member": "same, gh fails -> unresolved, exit 1, empty file",
+          "evidence": "shared/resources/tests/finalise-diff.test.mjs:276",
+          "status": "PASS"
+        },
+        {
+          "member": "no PR -> unresolved, exit 1",
+          "evidence": "shared/resources/tests/finalise-diff.test.mjs:304",
+          "status": "PASS"
+        },
+        {
+          "member": "branch adds nothing, forge diff empty -> unresolved, exit 1",
+          "evidence": "shared/resources/tests/finalise-diff.test.mjs:315",
+          "status": "PASS"
+        },
+        {
+          "member": "open PR, checkout on another branch -> PR head diffed",
+          "evidence": "shared/resources/tests/finalise-diff.test.mjs:333",
+          "status": "PASS"
+        },
+        {
+          "member": "bundled copy vs hand-written references/ file",
+          "evidence": "shared/resources/tests/finalise-diff.test.mjs:351",
+          "status": "PASS"
+        },
+        {
+          "member": "repo with no shared/resources/ -> all files",
+          "evidence": "shared/resources/tests/finalise-diff.test.mjs:429",
+          "status": "PASS"
+        },
+        {
+          "member": "path with space, quote or newline -> NUL-delimited names",
+          "evidence": "shared/resources/tests/finalise-diff.test.mjs:452",
+          "status": "PASS"
+        },
+        {
+          "member": "shared/resources file + bundled copy read by fix-evidence check 5",
+          "evidence": "shared/resources/tests/finalise-diff.test.mjs:351 (copy in names, not patch) + evals/shared/tests/finalise-dod-prompt-contract.test.mjs:1446 (prompt reads names)",
+          "status": "PASS"
+        },
+        {
+          "member": "base branch absent on remote -> unresolved with fetch reason",
+          "evidence": "shared/resources/tests/finalise-diff.test.mjs:472",
+          "status": "PASS"
+        },
+        {
+          "member": "gap body: current marker above heading not printed",
+          "evidence": "shared/resources/tests/finalise-gaps-path.test.mjs:904",
+          "status": "PASS"
+        },
+        {
+          "member": "gap body: each legacy marker not printed",
+          "evidence": "shared/resources/tests/finalise-gaps-path.test.mjs:904 (loops all 3 START_MARKERS; floor at :894)",
+          "status": "PASS"
+        },
+        {
+          "member": "gap body: fenced marker inside section printed",
+          "evidence": "shared/resources/tests/finalise-gaps-path.test.mjs:929",
+          "status": "PASS"
+        },
+        {
+          "member": "gap body: count of each document unchanged",
+          "evidence": "shared/resources/tests/finalise-gaps-path.test.mjs:904 and :929 (assert count '2')",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "The members are the 13 + 4 rows of § 8 (task file lines 309-330). Every row maps to a test that runs finalise-diff.sh or dod-gap-count.sh in bash and zsh. The check-5 row also relies on a prompt-contract test for the prompt half. Both suites run per PR in test.yml (`npm test` -> test:suite globs shared/resources/tests/*.test.mjs and evals/shared/tests/*.test.mjs; on pull_request with no path filter). Names list is non-empty (28 paths)."
+    },
+    {
+      "id": "#2",
+      "text_hash": "1ce7eac8aa0ef19b33c2a46323c0047e8d735ea0f957d5d51c287a330f87631b",
+      "status": "PASS",
+      "description": "No SKILL.md block runs git diff HEAD~1 HEAD",
+      "code_citation": "skills/finalise/SKILL.md:534",
+      "test_citation": "evals/shared/tests/finalise-dod-prompt-contract.test.mjs:1467",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Step 3a now calls finalise-diff.sh. grep finds 'HEAD~1' only in prose at SKILL.md:547, which describes the old fallback, not in a block. The test asserts doesNotMatch /git diff HEAD~1 HEAD/ over the whole SKILL.md. It runs in test.yml npm test."
+    },
+    {
+      "id": "#3",
+      "text_hash": "0d53c744dd190a0507c85f662f0095b86d98f4e18dec4e21c7924eace385d784",
+      "status": "PASS",
+      "description": "Step 3a writes a **PR diff:** line for merge-base, forge, unresolved",
+      "code_citation": "skills/finalise/SKILL.md:537",
+      "test_citation": "shared/resources/tests/finalise-diff.test.mjs:547",
+      "members": [],
+      "non_member_fail": null,
+      "note": "printf '**PR diff:** %s\\\\n' \\\"$DIFF_LINE\\\". The test pulls the Step 3a block out of SKILL.md and runs it in bash and zsh for all three sources. Per-PR via test.yml."
+    },
+    {
+      "id": "#4",
+      "text_hash": "9a4c1fcb631dc09e062af62853bed1a1c6569a49e2a0d6ff2bf73d2a2325507a",
+      "status": "PASS",
+      "description": "AC prompt fails a set criterion on an empty names list",
+      "code_citation": "shared/resources/finalise-dod-ac-prompt.md:61",
+      "test_citation": "evals/shared/tests/finalise-dod-prompt-contract.test.mjs:1431",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The quantifier rule lists the members from <DIFF_FILE>.names. An empty or missing list fails the criterion with 'the change could not be read'. The contract test pins both sentences and runs per PR via test.yml."
+    },
+    {
+      "id": "#5",
+      "text_hash": "5a375edaf19b3b7088b44728c200d0c20db09229d3c07a8e81cdbd404f51b733",
+      "status": "PASS",
+      "description": "Docs/fix-evidence prompts FAIL empty diff; check 5 reads .names",
+      "code_citation": "shared/resources/finalise-dod-docs-prompt.md:60-61; shared/resources/finalise-dod-fix-evidence-prompt.md:53-54, :74",
+      "test_citation": "evals/shared/tests/finalise-dod-prompt-contract.test.mjs:1407, :1446",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Both prompts say an empty or missing names list is `FAIL` with \\\"the change could not be read\\\", never PASS or NOT_APPLICABLE. Fix-evidence check 5 reads the copies from `<DIFF_FILE>.names`, not `<DIFF_FILE>`. Test :1407 pins the sentence in every diff-reading prompt and refuses NEEDS_MANUAL_REVIEW. Test :1446 pins check 5. Both run per PR."
+    },
+    {
+      "id": "#6",
+      "text_hash": "58a4fc0fa7916b328e32c071ad85be0d4ab89a78380e0478ce6b50ed8b8bc149",
+      "status": "PASS",
+      "description": "Performance not applicable: one git diff replaces one forge call",
+      "code_citation": "docs/tasks/task.321.finalise-diff-and-gap-body/task.321.finalise-diff-and-gap-body.md:361",
+      "test_citation": "NOT_APPLICABLE: no performance bound stated; the task states performance is not applicable (§ 8 Performance Tests, line 343)",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The criterion states no bound, only that one is not needed. The task says so at lines 343 and 361, and QA report 3 line 57 agrees ('no bound claimed'). Nothing here is left to measure or test."
+    },
+    {
+      "id": "#7",
+      "text_hash": "227328f9d84060718e9483f07b7066b1dd66b28556c3eb1e711403b40eef6a9a",
+      "status": "PASS",
+      "description": "Reverting each of three rules alone turns a named test red",
+      "code_citation": "docs/tasks/task.321.finalise-diff-and-gap-body/task.321.qa.1.finalise-diff-and-gap-body.md:90-92",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "exclusion rule",
+          "evidence": "task.321.qa.1...md:90 (false && git cat-file -e -> 'a bundled copy is excluded…' and 'every changed file is a bundled copy…' red in bash and zsh); re-run in task.321.qa.2...md:108",
+          "status": "PASS"
+        },
+        {
+          "member": "empty-result rule",
+          "evidence": "task.321.qa.1...md:91 (if false && [ ! -s \\\"$OUT\\\" ] -> 'every changed file is a bundled copy: unresolved…' red in bash and zsh); re-run in task.321.qa.2...md:109",
+          "status": "PASS"
+        },
+        {
+          "member": "marker rule",
+          "evidence": "task.321.qa.1...md:92 (0 && … in dod-gap-count.sh -> '--body stops at every start marker…' and '--body keeps a fenced marker…' red in bash and zsh); re-run in task.321.qa.2...md:110",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "The units are the three rules the criterion names. Each has a committed record of the revert and the named tests that went red. QA report 3 line 73 carries them forward, with the code lines unchanged since."
+    },
+    {
+      "id": "#8",
+      "text_hash": "dd27485753c55cd59698d99992ab4fafcbd2b7a7bc06fc826b8884122ebf8e18",
+      "status": "PASS",
+      "description": "npm run test:remote passes",
+      "code_citation": "docs/tasks/task.321.finalise-diff-and-gap-body/task.321.qa.3.finalise-diff-and-gap-body.md:59",
+      "test_citation": ".github/workflows/test.yml:57",
+      "members": [],
+      "non_member_fail": null,
+      "note": "test:remote runs ci:fast on the LAN server by default (scripts/remote-test/run.sh:112). QA report 3 records ci:fast at 391bd04e5: 9055 tests, 9052 pass, 0 fail, 3 skipped, rc 0. The same is in gate 3 line 39. `finalise-delta.js docs-only --base 391bd04e5 --head HEAD` gives tree-equivalent (exit 0): the only changes since are the 3 task docs. The same suite (npm test) runs per PR in test.yml. RERUN_AT_HEAD was none."
+    },
+    {
+      "id": "#9",
+      "text_hash": "14c1fda7501bc591cf6de98a1fde9399a9d4b5ea8156dba028cfceae33f31492",
+      "status": "PASS",
+      "description": "bundle:check passes; shellcheck passes on the new script",
+      "code_citation": "docs/tasks/task.321.finalise-diff-and-gap-body/task.321.qa.3.finalise-diff-and-gap-body.md:60",
+      "test_citation": ".github/workflows/validate.yml:128; .github/workflows/shellcheck.yml:59",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Re-run read-only at head 19c106141: `npm run bundle:check` printed '129 skill(s) checked, 0 problems' (rc 0). `bash scripts/lint-shell.sh` printed 'shellcheck: clean' (rc 0; it runs --severity=warning over the sources, finalise-diff.sh included). validate.yml (path-filtered to skills/** and shared/resources/**, both touched) and shellcheck.yml run per PR. Bare `shellcheck` without a severity reports one info-level SC1091 on the `. \\\"$HERE/pr-read.sh\\\"` source line; the project lane does not count info."
+    },
+    {
+      "id": "#10",
+      "text_hash": "8985033ad1dbc8329372013ef2c6a753cd0f3cd55d4b7542e212eafcedf91b87",
+      "status": "PASS",
+      "description": "npm run validate -- skills/finalise/ passes",
+      "code_citation": "docs/tasks/task.321.finalise-diff-and-gap-body/task.321.qa.3.finalise-diff-and-gap-body.md:61",
+      "test_citation": ".github/workflows/validate.yml:73",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Re-run read-only at head: `npm run validate -- skills/finalise/` printed '✓ finalise'. validate.yml runs quick_validate.py per skill on this PR (it touches skills/**)."
+    },
+    {
+      "id": "#11",
+      "text_hash": "dcc1660020d983a29e6c3acc4c90629ab44220a2daba5f6ed444d383a2b88898",
+      "status": "PASS",
+      "description": "CHANGELOG [Unreleased] names the change",
+      "code_citation": "CHANGELOG.md:126",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "CHANGELOG.md:126 is under `## [Unreleased]` (line 5; the next header is v0.69.0 at line 166). It reads '`/finalise` judges the PR's whole change, or says it could not read it (task 321)' and goes on to describe finalise-diff.sh, the names list, `unresolved` and `<DIFF_LINE>`, which names the change. The repo has no corpus guard that pins this entry."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#9",
+      "note": "`shellcheck shared/resources/finalise-diff.sh` with default severity exits 1 on SC1091 (info) at line 94, the `. \\\"$HERE/pr-read.sh\\\"` source line. The project lane (scripts/lint-shell.sh, --severity=warning) is clean, so this does not fail the criterion."
+    }
+  ]
+}

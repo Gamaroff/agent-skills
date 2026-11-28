@@ -1,0 +1,108 @@
+[
+  {
+    "id": "current-marker-not-printed",
+    "sink": "markdown-structure",
+    "input": "gaps.md",
+    "direction": "legitimate",
+    "why": "The current change-log start marker stands directly above ## Change Log; a section bounded only at the next ## heading took it as its last line and put it into the PR comment.",
+    "correct": "Exit 0; the body ends at the marker, and the marker is not printed.",
+    "spec_ref": "docs/tasks/task.321.finalise-diff-and-gap-body/task.321.finalise-diff-and-gap-body.md:327",
+    "fixture": {
+      "files": {
+        "gaps.md": "# T\n\n## Definition of Done - Gaps Identified\n\n### Missing Criteria\n\n- gap one\n\n<!-- change-log-start -->\n## Change Log\n\n| a |\n<!-- change-log-end -->\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "\n### Missing Criteria\n\n- gap one\n"
+    }
+  },
+  {
+    "id": "legacy-jira-marker-not-printed",
+    "sink": "markdown-structure",
+    "input": "gaps.md",
+    "direction": "legitimate",
+    "why": "The legacy jira-sync change-log marker must end the section the same way as the current one.",
+    "correct": "Exit 0; the jira-sync marker is not printed.",
+    "spec_ref": "docs/tasks/task.321.finalise-diff-and-gap-body/task.321.finalise-diff-and-gap-body.md:328",
+    "fixture": {
+      "files": {
+        "gaps.md": "# T\n\n## Definition of Done - Gaps Identified\n\n### Missing Criteria\n\n- gap one\n\n<!-- jira-sync-changelog-start -->\n## Change Log\n\n| a |\n<!-- jira-sync-changelog-end -->\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "\n### Missing Criteria\n\n- gap one\n"
+    }
+  },
+  {
+    "id": "legacy-github-marker-not-printed",
+    "sink": "markdown-structure",
+    "input": "gaps.md",
+    "direction": "legitimate",
+    "why": "The legacy github-sync change-log marker must end the section the same way as the current one.",
+    "correct": "Exit 0; the github-sync marker is not printed.",
+    "spec_ref": "docs/tasks/task.321.finalise-diff-and-gap-body/task.321.finalise-diff-and-gap-body.md:328",
+    "fixture": {
+      "files": {
+        "gaps.md": "# T\n\n## Definition of Done - Gaps Identified\n\n### Missing Criteria\n\n- gap one\n\n<!-- github-sync-changelog-start -->\n## Change Log\n\n| a |\n<!-- github-sync-changelog-end -->\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "\n### Missing Criteria\n\n- gap one\n"
+    }
+  },
+  {
+    "id": "fenced-marker-kept",
+    "sink": "markdown-structure",
+    "input": "gaps.md",
+    "direction": "legitimate",
+    "why": "A marker inside a fenced example is content, not structure; ending the section there would cut the report short.",
+    "correct": "Exit 0; the fenced marker is printed, and the section ends at the unfenced marker after it.",
+    "spec_ref": "docs/tasks/task.321.finalise-diff-and-gap-body/task.321.finalise-diff-and-gap-body.md:329",
+    "fixture": {
+      "files": {
+        "gaps.md": "# T\n\n## Definition of Done - Gaps Identified\n\n### Missing Criteria\n\n- gap one\n\n```text\n<!-- change-log-start -->\n```\n\n<!-- change-log-start -->\n## Change Log\n<!-- change-log-end -->\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "\n### Missing Criteria\n\n- gap one\n\n```text\n<!-- change-log-start -->\n```\n"
+    }
+  },
+  {
+    "id": "marker-only-section-refused",
+    "sink": "markdown-structure",
+    "input": "gaps.md",
+    "direction": "hostile",
+    "why": "A gaps section whose only line was the marker used to print the marker as the whole PR comment body; with the marker now ending the section, the body is empty.",
+    "correct": "Refused: --body HALTs with exit 1 on a section with no non-blank line.",
+    "spec_ref": "shared/resources/dod-gap-count.sh:59",
+    "fixture": {
+      "files": {
+        "gaps.md": "# T\n\n## Definition of Done - Gaps Identified\n\n<!-- change-log-start -->\n## Change Log\n<!-- change-log-end -->\n"
+      }
+    },
+    "expected": {
+      "exit": 1
+    }
+  },
+  {
+    "id": "no-current-section-refused",
+    "sink": "markdown-structure",
+    "input": "gaps.md",
+    "direction": "hostile",
+    "why": "A document with no current gaps section must not yield a body.",
+    "correct": "Refused: HALT, exit 1.",
+    "spec_ref": "shared/resources/dod-gap-count.sh:59",
+    "fixture": {
+      "files": {
+        "gaps.md": "# T\n\n<!-- change-log-start -->\n## Change Log\n<!-- change-log-end -->\n"
+      }
+    },
+    "expected": {
+      "exit": 1
+    }
+  }
+]
