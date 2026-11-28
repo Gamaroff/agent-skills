@@ -18,11 +18,12 @@
  *                carry every other verdict). Every doubt fails toward `full`.
  *   merge      — enforce the scope on the agent's YAML: restore every carried verdict
  *                whatever the agent said, send a differing verdict to `advisories[]`,
- *                recompute `overall`, and build this run's record. A result whose
- *                `story_file` names another document than the scope's is refused
- *                (`result-document-mismatch`, nothing written; task 331). With `--doc`,
- *                a scope that is not that document's is refused first
- *                (`scope-document-mismatch`, nothing written; task 331, T331-CR-1).
+ *                recompute `overall`, and build this run's record. `--doc` is required.
+ *                Each refusal below writes nothing: a scope with no document
+ *                (`scope-document-missing`, task 332) or another document's
+ *                (`scope-document-mismatch`, task 331), then a result that names no
+ *                document (`result-document-unnamed`, task 332), a file that does not
+ *                exist, or another document (`result-document-mismatch`, task 331).
  *   resolve-ci — at Step 6, grade every `DEFERRED-CI` criterion from CI reading 1
  *                (SUCCESS → PASS, FAILURE → FAIL, anything else stays deferred),
  *                rewrite the merged result and the record, and return the
@@ -720,28 +721,43 @@ function mergeReportedGap(r, agentAc, io, advisories) {
 }
 
 /**
- * Enforce a scope on the AC agent's YAML.
- *
- * @param {object} s           the `scope` result
- * @param {string} agentYaml   the AC agent's raw YAML
- * @param {object} opts        { dodN, document }
- * @param {object} io          { tracked } — the CLI passes gitIo(cwd)
+ * Read the AC agent's YAML the one way both the CLI checks and `merge()` read it. `ok: false` is
+ * every answer `merge()` reports as `result-unparseable`: a parse that throws, and a parse that
+ * holds no `ac_traceability.acs` list — `parseYamlSubset` returns `{}` for plain prose rather than
+ * throwing (task 332). The CLI's document checks run only on `ok: true`, so they can never make
+ * `result-unparseable` unreachable.
  */
-/**
- * The document the agent's answer says it is for: `ac_traceability.story_file`, read with the same
- * parser and the same root `merge()` uses. `null` when absent, empty or unparseable — an unparseable
- * answer is `merge()`'s to report, not this check's (task 331).
- */
-function storyFileOf(agentYaml) {
+function readAnswer(agentYaml) {
   let parsed;
   try {
     parsed = parseYamlSubset(String(agentYaml));
-  } catch {
-    return null;
+  } catch (err) {
+    return { ok: false, message: String(err && err.message) };
   }
   const ac = parsed && (parsed.ac_traceability ?? parsed);
-  const named = ac && typeof ac === "object" ? ac.story_file : null;
-  return typeof named === "string" && named.trim() !== "" ? named.trim() : null;
+  if (!ac || typeof ac !== "object" || !Array.isArray(ac.acs))
+    return {
+      ok: false,
+      message: "no ac_traceability.acs list in the agent's output",
+    };
+  return { ok: true, parsed, ac };
+}
+
+/**
+ * The document an accepted answer says it is for: `ac_traceability.story_file`, then a root
+ * `story_file` beside an `ac_traceability` block (task 332, G1-3). `null` when neither is a
+ * non-empty string.
+ */
+function storyFileOf(answer) {
+  const pick = (v) =>
+    typeof v === "string" && v.trim() !== "" ? v.trim() : null;
+  const named = pick(answer.ac.story_file);
+  if (named !== null) return named;
+  return answer.ac !== answer.parsed &&
+    answer.parsed &&
+    typeof answer.parsed === "object"
+    ? pick(answer.parsed.story_file)
+    : null;
 }
 
 /**
@@ -760,27 +776,25 @@ function sameDocument(cwd, a, b) {
   }
 }
 
+/**
+ * Enforce a scope on the AC agent's YAML.
+ *
+ * @param {object} s           the `scope` result
+ * @param {string} agentYaml   the AC agent's raw YAML
+ * @param {object} opts        { dodN, document }
+ * @param {object} io          { tracked } — the CLI passes gitIo(cwd)
+ */
 function merge(s, agentYaml, opts, io) {
-  let parsed;
-  try {
-    parsed = parseYamlSubset(String(agentYaml));
-  } catch (err) {
+  const answer = readAnswer(agentYaml);
+  if (!answer.ok) {
     return {
       reason: "result-unparseable",
       exitCode: 0,
       mode: s.mode,
-      message: String(err && err.message),
+      message: answer.message,
     };
   }
-  const ac = parsed && (parsed.ac_traceability ?? parsed);
-  if (!ac || typeof ac !== "object" || !Array.isArray(ac.acs)) {
-    return {
-      reason: "result-unparseable",
-      exitCode: 0,
-      mode: s.mode,
-      message: "no ac_traceability.acs list in the agent's output",
-    };
-  }
+  const { ac } = answer;
   const docs = Array.isArray(ac.docs) ? ac.docs : [];
   const advisories = (Array.isArray(ac.advisories) ? ac.advisories : []).filter(
     (a) => a && typeof a === "object",
@@ -1035,7 +1049,7 @@ const USAGE = [
   "usage:",
   "  finalise-rerun-scope.js scope --doc <document> --head <rev> [--prior <record.ac.json>] [--rerun-at-head <run.json|none>] [--json]",
   "  finalise-rerun-scope.js extract (--agent-id <id> | --transcript <file>) --out <path> [--block <info-string>] [--projects-root <dir>] [--json]",
-  "  finalise-rerun-scope.js merge --scope <scope.json> --result <agent.yaml> [--doc <document>] [--sha256 <hex>] [--dod-n <N>] [--record-out <path>] [--json]",
+  "  finalise-rerun-scope.js merge --scope <scope.json> --result <agent.yaml> --doc <document> [--sha256 <hex>] [--dod-n <N>] [--record-out <path>] [--json]",
   "  finalise-rerun-scope.js resolve-ci --merged <merged.json> --rollup <CI_ROLLUP> [--ci-head <sha>] [--tree-eq <sha>] [--record <record.ac.json>] [--json]",
 ].join("\n");
 
@@ -1210,21 +1224,28 @@ function main(argv) {
       return usage(opts.json, "--dod-n must be a number");
     if (opts.sha256 !== undefined && !/^[0-9a-f]{64}$/.test(opts.sha256))
       return usage(opts.json, "--sha256 must be 64 lowercase hex digits");
-    if (opts.doc !== undefined && opts.doc === "")
-      return usage(opts.json, "--doc must name the document this merge is for");
-    // The scope must be THIS document's. The scope file is keyed by run number alone, so another
-    // work item finalised in the same checkout can overwrite it. Merged, its criteria and carried
-    // verdicts would become this item's record; and a result naming this document would be refused
-    // as another document's answer, which no re-extract can clear (task 331, T331-CR-1).
-    if (
-      opts.doc !== undefined &&
-      !(s.document && sameDocument(cwd, opts.doc, s.document))
-    )
+    // --doc is required: an optional check is one a caller skips by leaving it out (task 332, S2).
+    if (opts.doc === undefined || opts.doc === "")
+      return usage(
+        opts.json,
+        "merge needs --doc: the document this merge is for",
+      );
+    // The scope must be THIS document's. Merged, another document's criteria and carried verdicts
+    // would become this item's record (task 331, T331-CR-1). A scope with no document predates
+    // task 331 and is its own refusal, with its own remedy (task 332, G3-2).
+    if (!s.document)
+      return emit(opts.json, {
+        reason: "scope-document-missing",
+        exitCode: 0,
+        mode: s.mode,
+        message: `--scope has no document: it predates task 331 — re-run Step 3a`,
+      });
+    if (!sameDocument(cwd, opts.doc, s.document))
       return emit(opts.json, {
         reason: "scope-document-mismatch",
         exitCode: 0,
         mode: s.mode,
-        message: `--scope is the re-run scope of ${s.document || "no document"}, not ${opts.doc}`,
+        message: `--scope is the re-run scope of ${s.document}, not ${opts.doc}`,
       });
     // The file the merge reads must be the file `extract` wrote. A different hash is a refusal that
     // writes nothing, so a file edited between the two steps never becomes the acceptance record.
@@ -1238,15 +1259,36 @@ function main(argv) {
       });
     // The file must be an answer for THIS document. A result another work item left in
     // .claude/state is refused and writes nothing, so its verdicts never become this item's record
-    // (task 331). A result that names no document merges as before: only a known-wrong one is refused.
-    const named = storyFileOf(agentYaml);
-    if (named && s.document && !sameDocument(cwd, named, s.document))
-      return emit(opts.json, {
-        reason: "result-document-mismatch",
-        exitCode: 0,
-        mode: s.mode,
-        message: `--result is for ${named}, not ${s.document}: it is another document's answer`,
-      });
+    // (task 331). It must name its document: the AC prompt always asks for story_file, so an answer
+    // without one is incomplete, and merging it would leave only the optional --sha256 to guard it
+    // (task 332, S1). An answer merge() cannot read skips these checks and is merge()'s to report
+    // as result-unparseable.
+    const answer = readAnswer(agentYaml);
+    if (answer.ok) {
+      const named = storyFileOf(answer);
+      if (named === null)
+        return emit(opts.json, {
+          reason: "result-document-unnamed",
+          exitCode: 0,
+          mode: s.mode,
+          message:
+            "--result names no document (ac_traceability.story_file is missing): it is not a complete AC answer",
+        });
+      if (!fs.existsSync(path.resolve(cwd, named)))
+        return emit(opts.json, {
+          reason: "result-document-mismatch",
+          exitCode: 0,
+          mode: s.mode,
+          message: `--result names ${named}, which does not exist: the answer's story_file is wrong — it must be the exact document path`,
+        });
+      if (!sameDocument(cwd, named, s.document))
+        return emit(opts.json, {
+          reason: "result-document-mismatch",
+          exitCode: 0,
+          mode: s.mode,
+          message: `--result is for ${named}, not ${s.document}: it is another document's answer`,
+        });
+    }
     const r = merge(
       s,
       agentYaml,

@@ -1,0 +1,86 @@
+schema: 2
+task: 'task.332.ac-merge-closes-task-331-follow-ups'
+task_title: "The AC merge closes task 331's follow-ups"
+gate: CONCERNS
+status_reason: 'All four phases are delivered and tested, but two refusal remedies cannot be cleared when the AC agent itself wrote the wrong or no story_file (reproduced by QA), and the CHANGELOG entry does not cite the task on one line, so /finalise 6d would HALT.'
+reviewer: 'QA Engineer'
+head: '239beaaedda85e6ef8585c0f5a26ea800925b550'
+updated: '2026-11-27T22:11:55Z'
+
+top_issues:
+  - id: 'T332-QA-1'
+    severity: medium
+    file: 'CHANGELOG.md'
+    finding: 'changelog-cites.sh answers "missing (task 332)": the entry wraps "(task" and "332)" onto two lines (CHANGELOG.md:20-21), so the one-line citation check cannot see it and /finalise 6d HALTs. The same entry claims "no state file of the AC merge is shared by two items", which CR-3 shows is not true of finalise-rerun-at-head-${DOD_N}.'
+    suggested_action: 'Rewrap so "(task 332)" sits on one line, and narrow the claim to the scope and extract files (or stem-key rerun-at-head too).'
+    suggested_owner: dev
+    status: open
+  - id: 'T332-CR-1'
+    severity: medium
+    file: 'shared/resources/finalise-rerun-scope.js'
+    finding: 'A story_file naming a file that does not exist (e.g. the basename task.9.demo.md) answers result-document-mismatch, the same reason as a real other document''s answer, and Step 3c''s arm for it (SKILL.md:1080) offers only re-extract or a hand copy, both of which reproduce the agent''s own wrong story_file, so the HALT cannot be cleared. Origin: code-review, reproduced by QA.'
+    suggested_action: 'Give the nonexistent-file case its own reason and Step 3c arm whose remedy is to re-run the AC agent with the exact <STORY_FILE> path, held by a unit test and a blocks-test case.'
+    suggested_owner: dev
+    status: open
+  - id: 'T332-CR-2'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'result-document-unnamed is reached both by a truncated hand copy and by an AC agent whose own answer omits story_file, but the Step 3c remedy (SKILL.md:1078) covers only the first; when the agent omitted it, re-extracting or hand-copying its full answer reproduces the refusal. Origin: code-review, reproduced by QA.'
+    suggested_action: 'Name re-running the AC agent in the result-document-unnamed remedy for the case where the agent''s own answer lacks story_file, and hold the wording in the blocks test.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 70
+
+evidence:
+  tests_reviewed: 96
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [2, 3, 4]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary: internal
+    internal_reason: 'shared/resources/finalise-rerun-scope.js#sameDocument and the new merge-CLI refusals (unnamed, nonexistent, scope-document-missing, required --doc) read only the AC agent YAML /finalise extracts from its own subagent transcript, the scope JSON Step 3a wrote, and the --doc path Step 3c substitutes. No corpus sink models those inputs; the refusals all exit 0 with a reason, so the cli: form has no exit-status verdict to score. Same decision as task 331 gate 4.'
+    notes: 'The change tightens the merge: every new branch refuses and writes nothing. No new input reaches the filesystem beyond an existsSync on the named path.'
+  performance:
+    status: PASS
+    notes: 'One extra existsSync and a second YAML parse per merge (CR-4, advisory).'
+  reliability:
+    status: CONCERNS
+    notes: 'T332-CR-1 and T332-CR-2: two HALT remedies cannot be cleared when the AC agent is the source of the bad story_file.'
+  maintainability:
+    status: PASS
+    notes: 'One shared readAnswer predicate; tests hold each refusal; 7 mutations proved.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Fix T332-QA-1, T332-CR-1 and T332-CR-2.'
+      refs: ['CHANGELOG.md', 'shared/resources/finalise-rerun-scope.js', 'skills/finalise/SKILL.md']
+  future:
+    - action: 'CR-3 (pre-existing, out of scope): finalise-rerun-at-head-${DOD_N}.json and .d (SKILL.md:600-605, 641) are still keyed by DOD_N alone, so two items finalised in one checkout share them. Identical on origin/develop. Follow-up: stem-key them after enumerating every .claude/state/*-${DOD_N} path.'
+      refs: ['skills/finalise/SKILL.md']
+      provenance: pre-existing
+      remedy: unverified
+    - action: 'CR-4 (cleanup): the merge CLI parses the agent YAML with readAnswer and merge() parses it again; pass the read answer in.'
+      refs: ['shared/resources/finalise-rerun-scope.js']
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T332-QA-1, T332-CR-1, T332-CR-2 fixed']

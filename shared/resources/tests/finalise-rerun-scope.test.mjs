@@ -15,6 +15,7 @@ import {
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
   existsSync,
 } from "node:fs";
@@ -1708,15 +1709,24 @@ test("scope → merge → scope: a cited file the agents read uncommitted, then 
 
 // ── merge ─────────────────────────────────────────────────────────────────
 
-function agentYaml(acs, { docs = "  docs: []", overall = "PASS" } = {}) {
+function agentYaml(
+  acs,
+  { docs = "  docs: []", overall = "PASS", storyFile } = {},
+) {
   const body = acs
     .map(
       (a) =>
         `    - ac_id: "${a.id}"\n      status: ${a.status}\n      code_citation: ${a.code ?? '"src/a.js:1"'}\n      test_citation: ${a.test ?? '"tests/a.test.mjs:1"'}\n      note: "${a.note ?? ""}"`,
     )
     .join("\n");
-  return `ac_traceability:\n  acs:\n${body}\n${docs}\n  overall: ${overall}\n`;
+  // The CLI's merge refuses an answer that names no document (task 332); the library merge()
+  // does not read story_file, so only CLI cases pass one.
+  const named = storyFile ? `  story_file: "${storyFile}"\n` : "";
+  return `ac_traceability:\n${named}  acs:\n${body}\n${docs}\n  overall: ${overall}\n`;
 }
+
+// A scope as the CLI's `scope --doc` writes it: with its document (task 331, 332).
+const docScope = (dir) => ({ ...scopeAt(dir, null), document: DOC });
 
 function scopedAllPass() {
   const dir = mkRepo();
@@ -1860,10 +1870,11 @@ test("computeOverall: PASS, PARTIAL and FAIL", () => {
 test("merge: unparseable output writes no record (CLI)", () => {
   const dir = mkRepo();
   try {
-    writeFileSync(
-      join(dir, "scope.json"),
-      JSON.stringify({ ...scopeAt(dir, null) }),
-    );
+    writeFileSync(join(dir, "scope.json"), JSON.stringify(docScope(dir)));
+    // Prose, not YAML. The parser returns {} for it rather than throwing, so this is the case that
+    // holds the order: the document checks run only on an answer merge() can read (task 332).
+    // Mutation target: checking story_file on every parsed result turns this into
+    // result-document-unnamed. It names no document on purpose — leave it so.
     writeFileSync(
       join(dir, "agent.yaml"),
       "this is not the YAML you asked for\n",
@@ -1875,6 +1886,8 @@ test("merge: unparseable output writes no record (CLI)", () => {
       "scope.json",
       "--result",
       "agent.yaml",
+      "--doc",
+      DOC,
       "--dod-n",
       "1",
       "--record-out",
@@ -1889,6 +1902,7 @@ test("merge: unparseable output writes no record (CLI)", () => {
       join(dir, "agent.yaml"),
       agentYaml(
         ["SC-1", "SC-2", "SC-3", "SC-4"].map((id) => ({ id, status: "PASS" })),
+        { storyFile: DOC },
       ),
     );
     const ok = cli(dir, [
@@ -1897,6 +1911,8 @@ test("merge: unparseable output writes no record (CLI)", () => {
       "scope.json",
       "--result",
       "agent.yaml",
+      "--doc",
+      DOC,
       "--dod-n",
       "1",
       "--record-out",
@@ -1947,6 +1963,7 @@ function ac4() {
       status: "PASS",
       note: `a long note for ${id}, which a hand copy would shorten`,
     })),
+    { storyFile: DOC },
   );
 }
 
@@ -1974,7 +1991,7 @@ test("extract: the AC block is written byte for byte, its hash recorded, and a c
     // The extracted file is the agent's block exactly (the fence's own line break is not part of it).
     assert.equal(readFileSync(join(dir, "ac.yaml"), "utf8"), yaml);
     assert.equal(e.bytes, Buffer.byteLength(yaml));
-    writeFileSync(join(dir, "scope.json"), JSON.stringify(scopeAt(dir, null)));
+    writeFileSync(join(dir, "scope.json"), JSON.stringify(docScope(dir)));
     const rec = "docs/tasks/task.9.demo/task.9.dod.1.ac.json";
     const merge = (sha) =>
       JSON.parse(
@@ -1984,6 +2001,8 @@ test("extract: the AC block is written byte for byte, its hash recorded, and a c
           "scope.json",
           "--result",
           "ac.yaml",
+          "--doc",
+          DOC,
           ...(sha ? ["--sha256", sha] : []),
           "--dod-n",
           "1",
@@ -2002,6 +2021,8 @@ test("extract: the AC block is written byte for byte, its hash recorded, and a c
         "scope.json",
         "--result",
         "tampered.yaml",
+        "--doc",
+        DOC,
         "--sha256",
         e.sha256,
         "--dod-n",
@@ -2088,7 +2109,7 @@ test("extract: a SubagentHandback reply is extracted, and merge with its sha256 
     assert.equal(e.reason, "extracted");
     assert.equal(e.reply, "handback");
     assert.equal(readFileSync(join(dir, "ac.yaml"), "utf8"), yaml);
-    writeFileSync(join(dir, "scope.json"), JSON.stringify(scopeAt(dir, null)));
+    writeFileSync(join(dir, "scope.json"), JSON.stringify(docScope(dir)));
     const rec = "docs/tasks/task.9.demo/task.9.dod.1.ac.json";
     const ok = JSON.parse(
       cli(dir, [
@@ -2097,6 +2118,8 @@ test("extract: a SubagentHandback reply is extracted, and merge with its sha256 
         "scope.json",
         "--result",
         "ac.yaml",
+        "--doc",
+        DOC,
         "--sha256",
         e.sha256,
         "--dod-n",
@@ -2275,12 +2298,19 @@ const agentDoc = (entries) =>
 const acOf = (merged, id) =>
   merged.ac_result.ac_traceability.acs.find((x) => x.ac_id === id);
 
-// ── merge refuses another document's result (task 331) ─────────────────────
-// A result whose story_file names another document is refused, and writes nothing; the same
-// document named absolutely, or no story_file at all, merges as before; the hash is checked first.
-function mergeDocCase(storyFile, { sha256, scopeDoc = DOC, doc } = {}) {
-  const dir = mkRepo();
+// ── merge refuses another document's result (task 331, 332) ────────────────
+// A result whose story_file names another document, names a file that does not exist, or names no
+// document is refused, and writes nothing; the same document named absolutely or through a symlink
+// merges; the hash is checked first. --doc defaults to this document (it is required, task 332);
+// `doc: null` leaves it out. OTHER exists in the repository, so "another document" is a real one.
+const OTHER = "docs/tasks/task.8.other/task.8.other.md";
+function mergeDocCase(
+  storyFile,
+  { sha256, scopeDoc = DOC, doc = DOC, rootStoryFile, setup } = {},
+) {
+  const dir = mkRepo({ [OTHER]: "# task 8\n" });
   try {
+    if (setup) setup(dir);
     const entries = ["SC-1", "SC-2", "SC-3", "SC-4"].map((id) =>
       acEntry(id, "PASS"),
     );
@@ -2293,6 +2323,8 @@ function mergeDocCase(storyFile, { sha256, scopeDoc = DOC, doc } = {}) {
         ? ""
         : `  story_file: "${typeof storyFile === "function" ? storyFile(dir) : storyFile}"\n`,
     );
+    if (rootStoryFile !== undefined)
+      yaml = `story_file: "${rootStoryFile}"\n` + yaml;
     writeFileSync(join(dir, "ac.yaml"), yaml);
     writeFileSync(
       join(dir, "scope.json"),
@@ -2306,7 +2338,7 @@ function mergeDocCase(storyFile, { sha256, scopeDoc = DOC, doc } = {}) {
       "--result",
       "ac.yaml",
       ...(sha256 ? ["--sha256", sha256] : []),
-      ...(doc === undefined
+      ...(doc === null
         ? []
         : ["--doc", typeof doc === "function" ? doc(dir) : doc]),
       "--dod-n",
@@ -2344,10 +2376,15 @@ test("merge: story_file naming the same document by absolute path merges (CLI, t
   assert.equal(m.recorded, true);
 });
 
-test("merge: a result with no story_file merges as before (CLI, task 331)", () => {
+test("merge: a result with no story_file is refused as result-document-unnamed and nothing is recorded (CLI, task 332)", () => {
+  // Reverses task 331's "merges as before". Mutation target: the refusal. Without it this answer
+  // merges, guarded only by the optional --sha256 (S1).
   const m = mergeDocCase(null);
-  assert.equal(m.out.reason, "merged");
-  assert.equal(m.recorded, true);
+  assert.equal(m.status, 0);
+  assert.equal(m.out.reason, "result-document-unnamed");
+  assert.equal(m.out.exitCode, 0);
+  assert.match(m.out.message, /names no document/);
+  assert.equal(m.recorded, false, "nothing is recorded");
 });
 
 test("merge: a mismatched story_file and a wrong --sha256 answer result-hash-mismatch — the hash is checked first (CLI, task 331)", () => {
@@ -2356,6 +2393,52 @@ test("merge: a mismatched story_file and a wrong --sha256 answer result-hash-mis
   });
   assert.equal(m.out.reason, "result-hash-mismatch");
   assert.equal(m.recorded, false);
+});
+
+test("merge: a result naming no document and a wrong --sha256 answer result-hash-mismatch — the hash is still checked first (CLI, task 332)", () => {
+  const m = mergeDocCase(null, { sha256: "0".repeat(64) });
+  assert.equal(m.out.reason, "result-hash-mismatch");
+  assert.equal(m.recorded, false);
+});
+
+test("merge with no --doc is a usage error, exit 2, and nothing is recorded (CLI, task 332)", () => {
+  // Mutation target: --doc made optional again. Without --doc the scope check is skipped (S2).
+  const m = mergeDocCase(DOC, { doc: null });
+  assert.equal(m.status, 2);
+  assert.equal(m.out.reason, "usage");
+  assert.match(m.out.message, /--doc/);
+  assert.equal(m.recorded, false);
+});
+
+test("merge: a root story_file beside an ac_traceability block that lacks one is checked (CLI, task 332)", () => {
+  // Mutation target: the root fallback in storyFileOf. Without it both answers read as naming no
+  // document: the first is refused as unnamed instead of merging, the second as unnamed instead
+  // of as another document's answer.
+  const same = mergeDocCase(null, { rootStoryFile: DOC });
+  assert.equal(same.out.reason, "merged");
+  assert.equal(same.recorded, true);
+  const other = mergeDocCase(null, { rootStoryFile: OTHER });
+  assert.equal(other.out.reason, "result-document-mismatch");
+  assert.match(other.out.message, /another document's answer/);
+  assert.equal(other.recorded, false);
+});
+
+test("merge: a story_file naming a file that does not exist is refused, and the message says so (CLI, task 332)", () => {
+  const m = mergeDocCase("docs/tasks/task.9.x/nope.md");
+  assert.equal(m.out.reason, "result-document-mismatch");
+  assert.match(m.out.message, /nope\.md, which does not exist/);
+  assert.doesNotMatch(m.out.message, /another document's answer/);
+  assert.equal(m.recorded, false);
+});
+
+test("merge: story_file naming the document through a symlink merges (CLI, task 332)", () => {
+  // Mutation target: the realpath branch of sameDocument. Without it the two spellings resolve
+  // to different paths and this correct answer is refused as another document's.
+  const m = mergeDocCase("link.md", {
+    setup: (dir) => symlinkSync(join(dir, DOC), join(dir, "link.md")),
+  });
+  assert.equal(m.out.reason, "merged");
+  assert.equal(m.recorded, true);
 });
 
 test("merge --doc: another document's scope is refused although the result names no document — nothing is recorded (CLI, T331-CR-1)", () => {
@@ -2382,12 +2465,21 @@ test("merge --doc: a stale scope is named as the scope, not as this item's corre
   assert.equal(m.recorded, false);
 });
 
-test("merge --doc: must differ — task.91's scope is not task.9's, and a scope with no document is refused (CLI, T331-CR-1)", () => {
-  for (const scopeDoc of ["docs/tasks/task.91.demo/task.91.demo.md", null]) {
-    const m = mergeDocCase(null, { scopeDoc, doc: DOC });
-    assert.equal(m.out.reason, "scope-document-mismatch", String(scopeDoc));
-    assert.equal(m.recorded, false, String(scopeDoc));
-  }
+test("merge --doc: must differ — task.91's scope is not task.9's (CLI, T331-CR-1)", () => {
+  const m = mergeDocCase(DOC, {
+    scopeDoc: "docs/tasks/task.91.demo/task.91.demo.md",
+  });
+  assert.equal(m.out.reason, "scope-document-mismatch");
+  assert.equal(m.recorded, false);
+});
+
+test("merge --doc: a scope with no document is scope-document-missing, not another document's scope (CLI, task 332)", () => {
+  // Mutation target: folding scope-document-missing back into scope-document-mismatch (G3-2).
+  const m = mergeDocCase(DOC, { scopeDoc: null });
+  assert.equal(m.status, 0);
+  assert.equal(m.out.reason, "scope-document-missing");
+  assert.match(m.out.message, /re-run Step 3a/);
+  assert.equal(m.recorded, false);
 });
 
 test("merge --doc: must match — the same document by absolute path merges (CLI, T331-CR-1)", () => {
