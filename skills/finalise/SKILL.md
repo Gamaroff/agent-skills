@@ -589,20 +589,25 @@ criterion carries it as a code span; every other criterion keeps its own rule. E
 ```bash
 # RUN BACKGROUNDED (run_in_background): a listed command may be a full suite. The whole run is bounded
 # to 25 minutes (--timeout-seconds 1500, the engine's default), inside the 30-minute wait it marks.
-# INPUTS, substituted into THIS block: {document-path}, and DOD_N as Step 0 bound it.
+# INPUTS, substituted into THIS block: {document-path}, and STEM and DOD_N as Step 0 bound them.
 DOC_PATH="{document-path}"
+STEM="{story.{P}.{E}.{S} | task.{id}}"
 DOD_N="{Step 0's DOD_N}"
-case "$DOC_PATH$DOD_N" in *'{'*) echo "HALT: DOC_PATH and DOD_N must be substituted into this block (an unsubstituted placeholder found)"; exit 1 ;; esac
+case "$DOC_PATH$STEM$DOD_N" in *'{'*) echo "HALT: DOC_PATH, STEM and DOD_N must be substituted into this block (an unsubstituted placeholder found)"; exit 1 ;; esac
+[ -n "$STEM" ] || { echo "HALT: STEM is empty — substitute the work item's filename stem"; exit 1; }
 case "$DOD_N" in ''|*[!0-9]*) echo "HALT: DOD_N ('$DOD_N') is not Step 0's run number"; exit 1 ;; esac
 mkdir -p .claude/state
+# Stem-keyed, like the scope, extract, result and merged files: two items on one run number in one
+# checkout never share a record (task 333, gate 3 CR-3).
+RERUN_AT_HEAD_FILE=".claude/state/finalise-rerun-at-head-${STEM}-${DOD_N}.json"
 bash .agents/skills/finalise/references/set-waiting-on.sh "step-7 re-run at head" --kind task --budget-minutes 30
 command node .agents/skills/finalise/references/finalise-rerun-at-head.js \
-  --doc "$DOC_PATH" --out-dir ".claude/state/finalise-rerun-at-head-${DOD_N}" --json \
-  > ".claude/state/finalise-rerun-at-head-${DOD_N}.json"
+  --doc "$DOC_PATH" --out-dir ".claude/state/finalise-rerun-at-head-${STEM}-${DOD_N}" --json \
+  > "$RERUN_AT_HEAD_FILE"
 RERUN_EXIT=$?
 bash .agents/skills/finalise/references/set-waiting-on.sh --clear
 jq -r '"re-run at head: \(.reason)\(if .message then " — " + .message else "" end)", (.runs[] | "  \(.command) -> \(if .not_started then "not started" elif .timed_out then "timed out" elif .exit_code == null then "did not finish" else "exit \(.exit_code)" end)")' \
-  ".claude/state/finalise-rerun-at-head-${DOD_N}.json"
+  "$RERUN_AT_HEAD_FILE"
 [ "$RERUN_EXIT" -eq 0 ] || { echo "HALT: finalise-rerun-at-head.js (exit $RERUN_EXIT)"; exit 1; }
 ```
 
@@ -638,7 +643,7 @@ RERUN_SCOPE_FILE=".claude/state/finalise-rerun-scope-${STEM}-${DOD_N}.json"   # 
 # The previous block's record. A criterion it lists is re-judged on that run; another head's is refused.
 command node .agents/skills/finalise/references/finalise-rerun-scope.js scope \
   --doc "{document-path}" --head "$RERUN_HEAD" --prior "$PRIOR_AC_RECORD" \
-  --rerun-at-head ".claude/state/finalise-rerun-at-head-${DOD_N}.json" --json > "$RERUN_SCOPE_FILE"
+  --rerun-at-head ".claude/state/finalise-rerun-at-head-${STEM}-${DOD_N}.json" --json > "$RERUN_SCOPE_FILE"
 case $? in
   0) jq -r '"re-run scope: \(.mode) (\(.reason)) — \(.rejudge | length) to re-judge, \(.carry | length) carried"' "$RERUN_SCOPE_FILE" ;;
   *) echo "HALT: finalise-rerun-scope.js scope failed — see $RERUN_SCOPE_FILE"; exit 1 ;;
@@ -1031,8 +1036,8 @@ pass it to `merge` below as `AC_SHA256` — `merge` re-hashes the file and answe
 (nothing merged, nothing recorded) when it differs, then records `result.bytes`, `result.sha256` and
 `result.verified: true` in `…dod.{N}.ac.json`. Any other reason (`transcript-not-found`,
 `transcript-ambiguous`, `transcript-unreadable`, `no-block`, `empty-block`, `entity-escaped`) wrote
-nothing, and removed any earlier file at that path: fall back to saving agent 1's YAML, verbatim, to the same path with the file-write tool, leave
-`AC_SHA256` empty, and say "AC YAML hand-copied (unverified): {reason}" in the DoD. A record with
+nothing, and removed any earlier file at that path: fall back to saving agent 1's YAML, verbatim, to the same path with the file-write tool, and leave
+`AC_SHA256` empty. A record with
 `verified: false` says exactly that: its hash describes the file `merge` read, not proof it matches the
 agent's reply. Whatever the route, `merge` also refuses a result whose `story_file` names another
 document than the scope's, or a file that does not exist (`result-document-mismatch`), and a result
@@ -1042,7 +1047,13 @@ copy of the wrong agent's answer stops here instead of becoming this item's reco
 AC agent itself wrote the wrong or no `story_file`, re-extracting brings the same answer back, so
 both arms also name re-running the AC agent, with the path it must give. A hand copy over a file
 `extract` wrote also removes `finalise-ac-extract-${STEM}-${DOD_N}.json`: its hash is the extracted
-file's, so `merge` would refuse the copy as `result-hash-mismatch` (T332-CR2-1). Before
+file's, so `merge` would refuse the copy as `result-hash-mismatch` (T332-CR2-1).
+
+**Every unverified record is disclosed, whichever route made it (task 333).** On `merged` the block
+below prints `AC_YAML_VERIFIED=<true|false>`, read from the record's `result.verified`. Whenever it
+prints `AC_YAML_VERIFIED=false`, the DoD's `**AC YAML:**` line says "AC YAML hand-copied (unverified):
+{reason}". The reason is the extract's failure reason after a failed extract, or `extract record
+removed for a hand copy` after a hand copy over a file `extract` wrote. Before
 that, `merge` requires `--doc` and refuses a scope that is not this document's
 (`scope-document-mismatch`) or names no document (`scope-document-missing`, a scope written before
 task 331). The scope, extract, result and merged files all carry the work item's stem, so two items
@@ -1075,8 +1086,10 @@ command node .agents/skills/finalise/references/finalise-rerun-scope.js merge \
   "${AC_SHA_ARGS[@]}" \
   --dod-n "$DOD_N" --record-out "$AC_RECORD" --json > "$AC_MERGED_FILE"
 [ $? -eq 0 ] || { echo "HALT: finalise-rerun-scope.js merge failed — see $AC_MERGED_FILE"; exit 1; }
+AC_YAML_VERIFIED=""   # set only on merged: result-unparseable writes no record
 case "$(jq -r '.reason' "$AC_MERGED_FILE")" in
   merged)             AC_OVERALL=$(jq -r '.ac_result.ac_traceability.overall' "$AC_MERGED_FILE")
+                      AC_YAML_VERIFIED=$(jq -r '.result.verified' "$AC_RECORD")   # false: disclose it in the DoD (task 333)
                       RERUN_SCOPE_LINE=$(jq -r '.scope_line' "$AC_MERGED_FILE") ;;
   result-unparseable) AC_OVERALL=NEEDS_MANUAL_REVIEW; RERUN_SCOPE_LINE="" ;;   # no record is written
   scope-document-missing)     # nothing merged, nothing recorded (task 332)
@@ -1092,6 +1105,9 @@ case "$(jq -r '.reason' "$AC_MERGED_FILE")" in
   *)                  echo "HALT: merge answered $(jq -r '.reason' "$AC_MERGED_FILE")"; exit 1 ;;
 esac
 echo "AC_OVERALL=$AC_OVERALL"
+# An `if`, not `[ … ] && echo`: on result-unparseable the test is false, and a trailing `&&` would
+# leave the block's exit status at 1.
+if [ -n "$AC_YAML_VERIFIED" ]; then echo "AC_YAML_VERIFIED=$AC_YAML_VERIFIED"; fi
 ```
 
 On `merged`, `AC_RESULT` **is** `.ac_result.ac_traceability` from `$AC_MERGED_FILE`, not the agent's

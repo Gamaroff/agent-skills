@@ -243,6 +243,19 @@ for (const shell of SHELLS) {
       assert.equal(a1.status, 0, a1.stdout + a1.stderr);
       assert.match(a1.stdout, /re-run at head: ran/);
       assert.match(a1.stdout, /sh check\.sh -> exit 0/);
+      // A run that ran a command writes its out-dir, and the out-dir is stem-keyed (task 333,
+      // gate 3 CR-3). Only this case reaches it: with no listed command nothing is written there.
+      // Mutation target: Step 3a's --out-dir reverted to `finalise-rerun-at-head-${DOD_N}`.
+      assert.ok(
+        existsSync(
+          path.join(dir, ".claude/state/finalise-rerun-at-head-task.9-1"),
+        ),
+        "the re-run-at-head out-dir is stem-keyed",
+      );
+      assert.ok(
+        !existsSync(path.join(dir, ".claude/state/finalise-rerun-at-head-1")),
+        "no run-number-keyed re-run-at-head out-dir is written",
+      );
       writeFileSync(
         path.join(dir, ".claude/state/finalise-ac-result-task.9-1.yaml"),
         AGENT_NAMED, // the citation says nothing of a re-run
@@ -318,6 +331,21 @@ for (const shell of SHELLS) {
           path.join(dir, ".claude/state/finalise-rerun-scope-1.json"),
         ),
         "no run-number-keyed scope file is written",
+      );
+      // The re-run-at-head record is stem-keyed too (task 333, gate 3 CR-3); its out-dir is held
+      // by the T319-CR-5 case, the one that runs a command. Mutation target: Step 3a's writer or
+      // the scope block's reader reverted to `finalise-rerun-at-head-${DOD_N}.json`.
+      assert.ok(
+        existsSync(
+          path.join(dir, ".claude/state/finalise-rerun-at-head-task.9-1.json"),
+        ),
+        "the re-run-at-head record is written at the stem-keyed path",
+      );
+      assert.ok(
+        !existsSync(
+          path.join(dir, ".claude/state/finalise-rerun-at-head-1.json"),
+        ),
+        "no run-number-keyed re-run-at-head record is written",
       );
       const other = "docs/tasks/task.8.other/task.8.other.md";
       writeFileSync(
@@ -514,9 +542,48 @@ for (const shell of SHELLS) {
       const c3 = run(shell, dir, substitute(STEP_3C, { dodN: 1 }));
       assert.equal(c3.status, 0, c3.stdout + c3.stderr);
       assert.match(c3.stdout, /^AC_OVERALL=PASS$/m);
-      assert.ok(
-        existsSync(path.join(dir, DOC_DIR, "task.9.dod.1.ac.json")),
-        "the corrected hand copy is recorded",
+      const record = path.join(dir, DOC_DIR, "task.9.dod.1.ac.json");
+      assert.ok(existsSync(record), "the corrected hand copy is recorded");
+      // ...and it is recorded, and disclosed, as unverified (task 333, gate 3 CR3-1/CR3-2).
+      // Mutation targets: the CLI recording `verified: true` with no --sha256, and the block's
+      // AC_YAML_VERIFIED echo removed.
+      assert.equal(
+        JSON.parse(readFileSync(record, "utf8")).result.verified,
+        false,
+        "a hand copy is recorded verified: false",
+      );
+      assert.match(c3.stdout, /^AC_YAML_VERIFIED=false$/m);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test(`[${shell}] Step 3c on an extracted result prints AC_YAML_VERIFIED=true and records verified: true (task 333)`, () => {
+    const dir = repo();
+    try {
+      const a1 = step3a(shell, dir, 1);
+      assert.equal(a1.status, 0, a1.stdout + a1.stderr);
+      // What a successful extract leaves: this item's answer and the record of its hash.
+      writeFileSync(
+        path.join(dir, ".claude/state/finalise-ac-result-task.9-1.yaml"),
+        AGENT_NAMED,
+      );
+      writeFileSync(
+        path.join(dir, ".claude/state/finalise-ac-extract-task.9-1.json"),
+        JSON.stringify({
+          reason: "extracted",
+          sha256: createHash("sha256").update(AGENT_NAMED).digest("hex"),
+        }),
+      );
+      const c = run(shell, dir, substitute(STEP_3C, { dodN: 1 }));
+      assert.equal(c.status, 0, c.stdout + c.stderr);
+      assert.match(c.stdout, /^AC_OVERALL=PASS$/m);
+      assert.match(c.stdout, /^AC_YAML_VERIFIED=true$/m);
+      const record = path.join(dir, DOC_DIR, "task.9.dod.1.ac.json");
+      assert.equal(
+        JSON.parse(readFileSync(record, "utf8")).result.verified,
+        true,
+        "an extracted result is recorded verified: true",
       );
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -572,7 +639,11 @@ for (const shell of SHELLS) {
       }
       const un = run(shell, dir, RERUN);
       assert.equal(un.status, 1, un.stdout + un.stderr);
-      assert.match(un.stdout, /HALT: DOC_PATH and DOD_N must be substituted/);
+      // STEM joined DOC_PATH and DOD_N when the re-run-at-head files were stem-keyed (task 333).
+      assert.match(
+        un.stdout,
+        /HALT: DOC_PATH, STEM and DOD_N must be substituted/,
+      );
       // Bound but not a run number: still refused, never passed to the engine.
       const bad = run(shell, dir, substitute(STEP_3C, { dodN: "" }));
       assert.equal(bad.status, 1, bad.stdout + bad.stderr);
