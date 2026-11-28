@@ -436,26 +436,26 @@ A wrong reason text, or a missing line in the running summary, is fixed forward.
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-28
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 96/100
+**Gate Decision**: PASS
 
 ### QA Report
-- **Full Report**: [task.321.qa.2.finalise-diff-and-gap-body.md](./task.321.qa.2.finalise-diff-and-gap-body.md)
-- **Gate File**: [task.321.gate.2.finalise-diff-and-gap-body.yml](./task.321.gate.2.finalise-diff-and-gap-body.yml)
+- **Full Report**: [task.321.qa.3.finalise-diff-and-gap-body.md](./task.321.qa.3.finalise-diff-and-gap-body.md)
+- **Gate File**: [task.321.gate.3.finalise-diff-and-gap-body.yml](./task.321.gate.3.finalise-diff-and-gap-body.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 128 in the three task suites; 9050 in `ci:fast`
+- **Tests Executed**: 133 in the three task suites; 9055 in `ci:fast`
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
-- Cycle 1's two findings are fixed; T321-CR-101 is held by an executed Step 3a → Step 3e test.
-- T321-CR-201 (medium): the AC and fix-evidence prompts read Step 3a's `**PR diff:**` line, which no agent receives.
-- T321-CR-202 (low): the merge-base patch takes the host's git config (reproduced with `color.ui=always`).
+- T321-CR-201 fixed: the AC and fix-evidence agents now receive `<DIFF_LINE>`, and the DoD's Step 2 block records it.
+- T321-CR-202 fixed: the merge-base patch ignores host git colour and prefix config.
+- Three low test-coverage cleanups recorded as future work.
 
 <!-- change-log-start -->
 ## Change Log
@@ -470,6 +470,7 @@ A wrong reason text, or a missing line in the running summary, is fixed forward.
 | 2026-11-28 |         | QA findings fixed — 2 of 2, 1 iteration         | qa-fix      |
 | 2026-11-28 |         | QA gate CONCERNS (90/100) — 2 findings          | qa-task     |
 | 2026-11-28 |         | QA findings fixed — 2 of 2, 1 iteration         | qa-fix      |
+| 2026-11-28 |         | QA gate PASS (96/100) — 0 findings              | qa-task     |
 <!-- change-log-end -->
 
 ---
