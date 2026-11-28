@@ -1052,8 +1052,9 @@ file's, so `merge` would refuse the copy as `result-hash-mismatch` (T332-CR2-1).
 **Every unverified record is disclosed, whichever route made it (task 333).** On `merged` the block
 below prints `AC_YAML_VERIFIED=<true|false>`, read from the record's `result.verified`. Whenever it
 prints `AC_YAML_VERIFIED=false`, the DoD's `**AC YAML:**` line says "AC YAML hand-copied (unverified):
-{reason}". The reason is the extract's failure reason after a failed extract, or `extract record
-removed for a hand copy` after a hand copy over a file `extract` wrote. Before
+{reason}", with `{reason}` copied from the `AC_YAML_UNVERIFIED_REASON=` line the block prints beside
+it: `extract failed: <reason>` after a failed extract, or `extract record removed for a hand copy`
+after a hand copy. Before
 that, `merge` requires `--doc` and refuses a scope that is not this document's
 (`scope-document-mismatch`) or names no document (`scope-document-missing`, a scope written before
 task 331). The scope, extract, result and merged files all carry the work item's stem, so two items
@@ -1108,6 +1109,17 @@ echo "AC_OVERALL=$AC_OVERALL"
 # An `if`, not `[ … ] && echo`: on result-unparseable the test is false, and a trailing `&&` would
 # leave the block's exit status at 1.
 if [ -n "$AC_YAML_VERIFIED" ]; then echo "AC_YAML_VERIFIED=$AC_YAML_VERIFIED"; fi
+# The {reason} for the DoD's "AC YAML hand-copied (unverified): {reason}" line, read from the extract
+# record rather than recalled: a failed extract leaves its reason there, a hand copy removed it.
+if [ "$AC_YAML_VERIFIED" = false ]; then
+  AC_EXTRACT_REASON=$(jq -r '.reason // empty' "$AC_EXTRACT_FILE" 2>/dev/null)
+  case "$AC_EXTRACT_REASON" in
+    "")        AC_UNVERIFIED_REASON="extract record removed for a hand copy" ;;
+    extracted) AC_UNVERIFIED_REASON="extract record present but merge recorded the result unverified" ;;
+    *)         AC_UNVERIFIED_REASON="extract failed: $AC_EXTRACT_REASON" ;;
+  esac
+  echo "AC_YAML_UNVERIFIED_REASON=$AC_UNVERIFIED_REASON"
+fi
 ```
 
 On `merged`, `AC_RESULT` **is** `.ac_result.ac_traceability` from `$AC_MERGED_FILE`, not the agent's

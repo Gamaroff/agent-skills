@@ -242,13 +242,15 @@ ARGS=(); [ -n "$X" ] && ARGS=(--flag "$X")
 cmd "${ARGS[@]}"
 ```
 
-`zsh-flag-expansion-guard.test.mjs` fails on any `${X:+--flag …}` (or `${X:+"-f" …}`, or
-`${X:+ --flag …}` with whitespace after `:+`) on a non-comment line of a fenced `bash` block in a
+`zsh-flag-expansion-guard.test.mjs` fails on any `${X:+--flag …}` whose flag is followed by a
+second word (also `${X:+"-f" …}`, `${X:+ --flag …}` with whitespace after `:+`, the no-colon
+`${X+--flag …}` and the positional `${1:+-f …}`) on a non-comment line of a fenced `bash` block in a
 canonical source: every `SKILL.md`, every `shared/resources/*.md` and every hand-authored
 `skills/*/references/*.md` (a generated copy is left out by its `AUTO-GENERATED` marker, not by its
 directory). It does not see an alternative that
 opens with a variable (`${X:+$FLAG "$X"}`) or a `.sh` file, so a reviewer applies the rule, not the
-regex. An alternative meant as one word (`"${X:+ (eq ${X})}"`) is correct in both shells and legal.
+regex. An alternative meant as one word (`"${X:+ (eq ${X})}"`), a flag joined to its value
+(`${X:+--flag=$X}`) and a lone flag (`${X:+-f}`) are correct in both shells and legal.
 
 ### A git pathspec `**` is `*` unless you say otherwise
 
