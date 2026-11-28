@@ -1,0 +1,20 @@
+[
+  {
+    "id": "count-unchanged-with-marker",
+    "sink": "markdown-structure",
+    "input": "gaps.md",
+    "direction": "legitimate",
+    "why": "The marker rule must not change the gap count, and a bullet under ## Change Log is not a gap.",
+    "correct": "Exit 0; prints 2.",
+    "spec_ref": "docs/tasks/task.321.finalise-diff-and-gap-body/task.321.finalise-diff-and-gap-body.md:330",
+    "fixture": {
+      "files": {
+        "gaps.md": "# T\n\n## Definition of Done - Gaps Identified\n\n### Missing Criteria\n\n- gap one\n- gap two\n\n<!-- change-log-start -->\n## Change Log\n\n- not a gap\n<!-- change-log-end -->\n"
+      }
+    },
+    "expected": {
+      "exit": 0,
+      "stdout": "2\n"
+    }
+  }
+]

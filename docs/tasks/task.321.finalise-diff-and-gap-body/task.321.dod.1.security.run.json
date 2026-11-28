@@ -1,0 +1,76 @@
+{
+  "version": 1,
+  "controls": [
+    {
+      "sink": null,
+      "entry": "shell-argv:shared/resources/dod-gap-count.sh",
+      "name": "dod-gap-count count",
+      "call_site": null,
+      "verdict": "unverifiable",
+      "reason": "no-hostile-evidence",
+      "executed": 2,
+      "passed": 2,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "observation_limits": [
+        "effects-after-accept"
+      ],
+      "shells": [
+        "bash",
+        "zsh"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "{input}"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "fixture_copy": null,
+      "ran_at": "2026-11-28T13:29:48.046Z"
+    },
+    {
+      "sink": null,
+      "entry": "shell-argv:shared/resources/dod-gap-count.sh",
+      "name": "dod-gap-count --body section end",
+      "call_site": null,
+      "verdict": "engages",
+      "reason": "hostile-rejected-legitimate-accepted",
+      "executed": 12,
+      "passed": 12,
+      "reproduced": 0,
+      "overblocked": 0,
+      "declined": 0,
+      "declined_cases": [],
+      "escaped": 0,
+      "observation_limits": [
+        "effects-after-accept"
+      ],
+      "shells": [
+        "bash",
+        "zsh"
+      ],
+      "interpreter": null,
+      "fake_gh": null,
+      "argv": [
+        "{input}",
+        "--body"
+      ],
+      "args": null,
+      "slot": null,
+      "fixture_setup": null,
+      "fixture_copy": null,
+      "ran_at": "2026-11-28T13:29:47.737Z"
+    }
+  ],
+  "totals": {
+    "executed": 14,
+    "reproduced": 0,
+    "escaped": 0
+  },
+  "updated_at": "2026-11-28T13:29:48.046Z"
+}

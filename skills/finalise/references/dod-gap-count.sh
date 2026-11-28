@@ -50,6 +50,12 @@ esac
 # open bullet indents, popped by any line at or left of them, so a detail sub-bullet is not a
 # second gap and a numbered category line (`1. **Unit Tests:**`) closes the list above it
 # (QA-222-4).
+# The section also ends at an unfenced change-log START marker, the current one or either legacy
+# one: the marker stands above the `## Change Log` heading (document-change-log.md § Markers), so
+# a section bounded at `## ` alone took the marker as its last line and put it into the PR comment
+# (task 321). The three markers are change-log.js's; finalise-gaps-path.test.mjs reads them from
+# there, so a fourth pair added to change-log.js turns that test red until it is added here.
+# `^ ? ? ?` is CommonMark's up-to-three-space indent, written without an interval expression.
 # Printed: "S" when the section exists, "@" when its subsection does, then the count — or, in
 # --body mode, "S" and then the section's lines. `--body` refuses a section with no non-blank
 # line, as the count refuses one with no gap: the marker is internal and never reaches stdout.
@@ -82,6 +88,7 @@ OUT=$(awk -v mode="$MODE" '
   }
   !infence && /^## Definition of Done - Gaps Identified[ \t]*$/ { s = 1; sec = 1; next }
   !infence && s && /^## / { s = 0 }
+  !infence && s && /^ ? ? ?<!-- (change-log|jira-sync-changelog|github-sync-changelog)-start -->[ \t]*$/ { s = 0; m = 0 }
   s { body = body $0 "\n" }
   infence { next }
   s && /^### Missing Criteria/ { m = 1; seen = 1; next }

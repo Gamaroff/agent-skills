@@ -1,0 +1,78 @@
+schema: 2
+task: 'task.321.finalise-diff-and-gap-body'
+task_title: "finalise's diff fallback is one commit, and its gap body leaks a marker"
+gate: CONCERNS
+status_reason: 'Both cycle-1 findings are fixed and held by tests that go red when the fix is reverted. The refute pass found that cycle 1''s forge-patch rewording points the agents at a **PR diff:** line they are never given (medium), and QA reproduced that the merge-base patch takes the host''s git config, so color.ui=always puts ANSI escapes in it (low).'
+reviewer: 'QA Engineer'
+head: '6230df1b18da0f859460572e9ee314313da60372'
+updated: '2026-11-28T12:55:19Z'
+
+top_issues:
+  - id: 'T321-CR-201'
+    severity: medium
+    file: 'shared/resources/finalise-dod-ac-prompt.md'
+    finding: 'The AC prompt (shared/resources/finalise-dod-ac-prompt.md:56) and the fix-evidence prompt (finalise-dod-fix-evidence-prompt.md:51) tell the agent whether <DIFF_FILE> holds the bundled copies by reading "Step 3a''s **PR diff:** line", but no agent receives that line: the Step 3b dispatch table (skills/finalise/SKILL.md:708, :711, :721) passes no DIFF_LINE substitution, and the running summary''s Step 2 block is written at Step 3d, after the agents return. The Append 1 template has no **PR diff:** slot either (code-review CR-2, advisory). Introduced by cycle 1''s CR-102 fix. Origin: code-review CR-1 (medium/high); confirmed by QA reading the dispatch table and the Append 1 template.'
+    suggested_action: 'Pass the line to the agents as a <DIFF_LINE> substitution in the AC, docs and fix-evidence dispatch rows and have the prompts read that placeholder; put **PR diff:** {DIFF_LINE} in the Append 1 template so the record has one writer.'
+    suggested_owner: dev
+    status: open
+  - id: 'T321-CR-202'
+    severity: low
+    file: 'shared/resources/finalise-diff.sh'
+    finding: 'The merge-base patch (shared/resources/finalise-diff.sh:132) is written by porcelain git diff, so the host''s git config reaches it. Reproduced: with color.ui=always and diff.noprefix in GIT_CONFIG_GLOBAL the patch holds ANSI escapes and its headers lose the a/ and b/ prefixes; control, the same run with GIT_CONFIG_GLOBAL=/dev/null, is clean. The tests pin /dev/null, so they cannot see it. New to this change: the base read the forge first. Origin: code-review CR-4 (low/low), reproduced by QA.'
+    suggested_action: 'Pass --no-color --no-ext-diff --no-textconv --src-prefix=a/ --dst-prefix=b/ to the patch diff, and add a test that runs with a hostile user config.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 128
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: internal
+    internal_reason: 'Unchanged from gate 1. dod-gap-count.sh reads the gaps section /finalise writes; the markdown-structure sink fits the content but the shell entry form refuses it (entry-not-probeable). finalise-diff.sh is boundary false: a reader whose unresolved answer is recorded and prevents no action; candidates named: the resolved/unresolved arms and the bundled-copy lookup. Cycle 1 changed only its comments and the Step 3a/3e prose.'
+    boundary_signals: []
+    notes: 'No input reaches a shell evaluation. The Step 3e cleanup now fails on an empty path (${DIFF_FILE:?}) instead of matching ./.names.'
+  performance:
+    status: PASS
+    notes: 'No bound claimed. The fetch has no timeout (code-review CR-5, advisory).'
+  reliability:
+    status: CONCERNS
+    notes: 'T321-CR-201: the agents cannot tell a with-copies patch from a without-copies one. T321-CR-202: the patch depends on host git config. 128 of 128 in the three task suites at this head; ci:fast on the LAN server 9050 tests, 0 failed. CI on the PR head is pending.'
+  maintainability:
+    status: PASS
+    notes: 'The Step 3e cleanup is held by execution in bash and zsh; the source-text check it replaced is gone.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'T321-CR-201: give the agents the **PR diff:** line as a substitution, and give the record one writer.'
+      refs: ['skills/finalise/SKILL.md', 'shared/resources/finalise-dod-ac-prompt.md', 'shared/resources/finalise-dod-fix-evidence-prompt.md']
+  future:
+    - action: 'Code-review CR-3 (low/medium): on "every changed file is a bundled copy" the names list is kept and the patch is empty, while the prompts read "could not be read" from an empty names list only. Decide whether the copies'' patch should be written in that case, or the prompts should also key on an unresolved line.'
+      refs: ['shared/resources/finalise-diff.sh']
+      remedy: unverified
+    - action: 'Code-review CR-5 (low/low): run the base fetch with GIT_TERMINAL_PROMPT=0 and a bounded timeout, so a credential prompt or stalled remote becomes a named unresolved reason.'
+      refs: ['shared/resources/finalise-diff.sh']
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T321-CR-201 fixed']

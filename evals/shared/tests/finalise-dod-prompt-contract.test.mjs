@@ -1384,3 +1384,185 @@ test("every entry shape in the four graded prompts names severity beside its sta
     }
   }
 });
+
+// --- Task 321: the change the agents read ----------------------------------------------------
+//
+// Step 3a now writes the patch to <DIFF_FILE> WITHOUT bundled copies, and every changed path to
+// <DIFF_FILE>.names. An empty diff used to pass a criterion over a set (no members, none unmapped).
+// Each assertion names the rule it holds; the prose may rewrap freely (`has` collapses whitespace).
+
+const DIFF_PROMPTS = {
+  "finalise-dod-ac-prompt.md": null,
+  "finalise-dod-docs-prompt.md": null,
+  "finalise-dod-fix-evidence-prompt.md": null,
+};
+const diffPrompt = (name) =>
+  (DIFF_PROMPTS[name] ??= readFileSync(
+    join(repoRoot, "shared", "resources", name),
+    "utf-8",
+  ));
+const NAMES_READ = "tr '\\0' '\\n' < <DIFF_FILE>.names";
+const UNREADABLE = '`FAIL` with the note "the change could not be read"';
+
+test("task 321: each diff-reading prompt reads paths from the names list and fails on an empty one", () => {
+  for (const name of Object.keys(DIFF_PROMPTS)) {
+    const text = diffPrompt(name);
+    assert.ok(
+      has(text, NAMES_READ),
+      `${name}: paths are not read from <DIFF_FILE>.names`,
+    );
+    assert.ok(
+      has(text, UNREADABLE),
+      `${name}: an empty change is not FAIL "the change could not be read"`,
+    );
+    assert.doesNotMatch(
+      text,
+      /NEEDS_MANUAL_REVIEW/,
+      `${name}: a status token its contract does not have`,
+    );
+    assert.doesNotMatch(
+      text,
+      /grep '\^diff --git' <DIFF_FILE>/,
+      `${name}: the patch is read for paths, and it no longer holds the bundled copies`,
+    );
+  }
+});
+
+test("task 321: the AC quantifier rule takes members from the names list and fails a set over an empty one", () => {
+  const ac = diffPrompt("finalise-dod-ac-prompt.md");
+  assert.ok(
+    has(ac, "List the members from `<DIFF_FILE>.names`"),
+    "members are not listed from the names list",
+  );
+  assert.ok(
+    has(
+      ac,
+      "When the names list is empty or missing, a criterion over a set is `FAIL`",
+    ),
+    "an empty names list does not fail a criterion over a set",
+  );
+});
+
+test("task 321: fix-evidence check 5 reads the bundled copies from the names list", () => {
+  const fe = diffPrompt("finalise-dod-fix-evidence-prompt.md");
+  const check5 = fe.slice(
+    fe.indexOf("5. **Bundled copies match the source.**"),
+  );
+  assert.ok(
+    check5.length > 0 && fe.includes("5. **Bundled copies match the source.**"),
+    "check 5 not found",
+  );
+  assert.ok(
+    has(
+      check5.slice(0, 400),
+      "read them from `<DIFF_FILE>.names`, not `<DIFF_FILE>`",
+    ),
+    "check 5 reads the copies from the patch, which leaves them out",
+  );
+});
+
+// Step 3e's cleanup is held by execution, not by its text: finalise-diff.test.mjs runs Step 3a and
+// then the Step 3e block in separate shells (QA T321-CR-101 — the old text passed while the block
+// ran `rm -f "" ".names"`).
+test("task 321: Step 3a reads the change through finalise-diff.sh", () => {
+  const s = skill();
+  assert.match(s, /references\/finalise-diff\.sh "\$\{DIFF_ARGS\[@\]\}"/);
+  assert.doesNotMatch(
+    s,
+    /git diff HEAD~1 HEAD/,
+    "a block still falls back to the last commit",
+  );
+});
+
+// QA T321-CR-201: a prompt that decides on Step 3a's `**PR diff:**` line must be GIVEN it. The
+// prompts read "Step 3a's `**PR diff:**` line" for a cycle while no dispatch row passed it and the
+// running summary that holds it was written after the agents returned. The rule holds for every
+// `<DIFF_*>` placeholder in every DoD prompt, read from the dispatch table rather than listed here.
+function dispatchRows(s) {
+  const rows = {};
+  for (const line of s.split("\n")) {
+    const m = line.match(
+      /^\| \d\. [^|]+\| `references\/(finalise-dod-[a-z-]+-prompt\.md)`\s*\|(.*)\|\s*$/,
+    );
+    if (m) rows[m[1]] = m[2];
+  }
+  const bug = s
+    .split("\n")
+    .find((l) => l.startsWith("**Bug mode (`fix-evidence`):**"));
+  if (bug)
+    rows["finalise-dod-fix-evidence-prompt.md"] = bug.slice(
+      0,
+      bug.indexOf("It checks"),
+    );
+  return rows;
+}
+
+test("task 321: every <DIFF_*> placeholder a DoD prompt reads is passed by its dispatch row", () => {
+  const rows = dispatchRows(skill());
+  const prompts = readdirSync(join(repoRoot, "shared", "resources")).filter(
+    (f) => /^finalise-dod-[a-z-]+-prompt\.md$/.test(f),
+  );
+  let checked = 0;
+  for (const p of prompts) {
+    const used = [...new Set(diffPrompt(p).match(/<DIFF_[A-Z_]+>/g) ?? [])];
+    if (used.length === 0) continue;
+    assert.ok(rows[p], `${p} reads ${used} but has no dispatch row`);
+    for (const ph of used) {
+      assert.ok(
+        rows[p].includes(ph),
+        `${p} reads ${ph}, which its dispatch row does not pass`,
+      );
+      checked++;
+    }
+  }
+  // <DIFF_FILE> alone is read by the AC, docs and fix-evidence prompts: fewer means the row parser
+  // or the prompt scan read nothing.
+  assert.ok(
+    checked >= 3,
+    `only ${checked} placeholder uses checked — the row parser read nothing`,
+  );
+});
+
+test("task 321: the prompts that branch on the patch's source read <DIFF_LINE>, never the running summary", () => {
+  for (const p of [
+    "finalise-dod-ac-prompt.md",
+    "finalise-dod-fix-evidence-prompt.md",
+  ]) {
+    const t = diffPrompt(p);
+    assert.ok(t.includes("<DIFF_LINE>"), `${p} does not read <DIFF_LINE>`);
+    assert.doesNotMatch(
+      flat(t),
+      /Step 3a's `\*\*PR diff:\*\*` line reads/,
+      `${p} still reads a line no agent receives`,
+    );
+  }
+});
+
+test("task 321: the PR diff line has one writer, the Step 2 template, and a re-run replaces it", () => {
+  const s = skill();
+  const append1 = s.slice(s.indexOf("**Append 1 — AC & PR section**"));
+  const block = append1.slice(0, append1.indexOf("### Acceptance Criteria"));
+  assert.ok(
+    block.includes("**PR diff:** {DIFF_LINE}"),
+    "the story/task Step 2 template has no PR diff slot",
+  );
+  const bugTpl = readFileSync(
+    join(repoRoot, "skills", "finalise", "assets", "bug-dod-template.md"),
+    "utf-8",
+  );
+  const bugStep2 = bugTpl.slice(bugTpl.indexOf("## Step 2: Fix Evidence"));
+  assert.ok(
+    bugStep2
+      .slice(0, bugStep2.indexOf("####"))
+      .includes("**PR diff:** {DIFF_LINE}"),
+    "the bug template's Step 2 block has no PR diff slot",
+  );
+  const rerun = s.slice(s.indexOf("**Idempotent re-run**"));
+  assert.ok(
+    has(
+      rerun.slice(0, 900),
+      "except its `**PR diff:**` line, which a re-run replaces with this run's",
+    ),
+    "a re-run keeps the previous run's PR diff line",
+  );
+});

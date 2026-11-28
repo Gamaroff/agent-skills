@@ -1,6 +1,6 @@
 ---
 name: finalise-dod-fix-evidence-prompt
-description: Explore subagent prompt for the fix-evidence check that replaces AC traceability when /finalise runs in bug mode (--bug). Substitute <BUG_FILE>, <PR_NUMBER>, <DIFF_FILE>, and <IMPL_REPORT> before dispatching.
+description: Explore subagent prompt for the fix-evidence check that replaces AC traceability when /finalise runs in bug mode (--bug). Substitute <BUG_FILE>, <PR_NUMBER>, <DIFF_FILE>, <DIFF_LINE>, and <IMPL_REPORT> before dispatching.
 ---
 <!-- AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/finalise-dod-fix-evidence-prompt.md. Regenerate via `npm run bundle`. -->
 
@@ -8,7 +8,7 @@ description: Explore subagent prompt for the fix-evidence check that replaces AC
 
 **Usage**: Dispatch as an Explore subagent from `/finalise --bug` Steps 3–5 parallel dispatch, in the
 slot the AC traceability agent occupies on the story/task path. Substitute `<BUG_FILE>`,
-`<PR_NUMBER>`, `<DIFF_FILE>` and `<IMPL_REPORT>` before sending.
+`<PR_NUMBER>`, `<DIFF_FILE>`, `<DIFF_LINE>` and `<IMPL_REPORT>` before sending.
 
 A bug report has no acceptance criteria. What it has instead is a single expected behaviour, a fix
 that claims to produce it, and a regression test that claims to prove it. This agent checks those
@@ -47,7 +47,12 @@ Run: `gh pr view <PR_NUMBER> --json state,reviewDecision,url 2>/dev/null`
 
 ### Step 3: Check the fix evidence
 
-Read `<DIFF_FILE>` to find the file paths modified in the PR. Then, for each check below, cite
+Read the file paths modified in the PR from `<DIFF_FILE>.names` (`tr '\0' '\n' < <DIFF_FILE>.names`),
+and their hunks from `<DIFF_FILE>`; the names list keeps bundled `skills/*/references/` copies, and
+the patch leaves them out only when `<DIFF_LINE>` (the line Step 3a's reader printed) starts
+`source=merge-base` (a `source=forge` patch keeps them). When the names list is empty or missing,
+the change could not be read (`<DIFF_LINE>` reads `unresolved: …`): every check that needs the diff is `FAIL` with the note "the
+change could not be read", never `PASS` or `NOT_APPLICABLE`. Then, for each check below, cite
 `path:line` — a check with no citation is `FAIL`, never `PASS`.
 
 1. **Expected behaviour is implemented.** Find the code in the diff that produces the expected
@@ -67,7 +72,8 @@ Read `<DIFF_FILE>` to find the file paths modified in the PR. Then, for each che
    of files (a corpus assertion, a call-site guard), check that it names what it scans and carries a
    non-vacuity floor. `NOT_APPLICABLE` with a note when the diff adds no such guard.
 5. **Bundled copies match the source.** When the diff touches `shared/resources/`, confirm the
-   bundled `skills/*/references/` copies are in the same diff (or `npm run bundle:check` is clean).
+   bundled `skills/*/references/` copies are in the same change: read them from `<DIFF_FILE>.names`,
+   not `<DIFF_FILE>`, which may leave the copies out (or `npm run bundle:check` is clean).
    `NOT_APPLICABLE` with a note when no shared file changed.
 
 ⚠️ **A `✅ Fixed` verification result is a claim, not evidence.** Verify against the diff and the

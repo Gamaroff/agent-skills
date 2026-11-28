@@ -1,11 +1,11 @@
 ---
 name: finalise-dod-ac-prompt
-description: Explore subagent prompt for AC traceability, PR status, and documentation check in /finalise DoD parallel dispatch. Substitute <STORY_FILE>, <PR_NUMBER>, <STORY_TYPE>, <DIFF_FILE>, <RERUN_SCOPE>, and <RERUN_AT_HEAD> before dispatching.
+description: Explore subagent prompt for AC traceability, PR status, and documentation check in /finalise DoD parallel dispatch. Substitute <STORY_FILE>, <PR_NUMBER>, <STORY_TYPE>, <DIFF_FILE>, <DIFF_LINE>, <RERUN_SCOPE>, and <RERUN_AT_HEAD> before dispatching.
 ---
 
 # AC Traceability Check — Explore Subagent Prompt
 
-**Usage**: Dispatch as an Explore subagent from `/finalise` Steps 3–5 parallel dispatch. Substitute `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`, `<DIFF_FILE>`, `<RERUN_SCOPE>`, and `<RERUN_AT_HEAD>` before sending.
+**Usage**: Dispatch as an Explore subagent from `/finalise` Steps 3–5 parallel dispatch. Substitute `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`, `<DIFF_FILE>`, `<DIFF_LINE>`, `<RERUN_SCOPE>`, and `<RERUN_AT_HEAD>` before sending.
 
 ---
 
@@ -53,12 +53,12 @@ Run: `gh pr view <PR_NUMBER> --json state,reviewDecision,url 2>/dev/null`
 ### Step 3: Check each acceptance criterion
 
 For each AC item extracted in Step 1:
-1. Read `<DIFF_FILE>` to find file paths modified in the PR.
+1. Read the changed file paths from `<DIFF_FILE>.names` (`tr '\0' '\n' < <DIFF_FILE>.names`): every path the PR changed, bundled `skills/*/references/` copies included. `<DIFF_FILE>` is the patch: without those copies when `<DIFF_LINE>` (the line Step 3a's reader printed) starts `source=merge-base`, with them when it starts `source=forge`. An empty or missing names list means the change could not be read (`<DIFF_LINE>` reads `unresolved: …`), not that nothing changed.
 2. For each modified file path: search for code that implements the AC (grep key terms from the AC description).
 3. Also search for a test file (`.spec.ts`, `.test.ts`, `.spec.js`) that covers the AC — grep for the same key terms.
 4. **Citation rule**: A `PASS` requires BOTH a non-null `code_citation` AND a non-null `test_citation`. Missing either → `FAIL`. No exceptions.
 5. **Execution rule**: the cited test must actually run in a lane that gates this change. A test that exists but never executes on the PR is not evidence — it is a citation. Determine the lane from the test's path and the project's CI config (e.g. a `paths-ignore`d job, a suite excluded by the runner's default scope, a directory the per-PR job does not select). If the cited test does not run per-PR, set `status: FAIL` and name the lane in `note`, even though the file exists.
-6. **Quantifier rule**: a criterion over a set ("each test", "every file", "all call sites") is checked member by member. List the members from `<DIFF_FILE>`, map each one to its evidence, and put every unmapped member in `note`. `PASS` only when that list is empty. Return the list as `members` (each `member`, `evidence`, `status`), so a re-run can carry the mapped ones. Evidence that some members are covered proves "at least one", not "each".
+6. **Quantifier rule**: a criterion over a set ("each test", "every file", "all call sites") is checked member by member. List the members from `<DIFF_FILE>.names`, map each one to its evidence, and put every unmapped member in `note`. `PASS` only when that list is empty. Return the list as `members` (each `member`, `evidence`, `status`), so a re-run can carry the mapped ones. Evidence that some members are covered proves "at least one", not "each". When the names list is empty or missing, a criterion over a set is `FAIL` with the note "the change could not be read": with no members none is unmapped, and that is not a pass.
 7. **Amendment rule**: a criterion is judged as it was reviewed. Run, from the repository root, `command node .agents/skills/finalise/references/criteria-drift.js --doc "<STORY_FILE>" --base-from-review "$(gh pr view <PR_NUMBER> --json baseRefName -q .baseRefName 2>/dev/null || echo develop)" --json` (criteria-drift.js, task.248). For each `changed` entry whose `kind` is `reworded`, `added` or `removed` and whose `approved` is false, set that criterion's `status: FAIL` and `note: "amendment unapproved"`, whatever its evidence. Do the same for an `appended` entry when the added text relaxes the criterion (widens a bound, adds an exception) and `approved` is false; an appended evidence note does not relax it. Exit 1 (`no-criteria`) means there is nothing to compare. Any other non-zero exit is not a pass: name it in every criterion's `note` and set `status: FAIL`.
 
 ⚠️ **A ticked AC checkbox is a claim, not evidence.** Verify against the diff and the test lane; never treat the story's own checkbox as satisfying either rule. Both failure modes below have occurred and neither was caught by the checkbox:

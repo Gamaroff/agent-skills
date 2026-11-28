@@ -5,11 +5,13 @@ type: task
 description: "Give /finalise one reader for the PR's whole change that names its source and refuses to answer with less, and end the gap report's body at the change-log marker."
 tags: [finalise, observation]
 category: refactoring
-status: planned
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-11-25
-updated: 2026-11-25
+updated: 2026-11-28
+completed_date: 2026-11-28
+pr_number: 969
 estimated_effort_hours: 8
 github_issue: 941
 ---
@@ -18,7 +20,8 @@ github_issue: 941
 
 **GitHub Issue**: [#941](https://github.com/Gamaroff/agent-skills/issues/941)
 
-**Status:** Planned
+**Status:** Accepted
+**Review**: ✅ All review recommendations from `task.321.review.1.finalise-diff-and-gap-body.md` implemented 2026-11-28
 
 ---
 
@@ -76,7 +79,7 @@ Every name below was grepped or run at `6f6c67aad` (v0.69.0).
 
 - **The diff.** `skills/finalise/SKILL.md:529-531` *(`DIFF_FILE=".claude/state/pr-diff-…`)*: `gh pr
   diff "$PR_NUMBER"`, else `git diff HEAD~1 HEAD`, else `touch`. Step 3e *(`rm -f "$DIFF_FILE"`,
-  `:1281`)* removes it.
+  `:1345`)* removes it.
 - **Its readers.** Three prompts: `finalise-dod-ac-prompt.md:56` and `:61`,
   `finalise-dod-docs-prompt.md:59`, `finalise-dod-fix-evidence-prompt.md:49`. Command:
   `grep -n 'DIFF_FILE' skills/finalise/SKILL.md shared/resources/finalise-dod-*-prompt.md`.
@@ -184,9 +187,9 @@ copies, and their names stay in the list beside it.
 - `shared/resources/tests/finalise-diff.test.mjs` (new)
 
 **Changes**:
-- [ ] Write the failing cases first (§ 8), each in a temporary repository with a stub `gh`
-- [ ] Write the script: four steps, two output files, one line, bash and zsh
-- [ ] Exclude a bundled copy by its source, never by a path pattern or a header
+- [x] Write the failing cases first (§ 8), each in a temporary repository with a stub `gh`
+- [x] Write the script: four steps, two output files, one line, bash and zsh
+- [x] Exclude a bundled copy by its source, never by a path pattern or a header
 
 **Dependencies**: None
 
@@ -201,10 +204,16 @@ copies, and their names stay in the list beside it.
 - `shared/resources/finalise-dod-fix-evidence-prompt.md`
 
 **Changes**:
-- [ ] Step 3a calls the script, and the Step 2 block of the running summary gains a `**PR diff:**` line
-- [ ] Step 3e removes both files
-- [ ] The AC prompt takes members from the names list, and an empty list fails a criterion over a set
-- [ ] The docs and fix-evidence prompts say what an empty diff means
+- [x] Step 3a calls the script, and the Step 2 block of the running summary gains a `**PR diff:**` line
+- [x] Step 3e removes both files
+- [x] The AC prompt takes members from the names list, and an empty list fails a criterion over a set
+- [x] The docs and fix-evidence prompts say what an empty diff means, in each prompt's own status
+      words: a check that needs the diff is `FAIL`, with the note "the change could not be read".
+      Neither contract has a `NEEDS_MANUAL_REVIEW` token (`PASS | FAIL | NOT_APPLICABLE` in both), and
+      `NOT_APPLICABLE` would read as nothing to check
+- [x] The fix-evidence prompt's check 5 ("bundled copies match the source",
+      `finalise-dod-fix-evidence-prompt.md:68-69`) reads the copies from `<DIFF_FILE>.names`: the patch
+      no longer holds them, so reading the patch would fail every bug fix that touches `shared/resources/`
 
 **Dependencies**: Phase 1
 
@@ -217,9 +226,9 @@ copies, and their names stay in the list beside it.
 - `shared/resources/tests/finalise-gaps-path.test.mjs`
 
 **Changes**:
-- [ ] Write the failing cases first
-- [ ] End the section at an unfenced change-log marker, current or legacy
-- [ ] Add a parity test: the script's markers are the ones `change-log.js` exports
+- [x] Write the failing cases first
+- [x] End the section at an unfenced change-log marker, current or legacy
+- [x] Add a parity test: the script's markers are the ones `change-log.js` exports
 
 **Dependencies**: None
 
@@ -232,8 +241,8 @@ copies, and their names stay in the list beside it.
 - Generated copies under `skills/*/references/`
 
 **Changes**:
-- [ ] Write the CHANGELOG entry
-- [ ] Run `npm run bundle`, then `npm run bundle:check`
+- [x] Write the CHANGELOG entry
+- [x] Run `npm run bundle`, then `npm run bundle:check`
 
 **Dependencies**: Phases 1 to 3
 
@@ -257,7 +266,29 @@ copies, and their names stay in the list beside it.
 ### Files to Modify (Tests)
 
 8. ✅ `shared/resources/tests/finalise-gaps-path.test.mjs` - the marker cases
-9. ✅ `evals/shared/tests/finalise-dod-prompt-contract.test.mjs` - the AC prompt's rule
+9. ✅ `evals/shared/tests/finalise-dod-prompt-contract.test.mjs` - the AC prompt's rule, the empty-diff
+   sentences, and fix-evidence check 5 reading the names list
+
+### Tests that pin the touched documents (read before editing)
+
+Found by file name, not by literal:
+`git grep -ln 'finalise-dod-ac-prompt\|finalise-dod-docs-prompt\|finalise-dod-fix-evidence-prompt\|dod-gap-count' -- '*.test.*'`.
+Each reads one of the files above by pattern and may need no change; read it for a structural pin
+before the edit.
+
+- `evals/shared/tests/finalise-bug-mode.test.mjs`, `finalise-publish-boundary.test.mjs`,
+  `finalise-rerun-scope-blocks.test.mjs`, `qa-measured-figure-parity.test.mjs`
+- `shared/resources/tests/finalise-dod-ac-kinds.test.mjs`, `qa-finalise-rules-wiring.test.mjs`,
+  `resolve-pr-number.test.mjs`, `zsh-flag-expansion-guard.test.mjs`
+- `tests/explore-prompts-no-write.test.js`, `review-plan-shape-checks.test.js`,
+  `review-task-measured-criterion.test.js`
+
+Two constraints follow. `finalise-rerun-scope-blocks.test.mjs` asserts that exactly one bash fence holds
+each of its needles, so the new Step 3a fence must not contain `finalise-rerun-scope.js scope`.
+`explore-prompts-no-write.test.js` refuses a write redirect in an Explore prompt, so the prompts read the
+names list (`tr '\0' '\n' < <DIFF_FILE>.names`) and never write it. The literal search
+(`git grep -n 'HEAD~1 HEAD\|gh pr diff\|pr-diff-' -- '*.test.*'`) finds one hit,
+`skills/review-pr/tests/review-pr.test.js:409`, which pins `review-pr` Step 4 and is out of scope.
 
 ### Files to Modify (Documentation)
 
@@ -290,6 +321,7 @@ None.
 | A bundled copy and a hand-written `references/` file change | both, or neither | the second in the patch, both in the names |
 | A repository with no `shared/resources/` | all files | all files |
 | A path with a space, a quote or a newline | as git prints it | in the names list, NUL-delimited |
+| A change to a `shared/resources/` file and its bundled copy, read by fix-evidence check 5 | the copy is in the patch | the copy is in the names list, and the prompt reads it there |
 | Base branch name absent on the remote | the last commit | `unresolved`, with the fetch's reason |
 
 | Gap body | Today | After |
@@ -321,7 +353,10 @@ Not applicable.
 - [ ] Every row of the two § 8 tables holds in a test that drives the script
 - [ ] No block in `skills/finalise/SKILL.md` runs `git diff HEAD~1 HEAD`
 - [ ] The Step 3a block writes a `**PR diff:**` line for each of `merge-base`, `forge` and `unresolved`
-- [ ] The AC prompt fails a criterion over a set when the names list is empty
+- [ ] The AC prompt fails a criterion over a set when the names list is empty, held by
+      `finalise-dod-prompt-contract.test.mjs`
+- [ ] The docs and fix-evidence prompts report an empty diff as `FAIL` with "the change could not be
+      read", and fix-evidence check 5 reads `<DIFF_FILE>.names`, held by `finalise-dod-prompt-contract.test.mjs`
 
 ### Performance
 
@@ -401,12 +436,67 @@ A wrong reason text, or a missing line in the running summary, is fixed forward.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: PASS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-28
+**Quality Score**: 96/100
+**Gate Decision**: PASS
+
+### QA Report
+- **Full Report**: [task.321.qa.3.finalise-diff-and-gap-body.md](./task.321.qa.3.finalise-diff-and-gap-body.md)
+- **Gate File**: [task.321.gate.3.finalise-diff-and-gap-body.yml](./task.321.gate.3.finalise-diff-and-gap-body.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 133 in the three task suites; 9055 in `ci:fast`
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
+
+### Key Findings
+- T321-CR-201 fixed: the AC and fix-evidence agents now receive `<DIFF_LINE>`, and the DoD's Step 2 block records it.
+- T321-CR-202 fixed: the merge-base patch ignores host git colour and prefix config.
+- Three low test-coverage cleanups recorded as future work.
+
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.321.qa.3.finalise-diff-and-gap-body.md`
+**Gate File**: `task.321.gate.3.finalise-diff-and-gap-body.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 96/100
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 11/11 met, each cited to code and a per-PR test (or a committed record)
+✅ **Unit Tests:** the three task suites (133 tests) and `ci:fast` (9055 tests, 0 failed); CI reading 1 SUCCESS over 6 checks
+✅ **PR Review:** PR #969 — `/review-pr` APPROVE, 0 findings (the host requires no human review)
+✅ **Documentation:** CHANGELOG `[Unreleased]` entry; finalise SKILL.md, three DoD prompts and bundled copies updated
+✅ **Security Review:** PASS — `dod-gap-count.sh` probed as a boundary, 14 candidates executed, 0 reproduced
+⚠️ **Compliance Review:** NOT_APPLICABLE — internal skill tooling
+
+**Task marked as ACCEPTED on:** 2026-11-28
+
+**Detailed Verification Log:** See `task.321.dod.1.finalise-diff-and-gap-body.md` for complete verification evidence and timestamps.
 <!-- change-log-start -->
 ## Change Log
 
-| Date       | Version | Description                                     | Author      |
-| ---------- | ------- | ----------------------------------------------- | ----------- |
+| Date | Version | Description | Author |
+|------|---------|-------------|--------|
 | 2026-11-25 | 1.0     | Initial draft — cut from observation #178       | create-task |
+| 2026-11-28 | 1.1     | Review passed (8/10) — prompts use their own status words, fix-evidence check 5 reads the names list, pattern-pinning tests listed | review-task |
+| 2026-11-28 |         | Status → ready-for-development                  | review-task |
+| 2026-11-28 |         | Implemented — 17 files, 21 tests                | develop     |
+| 2026-11-28 |         | QA gate CONCERNS (90/100) — 2 findings          | qa-task     |
+| 2026-11-28 |         | QA findings fixed — 2 of 2, 1 iteration         | qa-fix      |
+| 2026-11-28 |         | QA gate CONCERNS (90/100) — 2 findings          | qa-task     |
+| 2026-11-28 |         | QA findings fixed — 2 of 2, 1 iteration         | qa-fix      |
+| 2026-11-28 |         | QA gate PASS (96/100) — 0 findings              | qa-task     |
+| 2026-11-28 | 1.2 | DoD passed — accepted (PR #969) | finalise |
 <!-- change-log-end -->
 
 ---
@@ -415,26 +505,57 @@ A wrong reason text, or a missing line in the running summary, is fixed forward.
 
 ### Phase 1: The diff reader
 
-- [ ] Failing cases
-- [ ] Script
-- [ ] Exclusion
+- [x] Failing cases (written beside the script, not before it; each rule mutation-proven instead — see the implementation report)
+- [x] Script
+- [x] Exclusion
 
 ### Phase 2: `/finalise` uses it
 
-- [ ] Steps 3a and 3e
-- [ ] AC prompt
-- [ ] Docs and fix-evidence prompts
+- [x] Steps 3a and 3e
+- [x] AC prompt
+- [x] Docs and fix-evidence prompts
 
 ### Phase 3: The gap body
 
-- [ ] Failing cases
-- [ ] Marker rule
-- [ ] Parity test
+- [x] Failing cases
+- [x] Marker rule
+- [x] Parity test
 
 ### Phase 4: Records and bundle
 
-- [ ] CHANGELOG
-- [ ] Bundle
+- [x] CHANGELOG
+- [x] Bundle
+
+---
+
+## Implementation Summary
+
+**Completion Date**: 2026-11-28
+
+**Approach**: the plan's script and hunks, implemented inline. `finalise-diff.sh` reads the PR with
+`pr-read.sh`, resolves its head to a full commit, fetches the base, and diffs the merge base against
+that head. A `skills/*/references/` path whose relative path exists under `shared/resources/` in the
+head's tree is excluded from the patch and kept in `<file>.names`. When the head is not in the
+checkout, or adds nothing, the script asks `gh pr diff` (GitHub only) and takes the names from the
+`diff --git` headers. Otherwise it prints `unresolved: <reason>` and empties both files. Step 3a
+calls it through an argument array (for zsh) and records the line it prints. `dod-gap-count.sh` gains
+one awk rule after the `## ` rule.
+
+Beyond the plan: an executed-prose case cuts Step 3a's diff lines out of `SKILL.md` and runs them in
+bash and zsh. The source directory is held in `SRC_DIR` because the literal path read to the bundler
+as a file to bundle.
+
+**Testing Results**: `npm run test:remote` (`ci:fast` on the LAN server): 9045 tests, 9042 pass,
+0 fail, 3 skipped. The first run stopped at `format:check` (three new test files unformatted) and was
+re-run after `prettier --write`. The three task suites: 123 of 123. `bundle:check`: 0 problems.
+`lint:shell`: clean. `validate skills/finalise/`: passes. Phase 3's cases were red before the rule.
+Phase 1's were written after the script, so each rule was mutation-proven instead: the exclusion
+lookup, the empty-patch rule, the forge-arm empty check, the marker rule and its fence guard. Each
+was reverted alone and turned a named test red. They are listed in the implementation report.
+
+## Deferred Work
+
+None.
 
 ---
 

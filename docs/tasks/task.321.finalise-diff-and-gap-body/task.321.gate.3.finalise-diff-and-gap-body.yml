@@ -1,0 +1,68 @@
+schema: 2
+task: 'task.321.finalise-diff-and-gap-body'
+task_title: "finalise's diff fallback is one commit, and its gap body leaks a marker"
+gate: PASS
+status_reason: 'Both cycle-2 findings are fixed and held by tests that go red when the fix is reverted. The scoped refute pass (6230df1b1..391bd04e5) found no bugs; three low cleanups are recorded as future work.'
+reviewer: 'QA Engineer'
+head: '391bd04e5f035368026784dd8e24d060a4bb8fb6'
+updated: '2026-11-28T13:19:10Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 96
+
+evidence:
+  tests_reviewed: 133
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: internal
+    internal_reason: 'Unchanged from gate 1. dod-gap-count.sh reads the gaps section /finalise writes (markdown-structure sink, shell entry form entry-not-probeable). finalise-diff.sh is boundary false: a reader whose unresolved answer is recorded and prevents no action. Cycle 2 added only fixed output flags to its git and gh calls.'
+    boundary_signals: []
+    notes: 'No input reaches a shell evaluation; the PIN flags are literals.'
+  performance:
+    status: PASS
+    notes: 'No bound claimed.'
+  reliability:
+    status: PASS
+    notes: 'The agents receive <DIFF_LINE>; the patch no longer depends on host git colour or prefix config. 133 of 133 in the three task suites; ci:fast on the LAN server at this head 9055 tests, 0 failed. CI on the PR head is pending.'
+  maintainability:
+    status: PASS
+    notes: 'The placeholder rule is held for every DoD prompt by a test that reads the dispatch table.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'Code-review CR-301 (low/high): diff.relative only acts from a subdirectory and the hostile-config test runs at the repo top, so --no-relative is untested; add a case that runs the reader from a subdirectory.'
+      refs: ['shared/resources/tests/finalise-diff.test.mjs']
+      remedy: unverified
+    - action: 'Code-review CR-302 (low/high): no test covers --no-ext-diff or --no-textconv; add diff.external to the hostile config.'
+      refs: ['shared/resources/finalise-diff.sh']
+      remedy: unverified
+    - action: 'Code-review CR-303 (low/medium): a summary written before this change has no **PR diff:** line to replace on a re-run; say "replace or insert under **PR Status:**".'
+      refs: ['skills/finalise/SKILL.md']
+      remedy: unverified
+    - action: 'Carried from gate 2: CR-3 (copy-only change keeps names with an empty patch) and CR-5 (base fetch has no timeout).'
+      refs: ['shared/resources/finalise-diff.sh']
+      remedy: unverified
+
+deployment_readiness:
+  staging: READY
+  production: READY
+  conditions: []

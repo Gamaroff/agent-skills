@@ -1,0 +1,26 @@
+[
+  {
+    "argv": [
+      "--entry",
+      "shell-argv:shared/resources/dod-gap-count.sh",
+      "--argv",
+      "[\"{input}\",\"--body\"]",
+      "--name",
+      "dod-gap-count --body section end"
+    ],
+    "cases_file": "task.321.dod.1.security.cases.1.json",
+    "cases_sha256": "77838959088f646fd1807f326e3b57982d75771b1a22ef6562c2c29e1f1dcd65"
+  },
+  {
+    "argv": [
+      "--entry",
+      "shell-argv:shared/resources/dod-gap-count.sh",
+      "--argv",
+      "[\"{input}\"]",
+      "--name",
+      "dod-gap-count count"
+    ],
+    "cases_file": "task.321.dod.1.security.cases.2.json",
+    "cases_sha256": "649e41aafec44b336c660963885af2259a8a2c959b8f5c19d803585781800a57"
+  }
+]

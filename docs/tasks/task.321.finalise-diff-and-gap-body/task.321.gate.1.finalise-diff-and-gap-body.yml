@@ -1,0 +1,72 @@
+schema: 2
+task: 'task.321.finalise-diff-and-gap-body'
+task_title: "finalise's diff fallback is one commit, and its gap body leaks a marker"
+gate: CONCERNS
+status_reason: 'The diff reader, the prompts and the gap-body rule are right, and each rule turns a named test red when reverted. One medium finding: the Step 3e cleanup block reads $DIFF_FILE with no writer in its own shell, so it deletes ./.names and leaves both state files. One low: the forge arm keeps the bundled copies the contract says the patch leaves out. Both reproduced by execution.'
+reviewer: 'QA Engineer'
+head: 'd7eb2ce2cc5c1d21026d91a9fe2855b9a6c16dc7'
+updated: '2026-11-28T12:23:39Z'
+
+top_issues:
+  - id: 'T321-CR-101'
+    severity: medium
+    file: 'skills/finalise/SKILL.md'
+    finding: 'Step 3e (skills/finalise/SKILL.md:1359) runs rm -f "$DIFF_FILE" "$DIFF_FILE.names" in a block that never binds DIFF_FILE; each fenced block is its own shell, so it runs rm -f "" ".names" — reproduced in bash and zsh: ./.names deleted, .claude/state/pr-diff-*.diff and .names left. Control: with DIFF_FILE bound both state files go and ./.names stays. The base block (rm -f "$DIFF_FILE") had the same unbound read but deleted nothing; the .names deletion is new. Origin: code-review CR-1 (medium/high), reproduced by QA.'
+    suggested_action: 'Bind DIFF_FILE in the Step 3e block from a path Step 3a records, use ${DIFF_FILE:?} so an empty value fails, and hold the block with an executed test in bash and zsh.'
+    suggested_owner: dev
+    status: open
+  - id: 'T321-CR-102'
+    severity: low
+    file: 'shared/resources/finalise-diff.sh'
+    finding: 'The forge arm (shared/resources/finalise-diff.sh:144) writes gh pr diff verbatim, so its patch carries bundled skills/*/references/ copies that the script header, SKILL.md Step 3a and the fix-evidence prompt say <DIFF_FILE> leaves out — reproduced: a merged PR changing shared/resources/tool.md and its copy gives source=forge with the copy in the patch; control, the same change on the merge-base arm, excludes it. Origin: code-review CR-2 (low/medium), reproduced by QA.'
+    suggested_action: 'Filter the bundled-copy hunks out of the forge patch by the same source lookup (the names list keeps every path), or state in the header, SKILL.md and the prompts that the forge patch keeps them.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 123
+  phases_verified: '4/4'
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1, 2]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary: internal
+    internal_reason: 'dod-gap-count.sh reads the DoD gaps section /finalise writes into the task document; the markdown-structure sink fits the content but the shell entry form refuses it (entry-not-probeable: the sink is not materialised for shell entries), so no engine form reaches it. Same decision as task 222 gates 1-2. finalise-diff.sh is boundary false: a reader that reports its source, whose unresolved answer is recorded and prevents no action (exit 1 is not a HALT); candidates named: the resolved/unresolved arms and the bundled-copy lookup.'
+    boundary_signals: []
+    notes: 'No new input reaches a shell evaluation: paths are passed as arguments and pathspecs use :(literal). The forge error text is printed, never executed.'
+  performance:
+    status: PASS
+    notes: 'No bound claimed. One git diff --name-only and one git diff replace one forge call; one cat-file per references/ path.'
+  reliability:
+    status: CONCERNS
+    notes: 'T321-CR-101: the Step 3e cleanup misfires in its own shell. Otherwise: 123 of 123 across the three task suites at this head; ci:fast on the LAN server 9045 tests, 0 failed. CI on the PR head is pending.'
+  maintainability:
+    status: PASS
+    notes: 'One reader replaces an inline fallback chain; the markers are read from change-log.js by the test, not restated.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'T321-CR-101: bind DIFF_FILE in Step 3e and fail on an empty value.'
+      refs: ['skills/finalise/SKILL.md']
+  future: []
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T321-CR-101 fixed']
