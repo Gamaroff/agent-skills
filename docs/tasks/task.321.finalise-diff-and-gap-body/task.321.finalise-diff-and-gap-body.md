@@ -434,6 +434,28 @@ A wrong reason text, or a missing line in the running summary, is fixed forward.
 
 ---
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-28
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+- **Full Report**: [task.321.qa.1.finalise-diff-and-gap-body.md](./task.321.qa.1.finalise-diff-and-gap-body.md)
+- **Gate File**: [task.321.gate.1.finalise-diff-and-gap-body.yml](./task.321.gate.1.finalise-diff-and-gap-body.yml)
+
+### Test Coverage Summary
+- **Tests Executed**: 123 in the three task suites; 9045 in `ci:fast`
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
+
+### Key Findings
+- T321-CR-101 (medium): the Step 3e cleanup reads `$DIFF_FILE` with no writer in its own shell, deleting `./.names` and leaving both state files. Reproduced in bash and zsh.
+- T321-CR-102 (low): the forge arm's patch keeps bundled copies the contract says it leaves out. Reproduced.
+
 <!-- change-log-start -->
 ## Change Log
 
@@ -443,6 +465,8 @@ A wrong reason text, or a missing line in the running summary, is fixed forward.
 | 2026-11-28 | 1.1     | Review passed (8/10) — prompts use their own status words, fix-evidence check 5 reads the names list, pattern-pinning tests listed | review-task |
 | 2026-11-28 |         | Status → ready-for-development                  | review-task |
 | 2026-11-28 |         | Implemented — 17 files, 21 tests                | develop     |
+| 2026-11-28 |         | QA gate CONCERNS (90/100) — 2 findings          | qa-task     |
+| 2026-11-28 |         | QA findings fixed — 2 of 2, 1 iteration         | qa-fix      |
 <!-- change-log-end -->
 
 ---

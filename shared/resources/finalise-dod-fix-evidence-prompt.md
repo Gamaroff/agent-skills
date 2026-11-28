@@ -47,8 +47,9 @@ Run: `gh pr view <PR_NUMBER> --json state,reviewDecision,url 2>/dev/null`
 ### Step 3: Check the fix evidence
 
 Read the file paths modified in the PR from `<DIFF_FILE>.names` (`tr '\0' '\n' < <DIFF_FILE>.names`),
-and their hunks from `<DIFF_FILE>`; the patch leaves out bundled `skills/*/references/` copies, the
-names list keeps them. When the names list is empty or missing, the change could not be read (Step
+and their hunks from `<DIFF_FILE>`; the names list keeps bundled `skills/*/references/` copies, and
+the patch leaves them out only when Step 3a's `**PR diff:**` line reads `source=merge-base` (a
+`source=forge` patch keeps them). When the names list is empty or missing, the change could not be read (Step
 3a's `**PR diff:** unresolved: …`): every check that needs the diff is `FAIL` with the note "the
 change could not be read", never `PASS` or `NOT_APPLICABLE`. Then, for each check below, cite
 `path:line` — a check with no citation is `FAIL`, never `PASS`.
@@ -71,7 +72,7 @@ change could not be read", never `PASS` or `NOT_APPLICABLE`. Then, for each chec
    non-vacuity floor. `NOT_APPLICABLE` with a note when the diff adds no such guard.
 5. **Bundled copies match the source.** When the diff touches `shared/resources/`, confirm the
    bundled `skills/*/references/` copies are in the same change: read them from `<DIFF_FILE>.names`,
-   not `<DIFF_FILE>`, which leaves the copies out (or `npm run bundle:check` is clean).
+   not `<DIFF_FILE>`, which may leave the copies out (or `npm run bundle:check` is clean).
    `NOT_APPLICABLE` with a note when no shared file changed.
 
 ⚠️ **A `✅ Fixed` verification result is a claim, not evidence.** Verify against the diff and the

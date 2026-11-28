@@ -5,7 +5,8 @@
 #   bash .agents/skills/finalise/references/finalise-diff.sh --out <file> [--pr <n>]
 #
 # Writes two files and prints one line on stdout:
-#   <file>        the patch, without bundled copies (see "Bundled copies" below)
+#   <file>        the patch; on source=merge-base without bundled copies, on source=forge with them
+#                 (see "Bundled copies" below)
 #   <file>.names  EVERY changed path, the bundled copies included, NUL-delimited
 #
 #   source=merge-base base=<sha> head=<sha> files=<n> excluded=<n>   the change read from git
@@ -39,6 +40,11 @@
 # the source is in the patch, `bundle:check` holds the copy to it, and a criterion about the copies
 # still has its members. Not a path pattern (97 hand-written files live under references/), and not
 # the AUTO-GENERATED header (two JSON copies carry none).
+#
+# Only the merge-base arm leaves them out. The forge arm writes `gh pr diff` as the forge returned it,
+# copies included: its PR head is not in this checkout (or is merged), so there is no head tree to look
+# a source up in, and a lookup in another tree would exclude by a different rule. The line it prints,
+# source=forge, is what tells a reader the patch is the larger one.
 #
 # An empty result is `unresolved`, never an empty patch: "could not read the change" and "the change
 # is small" are different answers. `unresolved` truncates <file> before it exits, so a stale patch of

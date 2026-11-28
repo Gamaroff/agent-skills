@@ -1461,17 +1461,16 @@ test("task 321: fix-evidence check 5 reads the bundled copies from the names lis
   );
 });
 
-test("task 321: Step 3a reads the change through finalise-diff.sh, and Step 3e removes both files", () => {
+// Step 3e's cleanup is held by execution, not by its text: finalise-diff.test.mjs runs Step 3a and
+// then the Step 3e block in separate shells (QA T321-CR-101 — the old text passed while the block
+// ran `rm -f "" ".names"`).
+test("task 321: Step 3a reads the change through finalise-diff.sh", () => {
   const s = skill();
   assert.match(s, /references\/finalise-diff\.sh "\$\{DIFF_ARGS\[@\]\}"/);
   assert.doesNotMatch(
     s,
     /git diff HEAD~1 HEAD/,
     "a block still falls back to the last commit",
-  );
-  assert.ok(
-    has(s, 'rm -f "$DIFF_FILE" "$DIFF_FILE.names"'),
-    "Step 3e leaves the names list behind",
   );
   assert.ok(
     has(s, "`**PR diff:** {DIFF_LINE}` under the `**PR:**` line"),

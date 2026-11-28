@@ -54,7 +54,7 @@ Run: `gh pr view <PR_NUMBER> --json state,reviewDecision,url 2>/dev/null`
 ### Step 3: Check each acceptance criterion
 
 For each AC item extracted in Step 1:
-1. Read the changed file paths from `<DIFF_FILE>.names` (`tr '\0' '\n' < <DIFF_FILE>.names`): every path the PR changed, bundled `skills/*/references/` copies included. `<DIFF_FILE>` is the patch, without those copies. An empty or missing names list means the change could not be read (Step 3a's `**PR diff:** unresolved: …`), not that nothing changed.
+1. Read the changed file paths from `<DIFF_FILE>.names` (`tr '\0' '\n' < <DIFF_FILE>.names`): every path the PR changed, bundled `skills/*/references/` copies included. `<DIFF_FILE>` is the patch: without those copies when Step 3a's `**PR diff:**` line reads `source=merge-base`, with them when it reads `source=forge`. An empty or missing names list means the change could not be read (Step 3a's `**PR diff:** unresolved: …`), not that nothing changed.
 2. For each modified file path: search for code that implements the AC (grep key terms from the AC description).
 3. Also search for a test file (`.spec.ts`, `.test.ts`, `.spec.js`) that covers the AC — grep for the same key terms.
 4. **Citation rule**: A `PASS` requires BOTH a non-null `code_citation` AND a non-null `test_citation`. Missing either → `FAIL`. No exceptions.

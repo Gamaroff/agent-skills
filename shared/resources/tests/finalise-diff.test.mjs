@@ -213,6 +213,38 @@ for (const shell of SHELLS) {
     });
   });
 
+  // QA T321-CR-102: the forge patch keeps bundled copies, as the header, Step 3a and the prompts say.
+  test(`[${shell}] source=forge keeps a bundled copy in the patch as well as the names`, () => {
+    withRepo(({ dir, work }) => {
+      const head = commit(
+        work,
+        {
+          "shared/resources/tool.md": "v2\n",
+          "skills/s/references/tool.md": "v2\n",
+        },
+        "change",
+      );
+      git(work, "checkout", "-q", "develop");
+      git(work, "merge", "-q", "--no-ff", "-m", "merge", "feature/x");
+      git(work, "push", "-q", "origin", "develop");
+      const forge = git(work, "diff", "HEAD~1", "HEAD");
+      const { bin } = githubStub(dir, { head, diff: forge });
+      const out = path.join(work, "pr.diff");
+      const r = reader(shell, work, {
+        bin,
+        out,
+        env: { SKILLS_CONFIG_FILE: pinVcs(dir, "github") },
+      });
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      assert.match(r.stdout, /^source=forge pr=7 files=2$/m);
+      assert.match(
+        fs.readFileSync(out, "utf8"),
+        /^diff --git a\/skills\/s\/references\/tool\.md /m,
+      );
+      assert.ok(names(out).includes("skills/s/references/tool.md"));
+    });
+  });
+
   test(`[${shell}] the PR is merged, the checkout is the base, and gh fails: unresolved, exit 1, empty file`, () => {
     withRepo(({ dir, work }) => {
       const head = commit(work, { "a.txt": "a\n" }, "one");
@@ -538,6 +570,74 @@ for (const shell of SHELLS) {
         /^HALT: finalise-diff\.sh was called wrongly/m,
       );
       assert.doesNotMatch(wrong.stdout, /\*\*PR diff:\*\*/);
+    });
+  });
+}
+
+// ── The shipped Step 3e cleanup, executed in its own shell ───────────────────────────────────
+//
+// Each fenced block is its own shell, so the cleanup cannot read the DIFF_FILE Step 3a bound: it
+// binds the same path itself. Run as finalise runs it — Step 3a in one shell, Step 3e in the next —
+// both files Step 3a wrote are gone, and a `.names` beside them in the working directory is not
+// touched (QA T321-CR-101: an unbound `rm -f "$DIFF_FILE" "$DIFF_FILE.names"` is `rm -f "" ".names"`).
+function step3eBlock() {
+  const doc = readDoc("skills/finalise/SKILL.md");
+  const at = doc.indexOf("#### Step 3e: Clean Up and Proceed");
+  assert.ok(at >= 0, "Step 3e heading not found");
+  const m = doc.slice(at).match(/```bash\n([\s\S]*?)```/);
+  assert.ok(
+    m && /\.names/.test(m[1]),
+    "Step 3e's first bash block must remove the names list",
+  );
+  return m[1];
+}
+
+test("Step 3e binds the same DIFF_FILE path Step 3a writes", () => {
+  const bind = (code) =>
+    code.split("\n").find((l) => l.startsWith("DIFF_FILE="));
+  const a = bind(step3aDiffLines());
+  const e = bind(step3eBlock());
+  assert.ok(e, "Step 3e must bind DIFF_FILE in its own block");
+  assert.equal(e, a);
+  assert.doesNotMatch(
+    a,
+    /\$\(/,
+    "a path computed per shell cannot be rebound by a later block",
+  );
+});
+
+for (const shell of SHELLS) {
+  test(`[${shell}] Step 3e, run in its own shell, removes what Step 3a wrote and nothing else`, () => {
+    withRepo(({ dir, work }) => {
+      const cfg = pinVcs(dir, "github");
+      const env = { GIT_CONFIG_GLOBAL: "/dev/null", SKILLS_CONFIG_FILE: cfg };
+      const head = commit(work, { "a.txt": "a\n" }, "one");
+      consumer(work);
+      const { bin } = githubStub(dir, {
+        head,
+        diff: "diff --git a/a.txt b/a.txt\n",
+      });
+      const a = run(shell, `PR_NUMBER=7\n${step3aDiffLines()}`, {
+        cwd: work,
+        bin,
+        env,
+      });
+      assert.equal(a.status, 0, a.stdout + a.stderr);
+      const state = path.join(work, ".claude", "state");
+      const written = fs
+        .readdirSync(state)
+        .filter((f) => f.endsWith(".diff") || f.endsWith(".diff.names"));
+      assert.equal(written.length, 2, `Step 3a wrote ${written}`);
+      fs.writeFileSync(path.join(work, ".names"), "keep\n");
+
+      const e = run(shell, step3eBlock(), { cwd: work, bin, env });
+      assert.equal(e.status, 0, e.stdout + e.stderr);
+      for (const f of written)
+        assert.ok(!fs.existsSync(path.join(state, f)), `${f} left behind`);
+      assert.ok(
+        fs.existsSync(path.join(work, ".names")),
+        "./.names was deleted",
+      );
     });
   });
 }

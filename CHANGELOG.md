@@ -129,7 +129,8 @@ All notable changes to this project will be documented in this file. Format foll
   every run was judged on its last commit; and an empty diff passed a criterion over a set. The new
   `finalise-diff.sh` diffs the merge base against the PR's head on either forge, asks GitHub only
   when that head is not checked out or adds nothing, leaves bundled `references/` copies out of the
-  patch but keeps every path in a names list, and otherwise prints `unresolved: <reason>`. The line
+  merge-base patch (the forge's patch keeps them) but keeps every path in a names list, and
+  otherwise prints `unresolved: <reason>`. The line
   it prints goes into the DoD as `**PR diff:**`, and the AC, docs and fix-evidence prompts fail a
   check with "the change could not be read" when there is no change to read. Separately,
   `dod-gap-count.sh --body` now ends the gap section at the change-log start marker, current or
