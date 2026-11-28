@@ -392,6 +392,32 @@ Each phase stands alone. Revert one phase's commit to back out only that outcome
 
 A false positive in the guard is fixed by narrowing the key, with the new case added to the test.
 
+## QA Testing Results
+
+**QA Status**: CONCERNS
+**QA Engineer**: QA Engineer
+**Testing Date**: 2026-11-28
+**Quality Score**: 90/100
+**Gate Decision**: CONCERNS
+
+### QA Report
+
+- **Full Report**: [task.333.qa.1.close-task-332-follow-ups-and-zsh-flag-guard.md](./task.333.qa.1.close-task-332-follow-ups-and-zsh-flag-guard.md)
+- **Gate File**: [task.333.gate.1.close-task-332-follow-ups-and-zsh-flag-guard.yml](./task.333.gate.1.close-task-332-follow-ups-and-zsh-flag-guard.yml)
+
+### Test Coverage Summary
+
+- **Tests Executed**: 108 (task suites); 8985 pass in `test:remote`
+- **Phases Verified**: 4/4
+- **Critical Issues**: 0
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+
+### Key Findings
+
+- T333-QA-1 (MEDIUM): the zsh guard drops every `references/` path, so 81 hand-authored `skills/*/references/*.md` files go unscanned. Reproduced by QA.
+- T333-QA-2 (LOW): the guard's key misses `${X:+ --flag "$X"}` (whitespace after `:+`). Reproduced under zsh.
+- All six planned mutations reproduced red by QA; SC 1, 7 and 8 records are in the QA report.
+
 ## Change Log
 
 <!-- change-log-start -->
@@ -403,6 +429,7 @@ A false positive in the guard is fixed by narrowing the key, with the new case a
 |  |  | Status → ready-for-development | review-task |
 | 2026-11-28 |  | Implemented — 13 files, 6 tests added (guard 5 cases; 1 blocks case + 3 assertion sets; 1 parse-count) | develop |
 |  |  | Status → ready-for-review | develop |
+| 2026-11-28 |  | QA gate CONCERNS (90/100) — 2 findings (1 medium, 1 low) | qa-task |
 
 <!-- change-log-end -->
 

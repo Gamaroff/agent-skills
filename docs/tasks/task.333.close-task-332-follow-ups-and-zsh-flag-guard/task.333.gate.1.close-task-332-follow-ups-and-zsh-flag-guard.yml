@@ -1,0 +1,79 @@
+schema: 2
+task: 'task.333.close-task-332-follow-ups-and-zsh-flag-guard'
+task_title: "Close task 332's follow-ups and guard the zsh flag trap"
+gate: CONCERNS
+status_reason: 'Every success criterion verified and all six mutations reproduced red. One MEDIUM, reproduced by QA: the zsh guard drops every /references/ path, so the 81 hand-authored skills/*/references/*.md files it treats as bundle copies go unscanned. Its doc and traps.md say it covers every canonical source.'
+reviewer: 'QA Engineer'
+head: 'bc7b6013867d0db9c8b21dae448aa019ef46826d'
+updated: '2026-11-28T07:31:24Z'
+
+top_issues:
+  - id: 'T333-QA-1'
+    severity: medium
+    file: 'shared/resources/tests/zsh-flag-expansion-guard.test.mjs'
+    finding: 'population() drops every path containing /references/ as a bundle copy. 81 tracked skills/*/references/*.md files carry no AUTO-GENERATED header, so they are canonical sources the guard never reads. Reproduced: a `${PIN_BRANCH:+--doc-branch "$PIN_BRANCH"}` line put in a bash fence of skills/develop-bug/references/develop-bug-step-5-6-verify-loop.md left the guard green (5/5). Control: the same line in a SKILL.md fence turns test A red (M1). The guard header and traps.md say it covers canonical sources. Origin: code-review CR-1 (medium/medium), reproduced by QA.'
+    suggested_action: 'Select the population by content, not path: include a references/*.md file unless it carries the bundle AUTO-GENERATED header. Add a test that a hand-authored references file is in the population and a generated copy is not.'
+    suggested_owner: dev
+    status: open
+  - id: 'T333-QA-2'
+    severity: low
+    file: 'shared/resources/tests/zsh-flag-expansion-guard.test.mjs'
+    finding: 'FLAG_KEY misses whitespace after `:+`. Reproduced: `set -- ${X:+ --flag "$X"}` gives 1 argument under zsh and 2 under bash, the same defect as the caught form. The NOT CAUGHT list does not name this shape. Origin: code-review CR-3 (cleanup, low/medium), reproduced by QA.'
+    suggested_action: 'Allow optional whitespace in the key (`:\+\s*["'']?-`), add the spaced shape to test D''s caught list, and keep `"${X:+ (eq ${X})}"` legal.'
+    suggested_owner: dev
+    status: open
+
+waiver:
+  active: false
+
+quality_score: 90
+
+evidence:
+  tests_reviewed: 108
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: [1]
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary: internal
+    internal_reason: 'merge() change only passes the CLI''s parsed answer into merge (opts.answer). It adds no refusal and changes none. Its input is still the AC agent YAML /finalise extracts, the scope JSON Step 3a wrote and the --doc path Step 3c substitutes, and no corpus sink models those (same decision as task 331 gate 4 and task 332 gate 1). The Step 3a STEM guard reads only the placeholders the agent substitutes into the block. The fence: form fills one slot, and that block carries three placeholders plus a bundled-engine call, so no legitimate case can run. Its refusals run under bash and zsh in finalise-rerun-scope-blocks.test.mjs (unsubstituted placeholders and an empty DOD_N HALT before the engine).'
+    notes: 'No new input reaches the filesystem. The guard is a read-only test.'
+  performance:
+    status: PASS
+    notes: 'One merge CLI run now parses the AC YAML once instead of twice (parse-count test).'
+  reliability:
+    status: PASS
+    notes: 'AC_YAML_VERIFIED is echoed through an if, so result-unparseable keeps exit status 0. The Step 3a rename has a stated resume path.'
+  maintainability:
+    status: CONCERNS
+    notes: 'The guard''s claimed scope is wider than what it scans (T333-QA-1), and it misses one spelling (T333-QA-2).'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+recommendations:
+  immediate:
+    - action: 'Widen the guard population to hand-authored references/*.md (T333-QA-1).'
+      refs: ['shared/resources/tests/zsh-flag-expansion-guard.test.mjs']
+  future:
+    - action: 'review-story Step 9.6 and the status-push Jira block read $PIN_BRANCH and $STORY_FILE_PATH, which neither block binds. When a block runs as its own shell, the doc link silently stays on the current branch. Pre-existing: origin/develop reads PIN_BRANCH identically at :2398 and :2483. Origin: code-review CR-2 (low/medium).'
+      refs: ['skills/review-story/SKILL.md']
+      provenance: pre-existing
+      remedy: unverified
+    - action: 'The security-probe fence: form fills one slot, so a guard block with several placeholders (finalise Step 3a) cannot be probed by the engine.'
+      refs: ['shared/resources/security-probe.mjs']
+      remedy: unverified
+
+deployment_readiness:
+  staging: CONDITIONAL
+  production: CONDITIONAL
+  conditions: ['T333-QA-1 fixed and re-gated']
