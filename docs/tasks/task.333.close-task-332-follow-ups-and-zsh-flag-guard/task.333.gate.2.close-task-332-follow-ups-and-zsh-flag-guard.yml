@@ -1,0 +1,74 @@
+schema: 2
+task: 'task.333.close-task-332-follow-ups-and-zsh-flag-guard'
+task_title: "Close task 332's follow-ups and guard the zsh flag trap"
+gate: PASS
+status_reason: 'Both cycle 1 findings are fixed and mutation-proven by QA in both directions (M8, M9, M10 covered). The cycle 2 refute pass found two unbound reads in review-story that are identical on origin/develop (pre-existing, routed to future work) and two advisory cleanups. No open issue.'
+reviewer: 'QA Engineer'
+head: 'b30e42f940fd9cc2449cf32d0e77a4a9ad5e80b9'
+updated: '2026-11-28T08:32:43Z'
+
+top_issues: []
+
+waiver:
+  active: false
+
+quality_score: 100
+
+evidence:
+  tests_reviewed: 110
+  phases_verified: 4/4
+  trace:
+    phases_covered: [1, 2, 3, 4]
+    phases_with_issues: []
+
+nfr_validation:
+  security:
+    status: PASS
+    evidence: reasoned
+    probes_executed: 0
+    escaped: 0
+    boundary_signals: []
+    boundary: internal
+    internal_reason: 'Unchanged from gate 1: merge() only passes the parsed answer through opts.answer, and the Step 3a STEM guard reads only placeholders the agent substitutes. Cycle 1 changed only a read-only test file. No corpus sink models these inputs (same decision as task 331 gate 4 and task 332 gate 1). The fence: form fills one slot, and the Step 3a block carries three placeholders.'
+    notes: 'No new input reaches the filesystem. The guard is a read-only test.'
+  performance:
+    status: PASS
+    notes: 'One merge CLI run parses the AC YAML once (parse-count test).'
+  reliability:
+    status: PASS
+    notes: 'AC_YAML_VERIFIED is echoed through an if; the Step 3a rename has a stated resume path.'
+  maintainability:
+    status: PASS
+    notes: 'The guard now scans every canonical source it claims (76 hand-authored references files added; generated copies left out by marker) and catches the spaced form. CR-3 calibration gaps are advisory, with no live site.'
+
+criteria_drift:
+  reason: clean
+  base: review-commit
+  changed: []
+
+bug_resolution:
+  fixed: ['T333-QA-1', 'T333-QA-2']
+  fix_commit: 'b30e42f94'
+  verification_method: 'QA mutation spot check (M8 key, M9 population path half, M10 marker half) plus test:remote 8987 pass, 0 fail'
+
+recommendations:
+  immediate: []
+  future:
+    - action: 'review-story Step 9.6 and the Step 10 status-push Jira blocks read $PIN_BRANCH and $STORY_FILE_PATH, which neither block binds, so the doc link stays on the current branch when a block runs as its own shell. Pre-existing: origin/develop reads both identically at :2398 and :2483. Origin: cycle 2 code review CR-1/CR-2 (medium/medium), and gate 1 CR-2.'
+      refs: ['skills/review-story/SKILL.md']
+      provenance: pre-existing
+      remedy: unverified
+    - action: 'zsh guard calibration: FLAG_KEY flags the correct one-word ${X:+--flag=$X}, and misses ${X+--flag "$X"} (no colon) and ${1:+-f "$1"} (positional), both 1 argument under zsh and 2 under bash. No canonical source uses any of the three today. Either widen the key and exclude =-joined flags, or name them under NOT CAUGHT. Origin: cycle 2 CR-3 (cleanup), reproduced by QA.'
+      refs: ['shared/resources/tests/zsh-flag-expansion-guard.test.mjs', 'docs/contributing/traps.md']
+      remedy: unverified
+    - action: 'finalise Step 3c prints AC_YAML_VERIFIED=false for two routes (failed extract, removed record) and leaves the agent to recall which reason to disclose; print the reason too. Origin: cycle 2 CR-4 (cleanup).'
+      refs: ['skills/finalise/SKILL.md']
+      remedy: unverified
+    - action: 'The security-probe fence: form fills one slot, so a guard block with several placeholders (finalise Step 3a) cannot be probed by the engine.'
+      refs: ['shared/resources/security-probe.mjs']
+      remedy: unverified
+
+deployment_readiness:
+  staging: APPROVED
+  production: APPROVED
+  conditions: []

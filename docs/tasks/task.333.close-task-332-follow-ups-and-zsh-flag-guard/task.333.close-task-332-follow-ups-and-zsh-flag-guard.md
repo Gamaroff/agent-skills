@@ -394,29 +394,28 @@ A false positive in the guard is fixed by narrowing the key, with the new case a
 
 ## QA Testing Results
 
-**QA Status**: CONCERNS
+**QA Status**: PASS
 **QA Engineer**: QA Engineer
 **Testing Date**: 2026-11-28
-**Quality Score**: 90/100
-**Gate Decision**: CONCERNS
+**Quality Score**: 100/100
+**Gate Decision**: PASS
 
 ### QA Report
 
-- **Full Report**: [task.333.qa.1.close-task-332-follow-ups-and-zsh-flag-guard.md](./task.333.qa.1.close-task-332-follow-ups-and-zsh-flag-guard.md)
-- **Gate File**: [task.333.gate.1.close-task-332-follow-ups-and-zsh-flag-guard.yml](./task.333.gate.1.close-task-332-follow-ups-and-zsh-flag-guard.yml)
+- **Full Report**: [task.333.qa.2.close-task-332-follow-ups-and-zsh-flag-guard.md](./task.333.qa.2.close-task-332-follow-ups-and-zsh-flag-guard.md)
+- **Gate File**: [task.333.gate.2.close-task-332-follow-ups-and-zsh-flag-guard.yml](./task.333.gate.2.close-task-332-follow-ups-and-zsh-flag-guard.yml)
 
 ### Test Coverage Summary
 
-- **Tests Executed**: 108 (task suites); 8985 pass in `test:remote`
+- **Tests Executed**: 110 (task suites); 8987 pass in `test:remote`
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
-- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: CONCERNS
+- **NFR Status**: Security: PASS, Performance: PASS, Reliability: PASS, Maintainability: PASS
 
 ### Key Findings
 
-- T333-QA-1 (MEDIUM): the zsh guard drops every `references/` path, so 81 hand-authored `skills/*/references/*.md` files go unscanned. Reproduced by QA.
-- T333-QA-2 (LOW): the guard's key misses `${X:+ --flag "$X"}` (whitespace after `:+`). Reproduced under zsh.
-- All six planned mutations reproduced red by QA; SC 1, 7 and 8 records are in the QA report.
+- T333-QA-1 and T333-QA-2 are fixed (`b30e42f94`). QA reverted each fix and saw its test fail.
+- The cycle 2 refute review found two unbound reads in review-story's Jira blocks. They are identical on `origin/develop`, so they are routed to future work. It also found two advisory cleanups.
 
 ## Change Log
 
@@ -431,6 +430,7 @@ A false positive in the guard is fixed by narrowing the key, with the new case a
 |  |  | Status → ready-for-review | develop |
 | 2026-11-28 |  | QA gate CONCERNS (90/100) — 2 findings (1 medium, 1 low) | qa-task |
 | 2026-11-28 |  | QA findings fixed — T333-QA-1, T333-QA-2 (guard population by marker, whitespace key), 1 iteration | qa-fix |
+| 2026-11-28 |  | QA gate PASS (100/100) — 0 open findings (2 pre-existing routed to future, 2 advisory cleanups) | qa-task |
 
 <!-- change-log-end -->
 
