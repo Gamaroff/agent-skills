@@ -111,7 +111,10 @@ if [ -n "$HEAD_SHA" ]; then
     || unresolved "git fetch origin ${BASE} failed: $(printf '%s' "$FETCH_ERR" | tr '\n' ' ' | sed 's/ *$//')"
   MB=$(git merge-base "refs/remotes/origin/${BASE}" "$HEAD_SHA" 2>/dev/null) \
     || unresolved "no merge base between origin/${BASE} and the PR head ${HEAD_SHA:0:12}"
-  git diff --name-only -z "$MB" "$HEAD_SHA" > "$NAMES" \
+  # The output flags are pinned: a user's color.ui=always, diff.noprefix, diff.relative or an
+  # external diff tool must not reach what the agents read (QA T321-CR-202).
+  PIN=(--no-color --no-ext-diff --no-textconv --no-relative --src-prefix=a/ --dst-prefix=b/)
+  git diff "${PIN[@]}" --name-only -z "$MB" "$HEAD_SHA" > "$NAMES" \
     || unresolved "git diff --name-only $MB $HEAD_SHA failed"
   if [ -s "$NAMES" ]; then
     EXCL=()
@@ -130,7 +133,7 @@ if [ -n "$HEAD_SHA" ]; then
       esac
     done < "$NAMES"
     # `${EXCL[@]+…}`: an empty array under set -u is an error on bash 4.3 and older.
-    git diff "$MB" "$HEAD_SHA" -- ':(top)' ${EXCL[@]+"${EXCL[@]}"} > "$OUT" \
+    git diff "${PIN[@]}" "$MB" "$HEAD_SHA" -- ':(top)' ${EXCL[@]+"${EXCL[@]}"} > "$OUT" \
       || unresolved "git diff $MB $HEAD_SHA failed"
     if [ ! -s "$OUT" ]; then
       KEEP_NAMES=1 unresolved "every changed file is a bundled copy (${TOTAL} in ${NAMES##*/})"
@@ -148,7 +151,7 @@ fi
 # ── The forge arm: GitHub only ───────────────────────────────────────────────────────────────
 [ "$PR_READ_VCS" = github ] || unresolved "$WHY_NO_GIT, and the forge diff is GitHub-only (vcs: ${PR_READ_VCS:-unknown})"
 command -v gh >/dev/null 2>&1 || unresolved "$WHY_NO_GIT, and gh is not on PATH"
-FORGE_ERR=$(gh pr diff "$PR" 2>&1 > "$OUT") \
+FORGE_ERR=$(gh pr diff "$PR" --color=never 2>&1 > "$OUT") \
   || unresolved "$WHY_NO_GIT, and gh pr diff $PR failed: $(printf '%s' "$FORGE_ERR" | tr '\n' ' ' | sed 's/ *$//')"
 [ -s "$OUT" ] || unresolved "$WHY_NO_GIT, and gh pr diff $PR returned an empty diff"
 

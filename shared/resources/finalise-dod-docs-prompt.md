@@ -57,7 +57,7 @@ Based on `<STORY_TYPE>`, check:
 - Are any skill `SKILL.md` files, shared resource files, or README files updated for the changed functionality?
 - If a skill's catalog entry changed, is the catalog regenerated? Judge from the PR's changed files
   (`tr '\0' '\n' < <DIFF_FILE>.names`, then that `SKILL.md`'s hunks in `<DIFF_FILE>`). When the
-  names list is empty or missing, the change could not be read (Step 3a's `**PR diff:** unresolved: …`):
+  names list is empty or missing, the change could not be read (Step 3a's reader answered `unresolved`):
   this check is `FAIL` with the note "the change could not be read", never `PASS` or `NOT_APPLICABLE`.
   Otherwise:
   the catalog is built from `SKILL.md` frontmatter only, so a `SKILL.md` whose frontmatter changed in

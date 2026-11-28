@@ -443,18 +443,19 @@ A wrong reason text, or a missing line in the running summary, is fixed forward.
 **Gate Decision**: CONCERNS
 
 ### QA Report
-- **Full Report**: [task.321.qa.1.finalise-diff-and-gap-body.md](./task.321.qa.1.finalise-diff-and-gap-body.md)
-- **Gate File**: [task.321.gate.1.finalise-diff-and-gap-body.yml](./task.321.gate.1.finalise-diff-and-gap-body.yml)
+- **Full Report**: [task.321.qa.2.finalise-diff-and-gap-body.md](./task.321.qa.2.finalise-diff-and-gap-body.md)
+- **Gate File**: [task.321.gate.2.finalise-diff-and-gap-body.yml](./task.321.gate.2.finalise-diff-and-gap-body.yml)
 
 ### Test Coverage Summary
-- **Tests Executed**: 123 in the three task suites; 9045 in `ci:fast`
+- **Tests Executed**: 128 in the three task suites; 9050 in `ci:fast`
 - **Phases Verified**: 4/4
 - **Critical Issues**: 0
 - **NFR Status**: Security: PASS, Performance: PASS, Reliability: CONCERNS, Maintainability: PASS
 
 ### Key Findings
-- T321-CR-101 (medium): the Step 3e cleanup reads `$DIFF_FILE` with no writer in its own shell, deleting `./.names` and leaving both state files. Reproduced in bash and zsh.
-- T321-CR-102 (low): the forge arm's patch keeps bundled copies the contract says it leaves out. Reproduced.
+- Cycle 1's two findings are fixed; T321-CR-101 is held by an executed Step 3a → Step 3e test.
+- T321-CR-201 (medium): the AC and fix-evidence prompts read Step 3a's `**PR diff:**` line, which no agent receives.
+- T321-CR-202 (low): the merge-base patch takes the host's git config (reproduced with `color.ui=always`).
 
 <!-- change-log-start -->
 ## Change Log
@@ -465,6 +466,8 @@ A wrong reason text, or a missing line in the running summary, is fixed forward.
 | 2026-11-28 | 1.1     | Review passed (8/10) — prompts use their own status words, fix-evidence check 5 reads the names list, pattern-pinning tests listed | review-task |
 | 2026-11-28 |         | Status → ready-for-development                  | review-task |
 | 2026-11-28 |         | Implemented — 17 files, 21 tests                | develop     |
+| 2026-11-28 |         | QA gate CONCERNS (90/100) — 2 findings          | qa-task     |
+| 2026-11-28 |         | QA findings fixed — 2 of 2, 1 iteration         | qa-fix      |
 | 2026-11-28 |         | QA gate CONCERNS (90/100) — 2 findings          | qa-task     |
 | 2026-11-28 |         | QA findings fixed — 2 of 2, 1 iteration         | qa-fix      |
 <!-- change-log-end -->

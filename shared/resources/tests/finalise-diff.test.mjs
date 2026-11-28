@@ -135,6 +135,34 @@ for (const shell of SHELLS) {
     });
   });
 
+  // QA T321-CR-202: the patch must not depend on the host's git config. The other cases pin
+  // GIT_CONFIG_GLOBAL=/dev/null, which is exactly why they could not see this.
+  test(`[${shell}] a hostile user git config does not reach the patch: no colour, a/ and b/ prefixes`, () => {
+    withRepo(({ dir, work }) => {
+      const head = commit(work, { "a.txt": "a\n", "dir/b.txt": "b\n" }, "one");
+      const { bin } = githubStub(dir, { head });
+      const userCfg = path.join(dir, "hostile.gitconfig");
+      fs.writeFileSync(
+        userCfg,
+        "[color]\n\tui = always\n\tdiff = always\n[diff]\n\tnoprefix = true\n\tmnemonicPrefix = true\n\trelative = true\n",
+      );
+      const out = path.join(work, "pr.diff");
+      const r = reader(shell, work, {
+        bin,
+        out,
+        env: {
+          GIT_CONFIG_GLOBAL: userCfg,
+          SKILLS_CONFIG_FILE: pinVcs(dir, "github"),
+        },
+      });
+      assert.equal(r.status, 0, r.stdout + r.stderr);
+      const patch = fs.readFileSync(out, "utf8");
+      assert.doesNotMatch(patch, /\x1b\[/, "ANSI escapes in the patch");
+      assert.deepEqual(diffFiles(out).sort(), ["a.txt", "dir/b.txt"]);
+      assert.deepEqual(names(out).sort(), ["a.txt", "dir/b.txt"]);
+    });
+  });
+
   test(`[${shell}] a Bitbucket remote reads the change from git: source=merge-base`, () => {
     withRepo(({ dir, work, origin }) => {
       commit(work, { "a.txt": "a\n" }, "one");

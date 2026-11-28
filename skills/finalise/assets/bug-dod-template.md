@@ -16,6 +16,7 @@
 ## Step 2: Fix Evidence (the bug's "acceptance criteria")
 
 **Overall:** {✅ PASS | ❌ FAIL | ⚠️ PARTIAL}
+**PR diff:** {DIFF_LINE}
 
 #### Expected behaviour — "{the bug's Expected Behaviour, quoted}"
 

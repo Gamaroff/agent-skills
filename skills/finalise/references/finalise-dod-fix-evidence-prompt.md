@@ -1,6 +1,6 @@
 ---
 name: finalise-dod-fix-evidence-prompt
-description: Explore subagent prompt for the fix-evidence check that replaces AC traceability when /finalise runs in bug mode (--bug). Substitute <BUG_FILE>, <PR_NUMBER>, <DIFF_FILE>, and <IMPL_REPORT> before dispatching.
+description: Explore subagent prompt for the fix-evidence check that replaces AC traceability when /finalise runs in bug mode (--bug). Substitute <BUG_FILE>, <PR_NUMBER>, <DIFF_FILE>, <DIFF_LINE>, and <IMPL_REPORT> before dispatching.
 ---
 <!-- AUTO-GENERATED — DO NOT EDIT. Source: shared/resources/finalise-dod-fix-evidence-prompt.md. Regenerate via `npm run bundle`. -->
 
@@ -8,7 +8,7 @@ description: Explore subagent prompt for the fix-evidence check that replaces AC
 
 **Usage**: Dispatch as an Explore subagent from `/finalise --bug` Steps 3–5 parallel dispatch, in the
 slot the AC traceability agent occupies on the story/task path. Substitute `<BUG_FILE>`,
-`<PR_NUMBER>`, `<DIFF_FILE>` and `<IMPL_REPORT>` before sending.
+`<PR_NUMBER>`, `<DIFF_FILE>`, `<DIFF_LINE>` and `<IMPL_REPORT>` before sending.
 
 A bug report has no acceptance criteria. What it has instead is a single expected behaviour, a fix
 that claims to produce it, and a regression test that claims to prove it. This agent checks those
@@ -49,9 +49,9 @@ Run: `gh pr view <PR_NUMBER> --json state,reviewDecision,url 2>/dev/null`
 
 Read the file paths modified in the PR from `<DIFF_FILE>.names` (`tr '\0' '\n' < <DIFF_FILE>.names`),
 and their hunks from `<DIFF_FILE>`; the names list keeps bundled `skills/*/references/` copies, and
-the patch leaves them out only when Step 3a's `**PR diff:**` line reads `source=merge-base` (a
-`source=forge` patch keeps them). When the names list is empty or missing, the change could not be read (Step
-3a's `**PR diff:** unresolved: …`): every check that needs the diff is `FAIL` with the note "the
+the patch leaves them out only when `<DIFF_LINE>` (the line Step 3a's reader printed) starts
+`source=merge-base` (a `source=forge` patch keeps them). When the names list is empty or missing,
+the change could not be read (`<DIFF_LINE>` reads `unresolved: …`): every check that needs the diff is `FAIL` with the note "the
 change could not be read", never `PASS` or `NOT_APPLICABLE`. Then, for each check below, cite
 `path:line` — a check with no citation is `FAIL`, never `PASS`.
 

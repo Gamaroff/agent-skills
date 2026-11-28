@@ -130,8 +130,9 @@ All notable changes to this project will be documented in this file. Format foll
   `finalise-diff.sh` diffs the merge base against the PR's head on either forge, asks GitHub only
   when that head is not checked out or adds nothing, leaves bundled `references/` copies out of the
   merge-base patch (the forge's patch keeps them) but keeps every path in a names list, and
-  otherwise prints `unresolved: <reason>`. The line
-  it prints goes into the DoD as `**PR diff:**`, and the AC, docs and fix-evidence prompts fail a
+  otherwise prints `unresolved: <reason>`. Its output flags are pinned, so a user's `color.ui` or
+  `diff.noprefix` never reaches the patch. The line it prints is passed to the agents as
+  `<DIFF_LINE>` and goes into the DoD as `**PR diff:**`, and the AC, docs and fix-evidence prompts fail a
   check with "the change could not be read" when there is no change to read. Separately,
   `dod-gap-count.sh --body` now ends the gap section at the change-log start marker, current or
   legacy, so the marker no longer leaks into the PR comment.

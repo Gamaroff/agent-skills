@@ -1,11 +1,11 @@
 ---
 name: finalise-dod-ac-prompt
-description: Explore subagent prompt for AC traceability, PR status, and documentation check in /finalise DoD parallel dispatch. Substitute <STORY_FILE>, <PR_NUMBER>, <STORY_TYPE>, <DIFF_FILE>, <RERUN_SCOPE>, and <RERUN_AT_HEAD> before dispatching.
+description: Explore subagent prompt for AC traceability, PR status, and documentation check in /finalise DoD parallel dispatch. Substitute <STORY_FILE>, <PR_NUMBER>, <STORY_TYPE>, <DIFF_FILE>, <DIFF_LINE>, <RERUN_SCOPE>, and <RERUN_AT_HEAD> before dispatching.
 ---
 
 # AC Traceability Check — Explore Subagent Prompt
 
-**Usage**: Dispatch as an Explore subagent from `/finalise` Steps 3–5 parallel dispatch. Substitute `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`, `<DIFF_FILE>`, `<RERUN_SCOPE>`, and `<RERUN_AT_HEAD>` before sending.
+**Usage**: Dispatch as an Explore subagent from `/finalise` Steps 3–5 parallel dispatch. Substitute `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`, `<DIFF_FILE>`, `<DIFF_LINE>`, `<RERUN_SCOPE>`, and `<RERUN_AT_HEAD>` before sending.
 
 ---
 
@@ -53,7 +53,7 @@ Run: `gh pr view <PR_NUMBER> --json state,reviewDecision,url 2>/dev/null`
 ### Step 3: Check each acceptance criterion
 
 For each AC item extracted in Step 1:
-1. Read the changed file paths from `<DIFF_FILE>.names` (`tr '\0' '\n' < <DIFF_FILE>.names`): every path the PR changed, bundled `skills/*/references/` copies included. `<DIFF_FILE>` is the patch: without those copies when Step 3a's `**PR diff:**` line reads `source=merge-base`, with them when it reads `source=forge`. An empty or missing names list means the change could not be read (Step 3a's `**PR diff:** unresolved: …`), not that nothing changed.
+1. Read the changed file paths from `<DIFF_FILE>.names` (`tr '\0' '\n' < <DIFF_FILE>.names`): every path the PR changed, bundled `skills/*/references/` copies included. `<DIFF_FILE>` is the patch: without those copies when `<DIFF_LINE>` (the line Step 3a's reader printed) starts `source=merge-base`, with them when it starts `source=forge`. An empty or missing names list means the change could not be read (`<DIFF_LINE>` reads `unresolved: …`), not that nothing changed.
 2. For each modified file path: search for code that implements the AC (grep key terms from the AC description).
 3. Also search for a test file (`.spec.ts`, `.test.ts`, `.spec.js`) that covers the AC — grep for the same key terms.
 4. **Citation rule**: A `PASS` requires BOTH a non-null `code_citation` AND a non-null `test_citation`. Missing either → `FAIL`. No exceptions.

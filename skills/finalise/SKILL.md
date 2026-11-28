@@ -544,8 +544,10 @@ PR); GitHub only. It writes the patch to `$DIFF_FILE` — without bundled `skill
 copies on `source=merge-base`, with them on `source=forge` — and every changed path, the copies
 included, NUL-delimited to `$DIFF_FILE.names`. When no
 change can be read it prints `unresolved: <reason>` and leaves both files empty; it never falls back
-to `HEAD~1`, which on PR #937 handed the agents 1 file of 250. Record the line it printed as
-`**PR diff:** {DIFF_LINE}` under the `**PR:**` line of the running summary's Step 2 block.
+to `HEAD~1`, which on PR #937 handed the agents 1 file of 250. The line it printed is `DIFF_LINE`:
+Step 3b passes it to the agents that read the patch as `<DIFF_LINE>` (its `source=` says whether the
+patch holds the bundled copies), and Step 3d's Append 1 writes it as `**PR diff:** {DIFF_LINE}` —
+the one place the running summary records it.
 
 **The PR number comes from `references/resolve-pr-number.sh`, never from the document body.** It
 reads, first answer wins: an explicit `--pr`, the PR whose head is the current branch (`pr-read.sh`),
@@ -705,7 +707,7 @@ as off would drop an opted-in repository's changelog check with no line saying w
 
 | Agent                | Prompt file                                    | Key substitutions                                            |
 | -------------------- | ---------------------------------------------- | ------------------------------------------------------------ |
-| 1. AC traceability   | `references/finalise-dod-ac-prompt.md`         | `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`, `<DIFF_FILE>`, `<RERUN_SCOPE>` (Step 3a's `$RERUN_SCOPE`), `<RERUN_AT_HEAD>` (Step 3a's `run.json` path, or `none`) |
+| 1. AC traceability   | `references/finalise-dod-ac-prompt.md`         | `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`, `<DIFF_FILE>`, `<DIFF_LINE>` (Step 3a's `$DIFF_LINE`), `<RERUN_SCOPE>` (Step 3a's `$RERUN_SCOPE`), `<RERUN_AT_HEAD>` (Step 3a's `run.json` path, or `none`) |
 | 2. Security review   | `references/finalise-dod-security-prompt.md`   | `<STORY_FILE>`, `<STORY_TYPE>`, `<DOD_N>` (Step 0's `$DOD_N`) |
 | 3. Compliance review | `references/finalise-dod-compliance-prompt.md` | `<STORY_FILE>`                                               |
 | 4. Docs & changelog  | `references/finalise-dod-docs-prompt.md`       | `<STORY_FILE>`, `<PR_NUMBER>`, `<STORY_TYPE>`, `<DIFF_FILE>`, `<CHANGELOG_ENFORCE>` |
@@ -718,7 +720,7 @@ two engines, so QA and the DoD read one answer (task.248).
 
 **Bug mode (`ac-agent`):** skip — a bug report has no acceptance criteria, so agent 1's prompt has nothing to trace. Its slot is taken by the fix-evidence agent below; still four agents, still one message.
 
-**Bug mode (`fix-evidence`):** run — dispatch `references/finalise-dod-fix-evidence-prompt.md` as agent 1 with `<BUG_FILE>`, `<PR_NUMBER>`, `<DIFF_FILE>` and `<IMPL_REPORT>` (the newest implementation report beside the bug in **either** shape the pipeline has written — `{bug-prefix}.implementation.*.md` or `{bug-prefix}.{name}.implementation.*.md`, the two prefixes `references/bug-doc.js` accepts (TASK-125-BUG-13) — or empty). It checks the five things a bug fix must show — the expected behaviour is implemented, a regression test asserts it *and runs per PR*, the test is recorded red without the fix, a new guard states its scope, bundled copies match their source — and returns `fix_evidence:` YAML in the same PASS/FAIL-with-citation contract as `ac_traceability:`. Capture it **as `AC_RESULT`** so Steps 3c–6 read one variable: `AC_OVERALL` is `fix_evidence.overall`, and the Step 6 column "All Acceptance Criteria Met?" reads "all fix-evidence checks PASS". `STORY_TYPE` is `bug` for the other three agents, which need no bug variant.
+**Bug mode (`fix-evidence`):** run — dispatch `references/finalise-dod-fix-evidence-prompt.md` as agent 1 with `<BUG_FILE>`, `<PR_NUMBER>`, `<DIFF_FILE>`, `<DIFF_LINE>` and `<IMPL_REPORT>` (the newest implementation report beside the bug in **either** shape the pipeline has written — `{bug-prefix}.implementation.*.md` or `{bug-prefix}.{name}.implementation.*.md`, the two prefixes `references/bug-doc.js` accepts (TASK-125-BUG-13) — or empty). It checks the five things a bug fix must show — the expected behaviour is implemented, a regression test asserts it *and runs per PR*, the test is recorded red without the fix, a new guard states its scope, bundled copies match their source — and returns `fix_evidence:` YAML in the same PASS/FAIL-with-citation contract as `ac_traceability:`. Capture it **as `AC_RESULT`** so Steps 3c–6 read one variable: `AC_OVERALL` is `fix_evidence.overall`, and the Step 6 column "All Acceptance Criteria Met?" reads "all fix-evidence checks PASS". `STORY_TYPE` is `bug` for the other three agents, which need no bug variant.
 
 #### Step 3b.1: Run the security probe plan
 
@@ -1165,6 +1167,7 @@ Append sections to the running summary file. **One append per section** — not 
 
 **Overall AC Status:** {AC_OVERALL — ✅ PASS | ❌ FAIL | ⚠️ PARTIAL | 🔍 NEEDS_MANUAL_REVIEW}
 **PR Status:** {ac_result.pr_status} (PR #{PR_NUMBER})
+**PR diff:** {DIFF_LINE}
 **PR Review Decision:** {ac_result.pr_review_decision}
 {RERUN_SCOPE_LINE — e.g. **Re-run scope:** scoped (prior-record) — 2 re-judged, 9 carried; omit the line when it is empty}
 
@@ -1365,7 +1368,7 @@ rm -f -- "${DIFF_FILE:?}" "${DIFF_FILE:?}.names"
 
 After all 4 appends are complete, proceed directly to Step 6 (Make Acceptance Decision). The decision logic uses `AC_OVERALL`, `SEC_OVERALL`, `COMP_OVERALL`, and `DOCS_OVERALL`.
 
-**Idempotent re-run**: If the running summary already contains any of the `## Step 2:`, `## Step 3:`, `## Step 4:`, or `## Step 4b:` section headers (from a previous run), **skip** the corresponding append and reuse the existing content. This prevents duplicate sections on re-run.
+**Idempotent re-run**: If the running summary already contains any of the `## Step 2:`, `## Step 3:`, `## Step 4:`, or `## Step 4b:` section headers (from a previous run), **skip** the corresponding append and reuse the existing content — except its `**PR diff:**` line, which a re-run replaces with this run's `DIFF_LINE` (Edit that one line in the existing `## Step 2:` block): the agents judged this run's patch, so the record names this run's source. This prevents duplicate sections on re-run.
 
 ### Step 6: Make Acceptance Decision
 
