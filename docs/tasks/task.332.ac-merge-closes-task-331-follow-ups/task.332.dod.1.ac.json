@@ -1,0 +1,203 @@
+{
+  "schema": 1,
+  "dod_n": 1,
+  "head": "4b87a42c120d54a51af1553ad462d23c64f66e83",
+  "dirty_paths": [
+    "docs/tasks/task.332.ac-merge-closes-task-331-follow-ups/task.332.implementation.1.ac-merge-closes-task-331-follow-ups-initial-run.md",
+    "docs/tasks/task.332.ac-merge-closes-task-331-follow-ups/task.332.pr-review.1.ac-merge-closes-task-331-follow-ups.md"
+  ],
+  "document": "docs/tasks/task.332.ac-merge-closes-task-331-follow-ups/task.332.ac-merge-closes-task-331-follow-ups.md",
+  "result": {
+    "bytes": 10692,
+    "sha256": "5d542f1122c610c140366ccfe2f3aeab69c27ba6b82acf447367cd0b41272b49",
+    "verified": true
+  },
+  "scope": {
+    "mode": "full",
+    "reason": "no-prior-record",
+    "rejudged": 8,
+    "carried": 0
+  },
+  "criteria": [
+    {
+      "id": "#1",
+      "text_hash": "5b141a910ca8b1b6612b4b6d6d329f8ee6bfca43836414d2db874e17448eef8d",
+      "status": "PASS",
+      "description": "Every row of the § 8 table holds in a finalise-rerun-scope test",
+      "code_citation": "shared/resources/finalise-rerun-scope.js:1227",
+      "test_citation": "shared/resources/tests/finalise-rerun-scope.test.mjs:2404",
+      "members": [
+        {
+          "member": "merge with no --doc -> usage, exit 2, nothing written",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:2404",
+          "status": "PASS"
+        },
+        {
+          "member": "result with no story_file -> result-document-unnamed, nothing written",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:2379",
+          "status": "PASS"
+        },
+        {
+          "member": "prose result with no acs list -> result-unparseable (unnamed does not fire)",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:1870",
+          "status": "PASS"
+        },
+        {
+          "member": "root story_file beside ac_traceability -> checked (same merges, other refused)",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:2413",
+          "status": "PASS"
+        },
+        {
+          "member": "story_file naming a nonexistent file -> result-document-mismatch, message names the missing file",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:2426",
+          "status": "PASS"
+        },
+        {
+          "member": "scope with no document -> scope-document-missing",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:2476",
+          "status": "PASS"
+        },
+        {
+          "member": "scope for another document -> scope-document-mismatch (unchanged)",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:2444",
+          "status": "PASS"
+        },
+        {
+          "member": "story_file a symlinked spelling -> merged (tested)",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:2434",
+          "status": "PASS"
+        },
+        {
+          "member": "wrong --sha256 with a result naming no document -> result-hash-mismatch",
+          "evidence": "shared/resources/tests/finalise-rerun-scope.test.mjs:2398",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "All 9 rows map to a CLI test. Engine checks are in finalise-rerun-scope.js: --doc required at :1227, scope-document-missing at :1235, scope-document-mismatch at :1242, the hash at :1252, unnamed only on readAnswer().ok at :1266-1275, the nonexistent-file message at :1276-1282, the root fallback in storyFileOf at :750-760, and the realpath branch of sameDocument at :767-776. The tests run per PR: test.yml runs 'npm test', which globs shared/resources/tests/*.test.mjs."
+    },
+    {
+      "id": "#2",
+      "text_hash": "167a5640ccfcc28303a7e2aa2fec30cc978e95302e0e567878189fe380770f7b",
+      "status": "PASS",
+      "description": "Step 3c block, substituted, reads stem-keyed scope and extract paths",
+      "code_citation": "skills/finalise/SKILL.md:1072",
+      "test_citation": "evals/shared/tests/finalise-rerun-scope-blocks.test.mjs:305",
+      "members": [],
+      "non_member_fail": null,
+      "note": "Step 3a writes finalise-rerun-scope-${STEM}-${DOD_N}.json (SKILL.md:637). The extract tees finalise-ac-extract-${STEM}-${DOD_N}.json (:1025). Step 3c reads both (:1066, :1072). Under bash and zsh, the blocks test at :305 runs the substituted 3a and 3c blocks and asserts the stem-keyed scope and that no run-number-keyed scope is written (:312-321). The test at :462 drives the stem-keyed extract path finalise-ac-extract-task.9-1.json (:475). evals/shared/tests/*.test.mjs is in the npm test glob that test.yml runs on every PR."
+    },
+    {
+      "id": "#3",
+      "text_hash": "ec7c99e74e9970bf376075aa9e3c5927dab435d10f582fda3b8e63e45554b387",
+      "status": "PASS",
+      "description": "git grep for run-number-keyed scope/extract paths in SKILL.md reads 0",
+      "code_citation": "skills/finalise/SKILL.md:637",
+      "test_citation": "evals/shared/tests/finalise-rerun-scope-blocks.test.mjs:316",
+      "members": [],
+      "non_member_fail": null,
+      "note": "I ran the criterion's own git grep -c at head 4b87a42c1. It printed no match line and exited 1, so the count is 0. All four former sites now carry ${STEM} (SKILL.md:637, :1025, :1066, :1072). The blocks test at :316-321 asserts no run-number-keyed scope file is written; QA report 1 mutation 6 recorded that reverting the path turns 10 eval cases red. It runs per PR in npm test."
+    },
+    {
+      "id": "#4",
+      "text_hash": "3f4840e8e5357334d3ea4640273ec8c735da15b43ebaa0dbd95a1af07d077403",
+      "status": "PASS",
+      "description": "Performance: not applicable, no bound is claimed",
+      "code_citation": "docs/tasks/task.332.ac-merge-closes-task-331-follow-ups/task.332.ac-merge-closes-task-331-follow-ups.md:311",
+      "test_citation": "NOT_APPLICABLE: the task states Performance Tests are not applicable and claims no bound",
+      "members": [],
+      "non_member_fail": null,
+      "note": "§ 8 Performance Tests reads 'Not applicable.' (:311), and the criterion itself states no bound is claimed. There is no measured or behaviour content to test."
+    },
+    {
+      "id": "#5",
+      "text_hash": "416cfaa6810f7c0b13e1c445c2a5d6155cc78f55a42ac9860bd3e7181cb72d7f",
+      "status": "PASS",
+      "description": "Every § 8 mutation recorded in the QA report with the test it turned red",
+      "code_citation": "docs/tasks/task.332.ac-merge-closes-task-331-follow-ups/task.332.qa.1.ac-merge-closes-task-331-follow-ups.md:91",
+      "test_citation": "NOT_APPLICABLE: process criterion",
+      "members": [
+        {
+          "member": "1. --doc made optional again",
+          "evidence": "docs/tasks/task.332.ac-merge-closes-task-331-follow-ups/task.332.qa.1.ac-merge-closes-task-331-follow-ups.md:96",
+          "status": "PASS"
+        },
+        {
+          "member": "2. result-document-unnamed refusal removed",
+          "evidence": "docs/tasks/task.332.ac-merge-closes-task-331-follow-ups/task.332.qa.1.ac-merge-closes-task-331-follow-ups.md:97",
+          "status": "PASS"
+        },
+        {
+          "member": "3. root story_file fallback removed",
+          "evidence": "docs/tasks/task.332.ac-merge-closes-task-331-follow-ups/task.332.qa.1.ac-merge-closes-task-331-follow-ups.md:98",
+          "status": "PASS"
+        },
+        {
+          "member": "4. scope-document-missing folded into scope-document-mismatch",
+          "evidence": "docs/tasks/task.332.ac-merge-closes-task-331-follow-ups/task.332.qa.1.ac-merge-closes-task-331-follow-ups.md:99",
+          "status": "PASS"
+        },
+        {
+          "member": "5. realpath branch of sameDocument removed",
+          "evidence": "docs/tasks/task.332.ac-merge-closes-task-331-follow-ups/task.332.qa.1.ac-merge-closes-task-331-follow-ups.md:100",
+          "status": "PASS"
+        },
+        {
+          "member": "6. Step 3a scope path reverted to run-number key",
+          "evidence": "docs/tasks/task.332.ac-merge-closes-task-331-follow-ups/task.332.qa.1.ac-merge-closes-task-331-follow-ups.md:101",
+          "status": "PASS"
+        },
+        {
+          "member": "7. unnamed check run on every parsed result",
+          "evidence": "docs/tasks/task.332.ac-merge-closes-task-331-follow-ups/task.332.qa.1.ac-merge-closes-task-331-follow-ups.md:102",
+          "status": "PASS"
+        }
+      ],
+      "non_member_fail": null,
+      "note": "The units are the 7 mutations in § 8. QA report 1, section 'Mutation record' (:91-105, committed in the PR), records each one with the test name it turned red. Each named test exists (test.mjs:2404, :2379, :2413, :2476, :2434, :1870; blocks test :305). The mutations from later QA cycles are also recorded, in qa.2:173 and qa.3:126."
+    },
+    {
+      "id": "#6",
+      "text_hash": "4999c165b79021a23c9d1010200e422554cb68ede31c8b2797ca34a95f6dccd8",
+      "status": "PASS",
+      "description": "npm run test:remote and npm run bundle:check pass",
+      "code_citation": "docs/tasks/task.332.ac-merge-closes-task-331-follow-ups/task.332.qa.3.ac-merge-closes-task-331-follow-ups.md:82",
+      "test_citation": ".github/workflows/validate.yml:128",
+      "members": [],
+      "non_member_fail": null,
+      "note": "test:remote runs ci:fast on the LAN server (scripts/remote-test/run.sh:112). QA report 3 line 82 records 8980 tests, 8977 pass, 0 fail, 3 skipped at head 4ccb29fcd. The only change from 4ccb29fcd to head 4b87a42c1 is 3 files of task docs. bundle:check: I ran 'python3 skills/create-skill/scripts/bundle_skill.py --check' at head and it exited 0. Both lanes also gate the PR: test.yml runs 'npm test' on every pull_request, and validate.yml:128 runs bundle --check on any skills/** change (this PR changes skills/finalise/SKILL.md)."
+    },
+    {
+      "id": "#7",
+      "text_hash": "1e49fa5e1ac2692958153b124af1356c77589d5b9828cebb545aac8f79f9fbe4",
+      "status": "PASS",
+      "description": "Step 3c case has unnamed and scope-missing arms that HALT with remedies",
+      "code_citation": "skills/finalise/SKILL.md:1082",
+      "test_citation": "evals/shared/tests/finalise-rerun-scope-blocks.test.mjs:526",
+      "members": [],
+      "non_member_fail": null,
+      "note": "The scope-document-missing arm (SKILL.md:1082-1083) HALTs with 're-run Step 3a, the AC agent and the extract above'. The result-document-unnamed arm (:1086-1087) HALTs with the re-extract / hand-copy / re-run-the-AC-agent remedy. The blocks test pins the unnamed arm at :526-560 and the scope-missing arm at :358-374, both under bash and zsh. Both run per PR in npm test."
+    },
+    {
+      "id": "#8",
+      "text_hash": "31bc86ab4955d0b3489f0bad326ff3c73cafb54a5d5b62bbe6dd4c2f677567fa",
+      "status": "PASS",
+      "description": "CHANGELOG [Unreleased] names § 5's three changes and each resume path",
+      "code_citation": "CHANGELOG.md:20",
+      "test_citation": "NOT_APPLICABLE: documentation criterion",
+      "members": [],
+      "non_member_fail": null,
+      "note": "I read CHANGELOG.md:20-42, which is under [Unreleased] (:5), ### Changed. It names --doc required (usage, exit 2), result-document-unnamed, and the stem-keyed scope/extract paths (:21-29). It gives the resume path for before Step 3c (:35-38), between Step 3c and Step 3d and after Step 3d (:38-39), and a pre-upgrade result-unparseable answer (:39-41). That covers every resume point § 5 and Phase 4 name. changelog-cites.test.mjs tests the cites script, not this entry's text, so it does not pin this entry."
+    }
+  ],
+  "advisories": [
+    {
+      "ac_id": "#6",
+      "note": "No committed QA report or gate records a bundle:check result. Only the implementation report records it (implementation.1:98, which has uncommitted modifications in the working tree). The PASS here rests on a re-run at head (exit 0) and on validate.yml gating it per PR. A committed record (the DoD) should state the bundle:check result."
+    },
+    {
+      "ac_id": "#3",
+      "note": "The criterion's git grep exits 1 with no output when the count is 0 (git grep -c prints nothing for zero matches). A literal reader expecting the line '0' would see nothing. The result is still correct."
+    }
+  ]
+}

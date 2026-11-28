@@ -5,11 +5,13 @@ type: task
 description: "finalise-rerun-scope.js merge requires --doc and a named story_file, /finalise keys its scope and extract files by work item, and the task 331 refusals each name their own cause and remedy."
 tags: [finalise, ac-merge, follow-up]
 category: infrastructure
-status: ready-for-review
+status: accepted
 priority: Medium
 risk_level: low
 created: 2026-11-27
 updated: 2026-11-28
+completed_date: 2026-11-28
+pr_number: 964
 assignee:
 estimated_effort_hours: 8
 github_issue: 963
@@ -17,7 +19,7 @@ github_issue: 963
 
 # The AC merge closes task 331's follow-ups
 
-**Status:** Ready for Review
+**Status:** Accepted
 **Review**: ✅ All review recommendations from `task.332.review.1.ac-merge-closes-task-331-follow-ups.md` implemented 2026-11-27
 
 **GitHub Issue**: [#963](https://github.com/Gamaroff/agent-skills/issues/963)
@@ -402,9 +404,33 @@ None.
 - No open findings. Gate 2's T332-CR2-1 and the zsh `--sha256` defect are fixed and mutation-proven.
 - Two low advisories (DoD disclosure for a hand copy over an extract; a stronger test assertion) routed to the gate's future recommendations.
 
+## Definition of Done - PASSED ✅
+
+**Status:** ACCEPTED
+
+### QA Report Summary
+
+**QA Report**: `task.332.qa.3.ac-merge-closes-task-331-follow-ups.md`
+**Gate File**: `task.332.gate.3.ac-merge-closes-task-331-follow-ups.yml`
+**Gate Status**: ✅ PASS
+**Quality Score**: 100/100
+**PR Review**: `task.332.pr-review.1.ac-merge-closes-task-331-follow-ups.md` — ✅ APPROVE
+
+All Definition of Done criteria have been verified:
+
+✅ **Acceptance Criteria:** 8/8 success criteria met (record `task.332.dod.1.ac.json`)
+✅ **Tests:** full suite on the LAN server, 8,977/8,980 pass, 0 fail; per-PR CI green (6/6 checks) at `4b87a42c1`
+✅ **PR Review:** PR #964, /review-pr APPROVE (the host requires no reviews)
+✅ **Documentation:** CHANGELOG `[Unreleased]` cites task 332; finalise SKILL.md and the AC prompt are updated; bundled copies match
+✅ **Security Review:** PASS — `boundary: internal` (`finalise-rerun-scope.js#main` reads only pipeline-written artefacts)
+✅ **Compliance Review:** not applicable (internal tooling)
+
+**Task marked as ACCEPTED on:** 2026-11-28
+
+**Detailed Verification Log:** See `task.332.dod.1.ac-merge-closes-task-331-follow-ups.md` for the full verification evidence and timestamps.
+<!-- change-log-start -->
 ## Change Log
 
-<!-- change-log-start -->
 | Date | Version | Description | Author |
 |------|---------|-------------|--------|
 | 2026-11-27 | 1.0     | Initial draft — from task 331's DoD run 2 spec challenges and QA gate 1-3 advisories | create-task |
@@ -417,6 +443,7 @@ None.
 | 2026-11-28 |         | QA gate CONCERNS (90/100) — 1 finding | qa-task |
 | 2026-11-28 |         | QA findings fixed — gate 2's 1 MEDIUM (hand copy after an extract), plus the zsh `--sha256` argument, 1 iteration | qa-fix |
 | 2026-11-28 |         | QA gate PASS (100/100) — 0 findings | qa-task |
+| 2026-11-28 | 1.3 | DoD passed — accepted (PR #964) | finalise |
 <!-- change-log-end -->
 
 ## Progress Tracking
